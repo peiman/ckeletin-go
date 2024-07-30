@@ -2,11 +2,14 @@ package infrastructure
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/peiman/ckeletin-go/internal/errors"
 )
+
+const DefaultConfigFileName = "ckeletin-go.json"
 
 // ConfigManager handles operations related to the configuration file
 type ConfigManager struct {
@@ -15,6 +18,9 @@ type ConfigManager struct {
 
 // NewConfigManager creates a new ConfigManager
 func NewConfigManager(configPath string) *ConfigManager {
+	if configPath == "" {
+		configPath = DefaultConfigFileName
+	}
 	return &ConfigManager{
 		ConfigPath: configPath,
 	}
@@ -52,5 +58,6 @@ func (cm *ConfigManager) CreateDefaultConfig() error {
 		return errors.NewAppError(errors.ErrInvalidConfig, "Failed to write default config file", err)
 	}
 
+	fmt.Printf("Created default configuration file: %s\n", cm.ConfigPath)
 	return nil
 }

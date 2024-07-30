@@ -32,9 +32,12 @@ func TestLoadConfig(t *testing.T) {
 
 		viper.AutomaticEnv()
 		viper.SetEnvPrefix("CKELETIN")
-		viper.BindEnv("LogLevel", "CKELETIN_LOGLEVEL")
-		viper.BindEnv("Server.Port", "CKELETIN_SERVER_PORT")
-		viper.BindEnv("Server.Host", "CKELETIN_SERVER_HOST")
+		err := viper.BindEnv("LogLevel", "CKELETIN_LOGLEVEL")
+		assert.NoError(t, err)
+		err = viper.BindEnv("Server.Port", "CKELETIN_SERVER_PORT")
+		assert.NoError(t, err)
+		err = viper.BindEnv("Server.Host", "CKELETIN_SERVER_HOST")
+		assert.NoError(t, err)
 
 		config, err := LoadConfig()
 		assert.NoError(t, err)
@@ -62,5 +65,15 @@ func TestLoadConfig(t *testing.T) {
 		assert.Equal(t, "warn", config.LogLevel)
 		assert.Equal(t, 3000, config.Server.Port)
 		assert.Equal(t, "127.0.0.1", config.Server.Host)
+	})
+
+	// Test error case
+	t.Run("Unmarshal Error", func(t *testing.T) {
+		viper.Reset()
+		viper.Set("Server", "invalid")
+
+		_, err := LoadConfig()
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unable to decode into struct")
 	})
 }

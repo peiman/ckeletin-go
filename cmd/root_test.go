@@ -80,61 +80,99 @@ func TestExecute(t *testing.T) {
 	}
 }
 func TestInitConfig(t *testing.T) {
-	// Create a temporary config file
-	tempFile, err := os.CreateTemp("", "ckeletin-go*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(tempFile.Name())
+	// Test with existing config file
+	t.Run("Existing Config", func(t *testing.T) {
+		// Create a temporary config file
+		tempFile, err := os.CreateTemp("", "ckeletin-go*.json")
+		assert.NoError(t, err)
+		defer os.Remove(tempFile.Name())
 
-	// Write test configuration
-	testConfig := []byte(`{
+		// Write test configuration
+		testConfig := []byte(`{
 			"LogLevel": "debug",
 			"Server": {
-					"Port": 9090,
-					"Host": "127.0.0.1"
+				"Port": 9090,
+				"Host": "127.0.0.1"
 			}
-	}`)
-	if _, err := tempFile.Write(testConfig); err != nil {
-		t.Fatal(err)
-	}
-	tempFile.Close()
+		}`)
+		_, err = tempFile.Write(testConfig)
+		assert.NoError(t, err)
+		tempFile.Close()
 
-	// Set config file path
-	oldCfgFile := cfgFile
-	cfgFile = tempFile.Name()
-	defer func() { cfgFile = oldCfgFile }()
+		// Set config file path
+		oldCfgFile := cfgFile
+		cfgFile = tempFile.Name()
+		defer func() { cfgFile = oldCfgFile }()
 
-	// Reset viper to ensure a clean state
-	viper.Reset()
+		// Reset viper to ensure a clean state
+		viper.Reset()
 
-	// Redirect stdout to capture output
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+		// Redirect stdout to capture output
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
 
-	// Call initConfig
-	initConfig()
+		// Call initConfig
+		initConfig()
 
-	// Restore stdout
-	w.Close()
-	os.Stdout = old
+		// Restore stdout
+		w.Close()
+		os.Stdout = old
 
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
 
-	// Check if the output contains expected content
-	output := buf.String()
-	assert.Contains(t, output, "Using config file")
-	assert.Contains(t, output, "Loaded configuration")
-	assert.Contains(t, output, `"LogLevel":"debug"`)
-	assert.Contains(t, output, `"Port":9090`)
-	assert.Contains(t, output, `"Host":"127.0.0.1"`)
+		// Check if the output contains expected content
+		output := buf.String()
+		assert.Contains(t, output, "Using config file")
+		assert.Contains(t, output, "Loaded configuration")
+		assert.Contains(t, output, `"LogLevel":"debug"`)
+		assert.Contains(t, output, `"Port":9090`)
+		assert.Contains(t, output, `"Host":"127.0.0.1"`)
 
-	// Verify the loaded configuration
-	config, err := infrastructure.LoadConfig()
-	assert.NoError(t, err)
-	assert.Equal(t, "debug", config.LogLevel)
-	assert.Equal(t, 9090, config.Server.Port)
-	assert.Equal(t, "127.0.0.1", config.Server.Host)
+		// Verify the loaded configuration
+		config, err := infrastructure.LoadConfig()
+		assert.NoError(t, err)
+		assert.Equal(t, "debug", config.LogLevel)
+		assert.Equal(t, 9090, config.Server.Port)
+		assert.Equal(t, "127.0.0.1", config.Server.Host)
+	})
+
+	// Test with missing config file
+	t.Run("Missing Config", func(t *testing.T) {
+		// Set a non-existent config file path
+		oldCfgFile := cfgFile
+		cfgFile = "non_existent_config.json"
+		defer func() {
+			cfgFile = oldCfgFile
+			os.Remove("non_existent_config.json")
+		}()
+
+		// Reset viper to ensure a clean state
+		viper.Reset()
+
+		// Redirect stdout to capture output
+		old := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
+
+		// Call initConfig
+		initConfig()
+
+		// Restore stdout
+		w.Close()
+		os.Stdout = old
+
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+
+		// Check if the output contains expected content
+		output := buf.String()
+		assert.Contains(t, output, "Using config file")
+		assert.Contains(t, output, "Loaded configuration")
+
+		// Verify that the config file was created
+		_, err := os.Stat("non_existent_config.json")
+		assert.NoError(t, err, "Config file should have been created")
+	})
 }

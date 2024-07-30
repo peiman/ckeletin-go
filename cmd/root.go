@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/peiman/ckeletin-go/internal/errors"
 	"github.com/peiman/ckeletin-go/internal/infrastructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -26,7 +25,7 @@ examples and usage of using your application.`,
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() error {
+var Execute = func() error {
 	return rootCmd.Execute()
 }
 
@@ -45,42 +44,26 @@ func initConfig() {
 	infrastructure.InitLogger(logLevel)
 	logger := infrastructure.GetLogger()
 
-	// Reset viper configuration
-	viper.Reset()
-
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		// Search config in current directory with name "ckeletin-go.json"
-		viper.AddConfigPath(".")
-		viper.SetConfigName("ckeletin-go")
+	configManager := infrastructure.NewConfigManager(cfgFile)
+	if err := configManager.EnsureConfig(); err != nil {
+		logger.Error().Err(err).Msg("Failed to ensure config file exists")
+		os.Exit(1)
 	}
 
+	viper.SetConfigFile(configManager.ConfigPath)
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			logger.Warn().Msg("No config file found. Using defaults and environment variables.")
-		} else {
-			appErr := errors.NewAppError(errors.ErrInvalidConfig, "Error reading config file", err)
-			infrastructure.LogError(appErr, "Failed to read config file", nil)
-			os.Exit(1)
-		}
-	} else {
-		logger.Info().Str("config_file", viper.ConfigFileUsed()).Msg("Using config file")
+		logger.Error().Err(err).Msg("Failed to read config file")
+		os.Exit(1)
 	}
 
-	// Reload the configuration
-	viper.Set("LogLevel", viper.GetString("LogLevel"))
-	viper.Set("Server.Port", viper.GetInt("Server.Port"))
-	viper.Set("Server.Host", viper.GetString("Server.Host"))
+	logger.Info().Str("config_file", viper.ConfigFileUsed()).Msg("Using config file")
 
 	config, err := infrastructure.LoadConfig()
 	if err != nil {
-		appErr := errors.NewAppError(errors.ErrInvalidConfig, "Error loading config", err)
-		infrastructure.LogError(appErr, "Failed to load configuration", nil)
+		logger.Error().Err(err).Msg("Failed to load configuration")
 		os.Exit(1)
 	}
 

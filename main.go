@@ -7,13 +7,16 @@ import (
 	"github.com/peiman/ckeletin-go/cmd"
 )
 
-func run() error {
+var runFunc = defaultRun
+var exitFunc = os.Exit
+
+func defaultRun() error {
 	return cmd.Execute()
 }
 
 func main() {
-	if err := run(); err != nil {
+	if err := runFunc(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		exitFunc(1)
 	}
 }
