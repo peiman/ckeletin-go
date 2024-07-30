@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,34 +29,54 @@ func TestRootCommand(t *testing.T) {
 }
 
 func TestExecute(t *testing.T) {
-	// Create a new command for testing
-	cmd := &cobra.Command{
-		Use: "test",
-		Run: func(cmd *cobra.Command, args []string) {
-			// This is where the root command's Run function would be called
-			fmt.Println("Hello from ckeletin-go!")
+	// Save the original os.Args
+	oldArgs := os.Args
+	defer func() { os.Args = oldArgs }()
+
+	// Set up test cases
+	tests := []struct {
+		name     string
+		args     []string
+		expected string
+	}{
+		{
+			name:     "Default command",
+			args:     []string{"ckeletin-go"},
+			expected: "Hello from ckeletin-go!",
+		},
+		{
+			name:     "Version command",
+			args:     []string{"ckeletin-go", "version"},
+			expected: "ckeletin-go v",
 		},
 	}
 
-	// Redirect stdout to capture output
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up the command line arguments
+			os.Args = tt.args
 
-	// Execute the test command
-	cmd.Execute()
+			// Redirect stdout to capture output
+			old := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
 
-	// Restore stdout
-	w.Close()
-	os.Stdout = old
+			// Execute the command
+			Execute()
 
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+			// Restore stdout
+			w.Close()
+			os.Stdout = old
 
-	// Check if the output contains expected content
-	assert.Contains(t, buf.String(), "Hello from ckeletin-go!")
+			var buf bytes.Buffer
+			_, _ = io.Copy(&buf, r)
+
+			// Check if the output contains expected content
+			output := buf.String()
+			assert.Contains(t, output, tt.expected)
+		})
+	}
 }
-
 func TestInitConfig(t *testing.T) {
 	// Create a temporary config file
 	tempFile, err := os.CreateTemp("", "ckeletin-go*.json")
