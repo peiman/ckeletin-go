@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/internal/infrastructure"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -62,7 +63,8 @@ func TestExecute(t *testing.T) {
 			os.Stdout = w
 
 			// Execute the command
-			Execute()
+			err := Execute()
+			assert.NoError(t, err)
 
 			// Restore stdout
 			w.Close()
@@ -86,14 +88,14 @@ func TestInitConfig(t *testing.T) {
 	defer os.Remove(tempFile.Name())
 
 	// Write test configuration
-	_, err = tempFile.WriteString(`{
-		"LogLevel": "debug",
-		"Server": {
-			"Port": 9090,
-			"Host": "localhost"
-		}
+	testConfig := []byte(`{
+			"LogLevel": "debug",
+			"Server": {
+					"Port": 9090,
+					"Host": "127.0.0.1"
+			}
 	}`)
-	if err != nil {
+	if _, err := tempFile.Write(testConfig); err != nil {
 		t.Fatal(err)
 	}
 	tempFile.Close()
@@ -123,7 +125,16 @@ func TestInitConfig(t *testing.T) {
 
 	// Check if the output contains expected content
 	output := buf.String()
-	assert.Contains(t, output, "Using config file:")
-	assert.Contains(t, output, "debug")
-	assert.Contains(t, output, "9090")
+	assert.Contains(t, output, "Using config file")
+	assert.Contains(t, output, "Loaded configuration")
+	assert.Contains(t, output, `"LogLevel":"debug"`)
+	assert.Contains(t, output, `"Port":9090`)
+	assert.Contains(t, output, `"Host":"127.0.0.1"`)
+
+	// Verify the loaded configuration
+	config, err := infrastructure.LoadConfig()
+	assert.NoError(t, err)
+	assert.Equal(t, "debug", config.LogLevel)
+	assert.Equal(t, 9090, config.Server.Port)
+	assert.Equal(t, "127.0.0.1", config.Server.Host)
 }
