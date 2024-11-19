@@ -1,7 +1,6 @@
-.PHONY: build test lint clean format vuln check install run
+.PHONY: build test lint clean format vuln check install run test-race
 
 BINARY_NAME=ckeletin-go
-SERVER_PORT=8080
 FILE_MODE_EXEC=0755
 FILE_MODE_CONFIG=0600
 
@@ -9,7 +8,10 @@ build:
 	go build -o ${BINARY_NAME} main.go
 
 test:
-	go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+
+test-race:
+	go test -v -race ./...
 
 lint:
 	golangci-lint run
@@ -23,7 +25,7 @@ vuln:
 	govulncheck ./...
 
 # Run all quality checks
-check: format lint vuln test
+check: format lint vuln test test-race
 
 clean:
 	go clean
