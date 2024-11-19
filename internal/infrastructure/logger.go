@@ -3,51 +3,49 @@ package infrastructure
 import (
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-// InitLogger initializes the global logger
-func InitLogger(logLevel string) {
+var loggerMu sync.Mutex
+
+// InitLogger initializes the global logger.
+func InitLogger(logLevel string) error {
 	level, err := zerolog.ParseLevel(logLevel)
 	if err != nil {
-		level = zerolog.InfoLevel
+		return err
 	}
 
 	zerolog.SetGlobalLevel(level)
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-		NoColor:    false,
-	}
+	SetLogOutput(os.Stdout)
 
-	log.Logger = zerolog.New(output).With().
-		Timestamp().
-		Caller().
-		Logger()
+	return nil
 }
 
-// GetLogger returns a new logger instance
+// GetLogger returns the global logger instance.
 func GetLogger() zerolog.Logger {
 	return log.Logger
 }
 
-// SetLogOutput sets the output destination for the logger
+// SetLogOutput sets the output destination for the logger.
 func SetLogOutput(w io.Writer) {
-	log.Logger = log.Output(zerolog.ConsoleWriter{
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+
+	output := zerolog.ConsoleWriter{
 		Out:        w,
 		TimeFormat: time.RFC3339,
-		NoColor:    false,
-	})
+		NoColor:    true,
+	}
+	log.Logger = zerolog.New(output).With().Timestamp().Caller().Logger()
 }
 
-// LogError logs an error with additional context
-func LogError(err error, message string, fields map[string]interface{}) {
-	event := log.Error().Err(err).Str("message", message)
-	for k, v := range fields {
-		event = event.Interface(k, v)
-	}
-	event.Send()
+// SetLogger sets the global logger (for backwards compatibility).
+func SetLogger(l *zerolog.Logger) {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	log.Logger = *l
 }

@@ -51,6 +51,17 @@ func TestCreateDefaultConfig(t *testing.T) {
 	content, err := os.ReadFile(configPath)
 	assert.NoError(t, err)
 	assert.Contains(t, string(content), `"LogLevel": "info"`)
-	assert.Contains(t, string(content), `"Port": 8080`)
-	assert.Contains(t, string(content), `"Host": "localhost"`)
+}
+
+func TestCreateDefaultConfigWithError(t *testing.T) {
+	// Test with invalid directory permissions
+	if os.Geteuid() == 0 {
+		t.Skip("Skipping test when running as root")
+	}
+
+	configPath := "/root/test_config.json" // This should fail for non-root users
+	cm := NewConfigManager(configPath)
+
+	err := cm.CreateDefaultConfig()
+	assert.Error(t, err)
 }

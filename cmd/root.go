@@ -1,24 +1,27 @@
+// Package cmd implements the command-line interface for the application.
 package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/peiman/ckeletin-go/internal/infrastructure"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
-var logLevel string
+var (
+	cfgFile  string
+	logLevel string
+)
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   "ckeletin-go",
-	Short: "A brief description of your application",
+	Short: "A brief description of your application.",
 	Long: `A longer description that spans multiple lines and likely contains
 examples and usage of using your application.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println("Hello from ckeletin-go!")
 	},
 }
@@ -41,13 +44,18 @@ func init() {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	// Initialize logger
-	infrastructure.InitLogger(logLevel)
+	if err := infrastructure.InitLogger(logLevel); err != nil {
+		log.Error().Err(err).Msg("Failed to initialize logger")
+		osExit(1)
+		return
+	}
 	logger := infrastructure.GetLogger()
 
 	configManager := infrastructure.NewConfigManager(cfgFile)
 	if err := configManager.EnsureConfig(); err != nil {
 		logger.Error().Err(err).Msg("Failed to ensure config file exists")
-		os.Exit(1)
+		osExit(1)
+		return
 	}
 
 	viper.SetConfigFile(configManager.ConfigPath)
@@ -56,7 +64,8 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err != nil {
 		logger.Error().Err(err).Msg("Failed to read config file")
-		os.Exit(1)
+		osExit(1)
+		return
 	}
 
 	logger.Info().Str("config_file", viper.ConfigFileUsed()).Msg("Using config file")
@@ -64,7 +73,8 @@ func initConfig() {
 	config, err := infrastructure.LoadConfig()
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to load configuration")
-		os.Exit(1)
+		osExit(1)
+		return
 	}
 
 	logger.Info().Interface("config", config).Msg("Loaded configuration")

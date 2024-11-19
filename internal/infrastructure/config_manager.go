@@ -9,14 +9,19 @@ import (
 	"github.com/peiman/ckeletin-go/internal/errors"
 )
 
-const DefaultConfigFileName = "ckeletin-go.json"
+// Default configuration constants.
+const (
+	DefaultConfigFileName = "ckeletin-go.json"
+	DirPerms              = 0o755
+	FilePerms             = 0o600
+)
 
-// ConfigManager handles operations related to the configuration file
+// ConfigManager handles operations related to the configuration file.
 type ConfigManager struct {
 	ConfigPath string
 }
 
-// NewConfigManager creates a new ConfigManager
+// NewConfigManager creates a new ConfigManager.
 func NewConfigManager(configPath string) *ConfigManager {
 	if configPath == "" {
 		configPath = DefaultConfigFileName
@@ -26,7 +31,7 @@ func NewConfigManager(configPath string) *ConfigManager {
 	}
 }
 
-// EnsureConfig makes sure a config file exists, creating a default one if it doesn't
+// EnsureConfig makes sure a config file exists, creating a default one if it doesn't.
 func (cm *ConfigManager) EnsureConfig() error {
 	if _, err := os.Stat(cm.ConfigPath); os.IsNotExist(err) {
 		return cm.CreateDefaultConfig()
@@ -34,14 +39,10 @@ func (cm *ConfigManager) EnsureConfig() error {
 	return nil
 }
 
-// CreateDefaultConfig creates a default configuration file
+// CreateDefaultConfig creates a default configuration file.
 func (cm *ConfigManager) CreateDefaultConfig() error {
 	defaultConfig := Config{
-		LogLevel: "info",
-		Server: ServerConfig{
-			Port: 8080,
-			Host: "localhost",
-		},
+		LogLevel: DefaultLogLevel,
 	}
 
 	data, err := json.MarshalIndent(defaultConfig, "", "  ")
@@ -50,11 +51,11 @@ func (cm *ConfigManager) CreateDefaultConfig() error {
 	}
 
 	dir := filepath.Dir(cm.ConfigPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, DirPerms); err != nil {
 		return errors.NewAppError(errors.ErrInvalidConfig, "Failed to create config directory", err)
 	}
 
-	if err := os.WriteFile(cm.ConfigPath, data, 0644); err != nil {
+	if err := os.WriteFile(cm.ConfigPath, data, FilePerms); err != nil {
 		return errors.NewAppError(errors.ErrInvalidConfig, "Failed to write default config file", err)
 	}
 

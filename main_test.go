@@ -1,17 +1,20 @@
+// Package main_test contains tests for the main package.
 package main
 
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/cmd"
+	"github.com/peiman/ckeletin-go/internal/infrastructure"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockExecutor is a mock for cmd.Execute
+// MockExecutor is a mock for cmd.Execute.
 type MockExecutor struct {
 	mock.Mock
 }
@@ -21,7 +24,22 @@ func (m *MockExecutor) Execute() error {
 	return args.Error(0)
 }
 
-func TestMain(t *testing.T) {
+func TestMain(m *testing.M) {
+	// Initialize logger
+	if err := infrastructure.InitLogger("debug"); err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	infrastructure.SetLogOutput(os.Stdout)
+
+	// Run tests
+	code := m.Run()
+
+	// Exit
+	os.Exit(code)
+}
+
+func TestMainFunction(t *testing.T) {
 	// Redirect stdout to capture output
 	old := os.Stdout
 	r, w, _ := os.Pipe()

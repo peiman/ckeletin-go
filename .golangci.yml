@@ -1,0 +1,129 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs-use-default: true
+
+issues:
+  exclude-dirs:
+    - vendor
+    - build
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - gosec
+        - gocritic
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  disable-all: true
+  enable:
+    # Bug Detection:
+    - errcheck      # Check for unchecked errors
+    - gosimple     # Suggests code simplification
+    - govet        # Reports suspicious constructs
+    - staticcheck  # Advanced static analysis
+    - typecheck    # Like the front end of a Go compiler
+    - unused       # Check for unused constants, variables, functions and types
+    
+    # Security:
+    - gosec        # Security checker
+    
+    # Style:
+    - revive       # Drop-in replacement for golint
+    - gofumpt      # Stricter gofmt
+    - goimports    # Manage imports
+    - godot        # Check comment endings
+    
+    # Performance:
+    - bodyclose    # Checks whether HTTP response bodies are closed
+    - prealloc     # Suggests slice preallocation
+    
+    # Code Complexity:
+    - gocyclo      # Check cyclomatic complexity
+    - gocritic     # Provides advanced semantic analysis
+    
+    # Additional Checks:
+    - misspell     # Check spelling
+    - gocognit     # Computes and checks cognitive complexity
+    - goconst      # Finds repeated strings that could be constants
+    - mnd          # Magic number detector (replacement for gomnd)
+    - errorlint    # Error wrapping checker
+    - nilerr       # Checks for redundant nil checks on errors
+    - predeclared  # Find code that shadows Go's predeclared identifiers
+    - tparallel    # Detects inappropriate usage of t.Parallel()
+    - unconvert    # Remove unnecessary type conversions
+    - unparam      # Find unused function parameters
+    - whitespace   # Tool for white space style
+
+linters-settings:
+  gofumpt:
+    extra-rules: true
+    
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport   
+      - ifElseChain 
+      - octalLiteral
+      - whyNoLint   
+      
+  revive:
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+        
+  gosec:
+    excludes:
+      - G104  # Audit errors not checked handled differently
+      
+  mnd:
+    checks:
+      - argument
+      - assign
+      - case
+      - condition
+      - operation
+      - return
+    excluded-numbers:
+      - '0600'
+      - '0755'
+      
+output:
+  formats:
+    - format: colored-line-number
+      path-prefix: ""
+      print-issued-lines: true
+      print-linter-name: true
+      uniq-by-line: false
+      sort-results: true

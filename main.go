@@ -7,8 +7,10 @@ import (
 	"github.com/peiman/ckeletin-go/cmd"
 )
 
-var runFunc = defaultRun
-var exitFunc = os.Exit
+var (
+	runFunc  = defaultRun
+	exitFunc = os.Exit
+)
 
 func defaultRun() error {
 	return cmd.Execute()
