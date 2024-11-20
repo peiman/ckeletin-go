@@ -60,14 +60,20 @@ func captureOutput(f func()) string {
 	// Copy the output in a separate goroutine so printing can't block indefinitely
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, r)
+		_, err := io.Copy(&buf, r)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error capturing stdout: %v\n", err)
+		}
 		outC <- buf.String()
 	}()
 
 	errC := make(chan string)
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, re)
+		_, err := io.Copy(&buf, re)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error capturing stderr: %v\n", err)
+		}
 		errC <- buf.String()
 	}()
 

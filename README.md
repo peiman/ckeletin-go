@@ -47,16 +47,35 @@ This skeleton is ideal for developers who want to:
   - Proper error handling
 
 - **Development Tools**
-  - Comprehensive Makefile
+  - Task automation with Task
   - golangci-lint configuration
   - GitHub Actions CI
   - Comprehensive test suite
 
-## Installation
+## Getting Started
 
 ### Prerequisites
 - Go 1.21 or later
-- Make (optional, for using Makefile commands)
+- Task (see installation instructions below)
+
+### Installing Task
+
+To install Task, run the following command:
+```bash
+command -v go &> /dev/null && go install github.com/go-task/task/v3/cmd/task@latest || curl -sSL https://taskfile.dev/install.sh | sh
+```
+
+This command:
+1. Installs Task using Go if it's available.
+2. Falls back to using the official installation script if Go is not installed.
+
+#### Verify Task Installation
+After installation, check the version of Task:
+```bash
+task --version
+```
+
+For more information, visit the [Task installation guide](https://taskfile.dev/installation/).
 
 ### Building from Source
 ```bash
@@ -64,57 +83,50 @@ This skeleton is ideal for developers who want to:
 git clone https://github.com/peiman/ckeletin-go.git
 cd ckeletin-go
 
-# Install development tools
-make setup
+# Install dependencies and development tools
+go mod download
+task setup
 
 # Build the project
-make build
+task build
 ```
 
 ## Development Setup
 
-### Installing Dependencies
+### Development Tools
 
-The project uses Go modules for dependency management:
-
-```bash
-# Install main dependencies
-go mod download
-
-# Install development tools
-make setup
-```
-
-Development tools are managed through `tools.go` and are automatically installed when running `make setup`. These include:
+The project uses several development tools that are automatically installed when running `task setup`. These include:
 
 - `gotestsum`: Enhanced test runner with better output formatting
 - `golangci-lint`: Comprehensive linting tool
 - `goimports`: Import management and formatting
 - `govulncheck`: Vulnerability checking
-- `richgo`: Enriched test output
 
-### Available Make Commands
+### Available Task Commands
 
 ```bash
-make help           # Show available commands
-make setup         # Install development tools
-make build         # Build the binary
-make test          # Run tests with coverage
-make test-race     # Run tests with race detector
-make test-pretty   # Run tests with formatted output
-make test-watch    # Run tests in watch mode
-make lint          # Run linters
-make format        # Format code
-make vuln          # Check for vulnerabilities
-make check         # Run all quality checks
+task              # Show available commands
+task setup        # Install development tools
+task build        # Build the binary
+task test         # Run tests with coverage
+task test:race    # Run tests with race detector
+task test:watch   # Run tests in watch mode
+task lint         # Run linters
+task format       # Format code
+task vuln         # Check for vulnerabilities
+task check        # Run all quality checks
 ```
 
 ### Development Workflow
 
 1. Fork and clone the repository
-2. Install dependencies and tools:
+2. Install Task and other tools:
    ```bash
-   make setup
+   # Install Task
+   command -v go &> /dev/null && go install github.com/go-task/task/v3/cmd/task@latest || curl -sSL https://taskfile.dev/install.sh | sh
+   
+   # Install other development tools
+   task setup
    ```
 
 3. Create a new branch:
@@ -130,7 +142,7 @@ make check         # Run all quality checks
 
 5. Verify your changes:
    ```bash
-   make check      # Runs all quality checks
+   task check      # Runs all quality checks
    ```
 
 6. Commit and push your changes:
@@ -146,14 +158,13 @@ Tests follow Go's standard testing patterns:
 - Tests are in `_test.go` files alongside the code they test
 - Integration tests use `TestMain` for setup
 - Table-driven tests for comprehensive coverage
-- Race condition checking with `make test-race`
+- Race condition checking with `task test:race`
 
 Running tests:
 ```bash
-make test          # Regular tests with coverage
-make test-race     # Tests with race detection
-make test-pretty   # Tests with formatted output
-make test-watch    # Tests in watch mode
+task test          # Regular tests with coverage
+task test:race     # Tests with race detection
+task test:watch    # Run tests in watch mode
 ```
 
 ### Project Structure
@@ -215,16 +226,20 @@ if err := operation(); err != nil {
 
 ## Contributing
 
-1. Install development tools:
+1. Install Task and development tools:
    ```bash
-   make setup
+   # Install Task
+   command -v go &> /dev/null && go install github.com/go-task/task/v3/cmd/task@latest || curl -sSL https://taskfile.dev/install.sh | sh
+   
+   # Install development tools
+   task setup
    ```
 
 2. Create your feature branch
 3. Make your changes
 4. Run quality checks:
    ```bash
-   make check
+   task check
    ```
 5. Commit your changes
 6. Push and create a Pull Request
@@ -232,7 +247,7 @@ if err := operation(); err != nil {
 Please ensure:
 - Tests are added for new features
 - Documentation is updated
-- All checks pass (`make check`)
+- All checks pass (`task check`)
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 ## License

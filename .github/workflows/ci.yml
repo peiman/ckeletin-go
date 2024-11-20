@@ -8,36 +8,55 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build and Test
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go 1.x
-        uses: actions/setup-go@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          go-version: ^1.21
-        id: go
+          fetch-depth: 0 # Needed for proper version determination
 
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.21'
+          cache: true
 
-      - name: Get dependencies
+      - name: Install Task
         run: |
-          go get -v -t -d ./...
-          if [ -f Gopkg.toml ]; then
-              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-              dep ensure
-          fi
+          sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b /usr/local/bin
+          task --version
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          task setup
+
+      - name: Run linters
+        run: task lint
+
+      - name: Run tests
+        run: task test
 
       - name: Build
-        run: go build -v .
+        run: task build
 
-      - name: Test
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v3
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
         with:
-          version: latest
+          file: ./coverage.txt
+          flags: unittests
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Check for vulnerabilities
+        run: task vuln
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ckeletin-go
+          path: |
+            ckeletin-go
+            coverage.txt
+          retention-days: 7

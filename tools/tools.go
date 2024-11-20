@@ -1,18 +1,15 @@
+//nolint:all // Ignore linting for this file
 //go:build tools
 // +build tools
 
-// Package tools is used to track binary dependencies with go modules.
+// Package tools tracks binary dependencies using go modules.
+// These imports are not used in the actual application code.
 package tools
 
-// Import packages that we want `go mod` to download for us.
-// These are build-time dependencies, NOT runtime dependencies!
 import (
-	// Tools we use
+	_ "github.com/go-task/task/v3/cmd/task"
+	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "golang.org/x/vuln/cmd/govulncheck"
 	_ "gotest.tools/gotestsum"
 )
-
-// Note: Some tools are installed directly via the Makefile as they're binaries:
-// - golangci-lint
-// - richgo
