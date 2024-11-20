@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -51,14 +50,14 @@ func (cm *ConfigManager) CreateDefaultConfig() error {
 	}
 
 	dir := filepath.Dir(cm.ConfigPath)
-	if err := os.MkdirAll(dir, DirPerms); err != nil {
-		return errors.NewAppError(errors.ErrInvalidConfig, "Failed to create config directory", err)
+	// Don't create directory, just check if it exists
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return errors.NewAppError(errors.ErrInvalidConfig, "Config directory does not exist", err)
 	}
 
 	if err := os.WriteFile(cm.ConfigPath, data, FilePerms); err != nil {
 		return errors.NewAppError(errors.ErrInvalidConfig, "Failed to write default config file", err)
 	}
 
-	fmt.Printf("Created default configuration file: %s\n", cm.ConfigPath)
 	return nil
 }

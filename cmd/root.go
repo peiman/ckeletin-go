@@ -3,9 +3,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/peiman/ckeletin-go/internal/infrastructure"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,17 +35,22 @@ var Execute = func() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	// Persistent flags for use across all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./ckeletin-go.json)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Set the logging level (debug, info, warn, error)")
 
+	// Local flags only for this command
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	// Mark required flags if any
+	// rootCmd.MarkFlagRequired("config")
 }
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	// Initialize logger
 	if err := infrastructure.InitLogger(logLevel); err != nil {
-		log.Error().Err(err).Msg("Failed to initialize logger")
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		osExit(1)
 		return
 	}
