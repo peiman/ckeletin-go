@@ -49,28 +49,34 @@ tasks:
   test:
     desc: Run tests with coverage
     cmds:
-      - gotestsum --format pkgname-and-test-fails 
+      - gotestsum 
+        --format pkgname
         --jsonfile test-output.json 
         --hide-summary=skipped 
-        -- -coverprofile=coverage.txt -covermode=atomic ./...
+        --post-run-command "go tool cover -html=coverage.txt -o coverage.html"
+        -- -v -coverprofile=coverage.txt -covermode=atomic ./...
 
   test:race:
     desc: Run tests with race detection
     cmds:
-      - gotestsum --format testname 
+      - gotestsum 
+        --format standard-verbose 
         --jsonfile test-output.json 
-        -- -race ./...
+        -- -v -race ./...
 
   test:watch:
     desc: Run tests in watch mode
     cmds:
-      - gotestsum --format pkgname-and-test-fails --watch
+      - gotestsum 
+        --format pkgname
+        --watch 
+        --hide-summary=skipped
 
   clean:
     desc: Clean build artifacts
     cmds:
       - go clean
-      - rm -f {{.BINARY_NAME}} coverage.txt test-output.json
+      - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
 
   build:
     desc: Build the binary

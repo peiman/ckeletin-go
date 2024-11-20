@@ -27,7 +27,6 @@ examples and usage of using your application.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 var Execute = func() error {
 	return rootCmd.Execute()
 }
@@ -37,18 +36,15 @@ func init() {
 
 	// Persistent flags for use across all commands
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is ./ckeletin-go.json)")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Set the logging level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", infrastructure.DefaultLogLevel.String(),
+		`Set the logging level (trace, debug, info, warn, error, fatal, panic)`)
 
 	// Local flags only for this command
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
-	// Mark required flags if any
-	// rootCmd.MarkFlagRequired("config")
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	// Initialize logger
+	// Initialize logger with command line flag value first
 	if err := infrastructure.InitLogger(logLevel); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		osExit(1)
@@ -80,6 +76,16 @@ func initConfig() {
 		logger.Error().Err(err).Msg("Failed to load configuration")
 		osExit(1)
 		return
+	}
+
+	// Update log level from config if it wasn't specified on command line
+	if !rootCmd.PersistentFlags().Changed("log-level") {
+		if err := infrastructure.InitLogger(config.LogLevel.String()); err != nil {
+			logger.Error().Err(err).Msg("Failed to update log level from config")
+			osExit(1)
+			return
+		}
+		logger = infrastructure.GetLogger()
 	}
 
 	logger.Info().Interface("config", config).Msg("Loaded configuration")

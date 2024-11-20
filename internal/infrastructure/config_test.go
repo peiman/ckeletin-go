@@ -1,61 +1,111 @@
 package infrastructure
 
 import (
-	"bytes"
-	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestLoadConfig(t *testing.T) {
-	// Test with default values
-	t.Run("Default Values", func(t *testing.T) {
-		viper.Reset()
-		config, err := LoadConfig()
-		assert.NoError(t, err)
-		assert.Equal(t, "info", config.LogLevel)
-	})
+type ConfigTestSuite struct {
+	suite.Suite
+}
 
-	// Test with environment variables
-	t.Run("Environment Variables", func(t *testing.T) {
-		viper.Reset()
-		os.Setenv("CKELETIN_LOGLEVEL", "debug")
-		defer os.Unsetenv("CKELETIN_LOGLEVEL")
+func TestConfigSuite(t *testing.T) {
+	suite.Run(t, new(ConfigTestSuite))
+}
 
-		viper.AutomaticEnv()
-		viper.SetEnvPrefix("CKELETIN")
-		err := viper.BindEnv("LogLevel", "CKELETIN_LOGLEVEL")
-		assert.NoError(t, err)
+func (s *ConfigTestSuite) SetupTest() {
+	viper.Reset()
+}
 
-		config, err := LoadConfig()
-		assert.NoError(t, err)
-		assert.Equal(t, "debug", config.LogLevel)
-	})
+func (s *ConfigTestSuite) TestLoadConfig() {
+	tests := []struct {
+		name         string
+		configValues map[string]interface{}
+		expected     *Config
+		expectError  bool
+	}{
+		{
+			name: "Default Values",
+			configValues: map[string]interface{}{
+				"logLevel": "info", // Test string format
+			},
+			expected: &Config{
+				LogLevel: DefaultLogLevel,
+				Ping: PingConfig{
+					DefaultCount:  DefaultPingCount,
+					OutputMessage: DefaultPingMessage,
+					ColoredOutput: false,
+				},
+			},
+		},
+		{
+			name: "Custom Values with Numeric Level",
+			configValues: map[string]interface{}{
+				"logLevel":           int8(zerolog.DebugLevel), // Test numeric format
+				"ping.defaultCount":  5,
+				"ping.outputMessage": "hello",
+				"ping.coloredOutput": true,
+			},
+			expected: &Config{
+				LogLevel: zerolog.DebugLevel,
+				Ping: PingConfig{
+					DefaultCount:  5,
+					OutputMessage: "hello",
+					ColoredOutput: true,
+				},
+			},
+		},
+		{
+			name: "Custom Values with String Level",
+			configValues: map[string]interface{}{
+				"logLevel":           "debug", // Test string format
+				"ping.defaultCount":  5,
+				"ping.outputMessage": "hello",
+				"ping.coloredOutput": true,
+			},
+			expected: &Config{
+				LogLevel: zerolog.DebugLevel,
+				Ping: PingConfig{
+					DefaultCount:  5,
+					OutputMessage: "hello",
+					ColoredOutput: true,
+				},
+			},
+		},
+		{
+			name: "Invalid String Level",
+			configValues: map[string]interface{}{
+				"logLevel": "invalid",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid Numeric Level",
+			configValues: map[string]interface{}{
+				"logLevel": int8(-10),
+			},
+			expectError: true,
+		},
+	}
 
-	// Test with config file
-	t.Run("Config File", func(t *testing.T) {
-		viper.Reset()
-		viper.SetConfigType("json")
-		jsonConfig := []byte(`{
-			"LogLevel": "warn"
-		}`)
-		err := viper.ReadConfig(bytes.NewBuffer(jsonConfig))
-		assert.NoError(t, err)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			viper.Reset()
 
-		config, err := LoadConfig()
-		assert.NoError(t, err)
-		assert.Equal(t, "warn", config.LogLevel)
-	})
+			for k, v := range tt.configValues {
+				viper.Set(k, v)
+			}
 
-	// Test error case
-	t.Run("Unmarshal Error", func(t *testing.T) {
-		viper.Reset()
-		viper.Set("LogLevel", make(chan int)) // This will cause an unmarshal error
-
-		_, err := LoadConfig()
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "unable to decode into struct")
-	})
+			config, err := LoadConfig()
+			if tt.expectError {
+				s.Error(err)
+			} else {
+				s.NoError(err)
+				s.Equal(tt.expected, config)
+			}
+		})
+	}
 }

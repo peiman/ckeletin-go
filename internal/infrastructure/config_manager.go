@@ -8,13 +8,6 @@ import (
 	"github.com/peiman/ckeletin-go/internal/errors"
 )
 
-// Default configuration constants.
-const (
-	DefaultConfigFileName = "ckeletin-go.json"
-	DirPerms              = 0o755
-	FilePerms             = 0o600
-)
-
 // ConfigManager handles operations related to the configuration file.
 type ConfigManager struct {
 	ConfigPath string
@@ -40,8 +33,19 @@ func (cm *ConfigManager) EnsureConfig() error {
 
 // CreateDefaultConfig creates a default configuration file.
 func (cm *ConfigManager) CreateDefaultConfig() error {
-	defaultConfig := Config{
-		LogLevel: DefaultLogLevel,
+	// Use a separate struct for JSON to get human-readable log levels
+	type jsonConfig struct {
+		LogLevel string     `json:"logLevel"`
+		Ping     PingConfig `json:"ping"`
+	}
+
+	defaultConfig := jsonConfig{
+		LogLevel: DefaultLogLevel.String(), // Convert to string for readability
+		Ping: PingConfig{
+			DefaultCount:  DefaultPingCount,
+			OutputMessage: DefaultPingMessage,
+			ColoredOutput: false,
+		},
 	}
 
 	data, err := json.MarshalIndent(defaultConfig, "", "  ")
@@ -50,7 +54,6 @@ func (cm *ConfigManager) CreateDefaultConfig() error {
 	}
 
 	dir := filepath.Dir(cm.ConfigPath)
-	// Don't create directory, just check if it exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return errors.NewAppError(errors.ErrInvalidConfig, "Config directory does not exist", err)
 	}

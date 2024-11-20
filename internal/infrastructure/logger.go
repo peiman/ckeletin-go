@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -13,13 +14,13 @@ import (
 var loggerMu sync.Mutex
 
 // InitLogger initializes the global logger.
-func InitLogger(logLevel string) error {
-	level, err := zerolog.ParseLevel(logLevel)
+func InitLogger(level string) error {
+	parsedLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
-		return err
+		return fmt.Errorf("invalid log level %q: %w", level, err)
 	}
 
-	zerolog.SetGlobalLevel(level)
+	zerolog.SetGlobalLevel(parsedLevel)
 	SetLogOutput(os.Stdout)
 
 	return nil
@@ -41,11 +42,4 @@ func SetLogOutput(w io.Writer) {
 		NoColor:    true,
 	}
 	log.Logger = zerolog.New(output).With().Timestamp().Caller().Logger()
-}
-
-// SetLogger sets the global logger (for backwards compatibility).
-func SetLogger(l *zerolog.Logger) {
-	loggerMu.Lock()
-	defer loggerMu.Unlock()
-	log.Logger = *l
 }
