@@ -2,33 +2,41 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.20'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.x'
 
-    - name: Install Task
-      run: |
-        sh -s -- -d -b $HOME/.local/bin <<EOF
-        curl -sL https://taskfile.dev/install.sh
-        EOF
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install Task
+        run: |
+          #!/bin/bash
+          set -e
+          INSTALL_DIR="$HOME/.local/bin"
+          TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
+          mkdir -p "$INSTALL_DIR"
+          curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR"
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        shell: bash
 
-    - name: Set up dependencies
-      run: task setup
+      - name: Display Task Version
+        run: task --version
 
-    - name: Run checks
-      run: task check
+      - name: Install Project Dependencies
+        run: task setup
+
+      - name: Run Quality Checks
+        run: task check
