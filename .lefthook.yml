@@ -1,0 +1,10 @@
+# .lefthook.yml
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      run: task format
+    lint:
+      run: task lint
+    test:
+      run: task test

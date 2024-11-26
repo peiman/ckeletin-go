@@ -6,6 +6,9 @@
 *.dylib
 ckeletin-go
 
+# Task artifacts
+.task
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -13,7 +16,7 @@ ckeletin-go
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
+vendor/
 
 # Go workspace file
 go.work

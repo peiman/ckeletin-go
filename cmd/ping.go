@@ -1,103 +1,101 @@
-// cmd/ping.go - Ping command implementation
+// cmd/ping.go
 package cmd
 
 import (
 	"fmt"
 
 	"github.com/fatih/color"
-	"github.com/peiman/ckeletin-go/internal/errors"
-	"github.com/peiman/ckeletin-go/internal/infrastructure"
+	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-// pingOptions holds the command's options
-type pingOptions struct {
-	count int
-}
+var (
+	message  string
+	colorStr string
+	uiFlag   bool
+	logLevel string
+)
 
-func newPingCommand() *cobra.Command {
-	opts := &pingOptions{}
+// pingCmd represents the ping command
+var pingCmd = &cobra.Command{
+	Use:   "ping",
+	Short: "Responds with a pong",
+	Run: func(cmd *cobra.Command, args []string) {
+		// Initialize logger with the current log level
+		logger.Init()
 
-	cmd := &cobra.Command{
-		Use:   "ping",
-		Short: "Responds with pong",
-		Long: `A demonstration command that shows how to implement new commands
-using the framework's features like logging, configuration, and error handling.
+		log.Info().Msg("Ping command invoked")
 
-The ping command demonstrates how to use Viper configuration:
-- Default count can be set in config file (ping.defaultCount)
-- Output message can be customized (ping.outputMessage)
-- Colored output can be enabled (ping.coloredOutput)
+		// Get the message and color from configuration
+		msg := viper.GetString("app.output_message")
+		col := viper.GetString("app.output_color")
 
-Example config (ckeletin-go.json):
-{
-  "ping": {
-    "defaultCount": 3,
-    "outputMessage": "pong",
-    "coloredOutput": true
-  }
-}
-
-Example usage:
-  ckeletin-go ping            # Outputs using configured defaults
-  ckeletin-go ping --count 3  # Outputs configured message three times`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Get logger instance
-			logger := infrastructure.GetLogger()
-
-			// Get config values
-			outputMessage := viper.GetString("ping.outputMessage")
-			useColor := viper.GetBool("ping.coloredOutput")
-
-			// If count wasn't specified via flag, use config default
-			if !cmd.Flags().Changed("count") {
-				opts.count = viper.GetInt("ping.defaultCount")
+		// Check if UI is enabled
+		if viper.GetBool("app.ui") {
+			// Run the UI
+			if err := ui.RunUI(msg, col); err != nil {
+				log.Error().Err(err).Msg("Failed to start UI")
+				fmt.Println("An error occurred while running the UI.")
 			}
-
-			// Validate count
-			if opts.count <= 0 {
-				err := errors.NewAppError("INVALID_COUNT", "count flag must be greater than 0", nil)
-				logger.Error().Err(err).Int("count", opts.count).Msg("Invalid count value provided")
-				return err
+		} else {
+			// Print the message with color
+			if err := printColoredMessage(msg, col); err != nil {
+				log.Error().Err(err).Msg("Failed to print message")
+				fmt.Println("An error occurred while printing the message.")
 			}
-
-			// Log command execution
-			logger.Debug().
-				Int("count", opts.count).
-				Str("message", outputMessage).
-				Bool("colored", useColor).
-				Msg("Executing ping command")
-
-			// Prepare colored output if enabled
-			output := outputMessage
-			if useColor {
-				output = color.GreenString(output)
-			}
-
-			// Output the configured number of times
-			for i := 0; i < opts.count; i++ {
-				fmt.Fprintln(cmd.OutOrStdout(), output)
-			}
-
-			logger.Info().
-				Int("count", opts.count).
-				Str("message", outputMessage).
-				Msg("Ping command completed successfully")
-			return nil
-		},
-	}
-
-	// Add flags with default from config
-	defaultCount := viper.GetInt("ping.defaultCount")
-	if defaultCount == 0 {
-		defaultCount = infrastructure.DefaultPingCount
-	}
-	cmd.Flags().IntVarP(&opts.count, "count", "c", defaultCount, "number of times to ping")
-
-	return cmd
+		}
+	},
 }
 
 func init() {
-	rootCmd.AddCommand(newPingCommand())
+	rootCmd.AddCommand(pingCmd)
+
+	// Define flags specific to the ping command
+	pingCmd.Flags().StringVarP(&message, "message", "m", "", "Custom output message")
+	pingCmd.Flags().StringVarP(&colorStr, "color", "c", "", "Output color")
+	pingCmd.Flags().BoolVarP(&uiFlag, "ui", "u", false, "Enable UI")
+	pingCmd.Flags().StringVarP(&logLevel, "log-level", "l", "", "Set the log level (debug, info, warn, error)")
+
+	// Bind flags to Viper with error checking
+	if err := viper.BindPFlag("app.output_message", pingCmd.Flags().Lookup("message")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind flag 'message'")
+	}
+
+	if err := viper.BindPFlag("app.output_color", pingCmd.Flags().Lookup("color")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind flag 'color'")
+	}
+
+	if err := viper.BindPFlag("app.ui", pingCmd.Flags().Lookup("ui")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind flag 'ui'")
+	}
+
+	if err := viper.BindPFlag("app.log_level", pingCmd.Flags().Lookup("log-level")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind flag 'log-level'")
+	}
+}
+
+func printColoredMessage(message, col string) error {
+	// Map color names to color attributes
+	colorMap := map[string]color.Attribute{
+		"black":   color.FgBlack,
+		"red":     color.FgRed,
+		"green":   color.FgGreen,
+		"yellow":  color.FgYellow,
+		"blue":    color.FgBlue,
+		"magenta": color.FgMagenta,
+		"cyan":    color.FgCyan,
+		"white":   color.FgWhite,
+	}
+
+	attr, exists := colorMap[col]
+	if !exists {
+		return fmt.Errorf("invalid color: %s", col)
+	}
+
+	c := color.New(attr).Add(color.Bold)
+	c.Println(message)
+	return nil
 }

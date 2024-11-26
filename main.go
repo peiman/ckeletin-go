@@ -1,24 +1,12 @@
+// main.go
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/peiman/ckeletin-go/cmd"
+	"github.com/peiman/ckeletin-go/internal/logger"
 )
-
-var (
-	runFunc  = defaultRun
-	exitFunc = os.Exit
-)
-
-func defaultRun() error {
-	return cmd.Execute()
-}
 
 func main() {
-	if err := runFunc(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		exitFunc(1)
-	}
+	logger.Init()
+	cmd.Execute()
 }
