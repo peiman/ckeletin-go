@@ -1,12 +1,15 @@
-// main.go
 package main
 
 import (
 	"github.com/peiman/ckeletin-go/cmd"
-	"github.com/peiman/ckeletin-go/internal/logger"
 )
 
 func main() {
-	logger.Init()
+	// Run the application
+	run()
+}
+
+func run() {
+	// Execute the root command
 	cmd.Execute()
 }
