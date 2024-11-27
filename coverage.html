@@ -1,0 +1,412 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/peiman/ckeletin-go/cmd/ping.go (51.6%)</option>
+				
+				<option value="file1">github.com/peiman/ckeletin-go/cmd/root.go (10.5%)</option>
+				
+				<option value="file2">github.com/peiman/ckeletin-go/internal/logger/logger.go (0.0%)</option>
+				
+				<option value="file3">github.com/peiman/ckeletin-go/internal/ui/ui.go (12.0%)</option>
+				
+				<option value="file4">github.com/peiman/ckeletin-go/main.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// cmd/ping.go
+package cmd
+
+import (
+        "fmt"
+
+        "github.com/fatih/color"
+        "github.com/peiman/ckeletin-go/internal/logger"
+        "github.com/peiman/ckeletin-go/internal/ui"
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+)
+
+var (
+        message  string
+        colorStr string
+        uiFlag   bool
+        logLevel string
+)
+
+// pingCmd represents the ping command
+var pingCmd = &amp;cobra.Command{
+        Use:   "ping",
+        Short: "Responds with a pong",
+        Run: func(cmd *cobra.Command, args []string) <span class="cov0" title="0">{
+                // Initialize logger with the current log level
+                logger.Init()
+
+                log.Info().Msg("Ping command invoked")
+
+                // Get the message and color from configuration
+                msg := viper.GetString("app.output_message")
+                col := viper.GetString("app.output_color")
+
+                // Check if UI is enabled
+                if viper.GetBool("app.ui") </span><span class="cov0" title="0">{
+                        // Run the UI
+                        if err := ui.RunUI(msg, col); err != nil </span><span class="cov0" title="0">{
+                                log.Error().Err(err).Msg("Failed to start UI")
+                                fmt.Println("An error occurred while running the UI.")
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        // Print the message with color
+                        if err := printColoredMessage(msg, col); err != nil </span><span class="cov0" title="0">{
+                                log.Error().Err(err).Msg("Failed to print message")
+                                fmt.Println("An error occurred while printing the message.")
+                        }</span>
+                }
+        },
+}
+
+func init() <span class="cov8" title="1">{
+        rootCmd.AddCommand(pingCmd)
+
+        // Define flags specific to the ping command
+        pingCmd.Flags().StringVarP(&amp;message, "message", "m", "", "Custom output message")
+        pingCmd.Flags().StringVarP(&amp;colorStr, "color", "c", "", "Output color")
+        pingCmd.Flags().BoolVarP(&amp;uiFlag, "ui", "u", false, "Enable UI")
+        pingCmd.Flags().StringVarP(&amp;logLevel, "log-level", "l", "", "Set the log level (debug, info, warn, error)")
+
+        // Bind flags to Viper with error checking
+        if err := viper.BindPFlag("app.output_message", pingCmd.Flags().Lookup("message")); err != nil </span><span class="cov0" title="0">{
+                log.Fatal().Err(err).Msg("Failed to bind flag 'message'")
+        }</span>
+
+        <span class="cov8" title="1">if err := viper.BindPFlag("app.output_color", pingCmd.Flags().Lookup("color")); err != nil </span><span class="cov0" title="0">{
+                log.Fatal().Err(err).Msg("Failed to bind flag 'color'")
+        }</span>
+
+        <span class="cov8" title="1">if err := viper.BindPFlag("app.ui", pingCmd.Flags().Lookup("ui")); err != nil </span><span class="cov0" title="0">{
+                log.Fatal().Err(err).Msg("Failed to bind flag 'ui'")
+        }</span>
+
+        <span class="cov8" title="1">if err := viper.BindPFlag("app.log_level", pingCmd.Flags().Lookup("log-level")); err != nil </span><span class="cov0" title="0">{
+                log.Fatal().Err(err).Msg("Failed to bind flag 'log-level'")
+        }</span>
+}
+
+func printColoredMessage(message, col string) error <span class="cov8" title="1">{
+        // Map color names to color attributes
+        colorMap := map[string]color.Attribute{
+                "black":   color.FgBlack,
+                "red":     color.FgRed,
+                "green":   color.FgGreen,
+                "yellow":  color.FgYellow,
+                "blue":    color.FgBlue,
+                "magenta": color.FgMagenta,
+                "cyan":    color.FgCyan,
+                "white":   color.FgWhite,
+        }
+
+        attr, exists := colorMap[col]
+        if !exists </span><span class="cov8" title="1">{
+                return fmt.Errorf("invalid color: %s", col)
+        }</span>
+
+        <span class="cov8" title="1">c := color.New(attr).Add(color.Bold)
+        c.Println(message)
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// cmd/root.go
+package cmd
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/cobra"
+        "github.com/spf13/viper"
+)
+
+var (
+        // Version information (populated via ldflags)
+        Version = "dev"
+        Commit  = ""
+        Date    = ""
+
+        cfgFile string
+
+        // rootCmd represents the base command
+        rootCmd = &amp;cobra.Command{
+                Use:   "ckeletin-go",
+                Short: "A scaffold for building professional CLI applications in Go",
+                Long:  `ckeletin-go is a scaffold project that helps you kickstart your Go CLI applications.`,
+        }
+)
+
+// Execute adds all child commands to the root command
+func Execute() <span class="cov0" title="0">{
+        // Handle version flag
+        rootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
+
+        if err := rootCmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                log.Error().Err(err).Msg("Command execution failed")
+                os.Exit(1)
+        }</span>
+}
+
+func init() <span class="cov8" title="1">{
+        cobra.OnInitialize(initConfig)
+
+        // Define a persistent flag for specifying the config file
+        rootCmd.PersistentFlags().StringVar(&amp;cfgFile, "config", "", "config file (default is $HOME/.ckeletin-go.yaml)")
+}</span>
+
+func initConfig() <span class="cov0" title="0">{
+        if cfgFile != "" </span><span class="cov0" title="0">{
+                // Use the config file from the flag
+                viper.SetConfigFile(cfgFile)
+        }</span> else<span class="cov0" title="0"> {
+                // Find home directory
+                home, err := os.UserHomeDir()
+                cobra.CheckErr(err)
+
+                // Search config in home directory with name ".ckeletin-go" (without extension)
+                viper.AddConfigPath(home)
+                viper.SetConfigName(".ckeletin-go")
+        }</span>
+
+        <span class="cov0" title="0">viper.AutomaticEnv() // Read in environment variables that match
+
+        // Set default configuration values
+        viper.SetDefault("app.output_message", "Pong")
+        viper.SetDefault("app.output_color", "white")
+        viper.SetDefault("app.log_level", "info")
+        viper.SetDefault("app.ui", false)
+
+        // If a config file is found, read it
+        if err := viper.ReadInConfig(); err == nil </span><span class="cov0" title="0">{
+                fmt.Println("Using config file:", viper.ConfigFileUsed())
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// internal/logger/logger.go
+package logger
+
+import (
+        "os"
+
+        "github.com/rs/zerolog"
+        "github.com/rs/zerolog/log"
+        "github.com/spf13/viper"
+)
+
+// Init initializes the logger
+func Init() <span class="cov0" title="0">{
+        levelStr := viper.GetString("app.log_level")
+        if levelStr == "" </span><span class="cov0" title="0">{
+                levelStr = "info"
+        }</span>
+        <span class="cov0" title="0">level, err := zerolog.ParseLevel(levelStr)
+        if err != nil </span><span class="cov0" title="0">{
+                level = zerolog.InfoLevel
+        }</span>
+
+        <span class="cov0" title="0">zerolog.SetGlobalLevel(level)
+        log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// internal/ui/ui.go
+package ui
+
+import (
+        "fmt"
+
+        tea "github.com/charmbracelet/bubbletea"
+        "github.com/charmbracelet/lipgloss"
+)
+
+// model defines the Bubble Tea model
+type model struct {
+        message    string
+        colorStyle lipgloss.Style
+}
+
+// Init initializes the model (no-op)
+func (m model) Init() tea.Cmd <span class="cov0" title="0">{
+        return nil
+}</span>
+
+// Update handles messages and updates the model
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) <span class="cov0" title="0">{
+        switch msg := msg.(type) </span>{
+        case tea.KeyMsg:<span class="cov0" title="0">
+                switch </span>{
+                case msg.Type == tea.KeyCtrlC:<span class="cov0" title="0">
+                        return m, tea.Quit</span>
+                case msg.Type == tea.KeyEsc:<span class="cov0" title="0">
+                        return m, tea.Quit</span>
+                case msg.String() == "q":<span class="cov0" title="0">
+                        return m, tea.Quit</span>
+                }
+        }
+        <span class="cov0" title="0">return m, nil</span>
+}
+
+// View renders the model's view
+func (m model) View() string <span class="cov0" title="0">{
+        return m.colorStyle.Render(m.message) + "\n\nPress 'q' or 'CTRL-C' to exit."
+}</span>
+
+// RunUI runs the Bubble Tea UI
+func RunUI(message, col string) error <span class="cov0" title="0">{
+        colorStyle, err := GetLipglossColor(col)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">m := model{
+                message:    message,
+                colorStyle: lipgloss.NewStyle().Foreground(colorStyle).Bold(true),
+        }
+
+        p := tea.NewProgram(m)
+        _, err = p.Run()
+        return err</span>
+}
+
+// GetLipglossColor converts a color string to a lipgloss.Color
+func GetLipglossColor(col string) (lipgloss.Color, error) <span class="cov8" title="1">{
+        switch col </span>{
+        case "black":<span class="cov0" title="0">
+                return lipgloss.Color("#000000"), nil</span>
+        case "red":<span class="cov0" title="0">
+                return lipgloss.Color("#FF0000"), nil</span>
+        case "green":<span class="cov8" title="1">
+                return lipgloss.Color("#00FF00"), nil</span>
+        case "yellow":<span class="cov0" title="0">
+                return lipgloss.Color("#FFFF00"), nil</span>
+        case "blue":<span class="cov0" title="0">
+                return lipgloss.Color("#0000FF"), nil</span>
+        case "magenta":<span class="cov0" title="0">
+                return lipgloss.Color("#FF00FF"), nil</span>
+        case "cyan":<span class="cov0" title="0">
+                return lipgloss.Color("#00FFFF"), nil</span>
+        case "white":<span class="cov0" title="0">
+                return lipgloss.Color("#FFFFFF"), nil</span>
+        default:<span class="cov8" title="1">
+                return "", fmt.Errorf("invalid color: %s", col)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// main.go
+package main
+
+import (
+        "github.com/peiman/ckeletin-go/cmd"
+        "github.com/peiman/ckeletin-go/internal/logger"
+)
+
+func main() <span class="cov0" title="0">{
+        logger.Init()
+        cmd.Execute()
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

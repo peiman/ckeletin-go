@@ -1,4 +1,4 @@
-name: Continuous Integration
+name: CI
 
 on:
   push:
@@ -23,8 +23,6 @@ jobs:
 
       - name: Install Task
         run: |
-          #!/bin/bash
-          set -e
           INSTALL_DIR="$HOME/.local/bin"
           TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
           mkdir -p "$INSTALL_DIR"
@@ -38,5 +36,9 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
-      - name: Run Quality Checks
-        run: task check
+      - name: Run Quality Checks and Upload Coverage
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          task check
+          bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN

@@ -1,0 +1,8 @@
+# testdata/config.yaml
+
+app:
+  log_level: "debug"
+  ping:
+    output_message: "Config Message"
+    output_color: "cyan"
+    ui: true
