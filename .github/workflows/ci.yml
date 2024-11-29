@@ -69,8 +69,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3.5.2
 
+      - name: Print Working Directory
+        run: pwd
+
       - name: List Repository Files
         run: ls -la
+
+      - name: Find Taskfile.yml
+        run: find . -name "Taskfile.yml"
 
       - name: Validate SEMVER Tag
         id: validate_tag
