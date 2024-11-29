@@ -1,15 +1,15 @@
+// main.go
 package main
 
 import (
+	"os"
+
 	"github.com/peiman/ckeletin-go/cmd"
 )
 
-func main() {
-	// Run the application
-	run()
-}
+var osExit = os.Exit // Mockable variable for os.Exit
 
-func run() {
-	// Execute the root command
+func main() {
 	cmd.Execute()
+	osExit(0) // Use osExit for testability
 }

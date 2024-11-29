@@ -1,6 +1,10 @@
+// cmd/ping.go
+
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/internal/ui"
@@ -11,9 +15,6 @@ import (
 
 // NewPingCommand creates a new `ping` command with a customizable UIRunner
 func NewPingCommand(uiRunner ui.UIRunner) *cobra.Command {
-	var message, colorStr string
-	var uiFlag bool
-
 	// Initialize command-specific defaults and configurations
 	initPingConfig()
 
@@ -21,64 +22,64 @@ func NewPingCommand(uiRunner ui.UIRunner) *cobra.Command {
 		Use:   "ping",
 		Short: "Responds with a pong",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get values from flags or configuration
+			message := viper.GetString("app.ping.output_message")
+			colorStr := viper.GetString("app.ping.output_color")
+			uiFlag := viper.GetBool("app.ping.ui")
+
 			log.Info().
 				Str("command", "ping").
 				Bool("ui_enabled", uiFlag).
 				Msg("Ping command invoked")
 
-			// Get message and color from configuration
-			msg := viper.GetString("app.ping.output_message")
-			col := viper.GetString("app.ping.output_color")
-			uiFlag := viper.GetBool("app.ping.ui")
-
 			// Log configuration details
 			log.Debug().
-				Str("message", msg).
-				Str("color", col).
+				Str("message", message).
+				Str("color", colorStr).
 				Bool("ui_enabled", uiFlag).
 				Msg("Command configuration loaded")
 
 			if uiFlag {
 				// Log that the UI is starting
 				log.Info().
-					Str("message", msg).
-					Str("color", col).
+					Str("message", message).
+					Str("color", colorStr).
 					Msg("Starting UI")
 
 				// Run the UI
-				if err := uiRunner.RunUI(msg, col); err != nil {
+				if err := uiRunner.RunUI(message, colorStr); err != nil {
 					log.Error().
 						Err(err).
-						Str("message", msg).
-						Str("color", col).
+						Str("message", message).
+						Str("color", colorStr).
 						Msg("Failed to run UI")
 					return err
 				}
 
 				log.Info().
-					Str("message", msg).
-					Str("color", col).
+					Str("message", message).
+					Str("color", colorStr).
 					Msg("UI executed successfully")
 			} else {
 				// Log that we're printing the colored message
 				log.Info().
-					Str("message", msg).
-					Str("color", col).
+					Str("message", message).
+					Str("color", colorStr).
 					Msg("Printing colored message")
 
 				// Print the message
-				if err := ui.PrintColoredMessage(cmd.OutOrStdout(), msg, col); err != nil {
+				if err := ui.PrintColoredMessage(cmd.OutOrStdout(), message, colorStr); err != nil {
 					log.Error().
 						Err(err).
-						Str("message", msg).
-						Str("color", col).
+						Str("message", message).
+						Str("color", colorStr).
 						Msg("Failed to print colored message")
 					return err
 				}
 
 				log.Info().
-					Str("message", msg).
-					Str("color", col).
+					Str("message", message).
+					Str("color", colorStr).
 					Msg("Colored message printed successfully")
 			}
 
@@ -87,21 +88,24 @@ func NewPingCommand(uiRunner ui.UIRunner) *cobra.Command {
 	}
 
 	// Define flags specific to the ping command
-	cmd.Flags().StringVarP(&message, "message", "m", "", "Custom output message")
-	cmd.Flags().StringVarP(&colorStr, "color", "c", "", "Output color")
-	cmd.Flags().BoolVarP(&uiFlag, "ui", "", false, "Enable UI")
+	cmd.Flags().String("message", "", "Custom output message")
+	cmd.Flags().String("color", "", "Output color")
+	cmd.Flags().Bool("ui", false, "Enable UI")
 
-	// Bind flags
+	// Bind flags to Viper
 	if err := viper.BindPFlag("app.ping.output_message", cmd.Flags().Lookup("message")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind flag 'message'")
+		fmt.Fprintf(os.Stderr, "Failed to bind flag 'message': %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := viper.BindPFlag("app.ping.output_color", cmd.Flags().Lookup("color")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind flag 'color'")
+		fmt.Fprintf(os.Stderr, "Failed to bind flag 'color': %v\n", err)
+		os.Exit(1)
 	}
 
 	if err := viper.BindPFlag("app.ping.ui", cmd.Flags().Lookup("ui")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind flag 'ui'")
+		fmt.Fprintf(os.Stderr, "Failed to bind flag 'ui': %v\n", err)
+		os.Exit(1)
 	}
 
 	return cmd

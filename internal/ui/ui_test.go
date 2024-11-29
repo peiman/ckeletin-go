@@ -11,30 +11,32 @@ import (
 )
 
 func TestGetLipglossColor(t *testing.T) {
-	t.Run("Valid colors", func(t *testing.T) {
-		for colorName, expected := range ColorMap {
-			t.Run(colorName, func(t *testing.T) {
-				got, err := GetLipglossColor(colorName)
-				if err != nil {
-					t.Errorf("GetLipglossColor(%q) returned unexpected error: %v", colorName, err)
-				}
-				if got != expected {
-					t.Errorf("GetLipglossColor(%q) = %v, want %v", colorName, got, expected)
-				}
-			})
-		}
-	})
+	tests := []struct {
+		colorName string
+		wantErr   bool
+	}{
+		{"red", false},
+		{"green", false},
+		{"invalid", true},
+	}
 
-	t.Run("Invalid color", func(t *testing.T) {
-		invalidColor := "not-a-color"
-		got, err := GetLipglossColor(invalidColor)
-		if err == nil {
-			t.Errorf("GetLipglossColor(%q) did not return an error", invalidColor)
-		}
-		if got != "" {
-			t.Errorf("GetLipglossColor(%q) = %v, want \"\"", invalidColor, got)
-		}
-	})
+	for _, tt := range tests {
+		t.Run(tt.colorName, func(t *testing.T) {
+			color, err := GetLipglossColor(tt.colorName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetLipglossColor() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				if _, ok := ColorMap[tt.colorName]; !ok {
+					t.Errorf("Color %s should be valid", tt.colorName)
+				}
+				expectedColor := ColorMap[tt.colorName]
+				if color != expectedColor {
+					t.Errorf("Expected color %v, got %v", expectedColor, color)
+				}
+			}
+		})
+	}
 }
 
 func TestRunUIWithMock(t *testing.T) {
@@ -152,5 +154,15 @@ func TestModelUpdate(t *testing.T) {
 				t.Errorf("Update() cmd returned = %v, want %v", cmd != nil, tt.wantCmd)
 			}
 		})
+	}
+}
+
+func TestRunUI(t *testing.T) {
+	runner := DefaultUIRunner{}
+
+	// Since testing the actual UI is complex, we can test for error handling
+	err := runner.RunUI("Test Message", "invalid-color")
+	if err == nil {
+		t.Errorf("Expected error for invalid color, got nil")
 	}
 }

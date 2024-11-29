@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "*" # Trigger for all tags; we'll filter using a custom regex in the workflow
+
   pull_request:
     branches:
       - main
@@ -42,3 +45,48 @@ jobs:
         run: |
           task check
           bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') # Only run on tags
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Validate SEMVER Tag
+        id: validate_tag
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"
+          echo "Tag: $TAG_NAME"
+          if [[ ! "$TAG_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9-.]+)?(\+[a-zA-Z0-9-.]+)?$ ]]; then
+            echo "❌ Invalid SEMVER tag: $TAG_NAME"
+            exit 1
+          fi
+          echo "✅ Valid SEMVER tag: $TAG_NAME"
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23.x'
+
+      - name: Install Task
+        run: |
+          INSTALL_DIR="$HOME/.local/bin"
+          TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
+          mkdir -p "$INSTALL_DIR"
+          curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR"
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        shell: bash
+
+      - name: Build Binary
+        run: task build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./build/your_binary_name
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,3 +1,5 @@
+// cmd/root.go
+
 package cmd
 
 import (
@@ -17,6 +19,7 @@ var (
 	Commit  = ""
 	Date    = ""
 	cfgFile string
+
 	rootCmd = &cobra.Command{
 		Use:   "ckeletin-go",
 		Short: "A scaffold for building professional CLI applications in Go",
@@ -25,30 +28,25 @@ var (
 			// Initialize the logger
 			if err := logger.Init(nil); err != nil {
 				fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-				os.Exit(1)
+				osExit(1)
 			}
-			return nil
+			// Initialize configuration
+			return initConfig()
 		},
 	}
+
+	osExit = os.Exit // Mockable variable for os.Exit
 )
 
 func Execute() {
 	rootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
 	if err := rootCmd.Execute(); err != nil {
 		log.Error().Err(err).Msg("Command execution failed")
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
-func RootCommand() *cobra.Command {
-	return rootCmd
-}
-
-// cmd/root.go
-
 func init() {
-	cobra.OnInitialize(initConfig)
-
 	// Define persistent flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Config file (default is $HOME/.ckeletin-go.yaml)")
 	if err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config")); err != nil {
@@ -65,12 +63,15 @@ func init() {
 	rootCmd.AddCommand(NewPingCommand(uiRunner))
 }
 
-func initConfig() {
+func initConfig() error {
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+		if err != nil {
+			return err
+		}
+
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".ckeletin-go")
 	}
@@ -81,15 +82,17 @@ func initConfig() {
 
 	// Set default values for global configurations
 	viper.SetDefault("app.log_level", "info")
-	// Other global defaults...
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			log.Info().Msg("No config file found, using defaults and environment variables")
 		} else {
-			log.Fatal().Err(err).Msg("Failed to read config file")
+			log.Error().Err(err).Msg("Failed to read config file")
+			return fmt.Errorf("Failed to read config file: %w", err)
 		}
 	} else {
 		log.Info().Str("config_file", viper.ConfigFileUsed()).Msg("Using config file")
 	}
+
+	return nil
 }
