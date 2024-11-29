@@ -152,6 +152,9 @@ jobs:
       - name: List Directory
         run: ls -la
 
+      - name: Set debug mode
+        run: echo "DEBUG=*" >> $GITHUB_ENV
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -161,5 +164,4 @@ jobs:
           name: Release ${{ github.ref_name }}
           body: |
             Release of version ${{ github.ref_name }}.
-        env:
-          GITHUB_TOKEN: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
+          token: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
