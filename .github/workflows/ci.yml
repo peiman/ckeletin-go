@@ -1,18 +1,17 @@
-name: CI
+name: CI and Release Workflow
 
 on:
   push:
     branches:
       - main
     tags:
-      - "*" # Trigger for all tags; we'll filter using a custom regex in the workflow
+      - "*" # Trigger for all tags
 
   pull_request:
     branches:
       - main
 
 env:
-  # Centralized Version Definitions
   GO_VERSION: '1.23.x'       # Define Go version here
   YQ_VERSION: '4.34.1'       # Define yq version here
 
@@ -64,16 +63,11 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') # Only run on tags
+    needs: build # Ensure build job is completed successfully
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3.5.2
-
-      - name: List Repository Files
-        run: ls -la
-
-      - name: Find Taskfile.yml
-        run: find . -name "Taskfile.yml"
 
       - name: Validate SEMVER Tag
         id: validate_tag
@@ -103,17 +97,9 @@ jobs:
 
       - name: Install yq via Go
         run: |
-          # Install yq version defined in YQ_VERSION
           GO111MODULE=on go install github.com/mikefarah/yq/v4@v${{ env.YQ_VERSION }}
-          # Add Go bin to PATH
           echo "$HOME/go/bin" >> $GITHUB_PATH
-          # Verify yq installation
-          yq --version
-          if ! command -v yq &> /dev/null
-          then
-              echo "❌ yq could not be installed."
-              exit 1
-          fi
+        shell: bash
 
       - name: Extract BINARY_NAME from Taskfile.yml
         id: extract_binary_name
@@ -135,25 +121,11 @@ jobs:
           TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
           mkdir -p "$INSTALL_DIR"
           curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR"
-          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+          echo "$INSTALL_DIR" >> $GITHUB_PATH
         shell: bash
-
-      - name: Verify Task Installation
-        run: |
-          task --version
-          if [ $? -ne 0 ]; then
-            echo "❌ Task installation failed."
-            exit 1
-          fi
 
       - name: Build Binary
         run: task build
-
-      - name: List Directory
-        run: ls -la
-
-      - name: Set debug mode
-        run: echo "DEBUG=*" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
