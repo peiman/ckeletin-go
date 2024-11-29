@@ -14,7 +14,7 @@ on:
 env:
   # Centralized Version Definitions
   GO_VERSION: '1.23.x'       # Define Go version here
-  YQ_VERSION: '4.34.1'        # Define yq version here
+  YQ_VERSION: '4.34.1'       # Define yq version here
 
 jobs:
   build:
@@ -68,9 +68,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3.5.2
-
-      - name: Print Working Directory
-        run: pwd
 
       - name: List Repository Files
         run: ls -la
