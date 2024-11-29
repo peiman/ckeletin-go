@@ -158,8 +158,8 @@ jobs:
           files: |
             ./${{ env.APP_NAME }}
           tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
             Release of version ${{ github.ref_name }}.
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CKELETON_GITHUB_TOKEN }}
