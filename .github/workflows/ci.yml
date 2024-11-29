@@ -162,4 +162,4 @@ jobs:
           body: |
             Release of version ${{ github.ref_name }}.
         env:
-          GITHUB_TOKEN: ${{ secrets.CKELETON_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
