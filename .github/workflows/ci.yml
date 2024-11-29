@@ -149,14 +149,14 @@ jobs:
       - name: Build Binary
         run: task build
 
-      - name: List Build Directory
-        run: ls -la ./build/
+      - name: List Directory
+        run: ls -la
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./build/${{ env.APP_NAME }}
+            ./${{ env.APP_NAME }}
           tag_name: ${{ github.ref_name }}
           release_name: Release ${{ github.ref_name }}
           body: |
