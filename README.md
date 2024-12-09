@@ -6,7 +6,7 @@
 [![Version](https://img.shields.io/github/v/release/peiman/ckeletin-go)](https://github.com/peiman/ckeletin-go/releases)
 [![Go Reference](https://pkg.go.dev/badge/github.com/peiman/ckeletin-go.svg)](https://pkg.go.dev/github.com/peiman/ckeletin-go)
 [![License](https://img.shields.io/github/license/peiman/ckeletin-go)](LICENSE)
-[![CodeQL](https://github.com/peiman/ckeletin-go/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/peiman/ckeletin-go/security/code-scanning)
+[![CodeQL](https://github.com/peiman/ckeletin-go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/peiman/ckeletin-go/security/code-scanning)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-brightgreen.svg)](https://go.dev)
 
 **A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications.**
@@ -18,6 +18,8 @@
 - [ckeletin-go](#ckeletin-go)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
+  - [Key Highlights](#key-highlights)
+  - [Quick Start](#quick-start)
   - [Features](#features)
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
@@ -41,6 +43,7 @@
     - [Adding New Commands](#adding-new-commands)
     - [Modifying Configurations](#modifying-configurations)
     - [Customizing the UI](#customizing-the-ui)
+  - [Tooling Best Practices](#tooling-best-practices)
   - [Contributing](#contributing)
   - [License](#license)
   - [Additional Notes](#additional-notes)
@@ -50,47 +53,65 @@
 
 ## Introduction
 
-**ckeletin-go** is a Golang scaffold project designed to help developers create professional, robust, and beautiful command-line interface (CLI) applications. The name **ckeletin** is a playful twist on the word "skeleton," reflecting the project's role as a foundational structure for your CLI applications.
+**ckeletin-go** is a Golang scaffold project designed to help developers create professional, robust, and beautiful CLI applications. Inspired by the idea of a "skeleton," **ckeletin** provides a strong foundation on which you can build your own tooling, utilities, and interactive experiences.
 
-This scaffold integrates essential libraries and tools that follow best practices in Go development, including proper logging, configuration management, error handling, testing, and task automation. It emphasizes modularity by having each command manage its own configurations and defaults, promoting separation of concerns and ease of maintenance.
+This scaffold integrates essential libraries and tools that follow best practices:
+
+- [Cobra](https://github.com/spf13/cobra) for building flexible, modular CLI commands.
+- [Viper](https://github.com/spf13/viper) for configuration management via files, environment variables, and flags.
+- [Zerolog](https://github.com/rs/zerolog) for structured, leveled logging.
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) for beautiful, interactive terminal UIs.
+- Task automation with [Task](https://taskfile.dev/) and pre-commit hooks with [Lefthook](https://github.com/evilmartians/lefthook).
+- High test coverage, code quality checks, and CI/CD pipelines using GitHub Actions and CodeQL.
+
+Each command manages its own configuration and defaults, promoting modularity and ease of maintenance.
+
+---
+
+## Key Highlights
+
+- **Single-Source Binary Name**: Update `BINARY_NAME` in `Taskfile.yml`, and `ldflags` handles the rest. No more hunting down references.
+- **Detailed Coverage Reports**: Use `task test:coverage-text` to see exactly what code paths need testing.
+- **Seamless Customization**: Easily add new commands, reconfigure settings, or integrate Bubble Tea UIs.
+
+---
+
+## Quick Start
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/yourusername/ckeletin-go.git
+   cd ckeletin-go
+   ```
+
+2. **Set up development tools**:
+
+   ```bash
+   task setup
+   ```
+
+   Installs necessary tools and pre-commit hooks.
+
+3. **Build and run the sample command**:
+
+   ```bash
+   task build
+   ./ckeletin-go ping
+   ```
+
+   You’ll see “Pong” printed—congratulations, you’re running the scaffold!
 
 ---
 
 ## Features
 
-- **Modular Command Structure with Cobra and Viper**
-  - Each command is self-contained, handling its own configurations and defaults.
-  - Easily add new commands and flags.
-  - Manage commands and configurations seamlessly.
-
-- **Structured Logging with Zerolog**
-  - Efficient, structured logging with configurable log levels.
-  - Centralized logging initialization ensures consistent logging behavior.
-
-- **Beautiful Terminal UI with Bubble Tea**
-  - Create interactive and aesthetically pleasing interfaces.
-  - Commands can optionally enable UI features, enhancing user experience.
-  - Customize UI elements like colors and messages.
-
-- **Task Automation with Taskfile**
-  - Define and automate development tasks.
-  - Single source of truth for tasks, used in pre-commit hooks and CI pipelines.
-  - Ensures consistent development workflow and environment.
-
-- **Robust Error Handling**
-  - Follow Go best practices for error propagation and handling.
-  - Provide meaningful error messages to users.
-  - Gracefully handle errors within commands.
-
-- **Testing and Code Quality**
-  - Test-driven development with high test coverage.
-  - Tests are designed to be self-contained, ensuring configurations are properly initialized.
-  - Static code analysis and vulnerability checks.
-
-- **Configurability and Extensibility**
-  - Commands manage their own configurations, enhancing modularity.
-  - Customize command behaviors, output messages, colors, and log levels.
-  - Easily change the program name; changes propagate throughout the application.
+- **Modular Command Structure**: Add, remove, or update commands without breaking the rest of the application.
+- **Structured Logging**: Use Zerolog to create efficient, leveled logs. Perfect for debugging, auditing, and production use.
+- **Bubble Tea UI**: Optional, interactive UI for advanced terminal applications.
+- **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
+- **Task Automation**: One Taskfile to define all build, test, and lint tasks.
+- **High Test Coverage & Quality Checks**: Ensure a robust codebase that meets production standards.
 
 ---
 
@@ -98,70 +119,40 @@ This scaffold integrates essential libraries and tools that follow best practice
 
 ### Prerequisites
 
-- **Go**: Version **1.20** or higher (recommended **1.23.x**). You can download it from [golang.org](https://golang.org/dl/).
-
-- **Task**: Task is a task runner similar to Make, but written in Go. Install it by following the instructions at [taskfile.dev](https://taskfile.dev/#/installation).
-
-- **Git**: Git is required for version control and to clone the repository.
+- **Go**: 1.20+ recommended.
+- **Task**: Install from [taskfile.dev](https://taskfile.dev/#/installation).
+- **Git**: For version control.
 
 ### Installation
 
-1. **Clone the Repository**
-
-   ```bash
-   git clone https://github.com/yourusername/ckeletin-go.git
-   cd ckeletin-go
-   ```
-
-2. **Set Up Development Tools**
-
-   Install all the necessary development tools using Task:
-
-   ```bash
-   task setup
-   ```
-
-   This will install Go tools and set up the Git pre-commit hooks automatically.
+```bash
+git clone https://github.com/yourusername/ckeletin-go.git
+cd ckeletin-go
+task setup
+```
 
 ### Using the Scaffold
 
-To use **ckeletin-go** as a starting point for your own CLI application:
-
-1. **Rename the Module Path**
-
-   - Update the `module` path in `go.mod` to your own project's path.
-   - Replace all occurrences of `github.com/yourusername/ckeletin-go` with your module path.
-
-2. **Change the Program Name**
-
-   - Update the `BINARY_NAME` variable in `Taskfile.yml`.
-   - Modify the `ProgramName` constant in the configuration or main package.
-   - Use Go's `ldflags` in `Taskfile.yml` to inject the program name at build time.
-   - The name change will propagate throughout the application.
-
-3. **Customize the `ping` Command**
-
-   - Modify the `ping` command to suit your needs.
-   - Use it as a template to add new commands.
-   - Ensure new commands manage their own configurations and defaults within their files.
-
-4. **Run the Application**
+1. Update `module` path in `go.mod`.
+2. Change `BINARY_NAME` in `Taskfile.yml` to rename your CLI (e.g., `myapp`).
+3. Build and run to confirm setup:
 
    ```bash
-   task run
+   task build
+   ./myapp ping
    ```
 
 ---
 
 ## Configuration
 
-**ckeletin-go** uses Viper for configuration management, allowing you to configure the application via configuration files, environment variables, and flags. Each command handles its own configurations, enhancing modularity and separation of concerns.
+**ckeletin-go** uses Viper for flexible configuration:
 
 ### Configuration File
 
-Create a configuration file in one of the supported formats (YAML, JSON, TOML) and place it in one of the default paths (e.g., `$HOME/.ckeletin-go.yaml`).
+Default config file: `$HOME/.ckeletin-go.yaml` (or `myapp` if renamed).
 
-Example `~/.ckeletin-go.yaml`:
+Example:
 
 ```yaml
 app:
@@ -172,42 +163,23 @@ app:
     ui: false
 ```
 
-- **Global Configurations**: Settings under `app`, like `log_level`, are global and affect the entire application.
-- **Command-Specific Configurations**: Settings under `app.ping` are specific to the `ping` command.
-
 ### Environment Variables
 
-You can set configuration options using environment variables. The environment variable names are derived from the configuration keys by replacing dots (`.`) with underscores (`_`) and converting to uppercase.
+Override any config via environment variables:
 
-**Examples:**
-
-- To override `app.log_level`:
-
-  ```bash
-  export APP_LOG_LEVEL="debug"
-  ```
-
-- To override `app.ping.output_message`:
-
-  ```bash
-  export APP_PING_OUTPUT_MESSAGE="Hello, World!"
-  ```
-
-- To override `app.ping.ui`:
-
-  ```bash
-  export APP_PING_UI=true
-  ```
+```bash
+export APP_LOG_LEVEL="debug"
+export APP_PING_OUTPUT_MESSAGE="Hello, World!"
+export APP_PING_UI=true
+```
 
 ### Command-Line Flags
 
-Override configurations at runtime using flags:
+Override at runtime:
 
 ```bash
-./ckeletin-go ping --message "Hi there!" --color yellow --ui
+./myapp ping --message "Hi there!" --color yellow --ui
 ```
-
-- Flags take precedence over environment variables and configuration files.
 
 ---
 
@@ -215,46 +187,27 @@ Override configurations at runtime using flags:
 
 ### `ping` Command
 
-The `ping` command is a sample command that demonstrates how to implement a command using Cobra, Viper, Zerolog, and Bubble Tea. It manages its own configurations and defaults, promoting modularity.
+A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea together.
 
 #### Usage
 
 ```bash
-./ckeletin-go ping [flags]
+./myapp ping [flags]
 ```
 
 #### Flags
 
-- `-m`, `--message`: Custom output message (overrides configuration).
-- `-c`, `--color`: Output color (overrides configuration).
-- `--ui`: Enable the Bubble Tea UI.
+- `--message`: Override output message.
+- `--color`: Override output color.
+- `--ui`: Enable Bubble Tea UI.
 
 #### Examples
 
-- Default behavior:
-
-  ```bash
-  ./ckeletin-go ping
-  ```
-
-- Custom message and color:
-
-  ```bash
-  ./ckeletin-go ping --message "Hello!" --color cyan
-  ```
-
-- Enable UI:
-
-  ```bash
-  ./ckeletin-go ping --ui
-  ```
-
-- Using environment variables:
-
-  ```bash
-  export APP_PING_OUTPUT_MESSAGE="Env Message"
-  ./ckeletin-go ping
-  ```
+```bash
+./myapp ping
+./myapp ping --message "Hello!" --color cyan
+./myapp ping --ui
+```
 
 ---
 
@@ -262,216 +215,132 @@ The `ping` command is a sample command that demonstrates how to implement a comm
 
 ### Taskfile Tasks
 
-**ckeletin-go** uses a `Taskfile.yml` to define and automate development tasks. Here are some of the most common tasks:
-
-- **Setup Development Tools**
-
-  ```bash
-  task setup
-  ```
-
-- **Format Code**
-
-  ```bash
-  task format
-  ```
-
-- **Run Linters**
-
-  ```bash
-  task lint
-  ```
-
-- **Check for Vulnerabilities**
-
-  ```bash
-  task vuln
-  ```
-
-- **Run Tests with Coverage**
-
-  ```bash
-  task test
-  ```
-
-- **Run All Quality Checks**
-
-  ```bash
-  task check
-  ```
-
-- **Build the Application**
-
-  ```bash
-  task build
-  ```
-
-- **Run the Application**
-
-  ```bash
-  task run
-  ```
-
-- **Clean Build Artifacts**
-
-  ```bash
-  task clean
-  ```
+- `task setup`: Install tools.
+- `task format`: Format code.
+- `task lint`: Run linters.
+- `task vuln`: Check for vulnerabilities.
+- `task test`: Run tests with coverage.
+- `task test:coverage-text`: Detailed coverage report.
+- `task check`: All checks.
+- `task build`: Build the binary.
+- `task run`: Run the binary.
+- `task clean`: Clean artifacts.
 
 ### Pre-Commit Hooks with Lefthook
 
-To maintain code quality and consistency, Lefthook is set up to run tasks before each commit.
-
-- **Install Lefthook**
-
-  Lefthook is installed during `task setup`. The Git hooks are automatically configured.
-
-- **Hooks Executed**
-
-  - `task format`: Ensures code is formatted.
-  - `task lint`: Runs linters to catch issues.
-  - `task test`: Runs tests to ensure code works as expected.
+`task setup` installs hooks that run `format`, `lint`, `test` on commit, ensuring code quality before changes land in the repository.
 
 ### Continuous Integration
 
-The project includes a CI pipeline configured using GitHub Actions. The CI pipeline runs the `task check` command to perform all quality checks, ensuring that code merged into the main branch meets the project's standards.
-
-- **CI Pipeline Tasks**
-
-  - Checkout repository.
-  - Set up Go environment.
-  - Install Task.
-  - Install dependencies (`task setup`).
-  - Run checks (`task check`).
+GitHub Actions runs `task check` on each commit or pull request, maintaining code standards and reliability.
 
 ---
 
 ## Customization
 
+**In Short**:
+
+- Change `BINARY_NAME` in `Taskfile.yml` to rename your CLI.
+- Add commands using `cobra-cli`: `cobra-cli add hello`.
+- Adjust configs in Viper.
+- Enhance UI in `internal/ui/`.
+
 ### Changing the Program Name
 
-To change the program name:
+In `Taskfile.yml`:
 
-1. Update the `BINARY_NAME` variable in `Taskfile.yml`.
-2. Modify the `ProgramName` constant in the codebase.
-3. Use Go's `ldflags` in `Taskfile.yml` to inject the program name at build time.
-4. The name change will propagate throughout the application.
+```yaml
+vars:
+  BINARY_NAME: myapp
+```
+
+Then:
+
+```bash
+task build
+./myapp ping
+```
 
 ### Adding New Commands
 
-1. **Create a New Command File**
+Install Cobra CLI tool:
 
-   - Add a new file in the `cmd/` directory (e.g., `cmd/yourcommand.go`).
+```bash
+go install github.com/spf13/cobra-cli@latest
+```
 
-2. **Implement the Command Logic**
+Add a new command:
 
-   - Use `cobra.Command` to define the command, its flags, and behavior.
-   - Manage command-specific configurations and defaults within the command file.
+```bash
+cobra-cli add hello
+```
 
-3. **Register the Command**
-
-   - In `cmd/root.go`, add your new command:
-
-     ```go
-     rootCmd.AddCommand(NewYourCommand())
-     ```
+This follows Cobra’s best practice: each command in its own file, cleanly separated and easily testable.
 
 ### Modifying Configurations
 
-- **Add New Configuration Fields**
-
-  - Define new default values within the command file or `initConfig` in `root.go` for global settings.
-
-- **Use Viper to Bind New Configuration Options**
-
-  - Bind new flags and environment variables using Viper within the command file.
-
-- **Update Configuration Files and Environment Variables**
-
-  - Reflect new configuration options in your config files and document the corresponding environment variables.
+Set new defaults in `initConfig` or in command files. Use `viper.BindPFlag()` to bind flags. Adjust config files or env vars to match your desired behavior.
 
 ### Customizing the UI
 
-- **Modify the Bubble Tea Model**
+Explore the `internal/ui/` package to modify the Bubble Tea model, colors, and interactivity. Use configs to allow runtime customization of UI elements.
 
-  - Update the UI logic in the `internal/ui/` package or within your command if the UI is command-specific.
+---
 
-- **Customize Colors and Styles**
+## Tooling Best Practices
 
-  - Use configuration options to make UI elements customizable by the user.
+**Cobra** ([repo](https://github.com/spf13/cobra), [docs](https://pkg.go.dev/github.com/spf13/cobra)):
 
-- **Enhance Interactivity**
+- Keep commands small and focused.
+- Each command in its own file promotes clarity and testability.
+- Use `RunE` to return errors gracefully rather than exiting immediately.
 
-  - Add new interactive components to the UI as needed.
+**Viper** ([repo](https://github.com/spf13/viper), [docs](https://pkg.go.dev/github.com/spf13/viper)):
+
+- Set defaults first, then allow overrides via config files, env vars, and flags.
+- Keep configuration keys consistent and descriptive.
+- Exploit environment variable binding and automatic environment detection for easy deployment in different environments.
+
+**Zerolog** ([repo](https://github.com/rs/zerolog), [docs](https://pkg.go.dev/github.com/rs/zerolog)):
+
+- Use structured logs for better machine readability.
+- Set a global log level and pass context around rather than using global variables directly.
+- Keep logs concise and meaningful; leverage fields to add context without cluttering messages.
+
+**Bubble Tea** ([repo](https://github.com/charmbracelet/bubbletea), [docs](https://pkg.go.dev/github.com/charmbracelet/bubbletea)):
+
+- Keep the TUI logic isolated in its package or command.
+- Make colors, messages, and interactions configurable to adapt to user preferences.
+
+By following these best practices, you ensure that your CLI remains maintainable, testable, and flexible enough to grow with your project's needs.
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
-
-1. **Fork the Repository**
-
-   - Click the "Fork" button at the top right of the repository page.
-
-2. **Create a New Branch**
-
-   - For a new feature: `git checkout -b feature/your-feature-name`
-   - For a bug fix: `git checkout -b bugfix/your-bugfix-name`
-
-3. **Make Your Changes**
-
-   - Ensure all tasks pass by running `task check`.
-
-4. **Commit Your Changes**
-
-   - Use clear and descriptive commit messages.
-
-5. **Submit a Pull Request**
-
-   - Push your branch to your forked repository.
-   - Open a pull request against the main repository's `main` branch.
+1. Fork & create a new branch.
+2. Make changes, run `task check`.
+3. Commit with descriptive messages.
+4. Open a pull request against `main`.
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
 ## Additional Notes
 
-- **Testing the Application**
-
-  After making changes, always rebuild and test the application:
-
-  ```bash
-  task build
-  ```
-
-  Run the application:
-
-  ```bash
-  ./ckeletin-go ping --message 'Hello, World!' --color green --ui
-  ```
-
-- **Exiting the Program**
-
-  - Press `q`, `Esc`, or `CTRL-C` to exit the program when using the `--ui` flag.
-
-- **Shell Special Characters**
-
-  - Be cautious when using special characters in command-line arguments.
-  - Use single quotes or escape characters as needed.
-
-- **Updating Dependencies**
-
-  - Run `go mod tidy` to ensure dependencies are up-to-date.
-  - Update tools and dependencies regularly for compatibility.
+- `task test:coverage-text` identifies uncovered code paths for targeted testing improvements.
+- Press `q` or `Ctrl-C` to exit UI mode.
+- Use quotes for special chars in arguments.
+- Run `go mod tidy` to keep dependencies clean.
+- Regularly run tests, lint, and format tasks to maintain code quality and style.
 
 ---
 
 ## Note
 
-Remember to keep your development environment and tools updated to the latest stable versions to avoid compatibility issues. Regularly run your test suite and linters to maintain code quality.
+Keep your environment and tools updated. Embrace the structured approach offered by this scaffold, and enjoy building a professional-grade CLI with ckeletin-go!
