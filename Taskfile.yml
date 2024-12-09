@@ -12,6 +12,7 @@ vars:
     sh: date -u '+%Y-%m-%d_%H:%M:%S'
   LDFLAGS: >-
     -ldflags="
+    -X '{{.MODULE_PATH}}/cmd.binaryName={{.BINARY_NAME}}'
     -X '{{.MODULE_PATH}}/cmd.Version={{.VERSION}}'
     -X '{{.MODULE_PATH}}/cmd.Commit={{.COMMIT}}'
     -X '{{.MODULE_PATH}}/cmd.Date={{.DATE}}'
