@@ -15,7 +15,6 @@ func run() int {
 	return 0
 }
 
-
 // main is intentionally not covered by tests because it's the program's entry point.
 // All logic is tested via the run() function and other commands. The main function’s
 // sole purpose is to call run() and exit accordingly. Attempting to cover main directly
