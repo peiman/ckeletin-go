@@ -71,6 +71,14 @@ tasks:
     cmd: |
       gotestsum --format pkgname --watch --hide-summary=skipped
 
+  test:coverage-text:
+    desc: Run tests with detailed coverage data and display uncovered parts in the terminal
+    cmds:
+      - gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -cover -coverprofile=coverage.txt -covermode=atomic ./...
+      - echo "Detailed coverage report:"
+      - go tool cover -func=coverage.txt
+    silent: false
+
   check:
     desc: Run all quality checks
     deps:

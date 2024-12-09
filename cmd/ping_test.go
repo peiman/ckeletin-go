@@ -5,105 +5,108 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+type mockUIRunner struct {
+	CalledWithMessage string
+	CalledWithColor   string
+	ReturnError       error
+}
+
+func (m *mockUIRunner) RunUI(message, col string) error {
+	m.CalledWithMessage = message
+	m.CalledWithColor = col
+	return m.ReturnError
+}
+
 func TestPingCommand(t *testing.T) {
-	// Save original logger and restore after the test
 	originalLogger := log.Logger
 	defer func() { log.Logger = originalLogger }()
-	log.Logger = zerolog.New(bytes.NewBuffer([]byte{})) // Disable output for test
+	log.Logger = zerolog.New(bytes.NewBuffer([]byte{}))
 
 	tests := []struct {
 		name       string
 		args       []string
 		setup      func()
-		uiRunner   *ui.MockUIRunner
+		uiRunner   *mockUIRunner
 		wantErr    bool
 		wantOutput string
 	}{
 		{
-			name: "Default",
-			args: []string{},
-			setup: func() {
-				// No setup needed; use defaults
-			},
-			uiRunner:   &ui.MockUIRunner{},
+			name:       "Default",
+			args:       []string{},
+			setup:      func() {},
+			uiRunner:   &mockUIRunner{},
 			wantErr:    false,
 			wantOutput: "Pong\n",
 		},
 		{
-			name: "Custom Message and Color",
-			args: []string{"--message", "Hello, Test!", "--color", "red"},
-			setup: func() {
-				// No setup needed; flags will override defaults
-			},
-			uiRunner:   &ui.MockUIRunner{},
+			name:       "Custom Message and Color",
+			args:       []string{"--message", "Hello, Test!", "--color", "red"},
+			setup:      func() {},
+			uiRunner:   &mockUIRunner{},
 			wantErr:    false,
 			wantOutput: "Hello, Test!\n",
 		},
 		{
-			name: "UI Enabled",
-			args: []string{"--ui"},
-			setup: func() {
-				// No setup needed; --ui flag enables UI
-			},
-			uiRunner: &ui.MockUIRunner{},
-			wantErr:  false,
+			name:       "UI Enabled",
+			args:       []string{"--ui"},
+			setup:      func() {},
+			uiRunner:   &mockUIRunner{},
+			wantErr:    false,
+			wantOutput: "", // UI mode no direct output
 		},
 		{
-			name: "UI Enabled with Error",
-			args: []string{"--ui"},
-			setup: func() {
-				// No setup needed; --ui flag enables UI
-			},
-			uiRunner: &ui.MockUIRunner{
+			name:  "UI Enabled with Error",
+			args:  []string{"--ui"},
+			setup: func() {},
+			uiRunner: &mockUIRunner{
 				ReturnError: errors.New("UI error"),
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantOutput: "",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset Viper to clear any previous configurations
-			viper.Reset()
-
-			// Initialize the command, which sets defaults and configurations
-			cmd := NewPingCommand(tt.uiRunner)
-
-			// Apply any test-specific setup
+			// Don't reset viper, to keep flag bindings
 			if tt.setup != nil {
 				tt.setup()
 			}
 
-			// Set up command execution
+			// Inject mock UI runner
+			originalRunner := pingRunner
+			pingRunner = tt.uiRunner
+			defer func() { pingRunner = originalRunner }()
+
+			testRoot := &cobra.Command{Use: "test"}
+			testRoot.AddCommand(pingCmd)
+			testRoot.SetArgs(append([]string{"ping"}, tt.args...))
+
 			buf := new(bytes.Buffer)
-			cmd.SetOut(buf)
-			cmd.SetErr(buf)
-			cmd.SetArgs(tt.args)
-			cmd.SilenceUsage = true
-			cmd.SilenceErrors = true
+			testRoot.SetOut(buf)
+			testRoot.SetErr(buf)
+			testRoot.SilenceUsage = true
+			testRoot.SilenceErrors = true
 
-			// Execute the command
-			err := cmd.Execute()
-
-			// Check for expected errors
+			err := testRoot.Execute()
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
-			// Check for expected output
-			if gotOutput := buf.String(); gotOutput != tt.wantOutput {
+			gotOutput := buf.String()
+			if gotOutput != tt.wantOutput {
 				t.Errorf("Output = %q, want %q", gotOutput, tt.wantOutput)
 			}
 
-			// Verify UIRunner calls for UI-enabled scenarios
 			uiFlag := viper.GetBool("app.ping.ui")
-			if uiFlag {
+			if uiFlag && tt.uiRunner != nil && !tt.wantErr {
+				// Check UI Runner calls
 				if tt.uiRunner.CalledWithMessage != viper.GetString("app.ping.output_message") {
 					t.Errorf("UIRunner called with wrong message: got %q, want %q",
 						tt.uiRunner.CalledWithMessage, viper.GetString("app.ping.output_message"))

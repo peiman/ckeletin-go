@@ -1,4 +1,3 @@
-// internal/logger/logger.go
 package logger
 
 import (
@@ -11,8 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Init initializes the logger with the given output writer.
-// If out is nil, it defaults to os.Stderr.
+// Init initializes the logger with options from Viper.
+// Call this once in rootCmd's PersistentPreRunE or main initialization.
 func Init(out io.Writer) error {
 	if out == nil {
 		out = os.Stderr
@@ -29,15 +28,10 @@ func Init(out io.Writer) error {
 	}
 	zerolog.SetGlobalLevel(level)
 
-	// Configure the logger to write to 'out' and set time format
-	log.Logger = zerolog.New(out).
+	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}).
 		With().
 		Timestamp().
-		Logger().
-		Output(zerolog.ConsoleWriter{
-			Out:        out,
-			TimeFormat: time.RFC3339,
-		})
+		Logger()
 
 	return nil
 }

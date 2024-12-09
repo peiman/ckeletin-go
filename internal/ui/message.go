@@ -1,5 +1,3 @@
-// internal/ui/message.go
-
 package ui
 
 import (
@@ -7,18 +5,12 @@ import (
 	"io"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/rs/zerolog/log"
 )
 
-// PrintColoredMessage prints a message to the console with a specific color style
+// PrintColoredMessage prints a message to the console with a specific color
 func PrintColoredMessage(out io.Writer, message, col string) error {
-	colorStyle, err := GetLipglossColor(col)
-	if err != nil {
-		log.Error().Err(err).Str("color", col).Msg("Invalid color")
-		return fmt.Errorf("invalid color: %w", err)
-	}
-
+	colorStyle := lipgloss.Color(col)
 	style := lipgloss.NewStyle().Foreground(colorStyle).Bold(true)
-	fmt.Fprintln(out, style.Render(message))
-	return nil
+	_, err := fmt.Fprintln(out, style.Render(message))
+	return err
 }
