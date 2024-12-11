@@ -1,3 +1,5 @@
+// main_test.go
+
 package main
 
 import (
@@ -9,10 +11,14 @@ import (
 )
 
 func TestMainFunction(t *testing.T) {
-	originalRoot := cmd.GetRootCmd() // call the function, not reference
+	// Save the original RootCmd
+	originalRoot := cmd.RootCmd
+	// Create a test root command
 	testRoot := &cobra.Command{Use: "test"}
-	cmd.SetRootCmd(testRoot)
-	defer cmd.SetRootCmd(originalRoot)
+	// Replace global RootCmd with our test root
+	cmd.RootCmd = testRoot
+	// Restore after the test
+	defer func() { cmd.RootCmd = originalRoot }()
 
 	// Add a dummy success command
 	testRoot.AddCommand(&cobra.Command{

@@ -1,3 +1,5 @@
+// cmd/root.go
+
 package cmd
 
 import (
@@ -11,19 +13,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// The following variables are set by ldflags at build time.
-// For example:
-// -X 'github.com/peiman/ckeletin-go/cmd.binaryName=your-binary'
-// -X 'github.com/peiman/ckeletin-go/cmd.Version=1.0.0'
 var (
 	cfgFile    string
 	Version    = "dev"
 	Commit     = ""
 	Date       = ""
-	binaryName = "ckeletin-go" // default, overridden by ldflags if desired
+	binaryName = "ckeletin-go"
 )
 
-var rootCmd = &cobra.Command{
+// Export RootCmd so that tests in other packages can manipulate it without getters/setters.
+var RootCmd = &cobra.Command{
 	Use:   binaryName,
 	Short: "A scaffold for building professional CLI applications in Go",
 	Long: fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
@@ -40,18 +39,18 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 }
 
 func Execute() error {
-	rootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
-	return rootCmd.Execute()
+	RootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
+	return RootCmd.Execute()
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("Config file (default is $HOME/.%s.yaml)", binaryName))
-	if err := viper.BindPFlag("config", rootCmd.PersistentFlags().Lookup("config")); err != nil {
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("Config file (default is $HOME/.%s.yaml)", binaryName))
+	if err := viper.BindPFlag("config", RootCmd.PersistentFlags().Lookup("config")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'config' flag")
 	}
 
-	rootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
-	if err := viper.BindPFlag("app.log_level", rootCmd.PersistentFlags().Lookup("log-level")); err != nil {
+	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
+	if err := viper.BindPFlag("app.log_level", RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'log-level'")
 	}
 }
@@ -84,13 +83,4 @@ func initConfig() error {
 	}
 
 	return nil
-}
-
-// For testing main and commands
-func GetRootCmd() *cobra.Command {
-	return rootCmd
-}
-
-func SetRootCmd(cmd *cobra.Command) {
-	rootCmd = cmd
 }

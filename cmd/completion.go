@@ -1,3 +1,5 @@
+// cmd/completion.go
+
 package cmd
 
 import (
@@ -27,5 +29,5 @@ PowerShell:
 }
 
 func init() {
-	rootCmd.AddCommand(completionCmd)
+	RootCmd.AddCommand(completionCmd)
 }

@@ -150,7 +150,7 @@ task setup
 
 ### Configuration File
 
-Default config file: `$HOME/.ckeletin-go.yaml` (or `myapp` if renamed).
+Default config file: `$HOME/.ckeletin-go.yaml` (or `myapp.yaml` if renamed).
 
 Example:
 
