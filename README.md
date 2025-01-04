@@ -25,6 +25,8 @@
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
     - [Using the Scaffold](#using-the-scaffold)
+    - [Customizing the Module Path](#customizing-the-module-path)
+      - [Steps to Update the Module Path](#steps-to-update-the-module-path)
   - [Configuration](#configuration)
     - [Configuration File](#configuration-file)
     - [Environment Variables](#environment-variables)
@@ -81,7 +83,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 1. **Clone the repository**:
 
    ```bash
-   git clone https://github.com/yourusername/ckeletin-go.git
+   git clone https://github.com/peiman/ckeletin-go.git
    cd ckeletin-go
    ```
 
@@ -141,6 +143,32 @@ task setup
    task build
    ./myapp ping
    ```
+
+### Customizing the Module Path
+
+When you clone this repository, it's important to update the `MODULE_PATH` in the `go.mod` file to reflect your own repository path. This ensures that your module is uniquely identifiable and avoids conflicts with other projects.
+
+#### Steps to Update the Module Path
+
+1. **Open `go.mod`**: Locate the `go.mod` file in the root of the project.
+
+2. **Edit the Module Path**: Change the module path to reflect your own repository. For example, if you're using GitHub, it might look like this:
+
+   ```go
+   module github.com/yourusername/your-repo-name
+   ```
+
+   If you're using another version control system, adjust the path accordingly. For example:
+
+   ```go
+   module gitlab.com/yourusername/your-repo-name
+   ```
+
+3. **Update References**: If the `MODULE_PATH` is used elsewhere in the project (e.g., in `Taskfile.yml` for build flags), update those references to match your new module path.
+
+4. **Run `go mod tidy`**: After making changes, run `go mod tidy` to clean up any unnecessary dependencies and ensure the `go.mod` and `go.sum` files are up to date.
+
+By following these steps, you can ensure that your version of the project is correctly configured and ready for further development or deployment.
 
 ---
 

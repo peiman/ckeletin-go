@@ -10,7 +10,7 @@
 - If a function does not have a corresponding test, mention it.
 - When building tests, don't mock anything.
 
-# Project Structure
+## Project Structure
 
 The project is structured according to conventional Go project structure.
 It also follows Cobra and Viper conventions.
