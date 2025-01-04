@@ -49,3 +49,9 @@ ckeletin-go.json
 # Test coverage
 coverage.txt
 test-output.json
+
+# Aider
+.aider*
+
+# Environment variables
+.env
