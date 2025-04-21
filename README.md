@@ -25,6 +25,7 @@
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
     - [Using the Scaffold](#using-the-scaffold)
+    - [Important: Single Source of Truth for Names](#important-single-source-of-truth-for-names)
     - [Customizing the Module Path](#customizing-the-module-path)
       - [Steps to Update the Module Path](#steps-to-update-the-module-path)
   - [Configuration](#configuration)
@@ -148,6 +149,22 @@ task setup
    task build
    ./myapp ping
    ```
+
+### Important: Single Source of Truth for Names
+
+This project uses a "single source of truth" approach for configuration:
+
+1. **Binary Name**: Defined only in `Taskfile.yml` as `BINARY_NAME`. This is propagated through the codebase via build flags and the `binaryName` variable in `cmd/root.go`.
+
+2. **Module Path**: Defined only in `go.mod` and referenced in `Taskfile.yml` as `MODULE_PATH`.
+
+When customizing this project:
+
+- Change `BINARY_NAME` in `Taskfile.yml` to your desired binary name
+- Change the module path in `go.mod` to your own repository path
+- Run `task build` to apply these changes throughout the codebase
+
+This design ensures you don't need to search and replace names across multiple files.
 
 ### Customizing the Module Path
 

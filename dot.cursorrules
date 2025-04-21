@@ -31,6 +31,7 @@ ckeletin-go is a Golang scaffold for professional CLI applications.
    - Automated development workflows
    - Consistent commands across local and CI environments
    - File location: Taskfile.yml
+   - Contains BINARY_NAME variable that should be updated when forking the project
 
 5. Error Handling:
    - Use of %w for wrapping errors

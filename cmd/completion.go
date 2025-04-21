@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,17 +12,17 @@ import (
 var completionCmd = &cobra.Command{
 	Use:   "completion",
 	Short: "Generate the autocompletion script for the specified shell",
-	Long: `To load completions:
+	Long: fmt.Sprintf(`To load completions:
 
 Bash:
-  source <(ckeletin-go completion bash)
+  source <(%s completion bash)
 Zsh:
-  source <(ckeletin-go completion zsh)
+  source <(%s completion zsh)
 Fish:
-  ckeletin-go completion fish | source
+  %s completion fish | source
 PowerShell:
-  ckeletin-go completion powershell | Out-String | Invoke-Expression
-`,
+  %s completion powershell | Out-String | Invoke-Expression
+`, binaryName, binaryName, binaryName, binaryName),
 	DisableFlagsInUseLine: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Default to bash if no args provided:

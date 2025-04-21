@@ -29,6 +29,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Included clear examples of correctly formatted commits
   - Added practical command examples for creating well-formatted commits
   - Standardized on heredoc approach for creating properly formatted commit messages
+- Improved binary name handling:
+  - Updated completion command to use binaryName variable
+  - Added clear documentation about BINARY_NAME in Taskfile.yml
+  - Added explanatory comments in .gitignore
+  - Enhanced README with "Single Source of Truth" section
 
 ### Changed
 

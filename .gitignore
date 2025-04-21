@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+# Replace the following line with the Binary name from BINARY_NAME in Taskfile.yml
 ckeletin-go
 
 # Task artifacts
@@ -42,6 +43,7 @@ Thumbs.db
 *.log
 
 # Config files
+# Replace the following line with the Config file name from BINARY_NAME in Taskfile.yml
 ckeletin-go.json
 
 # Build output directory
