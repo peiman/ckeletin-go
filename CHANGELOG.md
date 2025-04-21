@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrated dependency verification in pre-commit hooks
   - Dependency checks included in the CI pipeline
   - New section in README about dependency management
+- Added project specification as `.cursorrules`:
+  - Comprehensive project guidelines in LLM-friendly format
+  - Documentation of commit conventions and changelog requirements
+  - Explicit coding standards and implementation patterns
+  - Clear collaboration and quality requirements
 
 ### Changed
 
