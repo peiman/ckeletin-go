@@ -107,23 +107,19 @@ docs: update documentation
 - Documentation details
 ```
 
-When creating commit messages, use the following heredoc approach to ensure proper formatting:
 
-```bash
-# RECOMMENDED APPROACH: Using heredoc with a temporary file
-cat > commit-msg.txt << EOF
-type: concise summary
 
-- First bullet point
-- Second bullet point
-- Third bullet point
-EOF
+When a user asks for a commit message or help creating a commit, DO NOT use the git command directly. Instead, output the commit message as a simple text block that the user can easily copy and paste:
 
-git commit -F commit-msg.txt
-rm commit-msg.txt  # Optional: clean up the temporary file
+```text
+git commit -m"refactor: improve binary name handling
+
+- Updated completion command to use binaryName variable
+- Added clear documentation about BINARY_NAME in Taskfile.yml
+- Added explanatory comments in .gitignore"
 ```
 
-This approach ensures correct formatting and avoids issues with newlines in command arguments. When responding to users in documentation or in automated tools, always provide the full heredoc block for them to copy and paste.
+The user can then use this text with their preferred git commit method. This avoids problems with newlines and special characters and gives the user flexibility in how they create the commit.
 
 ### 2.2 CHANGELOG REQUIREMENTS
 
