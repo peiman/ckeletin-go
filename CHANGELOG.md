@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added documentation in README about Cursor AI integration
   - Added `.cursorrules` to `.gitignore` for customization flexibility
   - Users can now copy the template and adapt it to their needs
+- Enhanced git commit convention documentation in `dot.cursorrules`:
+  - Added explicit formatting instructions to avoid common mistakes
+  - Included clear examples of correctly formatted commits
+  - Added practical command examples for creating well-formatted commits
+  - Standardized on heredoc approach for creating properly formatted commit messages
 
 ### Changed
 

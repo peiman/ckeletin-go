@@ -65,6 +65,12 @@ All commits must follow this exact format:
 - <additional details>
 ```
 
+IMPORTANT FORMATTING NOTES:
+1. There must be exactly ONE blank line between the summary and bullet points
+2. Bullet points must be consecutive with NO blank lines between them
+3. Each bullet point begins with "- " (hyphen followed by a space)
+4. The entire message should be wrapped at 72 characters
+
 Where type must be one of:
 
 - feat: New features
@@ -77,6 +83,17 @@ Where type must be one of:
 - build: Build system changes
 - deps: Dependency updates
 
+Example of a correctly formatted commit:
+
+```text
+docs: update README with installation instructions
+
+- Add step-by-step installation guide
+- Include screenshots of the process
+- Document common troubleshooting steps
+- Update requirements section
+```
+
 For multiple types, separate with empty lines:
 
 ```text
@@ -88,6 +105,24 @@ docs: update documentation
 
 - Documentation details
 ```
+
+When creating commit messages, use the following heredoc approach to ensure proper formatting:
+
+```bash
+# RECOMMENDED APPROACH: Using heredoc with a temporary file
+cat > commit-msg.txt << EOF
+type: concise summary
+
+- First bullet point
+- Second bullet point
+- Third bullet point
+EOF
+
+git commit -F commit-msg.txt
+rm commit-msg.txt  # Optional: clean up the temporary file
+```
+
+This approach ensures correct formatting and avoids issues with newlines in command arguments. When responding to users in documentation or in automated tools, always provide the full heredoc block for them to copy and paste.
 
 ### 2.2 CHANGELOG REQUIREMENTS
 
