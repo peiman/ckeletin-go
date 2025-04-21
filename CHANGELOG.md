@@ -10,6 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added this CHANGELOG.md file to track changes between releases
+- Added comprehensive dependency management system:
+  - New Taskfile tasks: `deps:verify`, `deps:outdated`, and `deps:check`
+  - Integrated dependency verification in pre-commit hooks
+  - Dependency checks included in the CI pipeline
+  - New section in README about dependency management
+
+### Changed
+
+- Updated Go version from 1.23.3 to 1.24.0
+- Updated CI workflow to use Go 1.24.x
+- Enhanced `task check` to include dependency verification
+- Updated all outdated dependencies to their latest versions:
+  - bubbletea: v1.2.4 → v1.3.4
+  - lipgloss: v1.0.0 → v1.1.0
+  - zerolog: v1.33.0 → v1.34.0
+  - cobra: v1.8.1 → v1.9.1
+  - viper: v1.19.0 → v1.20.1
 
 ## [0.4.0] - 2025-01-05
 

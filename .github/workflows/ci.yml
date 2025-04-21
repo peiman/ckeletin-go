@@ -12,7 +12,7 @@ on:
       - main
 
 env:
-  GO_VERSION: '1.23.x'       # Define Go version here
+  GO_VERSION: '1.24.x'       # Define Go version here
   YQ_VERSION: '4.34.1'       # Define yq version here
 
 jobs:

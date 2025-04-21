@@ -32,6 +32,7 @@ tasks:
     - go install gotest.tools/gotestsum@latest
     - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
     - go install github.com/evilmartians/lefthook@latest
+    - go install github.com/psampaz/go-mod-outdated@latest
     - lefthook install
     silent: true
 
@@ -39,6 +40,27 @@ tasks:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
       - go mod tidy
+
+  deps:verify:
+    desc: Verify that dependencies haven't been modified
+    cmds:
+      - go mod verify
+    silent: true
+
+  deps:outdated:
+    desc: Check for outdated dependencies
+    cmds:
+      - echo "Checking for outdated dependencies..."
+      - go list -u -m -json all | go-mod-outdated -update -direct
+    silent: true
+
+  deps:check:
+    desc: Run all dependency checks
+    cmds:
+      - task: deps:verify
+      - task: deps:outdated
+      - task: vuln
+    silent: true
 
   format:
     desc: Format code
@@ -85,7 +107,7 @@ tasks:
     deps:
       - format
       - lint
-      - vuln
+      - deps:check
       - test
 
   build:

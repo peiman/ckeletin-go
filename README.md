@@ -31,6 +31,10 @@
     - [Configuration File](#configuration-file)
     - [Environment Variables](#environment-variables)
     - [Command-Line Flags](#command-line-flags)
+  - [Dependency Management](#dependency-management)
+    - [Available Tasks](#available-tasks)
+    - [Automated Checks](#automated-checks)
+    - [Best Practices](#best-practices)
   - [Commands](#commands)
     - [`ping` Command](#ping-command)
       - [Usage](#usage)
@@ -102,7 +106,7 @@ Each command manages its own configuration and defaults, promoting modularity an
    ./ckeletin-go ping
    ```
 
-   You’ll see “Pong” printed—congratulations, you’re running the scaffold!
+   You'll see "Pong" printed—congratulations, you're running the scaffold!
 
 ---
 
@@ -211,6 +215,33 @@ Override at runtime:
 
 ---
 
+## Dependency Management
+
+**ckeletin-go** includes robust dependency management tools to ensure your application remains secure and up-to-date:
+
+### Available Tasks
+
+- `task deps:verify`: Verifies that dependencies haven't been modified
+- `task deps:outdated`: Checks for outdated dependencies
+- `task deps:check`: Runs all dependency checks (verification, outdated, vulnerabilities)
+
+### Automated Checks
+
+Dependency verification is automatically included in:
+
+- Pre-commit hooks via Lefthook (prevents commits with corrupted dependencies)
+- CI workflow via GitHub Actions (as part of `task check`)
+- The comprehensive quality check command: `task check`
+
+### Best Practices
+
+1. Run `task deps:check` before starting a new feature
+2. Update dependencies incrementally with `go get -u <package>` followed by `task tidy`
+3. Always run tests after dependency updates
+4. Document significant dependency changes in commit messages
+
+---
+
 ## Commands
 
 ### `ping` Command
@@ -247,9 +278,12 @@ A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea togeth
 - `task format`: Format code.
 - `task lint`: Run linters.
 - `task vuln`: Check for vulnerabilities.
+- `task deps:verify`: Verify dependency integrity.
+- `task deps:outdated`: Check for outdated dependencies.
+- `task deps:check`: Run all dependency checks (verification, outdated, vulnerabilities).
 - `task test`: Run tests with coverage.
 - `task test:coverage-text`: Detailed coverage report.
-- `task check`: All checks.
+- `task check`: All checks (format, lint, deps, tests).
 - `task build`: Build the binary.
 - `task run`: Run the binary.
 - `task clean`: Clean artifacts.
@@ -303,7 +337,7 @@ Add a new command:
 cobra-cli add hello
 ```
 
-This follows Cobra’s best practice: each command in its own file, cleanly separated and easily testable.
+This follows Cobra's best practice: each command in its own file, cleanly separated and easily testable.
 
 ### Modifying Configurations
 
@@ -365,6 +399,7 @@ MIT License. See [LICENSE](LICENSE).
 - Press `q` or `Ctrl-C` to exit UI mode.
 - Use quotes for special chars in arguments.
 - Run `go mod tidy` to keep dependencies clean.
+- Run `task deps:check` regularly to ensure dependencies are up-to-date and secure.
 - Regularly run tests, lint, and format tasks to maintain code quality and style.
 
 ---
@@ -372,3 +407,5 @@ MIT License. See [LICENSE](LICENSE).
 ## Note
 
 Keep your environment and tools updated. Embrace the structured approach offered by this scaffold, and enjoy building a professional-grade CLI with ckeletin-go!
+
+---
