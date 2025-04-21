@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Documentation of commit conventions and changelog requirements
   - Explicit coding standards and implementation patterns
   - Clear collaboration and quality requirements
+- Renamed `.cursorrules` to `dot.cursorrules` for better usability:
+  - Added documentation in README about Cursor AI integration
+  - Added `.cursorrules` to `.gitignore` for customization flexibility
+  - Users can now copy the template and adapt it to their needs
 
 ### Changed
 

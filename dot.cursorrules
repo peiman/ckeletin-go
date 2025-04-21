@@ -1,0 +1,333 @@
+# CKELETIN-GO PROJECT SPECIFICATION
+
+## SECTION 1: PROJECT DEFINITION
+
+ckeletin-go is a Golang scaffold for professional CLI applications.
+
+### 1.1 PURPOSE
+
+- Create modular, testable, and maintainable CLI applications
+- Follow Go best practices
+- Provide comprehensive tooling for quality and automation
+
+### 1.2 KEY FEATURES
+
+1. Modular Command Structure (Cobra + Viper):
+   - Self-contained commands with isolated configuration
+   - Commands manage their own defaults and flag bindings
+   - File location: cmd/*.go
+
+2. Structured Logging (Zerolog):
+   - Centralized logger initialization
+   - Consistent structured logging patterns
+   - File location: internal/logger/logger.go
+
+3. Terminal UI (Bubble Tea):
+   - Interactive terminal interfaces
+   - Toggleable via flags or configuration
+   - File location: internal/ui/
+
+4. Task Automation (Taskfile):
+   - Automated development workflows
+   - Consistent commands across local and CI environments
+   - File location: Taskfile.yml
+
+5. Error Handling:
+   - Use of %w for wrapping errors
+   - Contextual error messages
+   - Graceful failure patterns
+
+6. Testing and Quality:
+   - High test coverage requirement
+   - Automated linting and formatting
+   - Mock interfaces for testability
+
+7. Configuration System:
+   - Multi-layered: flags, env vars, config files, defaults
+   - Clear precedence rules
+   - Command-specific configuration
+
+8. Dependency Management:
+   - Automated dependency verification
+   - Pre-commit dependency checks
+   - Integrated security scanning
+
+## SECTION 2: DEVELOPMENT WORKFLOWS
+
+### 2.1 GIT COMMIT CONVENTION
+
+All commits must follow this exact format:
+
+```text
+<type>: <concise summary>
+
+- <bullet point details>
+- <additional details>
+```
+
+Where type must be one of:
+
+- feat: New features
+- fix: Bug fixes
+- docs: Documentation changes
+- test: Test additions or modifications
+- refactor: Non-feature, non-bug code changes
+- style: Formatting changes
+- ci: CI configuration changes
+- build: Build system changes
+- deps: Dependency updates
+
+For multiple types, separate with empty lines:
+
+```text
+feat: add new feature
+
+- Feature implementation details
+
+docs: update documentation
+
+- Documentation details
+```
+
+### 2.2 CHANGELOG REQUIREMENTS
+
+1. Location: CHANGELOG.md
+2. Format: Keep a Changelog (<https://keepachangelog.com/en/1.1.0/>)
+3. Structure:
+   - [Unreleased] section at top
+   - Version sections with release dates
+   - Category headings within each version:
+     - Added: New features
+     - Changed: Changes to existing functionality
+     - Deprecated: Soon-to-be removed features
+     - Removed: Removed features
+     - Fixed: Bug fixes
+     - Security: Vulnerability fixes
+4. Actions Required:
+   - Add all significant changes to [Unreleased]
+   - Use end-user language, not technical details
+   - Update comparison links at bottom of file
+   - Include changelog updates in PRs
+
+## SECTION 3: DESIGN PRINCIPLES
+
+### 3.1 CLI INTERFACE PRINCIPLES
+
+1. Progressive Disclosure:
+   - Basic usage must be simple
+   - Advanced features available but not required
+   - Example: Optional flags for advanced functionality
+
+2. Default Values:
+   - Every option must have a sensible default
+   - Document all defaults in help text
+   - Defaults must work without configuration
+
+3. Interface Consistency:
+   - Command structure must be uniform
+   - Flag naming must follow patterns:
+     - --kebab-case for flags
+     - Consistent naming across related commands
+
+4. Error Handling:
+   - Error messages must explain:
+     - What went wrong
+     - Why it went wrong
+     - How to fix it
+   - Return appropriate exit codes
+
+5. Documentation:
+   - Every command must have:
+     - Short description (one line)
+     - Long description (multiple paragraphs)
+     - Example usage
+     - Flag documentation
+
+### 3.2 CODE ORGANIZATION PRINCIPLES
+
+1. Command Isolation:
+   - Each command in separate file
+   - Self-contained configuration
+   - Specific pattern: cmd/<command_name>.go
+
+2. Package Structure:
+   - cmd/: Command implementations
+   - internal/: Private implementation
+   - pkg/: Public API (if applicable)
+   - testdata/: Test fixtures
+
+3. Dependency Boundaries:
+   - No circular dependencies
+   - Clear dependency direction (low to high)
+   - Explicit interfaces between packages
+
+## SECTION 4: COLLABORATION REQUIREMENTS
+
+### 4.1 PULL REQUEST PROCESS
+
+1. Required Elements:
+   - Tests for all new functionality
+   - Documentation updates
+   - Changelog entries
+   - Passing CI checks
+
+2. Acceptance Criteria:
+   - No reduction in code coverage
+   - Adherence to project structure
+   - Proper error handling
+   - Configuration follows patterns
+
+### 4.2 CODE REVIEW GUIDELINES
+
+1. Review Focus Areas:
+   - Correctness of implementation
+   - Adherence to project patterns
+   - User experience considerations
+   - Error handling completeness
+
+2. Feedback Style:
+   - Specific and actionable comments
+   - Reference to relevant principles
+   - Constructive suggestions
+
+### 4.3 ISSUE MANAGEMENT
+
+1. Issue Requirements:
+   - Clear title describing problem/feature
+   - Detailed description
+   - Reproduction steps for bugs
+   - Expected vs. actual behavior
+
+2. Issue References:
+   - Reference issues in commits using #issue_number
+   - Close issues with "Fixes #issue_number" in PR
+
+## SECTION 5: IMPLEMENTATION DETAILS
+
+### 5.1 COMMAND IMPLEMENTATION PATTERN
+
+Every command must follow this structure:
+
+1. Define command with cobra.Command
+2. Set command-specific flags
+3. Bind flags to Viper
+4. Implement a dedicated initCommandConfig() function
+5. Use RunE (not Run) to support error handling
+
+Example command skeleton:
+
+```go
+var commandCmd = &cobra.Command{
+    Use:   "command",
+    Short: "One line description",
+    Long:  `Detailed multi-line description.`,
+    RunE:  runCommand,
+}
+
+func init() {
+    commandCmd.Flags().String("flag", "default", "Flag description")
+    viper.BindPFlag("app.command.flag", commandCmd.Flags().Lookup("flag"))
+    RootCmd.AddCommand(commandCmd)
+}
+
+func initCommandConfig() {
+    viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+    viper.AutomaticEnv()
+    viper.SetDefault("app.command.flag", "default")
+}
+
+func runCommand(cmd *cobra.Command, args []string) error {
+    initCommandConfig()
+    // Implementation
+    return nil
+}
+```
+
+### 5.2 TESTING REQUIREMENTS
+
+1. Test Coverage Targets:
+   - 80% overall coverage minimum
+   - 100% coverage for critical paths
+
+2. Test Structure:
+   - Reset Viper before each test
+   - Test with multiple configurations
+   - Test error cases explicitly
+
+3. UI Testing:
+   - Use mocks for UI testing
+   - Test terminal output capture
+
+### 5.3 DEPENDENCY MANAGEMENT
+
+1. Required Tasks:
+   - deps:verify: Verify integrity
+   - deps:outdated: Check for updates
+   - deps:check: All checks combined
+
+2. Update Process:
+   - Incremental updates preferred
+   - Run tests after updates
+   - Document in CHANGELOG.md
+
+## SECTION 6: VERSIONING AND RELEASE
+
+### 6.1 VERSION SCHEME
+
+Follow semantic versioning:
+
+- MAJOR: Breaking changes
+- MINOR: New features, backward-compatible
+- PATCH: Bug fixes, backward-compatible
+
+### 6.2 RELEASE PROCESS
+
+1. Steps:
+   - Update CHANGELOG.md
+   - Update version references
+   - Create git tag with v prefix (v1.0.0)
+   - Push tag to trigger release workflow
+
+2. Release Notes:
+   - Summarize changes from CHANGELOG.md
+   - Highlight breaking changes
+   - Include upgrade instructions
+
+## SECTION 7: IMPLEMENTATION PHASES
+
+### 7.1 DEVELOPMENT SEQUENCE
+
+Follow these phases in order:
+
+1. Project setup and scaffolding
+2. Root command and global configuration
+3. Logging system implementation
+4. Sample command implementation
+5. Testing infrastructure
+6. Task automation
+7. Documentation
+8. CI/CD setup
+
+### 7.2 QUALITY GATES
+
+Each phase must pass:
+
+- Linting checks
+- Tests with coverage targets
+- Documentation requirements
+- Dependency verification
+
+## SUMMARY
+
+This project requires strict adherence to:
+
+1. Modular command structure
+2. Consistent configuration patterns
+3. Comprehensive testing
+4. Detailed documentation
+5. Semantic versioning
+6. Conventional commits
+7. Keep a Changelog format
+8. Regular dependency maintenance
+
+END OF SPECIFICATION

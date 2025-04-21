@@ -49,6 +49,7 @@
     - [Adding New Commands](#adding-new-commands)
     - [Modifying Configurations](#modifying-configurations)
     - [Customizing the UI](#customizing-the-ui)
+    - [Cursor AI Integration](#cursor-ai-integration)
   - [Tooling Best Practices](#tooling-best-practices)
   - [Contributing](#contributing)
   - [License](#license)
@@ -346,6 +347,30 @@ Set new defaults in `initConfig` or in command files. Use `viper.BindPFlag()` to
 ### Customizing the UI
 
 Explore the `internal/ui/` package to modify the Bubble Tea model, colors, and interactivity. Use configs to allow runtime customization of UI elements.
+
+### Cursor AI Integration
+
+The project includes a template for Cursor AI rules in `dot.cursorrules`. This template contains detailed project specifications that help Cursor AI understand the project structure, coding conventions, and requirements.
+
+To use it with Cursor:
+
+1. Copy the template to a `.cursorrules` file:
+
+```bash
+cp dot.cursorrules .cursorrules
+```
+
+2. Cursor will automatically detect and use these rules to provide better code suggestions and assistance.
+
+The template covers:
+
+- Project structure and design principles
+- Command implementation patterns
+- Error handling guidelines
+- Testing requirements
+- Git commit conventions
+
+You can customize the rules to match your project's specific requirements.
 
 ---
 
