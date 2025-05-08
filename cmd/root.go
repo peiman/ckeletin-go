@@ -19,6 +19,8 @@ var (
 	Commit     = ""
 	Date       = ""
 	binaryName = "ckeletin-go"
+	configFileStatus     string
+	configFileUsed       string
 )
 
 // Export RootCmd so that tests in other packages can manipulate it without getters/setters.
@@ -34,6 +36,16 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 		if err := logger.Init(nil); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
+		
+		// Log config status after logger is initialized
+		if configFileStatus != "" {
+			if configFileUsed != "" {
+				log.Info().Str("config_file", configFileUsed).Msg(configFileStatus)
+			} else {
+				log.Debug().Msg(configFileStatus)
+			}
+		}
+		
 		return nil
 	},
 }
@@ -73,13 +85,15 @@ func initConfig() error {
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Info().Msg("No config file found, using defaults and environment variables")
+			configFileStatus = "No config file found, using defaults and environment variables"
 		} else {
+			// This error needs to be reported immediately
 			log.Error().Err(err).Msg("Failed to read config file")
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
 	} else {
-		log.Info().Str("config_file", viper.ConfigFileUsed()).Msg("Using config file")
+		configFileStatus = "Using config file"
+		configFileUsed = viper.ConfigFileUsed()
 	}
 
 	return nil
