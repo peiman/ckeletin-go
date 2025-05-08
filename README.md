@@ -1,5 +1,9 @@
 # ckeletin-go
 
+![ckeletin-go](ckeletin-go.png)
+
+**A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications.**
+
 [![Build Status](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml/badge.svg)](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/peiman/ckeletin-go)](https://codecov.io/gh/peiman/ckeletin-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/peiman/ckeletin-go)](https://goreportcard.com/report/github.com/peiman/ckeletin-go)
@@ -8,8 +12,6 @@
 [![License](https://img.shields.io/github/license/peiman/ckeletin-go)](LICENSE)
 [![CodeQL](https://github.com/peiman/ckeletin-go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/peiman/ckeletin-go/security/code-scanning)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-brightgreen.svg)](https://go.dev)
-
-**A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications.**
 
 ---
 
