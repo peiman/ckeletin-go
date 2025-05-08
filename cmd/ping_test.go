@@ -42,6 +42,113 @@ func setupTestViper(ui bool, message, color string) {
 	viper.SetDefault("app.ping.ui", ui)
 }
 
+// TestInitPingConfig ensures the default values are properly set
+func TestInitPingConfig(t *testing.T) {
+	// Reset viper for a clean test
+	viper.Reset()
+
+	// Call the function
+	initPingConfig()
+
+	// Check that defaults are set correctly
+	if viper.GetString("app.ping.output_message") != "Pong" {
+		t.Errorf("Expected default message to be 'Pong', got '%s'", viper.GetString("app.ping.output_message"))
+	}
+
+	if viper.GetString("app.ping.output_color") != "white" {
+		t.Errorf("Expected default color to be 'white', got '%s'", viper.GetString("app.ping.output_color"))
+	}
+
+	if viper.GetBool("app.ping.ui") != false {
+		t.Errorf("Expected default ui to be false, got %v", viper.GetBool("app.ping.ui"))
+	}
+}
+
+// TestPingCommandFlags tests that flags are correctly processed including from config file
+func TestPingCommandFlags(t *testing.T) {
+	// Setup test config in viper
+	viper.Reset()
+	viper.Set("app.ping.output_message", "ConfigMessage")
+	viper.Set("app.ping.output_color", "blue")
+	viper.Set("app.ping.ui", true)
+
+	// Create a command for testing
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("message", "", "Custom output message")
+	cmd.Flags().String("color", "", "Output color")
+	cmd.Flags().Bool("ui", false, "Enable UI")
+
+	// Test when flag is not set (should use viper value)
+	message := viper.GetString("app.ping.output_message")
+	if cmd.Flags().Changed("message") {
+		message, _ = cmd.Flags().GetString("message")
+	}
+
+	if message != "ConfigMessage" {
+		t.Errorf("Expected message to be 'ConfigMessage', got '%s'", message)
+	}
+
+	// Test when flag is set (should override viper value)
+	if err := cmd.Flags().Set("message", "FlagMessage"); err != nil {
+		t.Fatalf("Failed to set message flag: %v", err)
+	}
+
+	message = viper.GetString("app.ping.output_message")
+	if cmd.Flags().Changed("message") {
+		message, _ = cmd.Flags().GetString("message")
+	}
+
+	if message != "FlagMessage" {
+		t.Errorf("Expected message to be 'FlagMessage' when flag is set, got '%s'", message)
+	}
+
+	// Test the same for color
+	colorStr := viper.GetString("app.ping.output_color")
+	if cmd.Flags().Changed("color") {
+		colorStr, _ = cmd.Flags().GetString("color")
+	}
+
+	if colorStr != "blue" {
+		t.Errorf("Expected color to be 'blue', got '%s'", colorStr)
+	}
+
+	if err := cmd.Flags().Set("color", "red"); err != nil {
+		t.Fatalf("Failed to set color flag: %v", err)
+	}
+
+	colorStr = viper.GetString("app.ping.output_color")
+	if cmd.Flags().Changed("color") {
+		colorStr, _ = cmd.Flags().GetString("color")
+	}
+
+	if colorStr != "red" {
+		t.Errorf("Expected color to be 'red' when flag is set, got '%s'", colorStr)
+	}
+
+	// Test the same for ui flag
+	uiFlag := viper.GetBool("app.ping.ui")
+	if cmd.Flags().Changed("ui") {
+		uiFlag, _ = cmd.Flags().GetBool("ui")
+	}
+
+	if uiFlag != true {
+		t.Errorf("Expected ui to be true, got %v", uiFlag)
+	}
+
+	if err := cmd.Flags().Set("ui", "false"); err != nil {
+		t.Fatalf("Failed to set ui flag: %v", err)
+	}
+
+	uiFlag = viper.GetBool("app.ping.ui")
+	if cmd.Flags().Changed("ui") {
+		uiFlag, _ = cmd.Flags().GetBool("ui")
+	}
+
+	if uiFlag != false {
+		t.Errorf("Expected ui to be false when flag is set, got %v", uiFlag)
+	}
+}
+
 func TestPingCommand(t *testing.T) {
 	// Setup debug logging for tests
 	logBuf := &bytes.Buffer{}

@@ -5,6 +5,8 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -59,5 +61,69 @@ func TestExecute_ErrorPropagation(t *testing.T) {
 	err := Execute()
 	if err == nil || !strings.Contains(err.Error(), "some error") {
 		t.Errorf("Expected 'some error', got %v", err)
+	}
+}
+
+func TestInitConfig_WithConfigFile(t *testing.T) {
+	// Reset viper state before and after test
+	viper.Reset()
+	defer viper.Reset()
+
+	// Capture the original value and restore after test
+	origCfgFile := cfgFile
+	defer func() { cfgFile = origCfgFile }()
+
+	// Setup: point to the testdata config file
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+
+	testConfigPath := filepath.Join(wd, "../testdata/config.yaml")
+	// For debugging, output the path and check if file exists
+	_, err = os.Stat(testConfigPath)
+	if err != nil {
+		t.Logf("Test path doesn't exist: %s, err: %v", testConfigPath, err)
+		// Try a different path
+		testConfigPath = "./testdata/config.yaml"
+		_, err = os.Stat(testConfigPath)
+		if err != nil {
+			t.Fatalf("Could not find config file at either path: %v", err)
+		}
+	}
+	cfgFile = testConfigPath
+
+	// Capture logs for verification
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// Backup the original variables and restore after test
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	defer func() {
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+	}()
+
+	// Run the function
+	err = initConfig()
+
+	// Check result
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+
+	// Verify the variables are set correctly
+	if configFileStatus != "Using config file" {
+		t.Errorf("Expected configFileStatus to be 'Using config file', got '%s'", configFileStatus)
+	}
+
+	if !strings.Contains(configFileUsed, "testdata/config.yaml") {
+		t.Errorf("Expected configFileUsed to contain 'testdata/config.yaml', got '%s'", configFileUsed)
+	}
+
+	// Verify that viper read the config values
+	if viper.GetString("app.log_level") != "info" {
+		t.Errorf("Expected app.log_level to be 'info', got '%s'", viper.GetString("app.log_level"))
 	}
 }

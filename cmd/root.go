@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	cfgFile    string
-	Version    = "dev"
-	Commit     = ""
-	Date       = ""
-	binaryName = "ckeletin-go"
-	configFileStatus     string
-	configFileUsed       string
+	cfgFile          string
+	Version          = "dev"
+	Commit           = ""
+	Date             = ""
+	binaryName       = "ckeletin-go"
+	configFileStatus string
+	configFileUsed   string
 )
 
 // Export RootCmd so that tests in other packages can manipulate it without getters/setters.
@@ -36,7 +36,7 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 		if err := logger.Init(nil); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
-		
+
 		// Log config status after logger is initialized
 		if configFileStatus != "" {
 			if configFileUsed != "" {
@@ -45,7 +45,7 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 				log.Debug().Msg(configFileStatus)
 			}
 		}
-		
+
 		return nil
 	},
 }
