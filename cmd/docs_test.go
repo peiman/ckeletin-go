@@ -44,130 +44,218 @@ func newMockFile(w io.Writer, closeErr error) io.WriteCloser {
 
 // TestGenerateMarkdownDocs tests the markdown documentation generation
 func TestGenerateMarkdownDocs(t *testing.T) {
-	// Save original binary name and restore after test
-	origBinaryName := binaryName
-	defer func() {
-		binaryName = origBinaryName
-	}()
-
-	// Set test binary name
-	binaryName = "testapp"
-
-	// Output buffer
-	var buf bytes.Buffer
-
-	// Generate docs
-	err := generateMarkdownDocs(&buf)
-	if err != nil {
-		t.Fatalf("generateMarkdownDocs() error = %v", err)
+	tests := []struct {
+		name              string
+		binaryNameToSet   string
+		expectedSections  []string
+		expectedEnvPrefix string
+	}{
+		{
+			name:            "Standard markdown generation",
+			binaryNameToSet: "testapp",
+			expectedSections: []string{
+				"# testapp Configuration",
+				"## Configuration Sources",
+				"## Configuration Options",
+				"| Key | Type | Default | Environment Variable | Description |",
+				"## Example Configuration",
+				"### YAML Configuration File",
+				"### Environment Variables",
+			},
+			expectedEnvPrefix: "TESTAPP_APP_LOG_LEVEL",
+		},
 	}
 
-	// Check output
-	output := buf.String()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save original binary name and restore after test
+			origBinaryName := binaryName
+			defer func() {
+				binaryName = origBinaryName
+			}()
 
-	// Check for expected sections
-	expectedSections := []string{
-		"# testapp Configuration",
-		"## Configuration Sources",
-		"## Configuration Options",
-		"| Key | Type | Default | Environment Variable | Description |",
-		"## Example Configuration",
-		"### YAML Configuration File",
-		"### Environment Variables",
-	}
+			// Set test binary name
+			binaryName = tt.binaryNameToSet
 
-	for _, section := range expectedSections {
-		if !strings.Contains(output, section) {
-			t.Errorf("generateMarkdownDocs() output missing section: %q", section)
-		}
-	}
+			// Output buffer
+			var buf bytes.Buffer
 
-	// Check for environment variables with correct prefix
-	if !strings.Contains(output, "TESTAPP_APP_LOG_LEVEL") {
-		t.Errorf("generateMarkdownDocs() output missing environment variable with correct prefix")
-	}
+			// EXECUTION PHASE
+			err := generateMarkdownDocs(&buf)
 
-	// Additional checks for complete coverage
-	// Check that we're formatting the markdown correctly
-	if !strings.Contains(output, "| `app.") {
-		t.Errorf("generateMarkdownDocs() not formatting option keys correctly in markdown")
-	}
+			// ASSERTION PHASE
+			if err != nil {
+				t.Fatalf("generateMarkdownDocs() error = %v", err)
+			}
 
-	// Check for required field formatting (this tests the if opt.Required branch)
-	if !strings.Contains(output, " |") {
-		t.Errorf("generateMarkdownDocs() not formatting table cells correctly")
+			// Check output
+			output := buf.String()
+
+			// Check for expected sections
+			for _, section := range tt.expectedSections {
+				if !strings.Contains(output, section) {
+					t.Errorf("generateMarkdownDocs() output missing section: %q", section)
+				}
+			}
+
+			// Check for environment variables with correct prefix
+			if !strings.Contains(output, tt.expectedEnvPrefix) {
+				t.Errorf("generateMarkdownDocs() output missing environment variable with correct prefix")
+			}
+
+			// Additional checks for complete coverage
+			// Check that we're formatting the markdown correctly
+			if !strings.Contains(output, "| `app.") {
+				t.Errorf("generateMarkdownDocs() not formatting option keys correctly in markdown")
+			}
+
+			// Check for required field formatting (this tests the if opt.Required branch)
+			if !strings.Contains(output, " |") {
+				t.Errorf("generateMarkdownDocs() not formatting table cells correctly")
+			}
+		})
 	}
 }
 
 // Test specifically for required flag support in generateMarkdownDocs
 func TestGenerateMarkdownDocsRequiredFlag(t *testing.T) {
-	// Add a test configuration option that's marked as required
-	viper.SetDefault("app.test.required", "test")
-
-	// Output buffer
-	var buf bytes.Buffer
-
-	// Generate docs
-	err := generateMarkdownDocs(&buf)
-	if err != nil {
-		t.Fatalf("generateMarkdownDocs() error = %v", err)
+	tests := []struct {
+		name             string
+		configToSet      string
+		configValue      string
+		expectedContains string
+	}{
+		{
+			name:             "Required flag in table",
+			configToSet:      "app.test.required",
+			configValue:      "test",
+			expectedContains: "| Key | Type | Default | Environment Variable | Description |",
+		},
 	}
 
-	// Check output for Required indicator
-	output := buf.String()
-	if !strings.Contains(output, "| Key | Type | Default | Environment Variable | Description |") {
-		t.Errorf("Markdown table header missing")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save viper state
+			defer viper.Reset()
+			viper.Reset()
+
+			// Add a test configuration option that's marked as required
+			viper.SetDefault(tt.configToSet, tt.configValue)
+
+			// Output buffer
+			var buf bytes.Buffer
+
+			// EXECUTION PHASE
+			err := generateMarkdownDocs(&buf)
+
+			// ASSERTION PHASE
+			if err != nil {
+				t.Fatalf("generateMarkdownDocs() error = %v", err)
+			}
+
+			// Check output for Required indicator
+			output := buf.String()
+			if !strings.Contains(output, tt.expectedContains) {
+				t.Errorf("Markdown table header missing")
+			}
+		})
 	}
 }
 
 // TestGenerateYAMLConfig tests the YAML configuration template generation
 func TestGenerateYAMLConfig(t *testing.T) {
-	// Output buffer
-	var buf bytes.Buffer
-
-	// Generate YAML
-	err := generateYAMLConfig(&buf)
-	if err != nil {
-		t.Fatalf("generateYAMLConfig() error = %v", err)
+	tests := []struct {
+		name             string
+		expectedContains []string
+	}{
+		{
+			name: "YAML structure validation",
+			expectedContains: []string{
+				"app:",
+				"# Logging level for the application",
+				"log_level:",
+			},
+		},
 	}
 
-	// Check output
-	output := buf.String()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Output buffer
+			var buf bytes.Buffer
 
-	// Check for expected YAML structure
-	expectedParts := []string{
-		"app:",
-		"# Logging level for the application",
-		"log_level:",
-	}
+			// EXECUTION PHASE
+			err := generateYAMLConfig(&buf)
 
-	for _, part := range expectedParts {
-		if !strings.Contains(output, part) {
-			t.Errorf("generateYAMLConfig() output missing expected part: %q", part)
-		}
-	}
+			// ASSERTION PHASE
+			if err != nil {
+				t.Fatalf("generateYAMLConfig() error = %v", err)
+			}
 
-	// Check specific formatting elements
-	if !strings.Contains(output, "  #") && !strings.Contains(output, "  log_level:") {
-		t.Errorf("generateYAMLConfig() not formatting nested options correctly")
+			// Check output
+			output := buf.String()
+
+			// Check for expected YAML structure
+			for _, part := range tt.expectedContains {
+				if !strings.Contains(output, part) {
+					t.Errorf("generateYAMLConfig() output missing expected part: %q", part)
+				}
+			}
+
+			// Check specific formatting elements
+			if !strings.Contains(output, "  #") && !strings.Contains(output, "  log_level:") {
+				t.Errorf("generateYAMLConfig() not formatting nested options correctly")
+			}
+		})
 	}
 }
 
 // Test specifically for non-nested option support in generateYAMLConfig
 func TestGenerateYAMLConfigStandaloneOption(t *testing.T) {
-	// Mock registry to include a standalone option (no dots in key)
-	viper.SetDefault("standalone_option", "test")
-
-	// Output buffer
-	var buf bytes.Buffer
-
-	// Generate YAML
-	err := generateYAMLConfig(&buf)
-	if err != nil {
-		t.Fatalf("generateYAMLConfig() error = %v", err)
+	tests := []struct {
+		name          string
+		standaloneKey string
+		defaultValue  string
+		wantErr       bool
+	}{
+		{
+			name:          "Standalone option (no dots in key)",
+			standaloneKey: "standalone_option",
+			defaultValue:  "test",
+			wantErr:       false,
+		},
 	}
 
-	// The test passes if the function executes without errors
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save viper state and restore after
+			defer viper.Reset()
+			viper.Reset()
+
+			// Set up a standalone option (no dots in key) in viper
+			// Note: we can't easily mock the registry, so we just set this up and test that the
+			// function runs without error. The actual behavior with standalone options
+			// should be tested in a more focused test that can mock config.Registry()
+			viper.SetDefault(tt.standaloneKey, tt.defaultValue)
+
+			// Output buffer
+			var buf bytes.Buffer
+
+			// EXECUTION PHASE
+			err := generateYAMLConfig(&buf)
+
+			// ASSERTION PHASE
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("generateYAMLConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// We're just verifying that the function doesn't crash with standalone options
+			// A more comprehensive test would need to mock the registry
+		})
+	}
 }
 
 // TestRunDocsConfig tests the docs config command execution
@@ -363,77 +451,194 @@ func TestRunDocsConfig(t *testing.T) {
 // TestRunDocsConfig_FileCloseError tests the file close error specifically,
 // it verifies that the error is at least logged even if not returned.
 func TestRunDocsConfig_FileCloseError(t *testing.T) {
-	// Setup
-	origOpenOutputFile := openOutputFile
-	defer func() {
-		openOutputFile = origOpenOutputFile
-	}()
-
-	// Reset and set up configs
-	viper.Reset()
-	docsOutputFormat = FormatMarkdown
-	docsOutputFile = "test_output.md"
-
-	// Create a command for testing
-	cmd := &cobra.Command{Use: "config"}
-	cmd.Flags().String("format", FormatMarkdown, "Output format (markdown, yaml)")
-	cmd.Flags().String("output-file", "", "Output file")
-
-	// Create a buffer to capture output
-	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-
-	// Also capture log output
-	var logBuf bytes.Buffer
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	log.Logger = zerolog.New(&logBuf)
-
-	// Mock the file open function to return a file that will error on close
-	openOutputFile = func(path string) (io.WriteCloser, error) {
-		// Create a custom closer that will return our error
-		closer := &mockCloser{
-			Writer:   &buf,
-			closeErr: errCloseFailure,
-		}
-
-		return closer, nil
+	tests := []struct {
+		name         string
+		closeErr     error
+		wantLogEntry string
+	}{
+		{
+			name:         "File close error is logged",
+			closeErr:     errCloseFailure,
+			wantLogEntry: "Failed to close output file",
+		},
 	}
 
-	// Execute the function
-	_ = runDocsConfig(cmd, []string{})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save original open file function
+			origOpenOutputFile := openOutputFile
+			defer func() {
+				openOutputFile = origOpenOutputFile
+			}()
 
-	// Check log output instead of return error
-	logOutput := logBuf.String()
-	if !strings.Contains(logOutput, "Failed to close output file") ||
-		!strings.Contains(logOutput, errCloseFailure.Error()) {
-		t.Errorf("Close error not properly logged. Log output: %s", logOutput)
+			// Reset and set up configs
+			viper.Reset()
+			docsOutputFormat = FormatMarkdown
+			docsOutputFile = "test_output.md"
+
+			// Create a command for testing
+			cmd := &cobra.Command{Use: "config"}
+			cmd.Flags().String("format", FormatMarkdown, "Output format (markdown, yaml)")
+			cmd.Flags().String("output-file", "", "Output file")
+
+			// Create a buffer to capture output
+			var buf bytes.Buffer
+			cmd.SetOut(&buf)
+
+			// Also capture log output
+			var logBuf bytes.Buffer
+			zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+			log.Logger = zerolog.New(&logBuf)
+
+			// Mock the file open function to return a file that will error on close
+			openOutputFile = func(path string) (io.WriteCloser, error) {
+				// Create a custom closer that will return our error
+				closer := &mockCloser{
+					Writer:   &buf,
+					closeErr: tt.closeErr,
+				}
+
+				return closer, nil
+			}
+
+			// EXECUTION PHASE
+			_ = runDocsConfig(cmd, []string{})
+
+			// ASSERTION PHASE
+			// Check log output instead of return error
+			logOutput := logBuf.String()
+			if !strings.Contains(logOutput, tt.wantLogEntry) ||
+				!strings.Contains(logOutput, tt.closeErr.Error()) {
+				t.Errorf("Close error not properly logged. Log output: %s", logOutput)
+			}
+		})
 	}
 }
 
 // TestDocsCommands tests the docs command structure
 func TestDocsCommands(t *testing.T) {
-	// Verify the docs command is properly initialized
-	if docsCmd.Use != "docs" {
-		t.Errorf("docsCmd.Use = %q, want %q", docsCmd.Use, "docs")
+	tests := []struct {
+		name          string
+		cmd           *cobra.Command
+		expectedUse   string
+		flagToCheck   string
+		expectedShort string
+	}{
+		{
+			name:        "docs command",
+			cmd:         docsCmd,
+			expectedUse: "docs",
+		},
+		{
+			name:          "config subcommand",
+			cmd:           configCmd,
+			expectedUse:   "config",
+			flagToCheck:   "format",
+			expectedShort: "f",
+		},
+		{
+			name:          "output flag check",
+			cmd:           configCmd,
+			flagToCheck:   "output",
+			expectedShort: "o",
+		},
 	}
 
-	// Verify the config subcommand is properly initialized
-	if configCmd.Use != "config" {
-		t.Errorf("configCmd.Use = %q, want %q", configCmd.Use, "config")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// No specific setup needed for this test
+
+			// EXECUTION PHASE
+			// The commands are already initialized during package init
+
+			// ASSERTION PHASE
+			if tt.expectedUse != "" && tt.cmd.Use != tt.expectedUse {
+				t.Errorf("%s.Use = %q, want %q", tt.name, tt.cmd.Use, tt.expectedUse)
+			}
+
+			if tt.flagToCheck != "" {
+				flag := tt.cmd.Flag(tt.flagToCheck)
+				if flag == nil {
+					t.Errorf("Missing '%s' flag in %s", tt.flagToCheck, tt.name)
+				} else if flag.Shorthand != tt.expectedShort {
+					t.Errorf("%s.Shorthand = %q, want %q", tt.flagToCheck, flag.Shorthand, tt.expectedShort)
+				}
+			}
+		})
+	}
+}
+
+// Test for proper YAML nesting structure in generateYAMLConfig
+func TestGenerateYAMLConfigNestedStructure(t *testing.T) {
+	tests := []struct {
+		name              string
+		expectedStrings   []string
+		unexpectedStrings []string
+	}{
+		{
+			name: "Nested YAML structure",
+			expectedStrings: []string{
+				"app:",
+				"  log_level:",
+				"  ping:",
+				"    output_message:",
+				"    output_color:",
+				"    ui:",
+			},
+			unexpectedStrings: []string{
+				"  ping.output_message:",
+				"  ping.output_color:",
+				"  ping.ui:",
+			},
+		},
 	}
 
-	// Verify command flags
-	formatFlag := configCmd.Flag("format")
-	if formatFlag == nil {
-		t.Errorf("Missing 'format' flag in configCmd")
-	} else if formatFlag.Shorthand != "f" {
-		t.Errorf("formatFlag.Shorthand = %q, want %q", formatFlag.Shorthand, "f")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Reset viper state to ensure clean test
+			viper.Reset()
 
-	outputFlag := configCmd.Flag("output")
-	if outputFlag == nil {
-		t.Errorf("Missing 'output' flag in configCmd")
-	} else if outputFlag.Shorthand != "o" {
-		t.Errorf("outputFlag.Shorthand = %q, want %q", outputFlag.Shorthand, "o")
+			// Output buffer
+			var buf bytes.Buffer
+
+			// EXECUTION PHASE
+			err := generateYAMLConfig(&buf)
+
+			// ASSERTION PHASE
+			if err != nil {
+				t.Fatalf("generateYAMLConfig() error = %v", err)
+			}
+
+			// Get output
+			output := buf.String()
+
+			// Check that expected strings are in the output
+			for _, s := range tt.expectedStrings {
+				if !strings.Contains(output, s) {
+					t.Errorf("generateYAMLConfig() output missing expected content: %q", s)
+				}
+			}
+
+			// Check that unexpected strings are NOT in the output
+			for _, s := range tt.unexpectedStrings {
+				if strings.Contains(output, s) {
+					t.Errorf("generateYAMLConfig() output contains unexpected content: %q", s)
+				}
+			}
+
+			// Ensure proper indentation of nested structures
+			// The ping section should be indented under app
+			if !strings.Contains(output, "  ping:") {
+				t.Errorf("generateYAMLConfig() output not properly indenting 'ping' under 'app'")
+			}
+
+			// The output_message should be indented under ping
+			if !strings.Contains(output, "    output_") {
+				t.Errorf("generateYAMLConfig() output not properly indenting options under 'ping'")
+			}
+		})
 	}
 }

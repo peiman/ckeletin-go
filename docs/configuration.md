@@ -29,14 +29,15 @@ app:
   # Logging level for the application (trace, debug, info, warn, error, fatal, panic)
   log_level: debug
 
-  # Default message to display for the ping command
-  ping.output_message: Hello World!
+  ping:
+    # Default message to display for the ping command
+    output_message: Hello World!
 
-  # Text color for ping command output (white, red, green, blue, cyan, yellow, magenta)
-  ping.output_color: green
+    # Text color for ping command output (white, red, green, blue, cyan, yellow, magenta)
+    output_color: green
 
-  # Enable interactive UI for the ping command
-  ping.ui: true
+    # Enable interactive UI for the ping command
+    ui: true
 
 ```
 

@@ -5,6 +5,9 @@ alwaysApply: false
 ---
 # Testing Requirements
 
+## task check
+- Always run `task check` when you have modified any test
+
 ## Coverage Targets
 - 80% overall code coverage minimum
 - 100% coverage for critical paths
@@ -12,10 +15,38 @@ alwaysApply: false
 - All error paths must be tested
 
 ## Test Structure
-- Use table-driven tests for multiple test cases
+- Use table-driven tests for multiple test cases:
+  ```go
+  tests := []struct {
+      name string      // Descriptive test case name
+      input type       // Test input
+      expected type    // Expected output/result
+      wantErr bool     // Whether an error is expected
+  }{
+      {"Test case 1", input1, expected1, false},
+      {"Test case 2", input2, expected2, true},
+  }
+
+  for _, tt := range tests {
+      t.Run(tt.name, func(t *testing.T) {
+          // SETUP PHASE
+          // Prepare any test fixtures or dependencies
+
+          // EXECUTION PHASE
+          // Execute the code under test
+
+          // ASSERTION PHASE
+          // Verify results match expectations
+      })
+  }
+  ```
 - Reset Viper before each test to avoid configuration leakage
 - Test with multiple configurations to verify behavior
 - Test error cases explicitly and verify error messages
+- Always clearly separate test phases with comments:
+  1. `// SETUP PHASE`: Test initialization and fixture preparation
+  2. `// EXECUTION PHASE`: Function or method being tested
+  3. `// ASSERTION PHASE`: Result validation and error checking
 
 ## Unit Testing
 - Test each function/method in isolation
@@ -46,4 +77,10 @@ alwaysApply: false
 - `task test:coverage`: Run tests with coverage report
 - `task test:race`: Run tests with race detector
 - `task test:unit`: Run only unit tests
-- `task test:integration`: Run only integration tests 
+- `task test:integration`: Run only integration tests
+
+## Test Helpers and Fixtures
+- Place test fixtures in `testdata/` directory
+- Create reusable test helper functions for common setup operations
+- Document test fixtures and their purpose
+- Use descriptive names for test helper functions 

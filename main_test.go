@@ -11,40 +11,57 @@ import (
 )
 
 func TestMainFunction(t *testing.T) {
-	// Save the original RootCmd
-	originalRoot := cmd.RootCmd
-	// Create a test root command
-	testRoot := &cobra.Command{Use: "test"}
-	// Replace global RootCmd with our test root
-	cmd.RootCmd = testRoot
-	// Restore after the test
-	defer func() { cmd.RootCmd = originalRoot }()
-
-	// Add a dummy success command
-	testRoot.AddCommand(&cobra.Command{
-		Use: "success",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+	// Define test cases
+	tests := []struct {
+		name     string
+		cmd      string
+		cmdError error
+		wantCode int
+	}{
+		{
+			name:     "Success scenario",
+			cmd:      "success",
+			cmdError: nil,
+			wantCode: 0,
 		},
-	})
-
-	// Add a dummy fail command
-	testRoot.AddCommand(&cobra.Command{
-		Use: "fail",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return fmt.Errorf("simulated failure")
+		{
+			name:     "Failure scenario",
+			cmd:      "fail",
+			cmdError: fmt.Errorf("simulated failure"),
+			wantCode: 1,
 		},
-	})
-
-	// Test success scenario
-	testRoot.SetArgs([]string{"success"})
-	if code := run(); code != 0 {
-		t.Errorf("expected exit code 0, got %d", code)
 	}
 
-	// Test failure scenario
-	testRoot.SetArgs([]string{"fail"})
-	if code := run(); code != 1 {
-		t.Errorf("expected exit code 1, got %d", code)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save the original RootCmd
+			originalRoot := cmd.RootCmd
+			// Create a test root command
+			testRoot := &cobra.Command{Use: "test"}
+			// Replace global RootCmd with our test root
+			cmd.RootCmd = testRoot
+			// Restore after the test
+			defer func() { cmd.RootCmd = originalRoot }()
+
+			// Add a dummy command with the specified behavior
+			testRoot.AddCommand(&cobra.Command{
+				Use: tt.cmd,
+				RunE: func(cmd *cobra.Command, args []string) error {
+					return tt.cmdError
+				},
+			})
+
+			// Set command arguments
+			testRoot.SetArgs([]string{tt.cmd})
+
+			// EXECUTION PHASE
+			code := run()
+
+			// ASSERTION PHASE
+			if code != tt.wantCode {
+				t.Errorf("expected exit code %d, got %d", tt.wantCode, code)
+			}
+		})
 	}
 }
