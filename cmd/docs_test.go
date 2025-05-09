@@ -23,7 +23,7 @@ var errCloseFailure = errors.New("simulated close error")
 type mockCloser struct {
 	io.Writer
 	closeErr error
-	errCh    chan<- error  // Channel to send the error through
+	errCh    chan<- error // Channel to send the error through
 }
 
 func (m *mockCloser) Close() error {
@@ -180,68 +180,68 @@ func TestRunDocsConfig(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name             string
-		testFixturePath  string       // Path to test fixture
-		args             []string     // CLI args
-		expectOutput     string       // Expected output content
-		expectedFormat   string       // Expected format
-		wantErrContain   string       // Expected error substring, empty for no error
-		outputToFile     bool         // Whether to write to file
-		outputFilePath   string       // Output file path
-		mockCloseErr     error        // Mock file close error
+		name            string
+		testFixturePath string   // Path to test fixture
+		args            []string // CLI args
+		expectOutput    string   // Expected output content
+		expectedFormat  string   // Expected format
+		wantErrContain  string   // Expected error substring, empty for no error
+		outputToFile    bool     // Whether to write to file
+		outputFilePath  string   // Output file path
+		mockCloseErr    error    // Mock file close error
 	}{
 		{
-			name:           "Markdown Format Default",
+			name:            "Markdown Format Default",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{},
-			expectedFormat: FormatMarkdown,
-			expectOutput:   "# ckeletin-go Configuration",
-			wantErrContain: "",
+			args:            []string{},
+			expectedFormat:  FormatMarkdown,
+			expectOutput:    "# ckeletin-go Configuration",
+			wantErrContain:  "",
 		},
 		{
-			name:           "YAML Format",
+			name:            "YAML Format",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{"--format", "yaml"},
-			expectedFormat: FormatYAML,
-			expectOutput:   "app:",
-			wantErrContain: "",
+			args:            []string{"--format", "yaml"},
+			expectedFormat:  FormatYAML,
+			expectOutput:    "app:",
+			wantErrContain:  "",
 		},
 		{
-			name:           "Invalid Format",
+			name:            "Invalid Format",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{"--format", "invalid"},
-			wantErrContain: "unsupported format",
+			args:            []string{"--format", "invalid"},
+			wantErrContain:  "unsupported format",
 		},
 		{
-			name:           "Output to File Markdown",
+			name:            "Output to File Markdown",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{"--output-file", "test_output.md"},
-			expectedFormat: FormatMarkdown,
-			outputToFile:   true,
-			outputFilePath: "test_output.md",
-			expectOutput:   "# ckeletin-go Configuration",
-			wantErrContain: "",
+			args:            []string{"--output-file", "test_output.md"},
+			expectedFormat:  FormatMarkdown,
+			outputToFile:    true,
+			outputFilePath:  "test_output.md",
+			expectOutput:    "# ckeletin-go Configuration",
+			wantErrContain:  "",
 		},
 		{
-			name:           "Output to File YAML",
+			name:            "Output to File YAML",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{"--format", "yaml", "--output-file", "test_output.yaml"},
-			expectedFormat: FormatYAML,
-			outputToFile:   true,
-			outputFilePath: "test_output.yaml",
-			expectOutput:   "app:",
-			wantErrContain: "",
+			args:            []string{"--format", "yaml", "--output-file", "test_output.yaml"},
+			expectedFormat:  FormatYAML,
+			outputToFile:    true,
+			outputFilePath:  "test_output.yaml",
+			expectOutput:    "app:",
+			wantErrContain:  "",
 		},
 		{
-			name:           "File Close Error",
+			name:            "File Close Error",
 			testFixturePath: "../testdata/docs_config.yaml",
-			args:           []string{"--output-file", "test_output.md"},
-			expectedFormat: FormatMarkdown,
-			outputToFile:   true,
-			outputFilePath: "test_output.md",
-			mockCloseErr:   errCloseFailure,
-			wantErrContain: "",
-			expectOutput:   "# ckeletin-go Configuration",
+			args:            []string{"--output-file", "test_output.md"},
+			expectedFormat:  FormatMarkdown,
+			outputToFile:    true,
+			outputFilePath:  "test_output.md",
+			mockCloseErr:    errCloseFailure,
+			wantErrContain:  "",
+			expectOutput:    "# ckeletin-go Configuration",
 		},
 	}
 
@@ -368,26 +368,26 @@ func TestRunDocsConfig_FileCloseError(t *testing.T) {
 	defer func() {
 		openOutputFile = origOpenOutputFile
 	}()
-	
+
 	// Reset and set up configs
 	viper.Reset()
 	docsOutputFormat = FormatMarkdown
 	docsOutputFile = "test_output.md"
-	
+
 	// Create a command for testing
 	cmd := &cobra.Command{Use: "config"}
 	cmd.Flags().String("format", FormatMarkdown, "Output format (markdown, yaml)")
 	cmd.Flags().String("output-file", "", "Output file")
-	
+
 	// Create a buffer to capture output
 	var buf bytes.Buffer
 	cmd.SetOut(&buf)
-	
+
 	// Also capture log output
 	var logBuf bytes.Buffer
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	log.Logger = zerolog.New(&logBuf)
-	
+
 	// Mock the file open function to return a file that will error on close
 	openOutputFile = func(path string) (io.WriteCloser, error) {
 		// Create a custom closer that will return our error
@@ -395,17 +395,17 @@ func TestRunDocsConfig_FileCloseError(t *testing.T) {
 			Writer:   &buf,
 			closeErr: errCloseFailure,
 		}
-		
+
 		return closer, nil
 	}
-	
+
 	// Execute the function
 	_ = runDocsConfig(cmd, []string{})
-	
+
 	// Check log output instead of return error
 	logOutput := logBuf.String()
 	if !strings.Contains(logOutput, "Failed to close output file") ||
-	   !strings.Contains(logOutput, errCloseFailure.Error()) {
+		!strings.Contains(logOutput, errCloseFailure.Error()) {
 		t.Errorf("Close error not properly logged. Log output: %s", logOutput)
 	}
 }

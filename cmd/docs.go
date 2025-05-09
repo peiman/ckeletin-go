@@ -69,7 +69,7 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 	var writer io.Writer = cmd.OutOrStdout()
 	var file io.WriteCloser
 	var closeErr error
-	
+
 	// If output file is specified, create it
 	if docsOutputFile != "" {
 		var err error

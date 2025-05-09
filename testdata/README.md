@@ -42,4 +42,4 @@ For more complex tests that require mock data beyond configuration, consider:
 
 1. Adding subdirectories for specific test cases
 2. Using consistent naming patterns
-3. Documenting the structure and purpose of mock data 
+3. Documenting the structure and purpose of mock data

@@ -38,18 +38,21 @@ The `expected_outputs/` directory contains the expected output of commands for t
 Test fixtures can be used in your tests to:
 
 1. **Test Configuration Loading**: Use different config formats and scenarios
+
    ```go
    // Load a test config file
    viper.SetConfigFile("../../testdata/config.yaml")
    ```
 
 2. **Test Error Handling**: Use invalid configs to verify error handling
+
    ```go
    // Load an invalid config file
    viper.SetConfigFile("../../testdata/invalid_config.yaml")
    ```
 
 3. **Verify Command Output**: Compare command output with expected outputs
+
    ```go
    // Compare output with expected
    expected, err := os.ReadFile("../../testdata/expected_outputs/docs_markdown.md")
@@ -71,4 +74,4 @@ When adding new functionality that needs testing:
 2. **Document Purpose**: Include comments explaining the purpose of each test fixture
 3. **Use Realistic Data**: Make test fixtures representative of real-world usage
 4. **Version Control**: Always commit test fixtures alongside code changes
-5. **Isolation**: Each test fixture should be designed for a specific test case 
+5. **Isolation**: Each test fixture should be designed for a specific test case
