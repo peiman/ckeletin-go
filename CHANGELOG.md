@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added EnvPrefix() function to generate consistent environment variable prefixes
   - Created ConfigPaths() helper to centralize all config file paths/names
   - Ensured binary name changes automatically update environment variable prefixes
+- Enhanced YAML configuration handling:
+  - Improved YAML generation with proper nested structure
+  - Updated documentation to use consistent YAML format
+  - Added comprehensive tests to verify YAML structure
+- Enhanced developer guidance:
+  - Updated testing rules with clear table-driven test examples
+  - Added explicit test phase separation guidelines (setup, execution, assertion)
+  - Improved workflow rules for quality checks
 
 ### Changed
 
@@ -25,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added tests for config file path handling in root.go
   - Enhanced command testing for edge cases
   - Achieved higher coverage across core components
+  - Converted tests to table-driven format with phase separation
+  - Added clear setup, execution, and assertion phases for all tests
+- Migrated Cursor rules architecture:
+  - Transitioned from monolithic `dot.cursorrules` file to modular `.cursor/rules/` directory
+  - Created separate `.mdc` files for each rule category
+  - Improved organization with targeted rule files by domain
+  - Made rules more discoverable with specific file names
 
 ## [0.5.0] - 2025-04-22
 
