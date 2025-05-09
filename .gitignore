@@ -52,6 +52,7 @@ ckeletin-go.yaml
 # Test coverage
 coverage.txt
 test-output.json
+coverage.html
 
 # Aider
 .aider*
