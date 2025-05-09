@@ -138,28 +138,28 @@ func TestConfigPaths(t *testing.T) {
 
 	// Test with a known binary name
 	binaryName = "testapp"
-	
+
 	paths := ConfigPaths()
-	
+
 	// Verify the values are correctly constructed
 	if paths.DefaultName != ".testapp" {
 		t.Errorf("Expected DefaultName to be '.testapp', got '%s'", paths.DefaultName)
 	}
-	
+
 	if paths.Extension != "yaml" {
 		t.Errorf("Expected Extension to be 'yaml', got '%s'", paths.Extension)
 	}
-	
+
 	if paths.DefaultFullName != ".testapp.yaml" {
 		t.Errorf("Expected DefaultFullName to be '.testapp.yaml', got '%s'", paths.DefaultFullName)
 	}
-	
+
 	// DefaultPath includes the home directory, so we can't easily test its exact value
 	// But we can check that it ends with the expected filename
 	if !strings.HasSuffix(paths.DefaultPath, ".testapp.yaml") {
 		t.Errorf("Expected DefaultPath to end with '.testapp.yaml', got '%s'", paths.DefaultPath)
 	}
-	
+
 	if paths.IgnorePattern != "testapp.yaml" {
 		t.Errorf("Expected IgnorePattern to be 'testapp.yaml', got '%s'", paths.IgnorePattern)
 	}

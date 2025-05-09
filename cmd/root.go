@@ -40,16 +40,16 @@ func ConfigPaths() struct {
 	ext := "yaml"
 	defaultName := fmt.Sprintf(".%s", binaryName)
 	defaultFullName := fmt.Sprintf("%s.%s", defaultName, ext)
-	
+
 	home, err := os.UserHomeDir()
 	defaultPath := defaultFullName // Fallback if home dir not available
 	if err == nil {
 		defaultPath = filepath.Join(home, defaultFullName)
 	}
-	
+
 	// Used for .gitignore - without leading dot
 	ignorePattern := fmt.Sprintf("%s.%s", binaryName, ext)
-	
+
 	return struct {
 		DefaultName     string
 		Extension       string
@@ -112,7 +112,7 @@ func init() {
 
 func initConfig() error {
 	configPaths := ConfigPaths()
-	
+
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
 	} else {
