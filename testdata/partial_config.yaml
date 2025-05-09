@@ -1,0 +1,9 @@
+# testdata/partial_config.yaml
+# This file only contains some configuration options to test merging with defaults
+
+app:
+  log_level: warn
+  # timeout is intentionally missing
+  ping:
+    # only define output_message, other options should use defaults
+    output_message: "Partial Config Message" 

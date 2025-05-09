@@ -1,0 +1,22 @@
+# testdata/logger_test_config.yaml
+# Contains various logging configurations for testing
+
+app:
+  log_level: debug
+  logger:
+    console:
+      enabled: true
+      pretty: true
+      level: info
+    file:
+      enabled: true
+      path: "./logs/test.log"
+      level: debug
+      max_size: 10  # megabytes
+      max_backups: 3
+      max_age: 7    # days
+      compress: true
+    sampling:
+      enabled: true
+      initial: 100
+      thereafter: 10 

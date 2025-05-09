@@ -1,0 +1,10 @@
+# testdata/env_override.yaml
+# This config is designed to be overridden by environment variables
+
+app:
+  log_level: trace  # Can be overridden by APP_LOG_LEVEL
+  timeout: 10s      # Can be overridden by APP_TIMEOUT
+  ping:
+    output_message: "Base Message"  # Can be overridden by APP_PING_OUTPUT_MESSAGE
+    output_color: "blue"           # Can be overridden by APP_PING_OUTPUT_COLOR
+    ui: false                      # Can be overridden by APP_PING_UI 

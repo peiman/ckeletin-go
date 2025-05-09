@@ -548,6 +548,7 @@ MIT License. See [LICENSE](LICENSE).
 - Run `go mod tidy` to keep dependencies clean.
 - Run `task deps:check` regularly to ensure dependencies are up-to-date and secure.
 - Regularly run tests, lint, and format tasks to maintain code quality and style.
+- See [Test Fixtures Documentation](docs/test-fixtures.md) for information about available test fixtures.
 
 ---
 

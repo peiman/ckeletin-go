@@ -1,0 +1,17 @@
+# testdata/ui_test_config.yaml
+# Contains configuration for testing UI components
+
+app:
+  log_level: info
+  ui:
+    default_color: "blue"
+    spinner: "dots"
+    progress_bar:
+      enabled: true
+      char: "█"
+      width: 40
+  ping:
+    output_message: "UI Test Message"
+    output_color: "magenta"
+    ui: true
+    animation_speed: 100 
