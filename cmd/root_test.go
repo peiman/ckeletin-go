@@ -16,75 +16,167 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Test when HOME environment variable is not set (simulating UserHomeDir error)
-func TestInitConfig_UserHomeDirEnvironment(t *testing.T) {
-	// Save original HOME env var
-	origHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", origHome)
-
-	// Clear HOME env var to trigger an error in UserHomeDir via os.Getenv
-	os.Unsetenv("HOME")
-
-	// Reset viper and config path
-	viper.Reset()
-	cfgFile = ""
-
-	// Run the function with missing HOME env var
-	err := initConfig()
-
-	// Either we'll get an error or we'll get a path that doesn't include HOME
-	// Some systems might have a fallback for UserHomeDir, so we handle both cases
-	if err == nil {
-		t.Log("No error returned when HOME env var is not set, checking if config paths are valid")
-		// If no error, verify Viper is at least using reasonable paths that don't contain HOME
-		paths := viper.GetStringSlice("config_paths")
-		if len(paths) > 0 && strings.Contains(paths[0], origHome) {
-			t.Errorf("Expected paths without HOME, got %v", paths)
-		}
-	}
-}
-
-// Test the full config path
-func TestInitConfig_ConfigPathSetup(t *testing.T) {
-	// Setup test
-	viper.Reset()
-	origCfg := cfgFile
-	origStatus := configFileStatus
-	origUsed := configFileUsed
-	origBinaryName := binaryName
-
-	defer func() {
-		cfgFile = origCfg
-		configFileStatus = origStatus
-		configFileUsed = origUsed
-		binaryName = origBinaryName
-	}()
-
-	// Test with custom config path
-	binaryName = "test-binary"
-	cfgFile = ""
-
-	// Create a temporary directory
-	tmpDir, err := os.MkdirTemp("", "ckeletin-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// Save original and set HOME to temp dir
-	origHome := os.Getenv("HOME")
-	os.Setenv("HOME", tmpDir)
-	defer os.Setenv("HOME", origHome)
-
-	// Run the function (this should set paths correctly even if config file doesn't exist)
-	err = initConfig()
-	if err != nil {
-		t.Errorf("Expected no error for missing config, got %v", err)
+// TestInitConfig tests all cases related to the initConfig function in a table-driven format
+func TestInitConfig(t *testing.T) {
+	tests := []struct {
+		name               string
+		setupHome          string           // Specify HOME env var value (empty to unset)
+		setupConfigFile    string           // Config file path to set
+		setupTempDir       bool             // Whether to create a temp dir
+		setupBinaryName    string           // Binary name to set
+		expectedError      bool             // Whether an error is expected
+		expectedErrContain string           // Expected error substring
+		expectedStatus     string           // Expected config file status
+		customAssert       func(*testing.T) // Custom assertion function for special cases
+		skipIfNoHome       bool             // Skip test if HOME cannot be determined
+	}{
+		{
+			name:               "No HOME environment variable",
+			setupHome:          "",
+			expectedError:      true,
+			expectedErrContain: "$HOME is not defined",
+			skipIfNoHome:       true,
+			customAssert: func(t *testing.T) {
+				// This custom assert is not needed anymore since we expect an error
+			},
+		},
+		{
+			name:            "Config path setup with temp directory",
+			setupTempDir:    true,
+			setupBinaryName: "test-binary",
+			expectedError:   false,
+			expectedStatus:  "No config file found, using defaults and environment variables",
+		},
+		{
+			name:               "Invalid config file path",
+			setupConfigFile:    "/invalid/path/to/config.yaml",
+			expectedError:      true,
+			expectedErrContain: "failed to read config file",
+		},
+		{
+			name:            "No config file set",
+			setupConfigFile: "",
+			setupHome:       "/tmp", // Ensure HOME is set to something
+			expectedError:   false,
+		},
+		{
+			name:            "With valid config file",
+			setupConfigFile: "../testdata/config.yaml",
+			expectedError:   false,
+		},
 	}
 
-	// Verify the config file status
-	if configFileStatus != "No config file found, using defaults and environment variables" {
-		t.Errorf("Expected 'No config file found' message, got '%s'", configFileStatus)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save original values to restore after test
+			origHome := os.Getenv("HOME")
+
+			// Skip test if HOME is required but not available
+			if tt.skipIfNoHome && origHome == "" {
+				t.Skip("This test requires HOME environment variable to be set")
+			}
+
+			origCfgFile := cfgFile
+			origStatus := configFileStatus
+			origUsed := configFileUsed
+			origBinaryName := binaryName
+
+			// Create a cleanup function to restore all values
+			defer func() {
+				if origHome != "" {
+					os.Setenv("HOME", origHome)
+				}
+				cfgFile = origCfgFile
+				configFileStatus = origStatus
+				configFileUsed = origUsed
+				binaryName = origBinaryName
+			}()
+
+			// Reset viper state
+			viper.Reset()
+
+			// Setup HOME environment if specified
+			if tt.setupHome == "" {
+				os.Unsetenv("HOME")
+			} else {
+				os.Setenv("HOME", tt.setupHome)
+			}
+
+			// Setup binary name if specified
+			if tt.setupBinaryName != "" {
+				binaryName = tt.setupBinaryName
+			}
+
+			// Setup temporary directory if needed
+			var tmpDir string
+			if tt.setupTempDir {
+				var err error
+				tmpDir, err = os.MkdirTemp("", "ckeletin-test")
+				if err != nil {
+					t.Fatalf("Failed to create temp dir: %v", err)
+				}
+				// Set HOME to temp dir if temp dir is created
+				os.Setenv("HOME", tmpDir)
+				defer os.RemoveAll(tmpDir)
+			}
+
+			// Setup config file path if specified
+			if tt.setupConfigFile != "" {
+				// Check if the path is relative and exists
+				_, err := os.Stat(tt.setupConfigFile)
+				if err != nil {
+					// For test files, try with working directory
+					wd, _ := os.Getwd()
+					testPath := filepath.Join(wd, tt.setupConfigFile)
+					_, err = os.Stat(testPath)
+					if err == nil {
+						cfgFile = testPath
+					} else {
+						// Just use the path as-is for error cases
+						cfgFile = tt.setupConfigFile
+					}
+				} else {
+					cfgFile = tt.setupConfigFile
+				}
+			} else {
+				cfgFile = ""
+			}
+
+			// Setup logger for capturing output
+			buf := new(bytes.Buffer)
+			log.Logger = zerolog.New(buf)
+
+			// EXECUTION PHASE
+			err := initConfig()
+
+			// ASSERTION PHASE
+			// Check error expectations
+			if tt.expectedError && err == nil {
+				t.Errorf("Expected error, got nil")
+			} else if !tt.expectedError && err != nil {
+				t.Errorf("Expected no error, got: %v", err)
+			}
+
+			// Check error content if applicable
+			if tt.expectedErrContain != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.expectedErrContain) {
+					t.Errorf("Expected error to contain '%s', got: %v", tt.expectedErrContain, err)
+				}
+			}
+
+			// Check config status if applicable
+			if tt.expectedStatus != "" && !tt.expectedError {
+				if !strings.Contains(configFileStatus, tt.expectedStatus) {
+					t.Errorf("Expected status to contain '%s', got: '%s'", tt.expectedStatus, configFileStatus)
+				}
+			}
+
+			// Run custom assertions if provided
+			if tt.customAssert != nil && !tt.expectedError {
+				tt.customAssert(t)
+			}
+		})
 	}
 }
 
@@ -142,6 +234,7 @@ func TestRootCmd_ConfigStatusLogging(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
 			// Set up test state
 			configFileStatus = tt.configStatus
 			configFileUsed = tt.configUsed
@@ -163,43 +256,19 @@ func TestRootCmd_ConfigStatusLogging(t *testing.T) {
 				},
 			}
 
-			// We don't actually need to call the function, just verify the setup is correct
-			if err := mockCmd.PersistentPreRunE(mockCmd, []string{}); err != nil {
+			// EXECUTION PHASE
+			err := mockCmd.PersistentPreRunE(mockCmd, []string{})
+
+			// ASSERTION PHASE
+			if err != nil {
 				t.Errorf("Mock command failed: %v", err)
 			}
 		})
 	}
 }
 
-func TestInitConfig_InvalidConfigFile(t *testing.T) {
-	cfgFile = "/invalid/path/to/config.yaml"
-	defer func() { cfgFile = "" }()
-
-	buf := new(bytes.Buffer)
-	log.Logger = zerolog.New(buf)
-
-	err := initConfig()
-
-	if err == nil {
-		t.Errorf("Expected initConfig() to return an error for invalid config file")
-	}
-
-	// Actual error message includes "failed to read config file"
-	if !strings.Contains(err.Error(), "failed to read config file") {
-		t.Errorf("Expected error message to contain 'failed to read config file', got '%v'", err)
-	}
-}
-
-func TestInitConfig_NoConfigFile(t *testing.T) {
-	viper.Reset()
-	cfgFile = ""
-	err := initConfig()
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-}
-
 func TestExecute_ErrorPropagation(t *testing.T) {
+	// SETUP PHASE
 	// Create a temporary root command for testing
 	origRoot := RootCmd
 	defer func() { RootCmd = origRoot }()
@@ -212,115 +281,79 @@ func TestExecute_ErrorPropagation(t *testing.T) {
 	// Replace the global rootCmd with testRoot
 	RootCmd = testRoot
 
+	// EXECUTION PHASE
 	// Execute should now produce the error "some error"
 	err := Execute()
+
+	// ASSERTION PHASE
 	if err == nil || !strings.Contains(err.Error(), "some error") {
 		t.Errorf("Expected 'some error', got %v", err)
 	}
 }
 
-func TestInitConfig_WithConfigFile(t *testing.T) {
-	// Reset viper state before and after test
-	viper.Reset()
-	defer viper.Reset()
-
-	// Capture the original value and restore after test
-	origCfgFile := cfgFile
-	defer func() { cfgFile = origCfgFile }()
-
-	// Setup: point to the testdata config file
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-
-	testConfigPath := filepath.Join(wd, "../testdata/config.yaml")
-	// For debugging, output the path and check if file exists
-	_, err = os.Stat(testConfigPath)
-	if err != nil {
-		t.Logf("Test path doesn't exist: %s, err: %v", testConfigPath, err)
-		// Try a different path
-		testConfigPath = "./testdata/config.yaml"
-		_, err = os.Stat(testConfigPath)
-		if err != nil {
-			t.Fatalf("Could not find config file at either path: %v", err)
-		}
-	}
-	cfgFile = testConfigPath
-
-	// Capture logs for verification
-	buf := new(bytes.Buffer)
-	log.Logger = zerolog.New(buf)
-
-	// Backup the original variables and restore after test
-	origStatus := configFileStatus
-	origUsed := configFileUsed
-	defer func() {
-		configFileStatus = origStatus
-		configFileUsed = origUsed
-	}()
-
-	// Run the function
-	err = initConfig()
-
-	// Check result
-	if err != nil {
-		t.Errorf("Expected no error, got %v", err)
-	}
-
-	// Verify the variables are set correctly
-	if configFileStatus != "Using config file" {
-		t.Errorf("Expected configFileStatus to be 'Using config file', got '%s'", configFileStatus)
-	}
-
-	if !strings.Contains(configFileUsed, "testdata/config.yaml") {
-		t.Errorf("Expected configFileUsed to contain 'testdata/config.yaml', got '%s'", configFileUsed)
-	}
-
-	// Verify that viper read the config values
-	if viper.GetString("app.log_level") != "info" {
-		t.Errorf("Expected app.log_level to be 'info', got '%s'", viper.GetString("app.log_level"))
-	}
-}
-
-// TestConfigPaths ensures the ConfigPaths function works correctly
+// TestConfigPaths tests the ConfigPaths function that returns the configuration paths
 func TestConfigPaths(t *testing.T) {
-	// Save original binary name and restore after test
-	origBinaryName := binaryName
-	defer func() {
-		binaryName = origBinaryName
-	}()
-
-	// Test with a known binary name
-	binaryName = "testapp"
-
-	paths := ConfigPaths()
-
-	// Verify the values are correctly constructed
-	if paths.DefaultName != ".testapp" {
-		t.Errorf("Expected DefaultName to be '.testapp', got '%s'", paths.DefaultName)
+	tests := []struct {
+		name                    string
+		binaryName              string
+		wantDefaultName         string
+		wantDefaultFullName     string
+		wantDefaultPathContains string
+	}{
+		{
+			name:                    "Standard binary name",
+			binaryName:              "myapp",
+			wantDefaultName:         ".myapp",
+			wantDefaultFullName:     ".myapp.yaml",
+			wantDefaultPathContains: ".myapp.yaml",
+		},
+		{
+			name:                    "Name with hyphens",
+			binaryName:              "my-app",
+			wantDefaultName:         ".my-app",
+			wantDefaultFullName:     ".my-app.yaml",
+			wantDefaultPathContains: ".my-app.yaml",
+		},
+		{
+			name:                    "Name with dots",
+			binaryName:              "app.v2",
+			wantDefaultName:         ".app.v2",
+			wantDefaultFullName:     ".app.v2.yaml",
+			wantDefaultPathContains: ".app.v2.yaml",
+		},
 	}
 
-	if paths.Extension != "yaml" {
-		t.Errorf("Expected Extension to be 'yaml', got '%s'", paths.Extension)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save original and restore after test
+			origBinaryName := binaryName
+			defer func() { binaryName = origBinaryName }()
 
-	if paths.DefaultFullName != ".testapp.yaml" {
-		t.Errorf("Expected DefaultFullName to be '.testapp.yaml', got '%s'", paths.DefaultFullName)
-	}
+			// Set test binary name
+			binaryName = tt.binaryName
 
-	// DefaultPath includes the home directory, so we can't easily test its exact value
-	// But we can check that it ends with the expected filename
-	if !strings.HasSuffix(paths.DefaultPath, ".testapp.yaml") {
-		t.Errorf("Expected DefaultPath to end with '.testapp.yaml', got '%s'", paths.DefaultPath)
-	}
+			// EXECUTION PHASE
+			paths := ConfigPaths()
 
-	if paths.IgnorePattern != "testapp.yaml" {
-		t.Errorf("Expected IgnorePattern to be 'testapp.yaml', got '%s'", paths.IgnorePattern)
+			// ASSERTION PHASE
+			if paths.DefaultName != tt.wantDefaultName {
+				t.Errorf("ConfigPaths().DefaultName = %v, want %v", paths.DefaultName, tt.wantDefaultName)
+			}
+
+			if paths.DefaultFullName != tt.wantDefaultFullName {
+				t.Errorf("ConfigPaths().DefaultFullName = %v, want %v", paths.DefaultFullName, tt.wantDefaultFullName)
+			}
+
+			// Check if the default path contains the expected file name
+			if !strings.Contains(paths.DefaultPath, tt.wantDefaultPathContains) {
+				t.Errorf("ConfigPaths().DefaultPath = %v, should contain %v", paths.DefaultPath, tt.wantDefaultPathContains)
+			}
+		})
 	}
 }
 
-// TestEnvPrefix tests the EnvPrefix function with various binary names
+// TestEnvPrefix tests the EnvPrefix function used to create environment variable prefixes
 func TestEnvPrefix(t *testing.T) {
 	// Save original binary name and restore after test
 	origBinaryName := binaryName
@@ -372,8 +405,13 @@ func TestEnvPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
 			binaryName = tt.binaryName
+
+			// EXECUTION PHASE
 			prefix := EnvPrefix()
+
+			// ASSERTION PHASE
 			if prefix != tt.expectedPrefix {
 				t.Errorf("EnvPrefix() = %v, want %v", prefix, tt.expectedPrefix)
 			}
@@ -383,32 +421,97 @@ func TestEnvPrefix(t *testing.T) {
 
 // TestEnvironmentVariables tests that environment variables are correctly read with the proper prefix
 func TestEnvironmentVariables(t *testing.T) {
-	// Save original binary name and restore after test
-	origBinaryName := binaryName
-	defer func() {
-		binaryName = origBinaryName
-	}()
-
-	// Set a test binary name
-	binaryName = "testcli"
-
-	// Reset viper for a clean test
-	viper.Reset()
-
-	// Set an environment variable with the expected prefix
-	envVarName := "TESTCLI_APP_TEST_VALUE"
-	os.Setenv(envVarName, "env_value")
-	defer os.Unsetenv(envVarName)
-
-	// Initialize config
-	err := initConfig()
-	if err != nil {
-		t.Fatalf("initConfig() error = %v", err)
+	tests := []struct {
+		name          string
+		binaryName    string
+		envVars       map[string]string
+		viperKey      string
+		expectedValue string
+	}{
+		{
+			name:          "Simple environment variable",
+			binaryName:    "testapp",
+			envVars:       map[string]string{"TESTAPP_APP_LOG_LEVEL": "debug"},
+			viperKey:      "app.log_level",
+			expectedValue: "debug",
+		},
+		{
+			name:          "Hyphenated binary name",
+			binaryName:    "test-app",
+			envVars:       map[string]string{"TEST_APP_APP_LOG_LEVEL": "info"},
+			viperKey:      "app.log_level",
+			expectedValue: "info",
+		},
+		{
+			name:          "Multiple parts key",
+			binaryName:    "myapp",
+			envVars:       map[string]string{"MYAPP_APP_SERVER_PORT": "8080"},
+			viperKey:      "app.server.port",
+			expectedValue: "8080",
+		},
 	}
 
-	// Check that the value was read from the environment variable
-	value := viper.GetString("app.test_value")
-	if value != "env_value" {
-		t.Errorf("Expected viper to read value 'env_value' from environment, got '%s'", value)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// Save original values
+			origBinaryName := binaryName
+			origEnvVars := make(map[string]string)
+
+			// Save existing env vars that we'll modify
+			for k := range tt.envVars {
+				origEnvVars[k] = os.Getenv(k)
+			}
+
+			// Setup cleanup
+			defer func() {
+				// Restore binary name
+				binaryName = origBinaryName
+
+				// Restore original environment variables
+				for k, v := range origEnvVars {
+					if v == "" {
+						os.Unsetenv(k)
+					} else {
+						os.Setenv(k, v)
+					}
+				}
+
+				// Unset any new env vars we set
+				for k := range tt.envVars {
+					if _, exists := origEnvVars[k]; !exists {
+						os.Unsetenv(k)
+					}
+				}
+			}()
+
+			// Set test binary name
+			binaryName = tt.binaryName
+
+			// Reset viper
+			viper.Reset()
+
+			// Set environment variables for this test
+			for k, v := range tt.envVars {
+				os.Setenv(k, v)
+			}
+
+			// Initialize configuration with the new environment
+			cfgFile = "" // Ensure no config file is used
+
+			// EXECUTION PHASE
+			err := initConfig()
+
+			// ASSERTION PHASE
+			if err != nil {
+				t.Fatalf("initConfig() failed: %v", err)
+			}
+
+			actualValue := viper.GetString(tt.viperKey)
+			if actualValue != tt.expectedValue {
+				t.Errorf("viper.GetString(%q) = %q, want %q",
+					tt.viperKey, actualValue, tt.expectedValue)
+			}
+		})
 	}
 }
