@@ -46,6 +46,11 @@ The documentation can be output in various formats using the --format flag.`,
 	RunE: runDocsConfig,
 }
 
+// Variable to mock file opening for testing
+var openOutputFile = func(path string) (io.WriteCloser, error) {
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+}
+
 func init() {
 	// Add the config subcommand to the docs command
 	docsCmd.AddCommand(configCmd)
@@ -62,30 +67,43 @@ func init() {
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
 	var writer io.Writer = cmd.OutOrStdout()
+	var file io.WriteCloser
+	var closeErr error
 
 	// If output file is specified, create it
 	if docsOutputFile != "" {
-		file, err := os.Create(docsOutputFile)
+		var err error
+		file, err = openOutputFile(docsOutputFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer func() {
-			if err := file.Close(); err != nil {
-				log.Error().Err(err).Str("file", docsOutputFile).Msg("Failed to close output file")
+			// Capture the close error so we can return it
+			closeErr = file.Close()
+			if closeErr != nil {
+				log.Error().Err(closeErr).Str("file", docsOutputFile).Msg("Failed to close output file")
 			}
 		}()
 		writer = file
 		log.Info().Str("file", docsOutputFile).Msg("Writing documentation to file")
 	}
 
+	var err error
 	switch strings.ToLower(docsOutputFormat) {
 	case FormatMarkdown:
-		return generateMarkdownDocs(writer)
+		err = generateMarkdownDocs(writer)
 	case FormatYAML:
-		return generateYAMLConfig(writer)
+		err = generateYAMLConfig(writer)
 	default:
-		return fmt.Errorf("unsupported format: %s", docsOutputFormat)
+		err = fmt.Errorf("unsupported format: %s", docsOutputFormat)
 	}
+
+	// If there was no error from the operation but there was a close error, return the close error
+	if err == nil && closeErr != nil {
+		return fmt.Errorf("failed to close output file: %w", closeErr)
+	}
+
+	return err
 }
 
 // generateMarkdownDocs generates Markdown documentation for all configuration options
@@ -157,7 +175,25 @@ func generateMarkdownDocs(w io.Writer) error {
 			fmt.Fprintf(w, "%s:\n", topLevel)
 		}
 
+		// Process options
+		nestedGroups := make(map[string][]config.ConfigOption)
+		nonNestedOptions := []config.ConfigOption{}
+
+		// First separate nested from non-nested options
 		for _, opt := range options {
+			parts := strings.SplitN(opt.Key, ".", 2)
+			if len(parts) == 1 || len(parts) == 2 && !strings.Contains(parts[1], ".") {
+				// This is a top-level or single-level nested option
+				nonNestedOptions = append(nonNestedOptions, opt)
+			} else if len(parts) == 2 {
+				// This has further nesting
+				nestedKey := strings.SplitN(parts[1], ".", 2)[0]
+				nestedGroups[nestedKey] = append(nestedGroups[nestedKey], opt)
+			}
+		}
+
+		// Output non-nested options first
+		for _, opt := range nonNestedOptions {
 			parts := strings.SplitN(opt.Key, ".", 2)
 			key := opt.Key
 			if len(parts) > 1 {
@@ -166,6 +202,25 @@ func generateMarkdownDocs(w io.Writer) error {
 
 			fmt.Fprintf(w, "  # %s\n", opt.Description)
 			fmt.Fprintf(w, "  %s: %s\n\n", key, opt.ExampleValueString())
+		}
+
+		// Process nested groups
+		for nestedKey, nestedOpts := range nestedGroups {
+			fmt.Fprintf(w, "  %s:\n", nestedKey)
+			for _, opt := range nestedOpts {
+				// Extract the part after the second dot
+				parts := strings.SplitN(opt.Key, ".", 3)
+				var key string
+				if len(parts) >= 3 {
+					key = parts[2]
+				} else {
+					// Should not happen, but just in case
+					key = opt.Key
+				}
+
+				fmt.Fprintf(w, "    # %s\n", opt.Description)
+				fmt.Fprintf(w, "    %s: %s\n\n", key, opt.ExampleValueString())
+			}
 		}
 	}
 
@@ -205,7 +260,25 @@ func generateYAMLConfig(w io.Writer) error {
 			fmt.Fprintf(w, "%s:\n", topLevel)
 		}
 
+		// Process options
+		nestedGroups := make(map[string][]config.ConfigOption)
+		nonNestedOptions := []config.ConfigOption{}
+
+		// First separate nested from non-nested options
 		for _, opt := range options {
+			parts := strings.SplitN(opt.Key, ".", 2)
+			if len(parts) == 1 || len(parts) == 2 && !strings.Contains(parts[1], ".") {
+				// This is a top-level or single-level nested option
+				nonNestedOptions = append(nonNestedOptions, opt)
+			} else if len(parts) == 2 {
+				// This has further nesting
+				nestedKey := strings.SplitN(parts[1], ".", 2)[0]
+				nestedGroups[nestedKey] = append(nestedGroups[nestedKey], opt)
+			}
+		}
+
+		// Output non-nested options first
+		for _, opt := range nonNestedOptions {
 			parts := strings.SplitN(opt.Key, ".", 2)
 			key := opt.Key
 			if len(parts) > 1 {
@@ -214,6 +287,25 @@ func generateYAMLConfig(w io.Writer) error {
 
 			fmt.Fprintf(w, "  # %s\n", opt.Description)
 			fmt.Fprintf(w, "  %s: %s\n\n", key, opt.ExampleValueString())
+		}
+
+		// Process nested groups
+		for nestedKey, nestedOpts := range nestedGroups {
+			fmt.Fprintf(w, "  %s:\n", nestedKey)
+			for _, opt := range nestedOpts {
+				// Extract the part after the second dot
+				parts := strings.SplitN(opt.Key, ".", 3)
+				var key string
+				if len(parts) >= 3 {
+					key = parts[2]
+				} else {
+					// Should not happen, but just in case
+					key = opt.Key
+				}
+
+				fmt.Fprintf(w, "    # %s\n", opt.Description)
+				fmt.Fprintf(w, "    %s: %s\n\n", key, opt.ExampleValueString())
+			}
 		}
 	}
 

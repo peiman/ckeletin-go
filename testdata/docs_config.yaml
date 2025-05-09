@@ -1,0 +1,13 @@
+# testdata/docs_config.yaml
+# Contains configurations for all commands, used for docs command testing
+
+app:
+  log_level: info
+  timeout: 30s
+  ping:
+    output_message: "Ping Message from docs_config"
+    output_color: "yellow"
+    ui: true
+  docs:
+    format: "markdown"
+    output_file: "test_output.md" 

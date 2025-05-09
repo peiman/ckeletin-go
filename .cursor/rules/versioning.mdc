@@ -1,0 +1,48 @@
+---
+description: Versioning and Release Standards
+globs: 
+alwaysApply: false
+---
+# Versioning and Release Standards
+
+## Semantic Versioning
+This project strictly follows [Semantic Versioning 2.0.0](mdc:https:/semver.org):
+- **MAJOR**: Breaking changes
+- **MINOR**: New features (backward-compatible)
+- **PATCH**: Bug fixes (backward-compatible)
+
+## Version Format
+- Git tags must use the `v` prefix: `v1.0.0`
+- Version references in code and documentation should be consistent
+- All version components are numeric only
+
+## Release Process
+The release process follows these steps:
+1. Update CHANGELOG.md with all changes since the last release
+2. Update all version references in code and documentation
+3. Create a git tag with the `v` prefix (e.g., `v1.0.0`)
+4. Push the tag to trigger the release workflow
+5. Verify the release artifacts are correctly published
+
+## Release Notes
+All releases must include:
+- A summary of changes from CHANGELOG.md
+- Highlighted breaking changes (if any)
+- Upgrade instructions (especially for MAJOR version changes)
+- Links to relevant issues and pull requests
+
+## Pre-Release Versions
+For pre-release versions:
+- Use the format: `v1.0.0-beta.1`
+- Document clearly that these are not production-ready
+- Include known limitations and issues
+
+## Release Cadence
+- PATCH releases: As needed for bug fixes
+- MINOR releases: When new features are ready
+- MAJOR releases: Scheduled with adequate notice for breaking changes
+
+## Long-Term Support
+- Clear communication about supported versions
+- Security fixes for previous MAJOR versions when practical
+- Documentation of support timelines 

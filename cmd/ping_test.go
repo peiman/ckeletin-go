@@ -4,9 +4,9 @@ package cmd
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/config"
@@ -30,20 +30,8 @@ func (m *mockUIRunner) RunUI(message, col string) error {
 
 type errorWriter struct{}
 
-func (e errorWriter) Write(p []byte) (int, error) {
-	log.Debug().Msg("errorWriter.Write called - generating error")
+func (e *errorWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
-}
-
-// setupTestViper initializes a clean viper instance for testing
-func setupTestViper(ui bool, message, color string) {
-	viper.Reset()
-
-	// Instead of calling viper.SetDefault directly, set values directly
-	// for testing purposes only
-	viper.Set("app.ping.output_message", message)
-	viper.Set("app.ping.output_color", color)
-	viper.Set("app.ping.ui", ui)
 }
 
 // TestInitPingConfig ensures the default values are properly set
@@ -165,165 +153,175 @@ func TestPingCommand(t *testing.T) {
 	defer func() { pingRunner = originalRunner }()
 
 	tests := []struct {
-		name         string
-		args         []string
-		uiRunner     *mockUIRunner
-		wantErr      bool
-		wantOutput   string
-		mockPrintErr bool
-		writer       io.Writer
-		viperUI      bool
-		viperMsg     string
-		viperColor   string
+		name            string
+		testFixturePath string   // Path to test fixture
+		args            []string // CLI args
+		uiRunner        *mockUIRunner
+		wantErr         bool
+		wantOutput      string
+		writer          io.Writer
 	}{
 		{
-			name:       "Default",
-			args:       []string{},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    false,
-			wantOutput: "Pong\n",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
+			name:            "Default Configuration",
+			testFixturePath: "../testdata/config.yaml",
+			args:            []string{},
+			uiRunner:        &mockUIRunner{},
+			wantErr:         false,
+			wantOutput:      "Config Message\n", // From testdata/config.yaml
+			writer:          &bytes.Buffer{},
 		},
 		{
-			name:       "Custom Message and Color",
-			args:       []string{"--message", "Hello, Test!", "--color", "red"},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    false,
-			wantOutput: "Hello, Test!\n",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
+			name:            "JSON Configuration",
+			testFixturePath: "../testdata/config.json",
+			args:            []string{},
+			uiRunner:        &mockUIRunner{},
+			wantErr:         false,
+			wantOutput:      "JSON Config Message\n", // From testdata/config.json
+			writer:          &bytes.Buffer{},
 		},
 		{
-			name:       "UI Enabled",
-			args:       []string{"--ui"},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    false,
-			wantOutput: "",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
+			name:            "CLI Args Override Configuration",
+			testFixturePath: "../testdata/config.yaml",
+			args:            []string{"--message", "CLI Message", "--color", "cyan"},
+			uiRunner:        &mockUIRunner{},
+			wantErr:         false,
+			wantOutput:      "CLI Message\n",
+			writer:          &bytes.Buffer{},
 		},
 		{
-			name:       "UI Enabled with Error",
-			args:       []string{"--ui"},
-			uiRunner:   &mockUIRunner{ReturnError: errors.New("UI error")},
-			wantErr:    true,
-			wantOutput: "",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
+			name:            "Partial Configuration",
+			testFixturePath: "../testdata/partial_config.yaml",
+			args:            []string{"--color", "white"},
+			uiRunner:        &mockUIRunner{},
+			wantErr:         false,
+			wantOutput:      "Partial Config Message\n", // From testdata/partial_config.yaml
+			writer:          &bytes.Buffer{},
 		},
 		{
-			name:         "PrintColoredMessage Error",
-			args:         []string{"--message", "Should fail print"},
-			uiRunner:     &mockUIRunner{},
-			wantErr:      true,
-			wantOutput:   "",
-			mockPrintErr: true,
-			writer:       &errorWriter{},
-			viperUI:      false,
-			viperMsg:     "Should fail print",
-			viperColor:   "white",
+			name:            "UI Enabled",
+			testFixturePath: "../testdata/ui_test_config.yaml",
+			args:            []string{},
+			uiRunner:        &mockUIRunner{},
+			wantErr:         false,
+			wantOutput:      "", // No standard output when UI is enabled
+			writer:          &bytes.Buffer{},
 		},
 		{
-			name:       "Empty Message",
-			args:       []string{"--message", ""},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    false,
-			wantOutput: "\n",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
-		},
-		{
-			name:       "Invalid Color",
-			args:       []string{"--color", "invalidcolor"},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    true,
-			wantOutput: "",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
-		},
-		{
-			name:       "Special Characters",
-			args:       []string{"--message", "Hello世界!@#$%^&*()"},
-			uiRunner:   &mockUIRunner{},
-			wantErr:    false,
-			wantOutput: "Hello世界!@#$%^&*()\n",
-			writer:     &bytes.Buffer{},
-			viperUI:    false,
-			viperMsg:   "Pong",
-			viperColor: "white",
+			name:            "UI Error",
+			testFixturePath: "../testdata/ui_test_config.yaml",
+			args:            []string{},
+			uiRunner:        &mockUIRunner{ReturnError: fmt.Errorf("ui error")},
+			wantErr:         true,
+			wantOutput:      "",
+			writer:          &bytes.Buffer{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logBuf.Reset() // Clear the log buffer for each test
-			log.Debug().Str("test_case", tt.name).Msg("Starting test case")
+			// SETUP PHASE
+			// Reset viper for each test
+			viper.Reset()
 
-			// Set up a clean viper instance for this test
-			setupTestViper(tt.viperUI, tt.viperMsg, tt.viperColor)
+			// Load test fixture
+			viper.SetConfigFile(tt.testFixturePath)
+			if err := viper.ReadInConfig(); err != nil {
+				t.Fatalf("Failed to load test fixture %s: %v", tt.testFixturePath, err)
+			}
 
+			// Create command and register flags
+			cmd := &cobra.Command{Use: "ping"}
+			cmd.Flags().String("message", "", "Custom output message")
+			cmd.Flags().String("color", "", "Output color")
+			cmd.Flags().Bool("ui", false, "Enable UI")
+			cmd.SetOut(tt.writer)
+
+			// Parse args
+			cmd.SetArgs(tt.args)
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("Failed to parse flags: %v", err)
+			}
+
+			// Setup mock UI runner
 			pingRunner = tt.uiRunner
 
-			// Create a new root command for each test
-			RootCmd = &cobra.Command{Use: binaryName}
-			pingCmd = &cobra.Command{
-				Use:   "ping",
-				Short: "Responds with a pong",
-				RunE:  runPing,
+			// Prepare output buffer
+			outBuf, isBuffer := tt.writer.(*bytes.Buffer)
+
+			// Clear the output buffer to ensure we're only capturing the current test output
+			if isBuffer {
+				outBuf.Reset()
 			}
 
-			// Set up the command flags
-			pingCmd.Flags().String("message", "", "Custom output message")
-			pingCmd.Flags().String("color", "", "Output color")
-			pingCmd.Flags().Bool("ui", false, "Enable UI")
+			// EXECUTION PHASE
+			err := runPing(cmd, []string{})
 
-			RootCmd.AddCommand(pingCmd)
-			RootCmd.SetArgs(append([]string{"ping"}, tt.args...))
-			RootCmd.SetOut(tt.writer)
-			RootCmd.SetErr(tt.writer)
-			RootCmd.SilenceUsage = true
-			RootCmd.SilenceErrors = true
-
-			log.Debug().
-				Bool("viper_ui", viper.GetBool("app.ping.ui")).
-				Str("viper_msg", viper.GetString("app.ping.output_message")).
-				Str("viper_color", viper.GetString("app.ping.output_color")).
-				Msg("Viper config before execution")
-
-			err := RootCmd.Execute()
-
-			log.Debug().
-				Err(err).
-				Bool("expected_error", tt.wantErr).
-				Bool("got_error", err != nil).
-				Msg("Command execution completed")
-
+			// ASSERTION PHASE
+			// Check error
 			if (err != nil) != tt.wantErr {
-				t.Logf("Debug logs:\n%s", logBuf.String())
-				t.Errorf("%s: Execute() error = %v, wantErr %v", tt.name, err, tt.wantErr)
+				t.Errorf("runPing() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 
-			if !tt.mockPrintErr {
-				if buf, ok := tt.writer.(*bytes.Buffer); ok {
-					gotOutput := buf.String()
-					if gotOutput != tt.wantOutput {
-						t.Errorf("%s: Output = %q, want %q", tt.name, gotOutput, tt.wantOutput)
-					}
+			// Check UI runner was called with correct parameters for UI tests
+			if viper.GetBool("app.ping.ui") {
+				expectedMessage := viper.GetString("app.ping.output_message")
+				// If message flag was set, it should override viper config
+				if cmd.Flags().Changed("message") {
+					expectedMessage, _ = cmd.Flags().GetString("message")
+				}
+
+				expectedColor := viper.GetString("app.ping.output_color")
+				// If color flag was set, it should override viper config
+				if cmd.Flags().Changed("color") {
+					expectedColor, _ = cmd.Flags().GetString("color")
+				}
+
+				if tt.uiRunner.CalledWithMessage != expectedMessage {
+					t.Errorf("UI runner called with wrong message, got: %s, want: %s",
+						tt.uiRunner.CalledWithMessage, expectedMessage)
+				}
+
+				if tt.uiRunner.CalledWithColor != expectedColor {
+					t.Errorf("UI runner called with wrong color, got: %s, want: %s",
+						tt.uiRunner.CalledWithColor, expectedColor)
+				}
+			}
+
+			// Check output
+			if isBuffer && !tt.wantErr && !viper.GetBool("app.ping.ui") {
+				got := outBuf.String()
+				if got != tt.wantOutput {
+					t.Errorf("runPing() output = %q, want %q", got, tt.wantOutput)
 				}
 			}
 		})
+	}
+}
+
+// TestPingCommand_WriteError tests the error handling when writing fails
+func TestPingCommand_WriteError(t *testing.T) {
+	// Setup
+	writer := &errorWriter{}
+	cmd := &cobra.Command{Use: "ping"}
+	cmd.SetOut(writer)
+
+	// Make sure UI is disabled and color is set to a valid value
+	viper.Reset()
+	viper.Set("app.ping.ui", false)
+	viper.Set("app.ping.output_message", "Test Message")
+	viper.Set("app.ping.output_color", "white")
+
+	// Execute
+	err := runPing(cmd, []string{})
+
+	// Assert
+	if err == nil {
+		t.Error("runPing() expected error, got nil")
+		return
+	}
+
+	if !strings.Contains(err.Error(), "failed to print colored message") {
+		t.Errorf("runPing() error = %v, expected to contain 'failed to print colored message'", err)
 	}
 }

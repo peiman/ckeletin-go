@@ -1,0 +1,64 @@
+---
+description: 
+globs: cmd/*.go
+alwaysApply: false
+---
+# Command Implementation Pattern
+
+## Command Structure
+Every command must follow this structure:
+1. Define command with cobra.Command
+2. Set command-specific flags
+3. Bind flags to Viper
+4. Implement a dedicated initCommandConfig() function
+5. Use RunE (not Run) to support error handling
+
+## Standard Implementation Template
+```go
+var commandCmd = &cobra.Command{
+    Use:   "command",
+    Short: "One line description",
+    Long:  `Detailed multi-line description.`,
+    RunE:  runCommand,
+}
+
+func init() {
+    commandCmd.Flags().String("flag", "default", "Flag description")
+    viper.BindPFlag("app.command.flag", commandCmd.Flags().Lookup("flag"))
+    RootCmd.AddCommand(commandCmd)
+}
+
+func initCommandConfig() {
+    viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+    viper.AutomaticEnv()
+    viper.SetDefault("app.command.flag", "default")
+}
+
+func runCommand(cmd *cobra.Command, args []string) error {
+    initCommandConfig()
+    // Implementation
+    return nil
+}
+```
+
+## Configuration Naming
+- Follow `app.<command>.<option>` pattern for all configuration keys
+- Use consistent keys across related commands
+- Document the configuration structure
+
+## Flag Binding
+- Bind all flags to Viper keys
+- Use the same default in both the flag definition and Viper default
+- Document flag purpose clearly
+
+## Command Documentation
+- Short description: One line, concise
+- Long description: Detailed explanation
+- Example usage: Practical examples
+- Flag documentation: Purpose and defaults
+
+## Error Handling
+- Use `RunE` instead of `Run` to properly handle errors
+- Wrap errors with context
+- Return errors rather than handling them within the command
+- Provide clear error messages 

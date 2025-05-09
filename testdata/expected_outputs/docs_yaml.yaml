@@ -1,0 +1,38 @@
+# Configuration Reference
+app:
+  # The log level (trace, debug, info, warn, error, fatal)
+  # Environment: APP_LOG_LEVEL
+  # Default: info
+  log_level: info
+
+  # Global timeout for operations
+  # Environment: APP_TIMEOUT
+  # Default: 30s
+  timeout: 30s
+
+  ping:
+    # Message to display
+    # Environment: APP_PING_OUTPUT_MESSAGE
+    # Default: Pong!
+    output_message: Pong!
+
+    # Color to use for output
+    # Environment: APP_PING_OUTPUT_COLOR
+    # Default: green
+    output_color: green
+
+    # Whether to use interactive UI
+    # Environment: APP_PING_UI
+    # Default: false
+    ui: false
+
+  docs:
+    # Output format (markdown, yaml)
+    # Environment: APP_DOCS_FORMAT
+    # Default: markdown
+    format: markdown
+
+    # File to write output to (stdout if empty)
+    # Environment: APP_DOCS_OUTPUT_FILE
+    # Default: ""
+    output_file: "" 

@@ -1,0 +1,46 @@
+---
+description: Development Workflow Standards
+globs: 
+alwaysApply: false
+---
+# Development Workflow Standards
+
+## Branch Management
+- Use feature branches for all changes (`feature/add-xyz`)
+- Use bugfix branches for bug fixes (`bugfix/fix-xyz`)
+- Merge through Pull Requests only
+
+## Code Review Process
+- All changes require at least one reviewer
+- Address all comments before merging
+- Ensure CI checks pass before requesting review
+
+## Commit Standards
+- Use conventional commit format
+- Reference issue numbers in commit messages
+- Keep commits focused on single changes
+
+## Testing Requirements
+- Add tests for all new features
+- Update tests for modified code
+- Ensure >80% test coverage
+
+## Documentation Updates
+- Update README for user-facing changes
+- Update code comments for API changes
+- Add/update examples for new features
+
+## Quality Checks
+- ALWAYS run `task check` when you have modified anything
+- Fix all linter issues
+- Format code using `task fmt`
+
+## Release Process
+- Follow semantic versioning
+- Update CHANGELOG.md with all changes
+- Create GitHub release with detailed notes
+
+## Continuous Integration
+- All PRs must pass CI checks
+- Run full test suite on all commits
+- Verify build on multiple platforms 

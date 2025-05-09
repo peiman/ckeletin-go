@@ -43,7 +43,13 @@ func TestConfigOptionEnvVarName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// No specific setup needed for this test
+
+			// EXECUTION PHASE
 			got := tt.opt.EnvVarName(tt.prefix)
+
+			// ASSERTION PHASE
 			if got != tt.want {
 				t.Errorf("EnvVarName() = %v, want %v", got, tt.want)
 			}
@@ -89,7 +95,13 @@ func TestConfigOptionDefaultValueString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// No specific setup needed for this test
+
+			// EXECUTION PHASE
 			got := tt.opt.DefaultValueString()
+
+			// ASSERTION PHASE
 			if got != tt.want {
 				t.Errorf("DefaultValueString() = %v, want %v", got, tt.want)
 			}
@@ -123,7 +135,13 @@ func TestConfigOptionExampleValueString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			// No specific setup needed for this test
+
+			// EXECUTION PHASE
 			got := tt.opt.ExampleValueString()
+
+			// ASSERTION PHASE
 			if got != tt.want {
 				t.Errorf("ExampleValueString() = %v, want %v", got, tt.want)
 			}
@@ -132,14 +150,7 @@ func TestConfigOptionExampleValueString(t *testing.T) {
 }
 
 func TestRegistryHasExpectedKeys(t *testing.T) {
-	registry := Registry()
-
-	// Check that the registry has the expected minimum number of entries
-	if len(registry) < 4 {
-		t.Errorf("Registry() returned %d entries, expected at least 4", len(registry))
-	}
-
-	// Check for essential keys
+	// SETUP PHASE
 	requiredKeys := []string{
 		"app.log_level",
 		"app.ping.output_message",
@@ -147,6 +158,16 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 		"app.ping.ui",
 	}
 
+	// EXECUTION PHASE
+	registry := Registry()
+
+	// ASSERTION PHASE
+	// Check that the registry has the expected minimum number of entries
+	if len(registry) < 4 {
+		t.Errorf("Registry() returned %d entries, expected at least 4", len(registry))
+	}
+
+	// Check for essential keys
 	for _, key := range requiredKeys {
 		found := false
 		for _, opt := range registry {
@@ -162,12 +183,15 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 }
 
 func TestSetDefaults(t *testing.T) {
+	// SETUP PHASE
 	// Reset viper before test
 	viper.Reset()
 
+	// EXECUTION PHASE
 	// Apply defaults
 	SetDefaults()
 
+	// ASSERTION PHASE
 	// Check that defaults were set
 	registry := Registry()
 	for _, opt := range registry {

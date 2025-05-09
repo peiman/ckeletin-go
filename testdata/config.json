@@ -1,0 +1,11 @@
+{
+  "app": {
+    "log_level": "debug",
+    "timeout": "45s",
+    "ping": {
+      "output_message": "JSON Config Message",
+      "output_color": "green",
+      "ui": false
+    }
+  }
+}

@@ -1,0 +1,10 @@
+# testdata/invalid_config.yaml
+# This file is intentionally invalid for testing error handling
+
+app:
+  log_level: info
+  timeout: 30s
+  ping:
+    output_message: "Config Message
+    ui: true
+    # Missing closing quote and incorrect indentation 
