@@ -282,3 +282,133 @@ func TestInitConfig_WithConfigFile(t *testing.T) {
 		t.Errorf("Expected app.log_level to be 'info', got '%s'", viper.GetString("app.log_level"))
 	}
 }
+
+// TestConfigPaths ensures the ConfigPaths function works correctly
+func TestConfigPaths(t *testing.T) {
+	// Save original binary name and restore after test
+	origBinaryName := binaryName
+	defer func() {
+		binaryName = origBinaryName
+	}()
+
+	// Test with a known binary name
+	binaryName = "testapp"
+
+	paths := ConfigPaths()
+
+	// Verify the values are correctly constructed
+	if paths.DefaultName != ".testapp" {
+		t.Errorf("Expected DefaultName to be '.testapp', got '%s'", paths.DefaultName)
+	}
+
+	if paths.Extension != "yaml" {
+		t.Errorf("Expected Extension to be 'yaml', got '%s'", paths.Extension)
+	}
+
+	if paths.DefaultFullName != ".testapp.yaml" {
+		t.Errorf("Expected DefaultFullName to be '.testapp.yaml', got '%s'", paths.DefaultFullName)
+	}
+
+	// DefaultPath includes the home directory, so we can't easily test its exact value
+	// But we can check that it ends with the expected filename
+	if !strings.HasSuffix(paths.DefaultPath, ".testapp.yaml") {
+		t.Errorf("Expected DefaultPath to end with '.testapp.yaml', got '%s'", paths.DefaultPath)
+	}
+
+	if paths.IgnorePattern != "testapp.yaml" {
+		t.Errorf("Expected IgnorePattern to be 'testapp.yaml', got '%s'", paths.IgnorePattern)
+	}
+}
+
+// TestEnvPrefix tests the EnvPrefix function with various binary names
+func TestEnvPrefix(t *testing.T) {
+	// Save original binary name and restore after test
+	origBinaryName := binaryName
+	defer func() {
+		binaryName = origBinaryName
+	}()
+
+	tests := []struct {
+		name           string
+		binaryName     string
+		expectedPrefix string
+	}{
+		{
+			name:           "Simple name",
+			binaryName:     "myapp",
+			expectedPrefix: "MYAPP",
+		},
+		{
+			name:           "With hyphens",
+			binaryName:     "my-cool-app",
+			expectedPrefix: "MY_COOL_APP",
+		},
+		{
+			name:           "With dots",
+			binaryName:     "app.name.v2",
+			expectedPrefix: "APP_NAME_V2",
+		},
+		{
+			name:           "With special characters",
+			binaryName:     "app@name!v2",
+			expectedPrefix: "APP_NAME_V2",
+		},
+		{
+			name:           "Starting with number",
+			binaryName:     "1app",
+			expectedPrefix: "_1APP",
+		},
+		{
+			name:           "All special characters",
+			binaryName:     "!@#$%^&*()",
+			expectedPrefix: "_",
+		},
+		{
+			name:           "Mixed case",
+			binaryName:     "MyApp",
+			expectedPrefix: "MYAPP",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binaryName = tt.binaryName
+			prefix := EnvPrefix()
+			if prefix != tt.expectedPrefix {
+				t.Errorf("EnvPrefix() = %v, want %v", prefix, tt.expectedPrefix)
+			}
+		})
+	}
+}
+
+// TestEnvironmentVariables tests that environment variables are correctly read with the proper prefix
+func TestEnvironmentVariables(t *testing.T) {
+	// Save original binary name and restore after test
+	origBinaryName := binaryName
+	defer func() {
+		binaryName = origBinaryName
+	}()
+
+	// Set a test binary name
+	binaryName = "testcli"
+
+	// Reset viper for a clean test
+	viper.Reset()
+
+	// Set an environment variable with the expected prefix
+	envVarName := "TESTCLI_APP_TEST_VALUE"
+	os.Setenv(envVarName, "env_value")
+	defer os.Unsetenv(envVarName)
+
+	// Initialize config
+	err := initConfig()
+	if err != nil {
+		t.Fatalf("initConfig() error = %v", err)
+	}
+
+	// Check that the value was read from the environment variable
+	value := viper.GetString("app.test_value")
+	if value != "env_value" {
+		t.Errorf("Expected viper to read value 'env_value' from environment, got '%s'", value)
+	}
+}

@@ -44,7 +44,7 @@ Thumbs.db
 
 # Config files
 # Replace the following line with the Config file name from BINARY_NAME in Taskfile.yml
-ckeletin-go.json
+ckeletin-go.yaml
 
 # Build output directory
 /build/
