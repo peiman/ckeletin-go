@@ -1,0 +1,54 @@
+---
+description: 
+globs: *.go
+alwaysApply: false
+---
+# Code Organization Principles
+
+## Command Isolation
+- Each command should be in a separate file
+- Commands should manage their own configuration
+- Follow the specific pattern: `cmd/<command_name>.go`
+- Each command should have self-contained functionality
+
+## Package Structure
+- **cmd/**: Command implementations
+- **internal/**: Private implementation details
+  - **config/**: Configuration management
+  - **logger/**: Logging utilities
+  - **ui/**: User interface components
+- **pkg/**: Public API (if applicable)
+- **testdata/**: Test fixtures and data
+- **docs/**: Documentation
+
+## Dependency Boundaries
+- No circular dependencies are allowed
+- Clear dependency direction (low to high level)
+- Explicit interfaces between packages
+- Dependencies should be explicitly defined in go.mod
+
+## File Organization
+- One primary type per file
+- Related helpers in the same file
+- Test files adjacent to implementation files
+- Consistent file naming: lowercase with underscores
+
+## Import Organization
+- Group imports in this order:
+  1. Standard library
+  2. External packages
+  3. Internal packages
+- Sort alphabetically within each group
+- Use explicit imports, no dot imports
+
+## Interface Design
+- Define interfaces at the point of use
+- Keep interfaces small and focused
+- Document interface contract clearly
+- Use composition over inheritance
+
+## Error Handling
+- Use explicit error checking
+- Wrap errors with context using `fmt.Errorf("...%w", err)`
+- Return errors rather than handling internally when appropriate
+- Define custom error types for specific error cases 

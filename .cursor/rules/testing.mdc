@@ -1,0 +1,49 @@
+---
+description: 
+globs: *_test.go
+alwaysApply: false
+---
+# Testing Requirements
+
+## Coverage Targets
+- 80% overall code coverage minimum
+- 100% coverage for critical paths
+- All commands must have tests
+- All error paths must be tested
+
+## Test Structure
+- Use table-driven tests for multiple test cases
+- Reset Viper before each test to avoid configuration leakage
+- Test with multiple configurations to verify behavior
+- Test error cases explicitly and verify error messages
+
+## Unit Testing
+- Test each function/method in isolation
+- Mock external dependencies
+- Verify both happy paths and error paths
+- Document test purpose clearly
+
+## Integration Testing
+- Test command interaction
+- Test configuration interactions
+- Test file system interactions
+- Verify correct error reporting
+
+## UI Testing
+- Use mocks for UI testing to avoid terminal capture issues
+- Test terminal output capture using test helpers
+- Verify UI renders correctly with different data
+- Test both interactive and non-interactive modes
+
+## Mocking
+- Create interface boundaries to enable mocking
+- Use consistent mocking patterns
+- Document mock behavior clearly
+- Verify mock expectations
+
+## Testing Commands
+- `task test`: Run all tests
+- `task test:coverage`: Run tests with coverage report
+- `task test:race`: Run tests with race detector
+- `task test:unit`: Run only unit tests
+- `task test:integration`: Run only integration tests 
