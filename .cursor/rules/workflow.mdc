@@ -31,7 +31,7 @@ alwaysApply: false
 - Add/update examples for new features
 
 ## Quality Checks
-- Run `task check` before committing
+- ALWAYS run `task check` when you have modified anything
 - Fix all linter issues
 - Format code using `task fmt`
 
