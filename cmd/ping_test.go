@@ -9,6 +9,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -37,15 +38,21 @@ func (e errorWriter) Write(p []byte) (int, error) {
 // setupTestViper initializes a clean viper instance for testing
 func setupTestViper(ui bool, message, color string) {
 	viper.Reset()
-	viper.SetDefault("app.ping.output_message", message)
-	viper.SetDefault("app.ping.output_color", color)
-	viper.SetDefault("app.ping.ui", ui)
+
+	// Instead of calling viper.SetDefault directly, set values directly
+	// for testing purposes only
+	viper.Set("app.ping.output_message", message)
+	viper.Set("app.ping.output_color", color)
+	viper.Set("app.ping.ui", ui)
 }
 
 // TestInitPingConfig ensures the default values are properly set
 func TestInitPingConfig(t *testing.T) {
 	// Reset viper for a clean test
 	viper.Reset()
+
+	// Apply defaults from registry
+	config.SetDefaults()
 
 	// Call the function
 	initPingConfig()

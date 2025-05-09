@@ -54,9 +54,9 @@ func initPingConfig() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
-	viper.SetDefault("app.ping.output_message", "Pong")
-	viper.SetDefault("app.ping.output_color", "white")
-	viper.SetDefault("app.ping.ui", false)
+	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
+	// All defaults MUST be defined in internal/config/registry.go
+	// See internal/config/registry.go for all configuration options
 }
 
 func runPing(cmd *cobra.Command, args []string) error {
