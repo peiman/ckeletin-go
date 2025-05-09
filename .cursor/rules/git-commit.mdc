@@ -53,4 +53,6 @@ git commit -m"refactor: improve binary name handling
 - Updated completion command to use binaryName variable
 - Added clear documentation about BINARY_NAME in Taskfile.yml
 - Added explanatory comments in .gitignore"
-``` 
+```
+
+!!!!DO NOT RUN THE GIT COMMIT COMMAND YOURSELF!!!!!
