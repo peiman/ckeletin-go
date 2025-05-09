@@ -164,3 +164,96 @@ func TestConfigPaths(t *testing.T) {
 		t.Errorf("Expected IgnorePattern to be 'testapp.yaml', got '%s'", paths.IgnorePattern)
 	}
 }
+
+// TestEnvPrefix tests the EnvPrefix function with various binary names
+func TestEnvPrefix(t *testing.T) {
+	// Save original binary name and restore after test
+	origBinaryName := binaryName
+	defer func() {
+		binaryName = origBinaryName
+	}()
+
+	tests := []struct {
+		name           string
+		binaryName     string
+		expectedPrefix string
+	}{
+		{
+			name:           "Simple name",
+			binaryName:     "myapp",
+			expectedPrefix: "MYAPP",
+		},
+		{
+			name:           "With hyphens",
+			binaryName:     "my-cool-app",
+			expectedPrefix: "MY_COOL_APP",
+		},
+		{
+			name:           "With dots",
+			binaryName:     "app.name.v2",
+			expectedPrefix: "APP_NAME_V2",
+		},
+		{
+			name:           "With special characters",
+			binaryName:     "app@name!v2",
+			expectedPrefix: "APP_NAME_V2",
+		},
+		{
+			name:           "Starting with number",
+			binaryName:     "1app",
+			expectedPrefix: "_1APP",
+		},
+		{
+			name:           "All special characters",
+			binaryName:     "!@#$%^&*()",
+			expectedPrefix: "_",
+		},
+		{
+			name:           "Mixed case",
+			binaryName:     "MyApp",
+			expectedPrefix: "MYAPP",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			binaryName = tt.binaryName
+			prefix := EnvPrefix()
+			if prefix != tt.expectedPrefix {
+				t.Errorf("EnvPrefix() = %v, want %v", prefix, tt.expectedPrefix)
+			}
+		})
+	}
+}
+
+// TestEnvironmentVariables tests that environment variables are correctly read with the proper prefix
+func TestEnvironmentVariables(t *testing.T) {
+	// Save original binary name and restore after test
+	origBinaryName := binaryName
+	defer func() {
+		binaryName = origBinaryName
+	}()
+
+	// Set a test binary name
+	binaryName = "testcli"
+
+	// Reset viper for a clean test
+	viper.Reset()
+
+	// Set an environment variable with the expected prefix
+	envVarName := "TESTCLI_APP_TEST_VALUE"
+	os.Setenv(envVarName, "env_value")
+	defer os.Unsetenv(envVarName)
+
+	// Initialize config
+	err := initConfig()
+	if err != nil {
+		t.Fatalf("initConfig() error = %v", err)
+	}
+
+	// Check that the value was read from the environment variable
+	value := viper.GetString("app.test_value")
+	if value != "env_value" {
+		t.Errorf("Expected viper to read value 'env_value' from environment, got '%s'", value)
+	}
+}

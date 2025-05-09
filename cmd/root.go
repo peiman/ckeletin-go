@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/internal/logger"
@@ -23,6 +24,27 @@ var (
 	configFileStatus string
 	configFileUsed   string
 )
+
+// EnvPrefix returns a sanitized environment variable prefix based on the binary name
+func EnvPrefix() string {
+	// Convert to uppercase and replace non-alphanumeric characters with underscore
+	prefix := strings.ToUpper(binaryName)
+	re := regexp.MustCompile(`[^A-Z0-9]`)
+	prefix = re.ReplaceAllString(prefix, "_")
+
+	// Ensure it doesn't start with a number (invalid for env vars)
+	if prefix != "" && prefix[0] >= '0' && prefix[0] <= '9' {
+		prefix = "_" + prefix
+	}
+
+	// Handle case where all characters were special and got replaced
+	re = regexp.MustCompile(`^_+$`)
+	if re.MatchString(prefix) {
+		prefix = "_"
+	}
+
+	return prefix
+}
 
 // ConfigPaths returns standard paths and filenames for config files based on the binary name
 func ConfigPaths() struct {
@@ -125,8 +147,12 @@ func initConfig() error {
 		viper.SetConfigType(configPaths.Extension)
 	}
 
+	// Set up environment variable handling with proper prefix
+	envPrefix := EnvPrefix()
+	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
+
 	viper.SetDefault("app.log_level", "info")
 
 	if err := viper.ReadInConfig(); err != nil {
