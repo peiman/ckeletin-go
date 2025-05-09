@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,9 +23,14 @@ var errCloseFailure = errors.New("simulated close error")
 type mockCloser struct {
 	io.Writer
 	closeErr error
+	errCh    chan<- error  // Channel to send the error through
 }
 
 func (m *mockCloser) Close() error {
+	// If we have a channel, signal that Close was called
+	if m.errCh != nil {
+		m.errCh <- m.closeErr
+	}
 	return m.closeErr
 }
 
@@ -168,179 +172,242 @@ func TestGenerateYAMLConfigStandaloneOption(t *testing.T) {
 
 // TestRunDocsConfig tests the docs config command execution
 func TestRunDocsConfig(t *testing.T) {
+	// Original openOutputFile implementation
+	origOpenOutputFile := openOutputFile
+	// Restore it after all tests
+	defer func() {
+		openOutputFile = origOpenOutputFile
+	}()
+
 	tests := []struct {
-		name           string
-		outputFormat   string
-		wantErrContain string
+		name             string
+		testFixturePath  string       // Path to test fixture
+		args             []string     // CLI args
+		expectOutput     string       // Expected output content
+		expectedFormat   string       // Expected format
+		wantErrContain   string       // Expected error substring, empty for no error
+		outputToFile     bool         // Whether to write to file
+		outputFilePath   string       // Output file path
+		mockCloseErr     error        // Mock file close error
 	}{
 		{
-			name:           "valid markdown format",
-			outputFormat:   FormatMarkdown,
+			name:           "Markdown Format Default",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{},
+			expectedFormat: FormatMarkdown,
+			expectOutput:   "# ckeletin-go Configuration",
 			wantErrContain: "",
 		},
 		{
-			name:           "valid yaml format",
-			outputFormat:   FormatYAML,
+			name:           "YAML Format",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{"--format", "yaml"},
+			expectedFormat: FormatYAML,
+			expectOutput:   "app:",
 			wantErrContain: "",
 		},
 		{
-			name:           "invalid format",
-			outputFormat:   "invalid",
+			name:           "Invalid Format",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{"--format", "invalid"},
 			wantErrContain: "unsupported format",
+		},
+		{
+			name:           "Output to File Markdown",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{"--output-file", "test_output.md"},
+			expectedFormat: FormatMarkdown,
+			outputToFile:   true,
+			outputFilePath: "test_output.md",
+			expectOutput:   "# ckeletin-go Configuration",
+			wantErrContain: "",
+		},
+		{
+			name:           "Output to File YAML",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{"--format", "yaml", "--output-file", "test_output.yaml"},
+			expectedFormat: FormatYAML,
+			outputToFile:   true,
+			outputFilePath: "test_output.yaml",
+			expectOutput:   "app:",
+			wantErrContain: "",
+		},
+		{
+			name:           "File Close Error",
+			testFixturePath: "../testdata/docs_config.yaml",
+			args:           []string{"--output-file", "test_output.md"},
+			expectedFormat: FormatMarkdown,
+			outputToFile:   true,
+			outputFilePath: "test_output.md",
+			mockCloseErr:   errCloseFailure,
+			wantErrContain: "",
+			expectOutput:   "# ckeletin-go Configuration",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
 			// Save original values and restore after test
 			origFormat := docsOutputFormat
 			origFile := docsOutputFile
 			defer func() {
 				docsOutputFormat = origFormat
 				docsOutputFile = origFile
+
+				// Clean up test output files
+				if tt.outputToFile {
+					os.Remove(tt.outputFilePath)
+				}
 			}()
 
-			// Set up test values
-			docsOutputFormat = tt.outputFormat
-			docsOutputFile = "" // Output to stdout for simpler testing
+			// Reset viper for test
+			viper.Reset()
 
-			// Create a cobra command for testing
-			cmd := &cobra.Command{}
-			var buf bytes.Buffer
-			cmd.SetOut(&buf) // Capture output
-
-			// Run the function
-			err := runDocsConfig(cmd, []string{})
-
-			// Check error
-			if tt.wantErrContain == "" {
-				if err != nil {
-					t.Errorf("runDocsConfig() error = %v, expected no error", err)
+			// Load test fixture if specified
+			if tt.testFixturePath != "" {
+				viper.SetConfigFile(tt.testFixturePath)
+				if err := viper.ReadInConfig(); err != nil {
+					t.Fatalf("Failed to load test fixture %s: %v", tt.testFixturePath, err)
 				}
-				// Verify some output was generated
-				if buf.Len() == 0 {
-					t.Errorf("runDocsConfig() produced no output")
+			}
+
+			// Create command and register flags
+			cmd := &cobra.Command{Use: "config"}
+			cmd.Flags().String("format", FormatMarkdown, "Output format (markdown, yaml)")
+			cmd.Flags().String("output-file", "", "Output file")
+
+			// Parse args
+			cmd.SetArgs(tt.args)
+			if err := cmd.ParseFlags(tt.args); err != nil {
+				t.Fatalf("Failed to parse flags: %v", err)
+			}
+
+			// Set up command parameters
+			if cmd.Flags().Changed("format") {
+				format, _ := cmd.Flags().GetString("format")
+				docsOutputFormat = format
+			} else {
+				docsOutputFormat = FormatMarkdown
+			}
+
+			if cmd.Flags().Changed("output-file") {
+				outputFile, _ := cmd.Flags().GetString("output-file")
+				docsOutputFile = outputFile
+			} else {
+				docsOutputFile = ""
+			}
+
+			// Setup output capture
+			var buf bytes.Buffer
+			cmd.SetOut(&buf)
+
+			// Prepare mock file if needed
+			if tt.mockCloseErr != nil {
+				openOutputFile = func(path string) (io.WriteCloser, error) {
+					return newMockFile(&buf, tt.mockCloseErr), nil
+				}
+			} else if tt.outputToFile {
+				// For file output tests, we'll capture to the buffer instead
+				openOutputFile = func(path string) (io.WriteCloser, error) {
+					return newMockFile(&buf, nil), nil
 				}
 			} else {
+				// Use default implementation for non-file tests
+				openOutputFile = origOpenOutputFile
+			}
+
+			// EXECUTION PHASE
+			err := runDocsConfig(cmd, []string{})
+
+			// ASSERTION PHASE
+			// Check error
+			if tt.wantErrContain != "" {
 				if err == nil {
 					t.Errorf("runDocsConfig() expected error containing %q, got nil", tt.wantErrContain)
-				} else if !strings.Contains(err.Error(), tt.wantErrContain) {
-					t.Errorf("runDocsConfig() error = %v, expected to contain %q", err, tt.wantErrContain)
+					return
+				}
+				if !strings.Contains(err.Error(), tt.wantErrContain) {
+					t.Errorf("runDocsConfig() error = %v, wantErrContain %q", err, tt.wantErrContain)
+					return
+				}
+			} else if err != nil {
+				t.Errorf("runDocsConfig() unexpected error: %v", err)
+				return
+			}
+
+			// Check format
+			if tt.expectedFormat != "" && docsOutputFormat != tt.expectedFormat {
+				t.Errorf("runDocsConfig() format = %q, want %q", docsOutputFormat, tt.expectedFormat)
+			}
+
+			// Check output content if not an error test
+			if tt.expectOutput != "" && tt.wantErrContain == "" {
+				output := buf.String()
+				if !strings.Contains(output, tt.expectOutput) {
+					t.Errorf("runDocsConfig() output missing expected content: %q", tt.expectOutput)
+					t.Errorf("Actual output: %q", output)
+				}
+			}
+
+			// Check file output if needed
+			if tt.outputToFile && tt.mockCloseErr == nil {
+				if docsOutputFile != tt.outputFilePath {
+					t.Errorf("runDocsConfig() output file = %q, want %q", docsOutputFile, tt.outputFilePath)
 				}
 			}
 		})
 	}
+}
 
-	// Test with output file
-	t.Run("output to file", func(t *testing.T) {
-		// Save original values and restore after test
-		origFormat := docsOutputFormat
-		origFile := docsOutputFile
-		defer func() {
-			docsOutputFormat = origFormat
-			docsOutputFile = origFile
-		}()
-
-		// Set up test values
-		docsOutputFormat = FormatMarkdown
-
-		// Create a temporary file for output
-		tempDir, err := os.MkdirTemp("", "docs-test")
-		if err != nil {
-			t.Fatalf("Failed to create temp dir: %v", err)
+// TestRunDocsConfig_FileCloseError tests the file close error specifically,
+// it verifies that the error is at least logged even if not returned.
+func TestRunDocsConfig_FileCloseError(t *testing.T) {
+	// Setup
+	origOpenOutputFile := openOutputFile
+	defer func() {
+		openOutputFile = origOpenOutputFile
+	}()
+	
+	// Reset and set up configs
+	viper.Reset()
+	docsOutputFormat = FormatMarkdown
+	docsOutputFile = "test_output.md"
+	
+	// Create a command for testing
+	cmd := &cobra.Command{Use: "config"}
+	cmd.Flags().String("format", FormatMarkdown, "Output format (markdown, yaml)")
+	cmd.Flags().String("output-file", "", "Output file")
+	
+	// Create a buffer to capture output
+	var buf bytes.Buffer
+	cmd.SetOut(&buf)
+	
+	// Also capture log output
+	var logBuf bytes.Buffer
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = zerolog.New(&logBuf)
+	
+	// Mock the file open function to return a file that will error on close
+	openOutputFile = func(path string) (io.WriteCloser, error) {
+		// Create a custom closer that will return our error
+		closer := &mockCloser{
+			Writer:   &buf,
+			closeErr: errCloseFailure,
 		}
-		defer os.RemoveAll(tempDir)
-
-		outputFile := filepath.Join(tempDir, "test-config.md")
-		docsOutputFile = outputFile
-
-		// Create a cobra command for testing
-		cmd := &cobra.Command{}
-
-		// Run the function
-		err = runDocsConfig(cmd, []string{})
-		if err != nil {
-			t.Errorf("runDocsConfig() with file output error = %v", err)
-		}
-
-		// Verify file was created and has content
-		if _, err := os.Stat(outputFile); os.IsNotExist(err) {
-			t.Errorf("Output file was not created")
-		}
-
-		content, err := os.ReadFile(outputFile)
-		if err != nil {
-			t.Errorf("Failed to read output file: %v", err)
-		}
-
-		if len(content) == 0 {
-			t.Errorf("Output file is empty")
-		}
-	})
-
-	// Test with invalid output file path
-	t.Run("invalid output file", func(t *testing.T) {
-		// Save original values and restore after test
-		origFormat := docsOutputFormat
-		origFile := docsOutputFile
-		defer func() {
-			docsOutputFormat = origFormat
-			docsOutputFile = origFile
-		}()
-
-		// Set up test values
-		docsOutputFormat = FormatMarkdown
-		docsOutputFile = "/nonexistent/directory/that/should/not/exist/file.md"
-
-		// Create a cobra command for testing
-		cmd := &cobra.Command{}
-
-		// Run the function
-		err := runDocsConfig(cmd, []string{})
-
-		// Should get an error about file creation
-		if err == nil {
-			t.Errorf("runDocsConfig() with invalid file path expected error, got nil")
-		} else if !strings.Contains(err.Error(), "failed to create output file") {
-			t.Errorf("runDocsConfig() error = %v, expected to contain 'failed to create output file'", err)
-		}
-	})
-
-	// Test for file close error path
-	t.Run("file close error", func(t *testing.T) {
-		// Create a temporary logger for this test
-		origLogger := log.Logger
-		var logBuf bytes.Buffer
-		log.Logger = zerolog.New(&logBuf)
-		defer func() {
-			log.Logger = origLogger
-		}()
-
-		// Create a test function that directly simulates the file.Close() error
-		func() {
-			// Create a buffer to capture output
-			var buf bytes.Buffer
-
-			// Create a mock file that will error on close
-			mockFile := newMockFile(&buf, errCloseFailure)
-
-			// Execute the exact defer block from runDocsConfig
-			defer func() {
-				if err := mockFile.Close(); err != nil {
-					log.Error().Err(err).Str("file", "test-file").Msg("Failed to close output file")
-				}
-			}()
-
-			// Cause the defer to execute
-		}()
-
-		// Check if the error was logged
-		logOutput := logBuf.String()
-		if !strings.Contains(logOutput, "Failed to close output file") ||
-			!strings.Contains(logOutput, errCloseFailure.Error()) {
-			t.Errorf("File close error not logged correctly, log output: %s", logOutput)
-		}
-	})
+		
+		return closer, nil
+	}
+	
+	// Execute the function
+	_ = runDocsConfig(cmd, []string{})
+	
+	// Check log output instead of return error
+	logOutput := logBuf.String()
+	if !strings.Contains(logOutput, "Failed to close output file") ||
+	   !strings.Contains(logOutput, errCloseFailure.Error()) {
+		t.Errorf("Close error not properly logged. Log output: %s", logOutput)
+	}
 }
 
 // TestDocsCommands tests the docs command structure

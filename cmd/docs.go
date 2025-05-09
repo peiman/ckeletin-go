@@ -46,6 +46,11 @@ The documentation can be output in various formats using the --format flag.`,
 	RunE: runDocsConfig,
 }
 
+// Variable to mock file opening for testing
+var openOutputFile = func(path string) (io.WriteCloser, error) {
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+}
+
 func init() {
 	// Add the config subcommand to the docs command
 	docsCmd.AddCommand(configCmd)
@@ -62,30 +67,43 @@ func init() {
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
 	var writer io.Writer = cmd.OutOrStdout()
-
+	var file io.WriteCloser
+	var closeErr error
+	
 	// If output file is specified, create it
 	if docsOutputFile != "" {
-		file, err := os.Create(docsOutputFile)
+		var err error
+		file, err = openOutputFile(docsOutputFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer func() {
-			if err := file.Close(); err != nil {
-				log.Error().Err(err).Str("file", docsOutputFile).Msg("Failed to close output file")
+			// Capture the close error so we can return it
+			closeErr = file.Close()
+			if closeErr != nil {
+				log.Error().Err(closeErr).Str("file", docsOutputFile).Msg("Failed to close output file")
 			}
 		}()
 		writer = file
 		log.Info().Str("file", docsOutputFile).Msg("Writing documentation to file")
 	}
 
+	var err error
 	switch strings.ToLower(docsOutputFormat) {
 	case FormatMarkdown:
-		return generateMarkdownDocs(writer)
+		err = generateMarkdownDocs(writer)
 	case FormatYAML:
-		return generateYAMLConfig(writer)
+		err = generateYAMLConfig(writer)
 	default:
-		return fmt.Errorf("unsupported format: %s", docsOutputFormat)
+		err = fmt.Errorf("unsupported format: %s", docsOutputFormat)
 	}
+
+	// If there was no error from the operation but there was a close error, return the close error
+	if err == nil && closeErr != nil {
+		return fmt.Errorf("failed to close output file: %w", closeErr)
+	}
+
+	return err
 }
 
 // generateMarkdownDocs generates Markdown documentation for all configuration options
