@@ -31,9 +31,13 @@
     - [Customizing the Module Path](#customizing-the-module-path)
       - [Steps to Update the Module Path](#steps-to-update-the-module-path)
   - [Configuration](#configuration)
+    - [Configuration Management](#configuration-management)
+    - [Adding New Configuration Options](#adding-new-configuration-options)
+    - [Automatic Documentation Generation](#automatic-documentation-generation)
     - [Configuration File](#configuration-file)
     - [Environment Variables](#environment-variables)
     - [Command-Line Flags](#command-line-flags)
+    - [Configuration Precedence](#configuration-precedence)
   - [Dependency Management](#dependency-management)
     - [Available Tasks](#available-tasks)
     - [Automated Checks](#automated-checks)
@@ -198,7 +202,70 @@ By following these steps, you can ensure that your version of the project is cor
 
 ## Configuration
 
-**ckeletin-go** uses Viper for flexible configuration:
+**ckeletin-go** uses Viper for flexible configuration and also implements a centralized configuration system with a single source of truth:
+
+### Configuration Management
+
+All configuration options are defined in **one place**: `internal/config/registry.go`.
+
+This registry contains:
+
+- Default values
+- Option descriptions
+- Data types
+- Example values
+- Metadata for documentation
+
+Benefits of this approach:
+
+- No duplication of defaults across the codebase
+- Self-documenting configuration
+- Automatic validation during build
+- Consistent environment variable naming
+
+### Adding New Configuration Options
+
+When adding a new configuration option, ONLY add it to the registry:
+
+```go
+// in internal/config/registry.go
+func Registry() []ConfigOption {
+    return []ConfigOption{
+        // Existing options...
+        {
+            Key:          "app.myfeature.setting",
+            DefaultValue: "default-value",
+            Description:  "Description of what this setting does",
+            Type:         "string",
+            Required:     false,
+            Example:      "example-value",
+        },
+    }
+}
+```
+
+**Important**: Never use `viper.SetDefault()` directly in command files. Our `check-defaults` task will catch any violations of this rule.
+
+### Automatic Documentation Generation
+
+Generate comprehensive configuration documentation with:
+
+```bash
+task docs:config
+```
+
+This creates a Markdown file at `docs/configuration.md` with:
+
+- All available configuration options
+- Default values and types
+- Environment variable names
+- Full descriptions
+
+For a configuration template, run:
+
+```bash
+task docs:config-yaml
+```
 
 ### Configuration File
 
@@ -208,21 +275,25 @@ Example:
 
 ```yaml
 app:
-  log_level: "info"
+  log_level: "debug"
   ping:
-    output_message: "Pong"
+    output_message: "Hello World!"
     output_color: "green"
-    ui: false
+    ui: true
 ```
 
 ### Environment Variables
 
-Override any config via environment variables:
+Override any config via environment variables with automatic prefix based on binary name:
 
 ```bash
-export APP_LOG_LEVEL="debug"
-export APP_PING_OUTPUT_MESSAGE="Hello, World!"
-export APP_PING_UI=true
+# For binary name "ckeletin-go":
+export CKELETIN_GO_APP_LOG_LEVEL="debug"
+export CKELETIN_GO_APP_PING_OUTPUT_MESSAGE="Hello, World!"
+export CKELETIN_GO_APP_PING_UI=true
+
+# If you renamed to "myapp":
+export MYAPP_APP_LOG_LEVEL="debug"
 ```
 
 ### Command-Line Flags
@@ -232,6 +303,15 @@ Override at runtime:
 ```bash
 ./myapp ping --message "Hi there!" --color yellow --ui
 ```
+
+### Configuration Precedence
+
+Configuration values are resolved in this order:
+
+1. Command-line flags (highest priority)
+2. Environment variables
+3. Configuration file
+4. Default values (lowest priority)
 
 ---
 
@@ -361,7 +441,30 @@ This follows Cobra's best practice: each command in its own file, cleanly separa
 
 ### Modifying Configurations
 
-Set new defaults in `initConfig` or in command files. Use `viper.BindPFlag()` to bind flags. Adjust config files or env vars to match your desired behavior.
+Configuration has been centralized in `internal/config/registry.go` for clarity and maintainability. To add or modify configurations:
+
+1. **Add new options to the registry**: Add a new entry to the `Registry()` function in `internal/config/registry.go`.
+
+2. **Bind command flags**: Use `viper.BindPFlag()` in your command files to bind flags to configuration keys:
+
+   ```go
+   cmd.Flags().String("setting", "", "Description of the setting")
+   viper.BindPFlag("app.myfeature.setting", cmd.Flags().Lookup("setting"))
+   ```
+
+3. **Access configuration**: Use Viper's `Get*` methods in your code:
+
+   ```go
+   value := viper.GetString("app.myfeature.setting")
+   ```
+
+4. **Generate documentation**: After adding new configuration options, regenerate the documentation:
+
+   ```bash
+   task docs
+   ```
+
+Remember: **Never** use `viper.SetDefault()` directly. The `check-defaults` task will flag any violations.
 
 ### Customizing the UI
 

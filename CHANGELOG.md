@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added centralized configuration system:
+  - Created `internal/config/registry.go` as single source of truth for all configuration
+  - Implemented automatic documentation generation with `docs config` command
+  - Added task commands for generating both Markdown and YAML documentation
+  - Added check-defaults.sh script to detect direct viper.SetDefault() calls
+- Improved environment variable handling:
+  - Added EnvPrefix() function to generate consistent environment variable prefixes
+  - Created ConfigPaths() helper to centralize all config file paths/names
+  - Ensured binary name changes automatically update environment variable prefixes
+
+### Changed
+
+- Improved test coverage:
+  - Added tests for config file path handling in root.go
+  - Enhanced command testing for edge cases
+  - Achieved higher coverage across core components
+
 ## [0.5.0] - 2025-04-22
 
 ### Added

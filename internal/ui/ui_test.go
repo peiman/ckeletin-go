@@ -157,6 +157,21 @@ func TestModelUpdate(t *testing.T) {
 	}
 }
 
+// TestModelInit tests the Init method of the model
+func TestModelInit(t *testing.T) {
+	m := model{
+		message:    "Test Message",
+		colorStyle: lipgloss.NewStyle(),
+	}
+
+	// Init should return nil as it's a no-op in this implementation
+	cmd := m.Init()
+
+	if cmd != nil {
+		t.Errorf("Init() = %v, want nil", cmd)
+	}
+}
+
 func TestRunUI(t *testing.T) {
 	runner := DefaultUIRunner{}
 

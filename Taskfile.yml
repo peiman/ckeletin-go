@@ -79,6 +79,12 @@ tasks:
     cmds:
       - govulncheck ./...
 
+  check-defaults:
+    desc: Check for unauthorized viper.SetDefault() calls
+    cmds:
+      - ./scripts/check-defaults.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -102,11 +108,46 @@ tasks:
       - go tool cover -func=coverage.txt
     silent: false
 
+  test:coverage-html:
+    desc: Generate HTML coverage report and open in browser
+    cmds:
+      - task: test
+      - go tool cover -html=coverage.txt -o coverage.html
+      - echo "Coverage report saved to coverage.html"
+      - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
+    silent: true
+
+  docs:config:
+    desc: Generate configuration documentation
+    cmds:
+      - echo "Generating configuration documentation..."
+      - mkdir -p docs
+      - ./{{.BINARY_NAME}} docs config --output=docs/configuration.md
+      - echo "Configuration documentation saved to docs/configuration.md"
+    deps: [build]
+
+  docs:config-yaml:
+    desc: Generate YAML configuration template
+    cmds:
+      - echo "Generating YAML configuration template..."
+      - mkdir -p docs
+      - ./{{.BINARY_NAME}} docs config --format=yaml --output=docs/config-template.yaml
+      - echo "YAML template saved to docs/config-template.yaml"
+    deps: [build]
+
+  docs:
+    desc: Generate all documentation
+    cmds:
+      - task: docs:config
+      - task: docs:config-yaml
+    silent: true
+
   check:
     desc: Run all quality checks
     deps:
       - format
       - lint
+      - check-defaults
       - deps:check
       - test
 

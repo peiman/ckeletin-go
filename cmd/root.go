@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/peiman/ckeletin-go/internal/logger"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -153,7 +154,10 @@ func initConfig() error {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
-	viper.SetDefault("app.log_level", "info")
+	// Set default values from registry
+	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
+	// All defaults MUST be defined in internal/config/registry.go
+	config.SetDefaults()
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
