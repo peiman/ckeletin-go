@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Achieved higher coverage across core components
   - Converted tests to table-driven format with phase separation
   - Added clear setup, execution, and assertion phases for all tests
+  - Increased UI package coverage from 73.2% to 76.6%
+  - Improved RunUI coverage from 33.3% to 53.3%
 - Migrated Cursor rules architecture:
   - Transitioned from monolithic `dot.cursorrules` file to modular `.cursor/rules/` directory
   - Created separate `.mdc` files for each rule category
@@ -56,6 +58,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the `ping` command and template to follow the new pattern.
 - Improved documentation and code comments to reinforce centralized configuration management.
 - Enhanced test coverage for the new configuration pattern and helpers.
+
+### Security
+
+- Added explicit permissions to GitHub Actions workflows:
+  - Limited permissions to minimum required for each job
+  - Added separate permission blocks for build and release jobs
+  - Fixed CodeQL security warning about missing permissions
+- Fixed environment variable injection vulnerability in GitHub Actions:
+  - Added proper environment variable sanitization and quoting
+  - Used GitHub Environment File syntax instead of direct variable setting
+  - Improved handling of user-controlled input in workflow files
+  - Fixed CodeQL security warning about environment injection
 
 ## [0.5.0] - 2025-04-22
 
