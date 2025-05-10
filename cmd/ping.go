@@ -16,7 +16,7 @@ type UIRunner interface {
 }
 
 var (
-	pingRunner UIRunner = &ui.DefaultUIRunner{} // default UI runner, can be replaced in tests
+	pingRunner UIRunner = ui.NewDefaultUIRunner() // default UI runner, can be replaced in tests
 )
 
 // PingConfig holds all configuration for the ping command
