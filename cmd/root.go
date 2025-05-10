@@ -174,3 +174,77 @@ func initConfig() error {
 
 	return nil
 }
+
+// setupCommandConfig creates a PreRunE function that integrates with the root PersistentPreRunE
+// to provide consistent configuration initialization with command-specific behavior.
+// This pattern ensures that:
+// 1. Root configuration is initialized first
+// 2. Command-specific configuration is applied
+// 3. Parent command's PreRunE is always called to maintain inheritance
+func setupCommandConfig(cmd *cobra.Command) {
+	// Store original PreRunE if it exists
+	originalPreRunE := cmd.PreRunE
+
+	// Create new PreRunE that applies command-specific configuration
+	cmd.PreRunE = func(c *cobra.Command, args []string) error {
+		// Call original PreRunE if it exists
+		if originalPreRunE != nil {
+			if err := originalPreRunE(c, args); err != nil {
+				return err
+			}
+		}
+
+		// Debug log that we're configuring this command
+		log.Debug().Str("command", c.Name()).Msg("Applying command-specific configuration")
+
+		// The common viper environment setup is already done in root's PersistentPreRunE
+		// via the initConfig() function, so we don't need to repeat it here
+
+		// IMPORTANT: Never set defaults directly with viper.SetDefault() here or in command files.
+		// All defaults MUST be defined in internal/config/registry.go
+
+		return nil
+	}
+}
+
+// getConfigValue retrieves a configuration value with the following precedence:
+// 1. Command line flag (if set)
+// 2. Configuration from viper (environment variable or config file)
+// This consolidates the common pattern of checking if a flag is set and using its value
+func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string) T {
+	var value T
+
+	// Get the value from viper first (this will be from config file or env var)
+	if v := viper.Get(viperKey); v != nil {
+		if typedValue, ok := v.(T); ok {
+			value = typedValue
+		}
+	}
+
+	// If the flag was explicitly set, override the viper value
+	if cmd.Flags().Changed(flagName) {
+		// Handle different types appropriately
+		switch any(value).(type) {
+		case string:
+			if v, err := cmd.Flags().GetString(flagName); err == nil {
+				// We need to use interface conversion since Go can't directly assign
+				// to the type parameter value - this is a bit verbose but type-safe
+				value = any(v).(T)
+			}
+		case bool:
+			if v, err := cmd.Flags().GetBool(flagName); err == nil {
+				value = any(v).(T)
+			}
+		case int:
+			if v, err := cmd.Flags().GetInt(flagName); err == nil {
+				value = any(v).(T)
+			}
+		case float64:
+			if v, err := cmd.Flags().GetFloat64(flagName); err == nil {
+				value = any(v).(T)
+			}
+		}
+	}
+
+	return value
+}

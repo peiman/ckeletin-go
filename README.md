@@ -433,11 +433,33 @@ go install github.com/spf13/cobra-cli@latest
 
 Add a new command:
 
+This follows Cobra's best practice: each command in its own file, cleanly separated and easily testable.
+
+For faster development, you can also copy and modify the template file:
+
 ```bash
-cobra-cli add hello
+cp cmd/template_command.go.example cmd/hello.go
 ```
 
-This follows Cobra's best practice: each command in its own file, cleanly separated and easily testable.
+Then edit the file to implement your command following the established pattern.
+
+### Command Implementation Pattern
+
+The project uses an idiomatic Cobra/Viper pattern with command inheritance:
+
+1. The root command's `PersistentPreRunE` initializes global configuration
+2. Child commands inherit this behavior through Cobra's command chain
+3. Command-specific configuration is handled through the `setupCommandConfig` helper
+
+Benefits of this pattern:
+- Reduces duplication across commands
+- Ensures consistent configuration handling
+- Maintains command independence
+- Simplifies adding new commands
+
+When implementing a new command:
+1. Use the `setupCommandConfig(cmd)` helper in your command's `init()` function
+2. Use the `getConfigValue[T](cmd, flagName, viperKey)` helper to get configuration values
 
 ### Modifying Configurations
 

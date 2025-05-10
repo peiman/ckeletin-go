@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog/log"
@@ -48,11 +47,9 @@ func init() {
 
 	// Add pingCmd to RootCmd
 	RootCmd.AddCommand(pingCmd)
-}
 
-func initPingConfig() {
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
+	// Setup command configuration inheritance
+	setupCommandConfig(pingCmd)
 
 	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
 	// All defaults MUST be defined in internal/config/registry.go
@@ -61,23 +58,11 @@ func initPingConfig() {
 
 func runPing(cmd *cobra.Command, args []string) error {
 	log.Debug().Msg("Starting runPing execution")
-	initPingConfig()
 
-	// Get values from flags or Viper
-	message := viper.GetString("app.ping.output_message")
-	if cmd.Flags().Changed("message") {
-		message, _ = cmd.Flags().GetString("message")
-	}
-
-	colorStr := viper.GetString("app.ping.output_color")
-	if cmd.Flags().Changed("color") {
-		colorStr, _ = cmd.Flags().GetString("color")
-	}
-
-	uiFlag := viper.GetBool("app.ping.ui")
-	if cmd.Flags().Changed("ui") {
-		uiFlag, _ = cmd.Flags().GetBool("ui")
-	}
+	// Get values using the unified helper function
+	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
+	colorStr := getConfigValue[string](cmd, "color", "app.ping.output_color")
+	uiFlag := getConfigValue[bool](cmd, "ui", "app.ping.ui")
 
 	log.Debug().
 		Str("message", message).

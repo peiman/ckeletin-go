@@ -5,6 +5,7 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -513,5 +514,145 @@ func TestEnvironmentVariables(t *testing.T) {
 					tt.viperKey, actualValue, tt.expectedValue)
 			}
 		})
+	}
+}
+
+// TestSetupCommandConfig tests the command configuration inheritance pattern
+func TestSetupCommandConfig(t *testing.T) {
+	// SETUP PHASE
+	// Create a command for testing
+	isOriginalCalled := false
+
+	// Create a command with an existing PreRunE
+	cmd := &cobra.Command{
+		Use: "test",
+		PreRunE: func(c *cobra.Command, args []string) error {
+			isOriginalCalled = true
+			return nil
+		},
+	}
+
+	// EXECUTION PHASE
+	// Apply our setup function
+	setupCommandConfig(cmd)
+
+	// Run the resulting PreRunE
+	err := cmd.PreRunE(cmd, []string{})
+
+	// ASSERTION PHASE
+	// Verify original PreRunE was called
+	if !isOriginalCalled {
+		t.Error("Original PreRunE was not called")
+	}
+
+	// No error should be returned
+	if err != nil {
+		t.Errorf("PreRunE returned unexpected error: %v", err)
+	}
+
+	// Test with a command that has no PreRunE
+	cmdWithoutPreRun := &cobra.Command{Use: "test2"}
+	setupCommandConfig(cmdWithoutPreRun)
+
+	// Ensure it still works
+	err = cmdWithoutPreRun.PreRunE(cmdWithoutPreRun, []string{})
+	if err != nil {
+		t.Errorf("PreRunE returned unexpected error for command without original PreRunE: %v", err)
+	}
+
+	// Test with a command that returns an error in PreRunE
+	expectedErr := fmt.Errorf("test error")
+	cmdWithErrPreRun := &cobra.Command{
+		Use: "test3",
+		PreRunE: func(c *cobra.Command, args []string) error {
+			return expectedErr
+		},
+	}
+	setupCommandConfig(cmdWithErrPreRun)
+
+	// Run PreRunE and verify the error is propagated
+	err = cmdWithErrPreRun.PreRunE(cmdWithErrPreRun, []string{})
+	if err != expectedErr {
+		t.Errorf("Expected error %v, got %v", expectedErr, err)
+	}
+}
+
+// TestGetConfigValue_Types tests the getConfigValue function with different types
+func TestGetConfigValue_Types(t *testing.T) {
+	// SETUP PHASE
+	// Reset viper for a clean test
+	viper.Reset()
+
+	// Set different types of values in viper
+	viper.Set("test.string", "string-value")
+	viper.Set("test.bool", true)
+	viper.Set("test.int", 42)
+	viper.Set("test.float", 3.14)
+
+	// Create a command with flags of different types
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("string", "", "String flag")
+	cmd.Flags().Bool("bool", false, "Boolean flag")
+	cmd.Flags().Int("int", 0, "Integer flag")
+	cmd.Flags().Float64("float", 0, "Float flag")
+
+	// EXECUTION & ASSERTION PHASE
+	// Test string type
+	strVal := getConfigValue[string](cmd, "string", "test.string")
+	if strVal != "string-value" {
+		t.Errorf("Expected string value to be 'string-value', got '%s'", strVal)
+	}
+
+	// Test bool type
+	boolVal := getConfigValue[bool](cmd, "bool", "test.bool")
+	if boolVal != true {
+		t.Errorf("Expected bool value to be true, got %v", boolVal)
+	}
+
+	// Test int type
+	intVal := getConfigValue[int](cmd, "int", "test.int")
+	if intVal != 42 {
+		t.Errorf("Expected int value to be 42, got %d", intVal)
+	}
+
+	// Test float type
+	floatVal := getConfigValue[float64](cmd, "float", "test.float")
+	if floatVal != 3.14 {
+		t.Errorf("Expected float value to be 3.14, got %f", floatVal)
+	}
+
+	// Test overriding values with flags
+	if err := cmd.Flags().Set("string", "flag-value"); err != nil {
+		t.Fatalf("Failed to set string flag: %v", err)
+	}
+	if err := cmd.Flags().Set("bool", "false"); err != nil {
+		t.Fatalf("Failed to set bool flag: %v", err)
+	}
+	if err := cmd.Flags().Set("int", "99"); err != nil {
+		t.Fatalf("Failed to set int flag: %v", err)
+	}
+	if err := cmd.Flags().Set("float", "6.28"); err != nil {
+		t.Fatalf("Failed to set float flag: %v", err)
+	}
+
+	// Verify flag values override viper values
+	strVal = getConfigValue[string](cmd, "string", "test.string")
+	if strVal != "flag-value" {
+		t.Errorf("Expected string flag value to be 'flag-value', got '%s'", strVal)
+	}
+
+	boolVal = getConfigValue[bool](cmd, "bool", "test.bool")
+	if boolVal != false {
+		t.Errorf("Expected bool flag value to be false, got %v", boolVal)
+	}
+
+	intVal = getConfigValue[int](cmd, "int", "test.int")
+	if intVal != 99 {
+		t.Errorf("Expected int flag value to be 99, got %d", intVal)
+	}
+
+	floatVal = getConfigValue[float64](cmd, "float", "test.float")
+	if floatVal != 6.28 {
+		t.Errorf("Expected float flag value to be 6.28, got %f", floatVal)
 	}
 }

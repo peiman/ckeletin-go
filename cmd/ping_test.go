@@ -34,16 +34,13 @@ func (e *errorWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 
-// TestInitPingConfig ensures the default values are properly set
-func TestInitPingConfig(t *testing.T) {
+// TestConfigDefaultsForPing ensures the default values for ping command are properly set
+func TestConfigDefaultsForPing(t *testing.T) {
 	// Reset viper for a clean test
 	viper.Reset()
 
 	// Apply defaults from registry
 	config.SetDefaults()
-
-	// Call the function
-	initPingConfig()
 
 	// Check that defaults are set correctly
 	if viper.GetString("app.ping.output_message") != "Pong" {
@@ -56,6 +53,53 @@ func TestInitPingConfig(t *testing.T) {
 
 	if viper.GetBool("app.ping.ui") != false {
 		t.Errorf("Expected default ui to be false, got %v", viper.GetBool("app.ping.ui"))
+	}
+}
+
+// TestGetConfigValue tests our new helper function for retrieving config values
+func TestGetConfigValue(t *testing.T) {
+	// Setup test config in viper
+	viper.Reset()
+	viper.Set("app.ping.output_message", "ConfigMessage")
+	viper.Set("app.ping.output_color", "blue")
+	viper.Set("app.ping.ui", true)
+
+	// Create a command for testing
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("message", "", "Custom output message")
+	cmd.Flags().String("color", "", "Output color")
+	cmd.Flags().Bool("ui", false, "Enable UI")
+
+	// Test string value without flag set (should use viper value)
+	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
+	if message != "ConfigMessage" {
+		t.Errorf("Expected message to be 'ConfigMessage', got '%s'", message)
+	}
+
+	// Test when flag is set (should override viper value)
+	if err := cmd.Flags().Set("message", "FlagMessage"); err != nil {
+		t.Fatalf("Failed to set message flag: %v", err)
+	}
+
+	message = getConfigValue[string](cmd, "message", "app.ping.output_message")
+	if message != "FlagMessage" {
+		t.Errorf("Expected message to be 'FlagMessage' when flag is set, got '%s'", message)
+	}
+
+	// Test bool value without flag set (should use viper value)
+	uiFlag := getConfigValue[bool](cmd, "ui", "app.ping.ui")
+	if uiFlag != true {
+		t.Errorf("Expected ui to be true, got %v", uiFlag)
+	}
+
+	// Test when flag is set (should override viper value)
+	if err := cmd.Flags().Set("ui", "false"); err != nil {
+		t.Fatalf("Failed to set ui flag: %v", err)
+	}
+
+	uiFlag = getConfigValue[bool](cmd, "ui", "app.ping.ui")
+	if uiFlag != false {
+		t.Errorf("Expected ui to be false when flag is set, got %v", uiFlag)
 	}
 }
 

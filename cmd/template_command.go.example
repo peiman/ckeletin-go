@@ -1,0 +1,78 @@
+// cmd/template_command.go.example
+// This is a template for creating new commands following the idiomatic Cobra/Viper pattern
+// Copy this file to cmd/<command_name>.go and adapt as needed
+
+//go:build ignore
+// +build ignore
+
+package cmd
+
+import (
+	"fmt"
+
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+)
+
+var templateCmd = &cobra.Command{
+	Use:   "template",
+	Short: "One line description",
+	Long: `Detailed multi-line description of what this command does.
+- Include key features
+- Example usage patterns
+- Any important considerations`,
+	RunE: runTemplate,
+}
+
+func init() {
+	// Define command-specific flags
+	templateCmd.Flags().String("option", "", "Description of this option")
+	templateCmd.Flags().Bool("feature", false, "Enable/disable a feature")
+	
+	// Bind flags to Viper using consistent naming convention
+	if err := viper.BindPFlag("app.template.option", templateCmd.Flags().Lookup("option")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'option' flag")
+	}
+	if err := viper.BindPFlag("app.template.feature", templateCmd.Flags().Lookup("feature")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'feature' flag")
+	}
+	
+	// Add command to root and setup configuration inheritance
+	RootCmd.AddCommand(templateCmd)
+	setupCommandConfig(templateCmd)
+	
+	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
+	// All defaults MUST be defined in internal/config/registry.go
+	// See internal/config/registry.go for all configuration options
+}
+
+func runTemplate(cmd *cobra.Command, args []string) error {
+	log.Debug().Msg("Starting runTemplate execution")
+	
+	// Get configuration values using the helper function
+	option := getConfigValue[string](cmd, "option", "app.template.option")
+	featureEnabled := getConfigValue[bool](cmd, "feature", "app.template.feature")
+	
+	// Log configuration for debugging
+	log.Debug().
+		Str("option", option).
+		Bool("feature_enabled", featureEnabled).
+		Msg("Configuration loaded")
+	
+	// IMPLEMENT COMMAND LOGIC HERE
+	
+	// Example of error handling pattern
+	if err := someOperation(); err != nil {
+		log.Error().Err(err).Msg("Operation failed")
+		return fmt.Errorf("command failed: %w", err)
+	}
+	
+	log.Debug().Msg("runTemplate completed successfully")
+	return nil
+}
+
+// Placeholder function for example only - remove in real command
+func someOperation() error {
+	return nil
+} 
