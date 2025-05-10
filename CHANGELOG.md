@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated testing rules with clear table-driven test examples
   - Added explicit test phase separation guidelines (setup, execution, assertion)
   - Improved workflow rules for quality checks
+- Implemented Options Pattern for command configuration:
+  - Added `DocsConfig` with functional options in the docs command
+  - Created `WithOutputFormat` and `WithOutputFile` configuration options
+  - Updated tests to use the new pattern and improve coverage
+- Enhanced UI testing capabilities:
+  - Added program factory pattern to `DefaultUIRunner` for better testability
+  - Created `NewDefaultUIRunner` and `NewTestUIRunner` factory functions
+  - Added special test mode to `RunUI` to simulate successful execution
+  - Improved UI test coverage with comprehensive test cases
 
 ### Changed
 
