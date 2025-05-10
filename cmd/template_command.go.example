@@ -15,6 +15,57 @@ import (
 	"github.com/spf13/viper"
 )
 
+// =============================
+// OPTIONS PATTERN IMPLEMENTATION
+// =============================
+
+// TemplateConfig holds all configuration for the template command
+// This struct is built using the Options Pattern for testability and clarity
+// Defaults are set in internal/config/registry.go and loaded via Viper
+// Use functional options to override values as needed
+type TemplateConfig struct {
+	Option  string // String configuration option
+	Feature bool   // Boolean feature flag
+	// Add more configuration fields as needed for your command
+}
+
+// TemplateOption defines a function type that modifies a TemplateConfig
+// This is the core of the functional Options Pattern
+type TemplateOption func(*TemplateConfig)
+
+// WithOption returns a function that sets the Option field
+// This pattern allows for clean, chainable configuration
+func WithOption(option string) TemplateOption {
+	return func(cfg *TemplateConfig) { cfg.Option = option }
+}
+
+// WithFeature returns a function that sets the Feature field
+func WithFeature(feature bool) TemplateOption {
+	return func(cfg *TemplateConfig) { cfg.Feature = feature }
+}
+
+// NewTemplateConfig builds a TemplateConfig from options, with values loaded from Viper/flags by default
+// This constructor combines default values from configuration with any overrides passed as options
+func NewTemplateConfig(cmd *cobra.Command, opts ...TemplateOption) TemplateConfig {
+	// Start with defaults from Viper/flags using the getConfigValue helper
+	// This provides a consistent pattern for all commands
+	cfg := TemplateConfig{
+		Option:  getConfigValue[string](cmd, "option", "app.template.option"),
+		Feature: getConfigValue[bool](cmd, "feature", "app.template.feature"),
+	}
+	
+	// Apply any override options that were passed in
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	
+	return cfg
+}
+
+// =============================
+// COMMAND DEFINITION
+// =============================
+
 var templateCmd = &cobra.Command{
 	Use:   "template",
 	Short: "One line description",
@@ -47,23 +98,32 @@ func init() {
 	// See internal/config/registry.go for all configuration options
 }
 
+// =============================
+// COMMAND IMPLEMENTATION
+// =============================
+
 func runTemplate(cmd *cobra.Command, args []string) error {
 	log.Debug().Msg("Starting runTemplate execution")
 	
-	// Get configuration values using the helper function
-	option := getConfigValue[string](cmd, "option", "app.template.option")
-	featureEnabled := getConfigValue[bool](cmd, "feature", "app.template.feature")
+	// Build command config using Options Pattern
+	// In normal execution, use without options to get values from flags/config
+	cfg := NewTemplateConfig(cmd)
+	
+	// For testing, you can override configuration values:
+	// cfg := NewTemplateConfig(cmd, WithOption("test"), WithFeature(true))
 	
 	// Log configuration for debugging
 	log.Debug().
-		Str("option", option).
-		Bool("feature_enabled", featureEnabled).
+		Str("option", cfg.Option).
+		Bool("feature_enabled", cfg.Feature).
 		Msg("Configuration loaded")
 	
 	// IMPLEMENT COMMAND LOGIC HERE
+	// Now use cfg.Option and cfg.Feature instead of calling Viper or getConfigValue directly
+	// This makes your code more testable and modular
 	
 	// Example of error handling pattern
-	if err := someOperation(); err != nil {
+	if err := someOperation(cfg); err != nil {
 		log.Error().Err(err).Msg("Operation failed")
 		return fmt.Errorf("command failed: %w", err)
 	}
@@ -72,7 +132,17 @@ func runTemplate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// =============================
+// COMMAND HELPERS
+// =============================
+
 // Placeholder function for example only - remove in real command
-func someOperation() error {
+// Shows how to use the config struct for command operations
+func someOperation(cfg TemplateConfig) error {
+	// Using the configuration values from the struct
+	// rather than accessing Viper directly improves testability
+	if cfg.Feature {
+		log.Info().Str("option", cfg.Option).Msg("Feature enabled")
+	}
 	return nil
 } 

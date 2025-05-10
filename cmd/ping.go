@@ -16,8 +16,43 @@ type UIRunner interface {
 }
 
 var (
-	pingRunner UIRunner = &ui.DefaultUIRunner{} // default UI runner, can be replaced in tests
+	pingRunner UIRunner = ui.NewDefaultUIRunner() // default UI runner, can be replaced in tests
 )
+
+// PingConfig holds all configuration for the ping command
+// This struct is built using the Options Pattern for testability and clarity
+// Defaults are set in internal/config/registry.go and loaded via Viper
+// Use functional options to override values as needed
+type PingConfig struct {
+	Message string
+	Color   string
+	UI      bool
+}
+
+type PingOption func(*PingConfig)
+
+func WithPingMessage(msg string) PingOption {
+	return func(cfg *PingConfig) { cfg.Message = msg }
+}
+func WithPingColor(color string) PingOption {
+	return func(cfg *PingConfig) { cfg.Color = color }
+}
+func WithPingUI(ui bool) PingOption {
+	return func(cfg *PingConfig) { cfg.UI = ui }
+}
+
+// NewPingConfig builds a PingConfig from options, with values loaded from Viper/flags by default
+func NewPingConfig(cmd *cobra.Command, opts ...PingOption) PingConfig {
+	cfg := PingConfig{
+		Message: getConfigValue[string](cmd, "message", "app.ping.output_message"),
+		Color:   getConfigValue[string](cmd, "color", "app.ping.output_color"),
+		UI:      getConfigValue[bool](cmd, "ui", "app.ping.ui"),
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return cfg
+}
 
 var pingCmd = &cobra.Command{
 	Use:   "ping",
@@ -59,15 +94,12 @@ func init() {
 func runPing(cmd *cobra.Command, args []string) error {
 	log.Debug().Msg("Starting runPing execution")
 
-	// Get values using the unified helper function
-	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
-	colorStr := getConfigValue[string](cmd, "color", "app.ping.output_color")
-	uiFlag := getConfigValue[bool](cmd, "ui", "app.ping.ui")
+	cfg := NewPingConfig(cmd)
 
 	log.Debug().
-		Str("message", message).
-		Str("color", colorStr).
-		Bool("ui_enabled", uiFlag).
+		Str("message", cfg.Message).
+		Str("color", cfg.Color).
+		Bool("ui_enabled", cfg.UI).
 		Msg("Configuration loaded")
 
 	writer := cmd.OutOrStdout()
@@ -75,9 +107,9 @@ func runPing(cmd *cobra.Command, args []string) error {
 		Str("writer_type", fmt.Sprintf("%T", writer)).
 		Msg("Using writer")
 
-	if uiFlag {
-		log.Info().Str("message", message).Str("color", colorStr).Msg("Starting UI")
-		if err := pingRunner.RunUI(message, colorStr); err != nil {
+	if cfg.UI {
+		log.Info().Str("message", cfg.Message).Str("color", cfg.Color).Msg("Starting UI")
+		if err := pingRunner.RunUI(cfg.Message, cfg.Color); err != nil {
 			log.Error().Err(err).Msg("Failed to run UI")
 			return err
 		}
@@ -85,12 +117,12 @@ func runPing(cmd *cobra.Command, args []string) error {
 	}
 
 	// Non-UI mode: print the message
-	err := ui.PrintColoredMessage(writer, message, colorStr)
+	err := ui.PrintColoredMessage(writer, cfg.Message, cfg.Color)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Str("message", message).
-			Str("color", colorStr).
+			Str("message", cfg.Message).
+			Str("color", cfg.Color).
 			Msg("Failed to print colored message")
 		// Wrap the error to provide context
 		return fmt.Errorf("failed to print colored message: %w", err)

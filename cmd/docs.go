@@ -11,6 +11,7 @@ import (
 	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // Define output format types
@@ -19,12 +20,34 @@ const (
 	FormatYAML     = "yaml"
 )
 
-var (
-	// Flag for output format
-	docsOutputFormat string
-	// Flag for output file
-	docsOutputFile string
-)
+// DocsConfig holds all configuration for the docs command
+// This struct is built using the Options Pattern for testability and clarity
+type DocsConfig struct {
+	OutputFormat string
+	OutputFile   string
+}
+
+type DocsOption func(*DocsConfig)
+
+func WithOutputFormat(format string) DocsOption {
+	return func(cfg *DocsConfig) { cfg.OutputFormat = format }
+}
+
+func WithOutputFile(file string) DocsOption {
+	return func(cfg *DocsConfig) { cfg.OutputFile = file }
+}
+
+// NewDocsConfig builds a DocsConfig from options, with values loaded from Viper/flags by default
+func NewDocsConfig(cmd *cobra.Command, opts ...DocsOption) DocsConfig {
+	cfg := DocsConfig{
+		OutputFormat: getConfigValue[string](cmd, "format", "app.docs.output_format"),
+		OutputFile:   getConfigValue[string](cmd, "output", "app.docs.output_file"),
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return cfg
+}
 
 // docsCmd represents the docs command
 var docsCmd = &cobra.Command{
@@ -59,21 +82,38 @@ func init() {
 	RootCmd.AddCommand(docsCmd)
 
 	// Add flags to config command
-	configCmd.Flags().StringVarP(&docsOutputFormat, "format", "f", FormatMarkdown,
-		"Output format (markdown, yaml)")
-	configCmd.Flags().StringVarP(&docsOutputFile, "output", "o", "",
-		"Output file (defaults to stdout)")
+	configCmd.Flags().StringP("format", "f", FormatMarkdown, "Output format (markdown, yaml)")
+	configCmd.Flags().StringP("output", "o", "", "Output file (defaults to stdout)")
+
+	// Bind flags to Viper using consistent naming convention
+	if err := viper.BindPFlag("app.docs.output_format", configCmd.Flags().Lookup("format")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'format' flag")
+	}
+	if err := viper.BindPFlag("app.docs.output_file", configCmd.Flags().Lookup("output")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'output' flag")
+	}
+
+	// Setup command configuration inheritance
+	setupCommandConfig(configCmd)
 }
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
+	// Build command config using Options Pattern
+	cfg := NewDocsConfig(cmd)
+
+	log.Debug().
+		Str("format", cfg.OutputFormat).
+		Str("output_file", cfg.OutputFile).
+		Msg("Documentation configuration loaded")
+
 	var writer io.Writer = cmd.OutOrStdout()
 	var file io.WriteCloser
 	var closeErr error
 
 	// If output file is specified, create it
-	if docsOutputFile != "" {
+	if cfg.OutputFile != "" {
 		var err error
-		file, err = openOutputFile(docsOutputFile)
+		file, err = openOutputFile(cfg.OutputFile)
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
@@ -81,21 +121,21 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 			// Capture the close error so we can return it
 			closeErr = file.Close()
 			if closeErr != nil {
-				log.Error().Err(closeErr).Str("file", docsOutputFile).Msg("Failed to close output file")
+				log.Error().Err(closeErr).Str("file", cfg.OutputFile).Msg("Failed to close output file")
 			}
 		}()
 		writer = file
-		log.Info().Str("file", docsOutputFile).Msg("Writing documentation to file")
+		log.Info().Str("file", cfg.OutputFile).Msg("Writing documentation to file")
 	}
 
 	var err error
-	switch strings.ToLower(docsOutputFormat) {
+	switch strings.ToLower(cfg.OutputFormat) {
 	case FormatMarkdown:
 		err = generateMarkdownDocs(writer)
 	case FormatYAML:
 		err = generateYAMLConfig(writer)
 	default:
-		err = fmt.Errorf("unsupported format: %s", docsOutputFormat)
+		err = fmt.Errorf("unsupported format: %s", cfg.OutputFormat)
 	}
 
 	// If there was no error from the operation but there was a close error, return the close error

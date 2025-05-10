@@ -172,12 +172,66 @@ func TestModelInit(t *testing.T) {
 	}
 }
 
+// TestRunUI tests the basic error path of RunUI
 func TestRunUI(t *testing.T) {
-	runner := DefaultUIRunner{}
+	tests := []struct {
+		name    string
+		message string
+		color   string
+		wantErr bool
+	}{
+		{
+			name:    "Invalid color error",
+			message: "Test Message",
+			color:   "invalid-color",
+			wantErr: true,
+		},
+	}
 
-	// Since testing the actual UI is complex, we can test for error handling
-	err := runner.RunUI("Test Message", "invalid-color")
-	if err == nil {
-		t.Errorf("Expected error for invalid color, got nil")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := NewDefaultUIRunner()
+			err := runner.RunUI(tt.message, tt.color)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RunUI() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestRunUISuccessPath tests the success path of RunUI using the test runner
+func TestRunUISuccessPath(t *testing.T) {
+	// Create a test runner with nil program factory
+	runner := NewTestUIRunner()
+
+	// Valid color to pass the GetLipglossColor check
+	err := runner.RunUI("Test Message", "blue")
+
+	// Should not return an error
+	if err != nil {
+		t.Errorf("RunUI() error = %v, want nil", err)
+	}
+}
+
+// TestDefaultUIRunnerCreation tests creating a DefaultUIRunner
+func TestDefaultUIRunnerCreation(t *testing.T) {
+	runner := NewDefaultUIRunner()
+	if runner == nil {
+		t.Fatalf("NewDefaultUIRunner() returned nil")
+	}
+	if runner.newProgram == nil {
+		t.Errorf("NewDefaultUIRunner() returned a runner with nil newProgram")
+	}
+}
+
+// TestNewTestUIRunner tests creating a test UI runner
+func TestNewTestUIRunner(t *testing.T) {
+	runner := NewTestUIRunner()
+	if runner == nil {
+		t.Fatalf("NewTestUIRunner() returned nil")
+	}
+	if runner.newProgram != nil {
+		t.Errorf("NewTestUIRunner() returned a runner with non-nil newProgram")
 	}
 }

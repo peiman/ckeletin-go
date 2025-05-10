@@ -16,8 +16,31 @@ type UIRunner interface {
 	RunUI(message, col string) error
 }
 
+// programFactory is a function type that creates a new tea program
+type programFactory func(m tea.Model) *tea.Program
+
 // DefaultUIRunner is the default implementation of UIRunner
-type DefaultUIRunner struct{}
+type DefaultUIRunner struct {
+	// Allow for testing by passing a custom program factory
+	newProgram programFactory
+}
+
+// NewDefaultUIRunner creates a new DefaultUIRunner with the standard program factory
+func NewDefaultUIRunner() *DefaultUIRunner {
+	return &DefaultUIRunner{
+		newProgram: func(m tea.Model) *tea.Program {
+			return tea.NewProgram(m)
+		},
+	}
+}
+
+// For testing only - allows creating a DefaultUIRunner with a nil program factory
+// This simulates a successful UI run without actually creating a tea.Program
+func NewTestUIRunner() *DefaultUIRunner {
+	return &DefaultUIRunner{
+		newProgram: nil,
+	}
+}
 
 // RunUI runs the Bubble Tea UI
 func (d *DefaultUIRunner) RunUI(message, col string) error {
@@ -36,7 +59,17 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 		colorStyle: lipgloss.NewStyle().Foreground(colorStyle).Bold(true),
 	}
 
-	p := tea.NewProgram(m)
+	// For testing - if newProgram is nil, just log success and return
+	if d.newProgram == nil {
+		log.Info().
+			Str("message", message).
+			Str("color", col).
+			Msg("UI ran successfully (test mode)")
+		return nil
+	}
+
+	// Use the program factory
+	p := d.newProgram(m)
 	_, err = p.Run()
 	if err != nil {
 		log.Error().
