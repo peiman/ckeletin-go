@@ -102,6 +102,22 @@ func Registry() []ConfigOption {
 			Required:     false,
 			Example:      "true",
 		},
+		{
+			Key:          "app.docs.output_format",
+			DefaultValue: "markdown",
+			Description:  "Output format for documentation (markdown, yaml)",
+			Type:         "string",
+			Required:     false,
+			Example:      "yaml",
+		},
+		{
+			Key:          "app.docs.output_file",
+			DefaultValue: "",
+			Description:  "Output file for documentation (defaults to stdout)",
+			Type:         "string",
+			Required:     false,
+			Example:      "/path/to/output.md",
+		},
 	}
 }
 

@@ -54,6 +54,8 @@
   - [Customization](#customization)
     - [Changing the Program Name](#changing-the-program-name)
     - [Adding New Commands](#adding-new-commands)
+    - [Command Implementation Pattern](#command-implementation-pattern)
+    - [Options Pattern for Command Configuration](#options-pattern-for-command-configuration)
     - [Modifying Configurations](#modifying-configurations)
     - [Customizing the UI](#customizing-the-ui)
     - [Cursor AI Integration](#cursor-ai-integration)
@@ -425,12 +427,6 @@ task build
 
 ### Adding New Commands
 
-Install Cobra CLI tool:
-
-```bash
-go install github.com/spf13/cobra-cli@latest
-```
-
 Add a new command:
 
 This follows Cobra's best practice: each command in its own file, cleanly separated and easily testable.
@@ -452,14 +448,79 @@ The project uses an idiomatic Cobra/Viper pattern with command inheritance:
 3. Command-specific configuration is handled through the `setupCommandConfig` helper
 
 Benefits of this pattern:
+
 - Reduces duplication across commands
 - Ensures consistent configuration handling
 - Maintains command independence
 - Simplifies adding new commands
 
 When implementing a new command:
+
 1. Use the `setupCommandConfig(cmd)` helper in your command's `init()` function
 2. Use the `getConfigValue[T](cmd, flagName, viperKey)` helper to get configuration values
+
+### Options Pattern for Command Configuration
+
+The project implements the Options Pattern for command configuration, providing several benefits:
+
+1. **Testability**: Commands can be easily tested with different configurations
+2. **Modularity**: Configuration is encapsulated in dedicated structs
+3. **Type Safety**: Using strong typing and generics for configuration values
+4. **Default Handling**: Consistent handling of default values from the registry
+5. **Readability**: Clear separation of configuration from command logic
+
+To implement the Options Pattern for a new command:
+
+1. **Create a configuration struct**:
+
+   ```go
+   type CommandConfig struct {
+     Option1 string
+     Option2 bool
+     // Add other options as needed
+   }
+   ```
+
+2. **Define functional options**:
+
+   ```go
+   type CommandOption func(*CommandConfig)
+   
+   func WithOption1(value string) CommandOption {
+     return func(cfg *CommandConfig) { cfg.Option1 = value }
+   }
+   
+   func WithOption2(value bool) CommandOption {
+     return func(cfg *CommandConfig) { cfg.Option2 = value }
+   }
+   ```
+
+3. **Create a constructor**:
+
+   ```go
+   func NewCommandConfig(cmd *cobra.Command, opts ...CommandOption) CommandConfig {
+     cfg := CommandConfig{
+       Option1: getConfigValue[string](cmd, "option1", "app.command.option1"),
+       Option2: getConfigValue[bool](cmd, "option2", "app.command.option2"),
+     }
+     for _, opt := range opts {
+       opt(&cfg)
+     }
+     return cfg
+   }
+   ```
+
+4. **Use the config in your command**:
+
+   ```go
+   func runCommand(cmd *cobra.Command, args []string) error {
+     cfg := NewCommandConfig(cmd)
+     // Use cfg.Option1, cfg.Option2, etc.
+     return nil
+   }
+   ```
+
+See `cmd/ping.go` and `cmd/template_command.go.example` for working examples of this pattern.
 
 ### Modifying Configurations
 
