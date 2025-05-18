@@ -53,12 +53,12 @@ func NewTemplateConfig(cmd *cobra.Command, opts ...TemplateOption) TemplateConfi
 		Option:  getConfigValue[string](cmd, "option", "app.template.option"),
 		Feature: getConfigValue[bool](cmd, "feature", "app.template.feature"),
 	}
-	
+
 	// Apply any override options that were passed in
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	
+
 	return cfg
 }
 
@@ -80,7 +80,7 @@ func init() {
 	// Define command-specific flags
 	templateCmd.Flags().String("option", "", "Description of this option")
 	templateCmd.Flags().Bool("feature", false, "Enable/disable a feature")
-	
+
 	// Bind flags to Viper using consistent naming convention
 	if err := viper.BindPFlag("app.template.option", templateCmd.Flags().Lookup("option")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'option' flag")
@@ -88,11 +88,11 @@ func init() {
 	if err := viper.BindPFlag("app.template.feature", templateCmd.Flags().Lookup("feature")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'feature' flag")
 	}
-	
+
 	// Add command to root and setup configuration inheritance
 	RootCmd.AddCommand(templateCmd)
 	setupCommandConfig(templateCmd)
-	
+
 	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
 	// All defaults MUST be defined in internal/config/registry.go
 	// See internal/config/registry.go for all configuration options
@@ -104,30 +104,30 @@ func init() {
 
 func runTemplate(cmd *cobra.Command, args []string) error {
 	log.Debug().Msg("Starting runTemplate execution")
-	
+
 	// Build command config using Options Pattern
 	// In normal execution, use without options to get values from flags/config
 	cfg := NewTemplateConfig(cmd)
-	
+
 	// For testing, you can override configuration values:
 	// cfg := NewTemplateConfig(cmd, WithOption("test"), WithFeature(true))
-	
+
 	// Log configuration for debugging
 	log.Debug().
 		Str("option", cfg.Option).
 		Bool("feature_enabled", cfg.Feature).
 		Msg("Configuration loaded")
-	
+
 	// IMPLEMENT COMMAND LOGIC HERE
 	// Now use cfg.Option and cfg.Feature instead of calling Viper or getConfigValue directly
 	// This makes your code more testable and modular
-	
+
 	// Example of error handling pattern
 	if err := someOperation(cfg); err != nil {
 		log.Error().Err(err).Msg("Operation failed")
 		return fmt.Errorf("command failed: %w", err)
 	}
-	
+
 	log.Debug().Msg("runTemplate completed successfully")
 	return nil
 }
@@ -145,4 +145,4 @@ func someOperation(cfg TemplateConfig) error {
 		log.Info().Str("option", cfg.Option).Msg("Feature enabled")
 	}
 	return nil
-} 
+}

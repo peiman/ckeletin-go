@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2024-06-25
+
 ### Added
 
 - Added centralized configuration system:
@@ -35,6 +37,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `NewDefaultUIRunner` and `NewTestUIRunner` factory functions
   - Added special test mode to `RunUI` to simulate successful execution
   - Improved UI test coverage with comprehensive test cases
+- Added ckeletin-go specific conventions to CONVENSIONS.md:
+  - Documented separation of concerns between commands and business logic
+  - Clarified centralized configuration patterns
+  - Added guidelines for Options Pattern and Interface Abstractions
+  - Provided error handling best practices
 
 ### Changed
 
@@ -190,7 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/peiman/ckeletin-go/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/peiman/ckeletin-go/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/peiman/ckeletin-go/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/peiman/ckeletin-go/compare/v0.2.0...v0.3.0
