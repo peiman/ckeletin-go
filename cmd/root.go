@@ -243,6 +243,10 @@ func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string)
 			if v, err := cmd.Flags().GetFloat64(flagName); err == nil {
 				value = any(v).(T)
 			}
+		case []string:
+			if v, err := cmd.Flags().GetStringSlice(flagName); err == nil {
+				value = any(v).(T)
+			}
 		}
 	}
 

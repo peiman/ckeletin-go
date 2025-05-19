@@ -54,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored Viper initialization to use a centralized, idiomatic Cobra/Viper pattern with `PersistentPreRunE` and command inheritance.
 - Introduced `setupCommandConfig` helper for consistent command configuration across all commands.
 - Added `getConfigValue[T]` generic helper for type-safe and simplified configuration retrieval.
+  - Enhanced to support string, bool, int, float64, and string slice types
+  - Added comprehensive tests for all type handling scenarios
+  - Improved flag overriding behavior with proper type conversions
 - Removed redundant per-command Viper initialization logic.
 - Updated the `ping` command and template to follow the new pattern.
 - Improved documentation and code comments to reinforce centralized configuration management.

@@ -860,7 +860,7 @@ func TestRunDocsConfig_CloseError(t *testing.T) {
 		// This is exactly the part we want to test coverage for
 		var err error = nil // Simulate successful doc generation
 		closeErr := mock.Close()
-		if err == nil && closeErr != nil {
+		if closeErr != nil {
 			return fmt.Errorf("failed to close output file: %w", closeErr)
 		}
 		return err
