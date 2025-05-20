@@ -273,12 +273,12 @@ Then add it to the registry in `registry.go`:
 func Registry() []ConfigOption {
     // Start with application-wide core options
     options := CoreOptions()
-    
+
     // Append command-specific options
     options = append(options, PingOptions()...)
     options = append(options, DocsOptions()...)
     options = append(options, MyCommandOptions()...) // Add your new command options
-    
+
     return options
 }
 ```
@@ -522,11 +522,11 @@ To implement the Options Pattern for a new command:
 
    ```go
    type CommandOption func(*CommandConfig)
-   
+
    func WithOption1(value string) CommandOption {
      return func(cfg *CommandConfig) { cfg.Option1 = value }
    }
-   
+
    func WithOption2(value bool) CommandOption {
      return func(cfg *CommandConfig) { cfg.Option2 = value }
    }
