@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Improved error handling and file management
   - Enhanced mockability with function variables for testing
   - Added dependency injection for registry access to improve testability
-- Enhanced test coverage for document generation from 22.9% to 89.3%
+- Enhanced test coverage for document generation
 
 ## [0.6.0] - 2024-06-25
 
