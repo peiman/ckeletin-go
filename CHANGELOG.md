@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Created new `internal/docs` package for document generation:
+  - Implemented Generator pattern with configuration via Options Pattern
+  - Added Markdown and YAML output format support
+  - Provided dependency injection for registry access
+  - Created clean interfaces for document generation
+
+### Changed
+
+- Refactored documentation command architecture:
+  - Moved document generation logic from cmd/docs.go to new internal/docs package
+  - Created a clean separation between command interface and document generation
+  - Implemented a proper Generator pattern with configuration via Options Pattern
+  - Made document generation more testable and maintainable
+  - Improved error handling and file management
+  - Enhanced mockability with function variables for testing
+  - Added dependency injection for registry access to improve testability
+- Enhanced test coverage for document generation from 22.9% to 89.3%
+
+## [0.6.0] - 2024-06-25
+
+### Added
+
 - Added centralized configuration system:
   - Created `internal/config/registry.go` as single source of truth for all configuration
   - Implemented automatic documentation generation with `docs config` command
@@ -35,11 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `NewDefaultUIRunner` and `NewTestUIRunner` factory functions
   - Added special test mode to `RunUI` to simulate successful execution
   - Improved UI test coverage with comprehensive test cases
-- Created new `internal/docs` package for document generation:
-  - Implemented Generator pattern with configuration via Options Pattern
-  - Added Markdown and YAML output format support
-  - Provided dependency injection for registry access
-  - Created clean interfaces for document generation
+- Added ckeletin-go specific conventions to CONVENSIONS.md:
+  - Documented separation of concerns between commands and business logic
+  - Clarified centralized configuration patterns
+  - Added guidelines for Options Pattern and Interface Abstractions
+  - Provided error handling best practices
 
 ### Changed
 
@@ -56,14 +78,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created separate `.mdc` files for each rule category
   - Improved organization with targeted rule files by domain
   - Made rules more discoverable with specific file names
-- Refactored documentation command architecture:
-  - Moved document generation logic from cmd/docs.go to new internal/docs package
-  - Created a clean separation between command interface and document generation
-  - Implemented a proper Generator pattern with configuration via Options Pattern
-  - Made document generation more testable and maintainable
-  - Improved error handling and file management
-  - Enhanced mockability with function variables for testing
-  - Added dependency injection for registry access to improve testability
 - Refactored Viper initialization to use a centralized, idiomatic Cobra/Viper pattern with `PersistentPreRunE` and command inheritance.
 - Introduced `setupCommandConfig` helper for consistent command configuration across all commands.
 - Added `getConfigValue[T]` generic helper for type-safe and simplified configuration retrieval.
@@ -206,7 +220,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/peiman/ckeletin-go/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/peiman/ckeletin-go/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/peiman/ckeletin-go/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/peiman/ckeletin-go/compare/v0.2.0...v0.3.0

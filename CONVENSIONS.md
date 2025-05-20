@@ -15,6 +15,17 @@
 The project is structured according to conventional Go project structure.
 It also follows Cobra and Viper conventions.
 
+## ckeletin-go Conventions
+
+- **Separation of Concerns**: Commands in `cmd/` should act as shells for business logic. All actual business logic should reside in the `internal/` directory.
+- **Centralized Configuration**: All configuration options must be defined in `internal/config/registry.go` as the single source of truth. Never use `viper.SetDefault()` directly in command files.
+- **Options Pattern**: Use the Options pattern for command configuration to enhance testability and flexibility (see `cmd/ping.go` as example).
+- **Interface Abstractions**: Create interfaces for external dependencies and functionality to enable testing without mocks (e.g., `UIRunner` interface).
+- **Configuration Inheritance**: Use the `setupCommandConfig()` helper to ensure commands inherit configuration from their parents.
+- **Error Context**: Always wrap errors with `fmt.Errorf("context: %w", err)` to preserve the error chain while adding context.
+- **Functional Utilities**: Prefer small, focused utility functions that do one thing well over large, complex functions.
+- **Testing First**: Follow test-driven development by writing tests before implementation. Tests should verify behavior without mocking dependencies.
+
 ## Cobra and Viper Conventions
 
 - **Command Structure**: Organize commands in a modular fashion. Each command should be self-contained, managing its own configurations and defaults.
