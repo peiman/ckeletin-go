@@ -588,6 +588,7 @@ func TestGetConfigValue_Types(t *testing.T) {
 	viper.Set("test.bool", true)
 	viper.Set("test.int", 42)
 	viper.Set("test.float", 3.14)
+	viper.Set("test.stringslice", []string{"value1", "value2", "value3"})
 
 	// Create a command with flags of different types
 	cmd := &cobra.Command{Use: "test"}
@@ -595,6 +596,7 @@ func TestGetConfigValue_Types(t *testing.T) {
 	cmd.Flags().Bool("bool", false, "Boolean flag")
 	cmd.Flags().Int("int", 0, "Integer flag")
 	cmd.Flags().Float64("float", 0, "Float flag")
+	cmd.Flags().StringSlice("stringslice", []string{}, "String slice flag")
 
 	// EXECUTION & ASSERTION PHASE
 	// Test string type
@@ -621,6 +623,12 @@ func TestGetConfigValue_Types(t *testing.T) {
 		t.Errorf("Expected float value to be 3.14, got %f", floatVal)
 	}
 
+	// Test string slice type
+	sliceVal := getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+	if len(sliceVal) != 3 || sliceVal[0] != "value1" || sliceVal[1] != "value2" || sliceVal[2] != "value3" {
+		t.Errorf("Expected string slice value to be [value1 value2 value3], got %v", sliceVal)
+	}
+
 	// Test overriding values with flags
 	if err := cmd.Flags().Set("string", "flag-value"); err != nil {
 		t.Fatalf("Failed to set string flag: %v", err)
@@ -633,6 +641,9 @@ func TestGetConfigValue_Types(t *testing.T) {
 	}
 	if err := cmd.Flags().Set("float", "6.28"); err != nil {
 		t.Fatalf("Failed to set float flag: %v", err)
+	}
+	if err := cmd.Flags().Set("stringslice", "flag1,flag2,flag3,flag4"); err != nil {
+		t.Fatalf("Failed to set string slice flag: %v", err)
 	}
 
 	// Verify flag values override viper values
@@ -654,5 +665,97 @@ func TestGetConfigValue_Types(t *testing.T) {
 	floatVal = getConfigValue[float64](cmd, "float", "test.float")
 	if floatVal != 6.28 {
 		t.Errorf("Expected float flag value to be 6.28, got %f", floatVal)
+	}
+
+	// Verify string slice flag value overrides viper value
+	sliceVal = getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+	expectedSlice := []string{"flag1", "flag2", "flag3", "flag4"}
+	if len(sliceVal) != len(expectedSlice) {
+		t.Errorf("Expected string slice flag length to be %d, got %d", len(expectedSlice), len(sliceVal))
+	} else {
+		for i, v := range expectedSlice {
+			if sliceVal[i] != v {
+				t.Errorf("Expected string slice flag value at index %d to be '%s', got '%s'", i, v, sliceVal[i])
+			}
+		}
+	}
+}
+
+// TestGetConfigValue_StringSlice specifically tests the string slice handling in getConfigValue
+func TestGetConfigValue_StringSlice(t *testing.T) {
+	// SETUP PHASE
+	// Reset viper for a clean test
+	viper.Reset()
+
+	// Define test cases
+	tests := []struct {
+		name           string
+		viperValue     []string
+		flagValue      string
+		setFlag        bool
+		expectedResult []string
+	}{
+		{
+			name:           "Viper value only",
+			viperValue:     []string{"one", "two", "three"},
+			setFlag:        false,
+			expectedResult: []string{"one", "two", "three"},
+		},
+		{
+			name:           "Empty viper value",
+			viperValue:     []string{},
+			setFlag:        false,
+			expectedResult: []string{},
+		},
+		{
+			name:           "Flag value overrides viper",
+			viperValue:     []string{"viper1", "viper2"},
+			flagValue:      "flag1,flag2,flag3",
+			setFlag:        true,
+			expectedResult: []string{"flag1", "flag2", "flag3"},
+		},
+		{
+			name:           "Empty flag value",
+			viperValue:     []string{"viper1", "viper2"},
+			flagValue:      "",
+			setFlag:        true,
+			expectedResult: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE - for each test case
+			viper.Reset()
+			viper.Set("test.stringslice", tt.viperValue)
+
+			// Create a command with a string slice flag
+			cmd := &cobra.Command{Use: "test"}
+			cmd.Flags().StringSlice("stringslice", []string{}, "String slice flag")
+
+			// Set the flag if needed
+			if tt.setFlag {
+				if err := cmd.Flags().Set("stringslice", tt.flagValue); err != nil {
+					t.Fatalf("Failed to set string slice flag: %v", err)
+				}
+			}
+
+			// EXECUTION PHASE
+			result := getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+
+			// ASSERTION PHASE
+			if len(result) != len(tt.expectedResult) {
+				t.Errorf("Expected string slice length to be %d, got %d",
+					len(tt.expectedResult), len(result))
+				t.Errorf("Expected: %v, Got: %v", tt.expectedResult, result)
+				return
+			}
+
+			for i, v := range tt.expectedResult {
+				if result[i] != v {
+					t.Errorf("Expected value at index %d to be '%s', got '%s'", i, v, result[i])
+				}
+			}
+		})
 	}
 }

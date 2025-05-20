@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Created new `internal/docs` package for document generation:
+  - Implemented Generator pattern with configuration via Options Pattern
+  - Added Markdown and YAML output format support
+  - Provided dependency injection for registry access
+  - Created clean interfaces for document generation
+
+### Changed
+
+- Refactored documentation command architecture:
+  - Moved document generation logic from cmd/docs.go to new internal/docs package
+  - Created a clean separation between command interface and document generation
+  - Implemented a proper Generator pattern with configuration via Options Pattern
+  - Made document generation more testable and maintainable
+  - Improved error handling and file management
+  - Enhanced mockability with function variables for testing
+  - Added dependency injection for registry access to improve testability
+- Enhanced test coverage for document generation
+
 ## [0.6.0] - 2024-06-25
 
 ### Added
@@ -61,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored Viper initialization to use a centralized, idiomatic Cobra/Viper pattern with `PersistentPreRunE` and command inheritance.
 - Introduced `setupCommandConfig` helper for consistent command configuration across all commands.
 - Added `getConfigValue[T]` generic helper for type-safe and simplified configuration retrieval.
+  - Enhanced to support string, bool, int, float64, and string slice types
+  - Added comprehensive tests for all type handling scenarios
+  - Improved flag overriding behavior with proper type conversions
 - Removed redundant per-command Viper initialization logic.
 - Updated the `ping` command and template to follow the new pattern.
 - Improved documentation and code comments to reinforce centralized configuration management.

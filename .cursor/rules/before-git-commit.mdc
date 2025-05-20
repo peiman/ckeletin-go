@@ -1,9 +1,14 @@
 ---
-description: Git Commit Conventions
+description: Essential guidelines for git commit formatting and procedures. MUST be followed before any commit.
 globs: 
 alwaysApply: false
 ---
-# Git Commit Conventions
+# BEFORE GIT COMMIT - ALWAYS CHECK THIS RULE
+
+## WHEN TO USE THIS RULE
+- ⚠️ ALWAYS check this rule BEFORE preparing or suggesting any git commit operations
+- This rule MUST be followed for every commit in the project
+- Review this rule whenever the user mentions committing, git, or saving changes
 
 ## Commit Format
 All commits must follow this exact format:
@@ -55,4 +60,7 @@ git commit -m"refactor: improve binary name handling
 - Added explanatory comments in .gitignore"
 ```
 
+## ⚠️ CRITICAL REMINDER
 !!!!DO NOT RUN THE GIT COMMIT COMMAND YOURSELF!!!!!
+ONLY PROVIDE THE FORMATTED COMMIT MESSAGE FOR THE USER
+
