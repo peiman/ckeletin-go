@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `NewDefaultUIRunner` and `NewTestUIRunner` factory functions
   - Added special test mode to `RunUI` to simulate successful execution
   - Improved UI test coverage with comprehensive test cases
+- Created new `internal/docs` package for document generation:
+  - Implemented Generator pattern with configuration via Options Pattern
+  - Added Markdown and YAML output format support
+  - Provided dependency injection for registry access
+  - Created clean interfaces for document generation
 
 ### Changed
 
@@ -51,6 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created separate `.mdc` files for each rule category
   - Improved organization with targeted rule files by domain
   - Made rules more discoverable with specific file names
+- Refactored documentation command architecture:
+  - Moved document generation logic from cmd/docs.go to new internal/docs package
+  - Created a clean separation between command interface and document generation
+  - Implemented a proper Generator pattern with configuration via Options Pattern
+  - Made document generation more testable and maintainable
+  - Improved error handling and file management
+  - Enhanced mockability with function variables for testing
+  - Added dependency injection for registry access to improve testability
 - Refactored Viper initialization to use a centralized, idiomatic Cobra/Viper pattern with `PersistentPreRunE` and command inheritance.
 - Introduced `setupCommandConfig` helper for consistent command configuration across all commands.
 - Added `getConfigValue[T]` generic helper for type-safe and simplified configuration retrieval.
