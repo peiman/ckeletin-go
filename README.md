@@ -208,34 +208,54 @@ By following these steps, you can ensure that your version of the project is cor
 
 ### Configuration Management
 
-All configuration options are defined in **one place**: `internal/config/registry.go`.
+All configuration options are organized in a modular structure:
 
-This registry contains:
+- `internal/config/options.go`: Core `ConfigOption` type definition and methods
+- `internal/config/core_options.go`: Application-wide settings that affect all commands
+- `internal/config/ping_options.go`: Settings specific to the ping command
+- `internal/config/docs_options.go`: Settings specific to the docs command  
+- `internal/config/registry.go`: Aggregates all options into a single registry
 
-- Default values
-- Option descriptions
-- Data types
-- Example values
-- Metadata for documentation
+Benefits of this modular approach:
 
-Benefits of this approach:
-
-- No duplication of defaults across the codebase
+- Clean separation between command-specific and application-wide settings
+- Better maintainability as each command's options are isolated
+- Simple extension by adding new command option files
+- All options still accessible through a single registry
 - Self-documenting configuration
-- Automatic validation during build
-- Consistent environment variable naming
+- Improved testability with 100% test coverage
 
 ### Adding New Configuration Options
 
-When adding a new configuration option, ONLY add it to the registry:
+When adding a new configuration option for an existing command, add it to the appropriate file:
 
 ```go
-// in internal/config/registry.go
-func Registry() []ConfigOption {
+// For ping command options, add to internal/config/ping_options.go
+func PingOptions() []ConfigOption {
     return []ConfigOption{
         // Existing options...
         {
-            Key:          "app.myfeature.setting",
+            Key:          "app.ping.new_setting",
+            DefaultValue: "default-value",
+            Description:  "Description of what this setting does",
+            Type:         "string", 
+            Required:     false,
+            Example:      "example-value",
+        },
+    }
+}
+```
+
+For a new command, create a new file following the naming pattern `<command>_options.go`:
+
+```go
+// internal/config/mycommand_options.go
+package config
+
+func MyCommandOptions() []ConfigOption {
+    return []ConfigOption{
+        {
+            Key:          "app.mycommand.setting",
             DefaultValue: "default-value",
             Description:  "Description of what this setting does",
             Type:         "string",
@@ -243,6 +263,23 @@ func Registry() []ConfigOption {
             Example:      "example-value",
         },
     }
+}
+```
+
+Then add it to the registry in `registry.go`:
+
+```go
+// in internal/config/registry.go
+func Registry() []ConfigOption {
+    // Start with application-wide core options
+    options := CoreOptions()
+    
+    // Append command-specific options
+    options = append(options, PingOptions()...)
+    options = append(options, DocsOptions()...)
+    options = append(options, MyCommandOptions()...) // Add your new command options
+    
+    return options
 }
 ```
 

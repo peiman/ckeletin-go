@@ -26,6 +26,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced mockability with function variables for testing
   - Added dependency injection for registry access to improve testability
 - Enhanced test coverage for document generation
+- Refactored configuration system for improved modularity:
+  - Separated command-specific options into dedicated files
+  - Created clear distinction between core and command options
+  - Improved documentation with better file headers and comments
+  - Enhanced testability with 100% test coverage for config package
+  - Made adding new command configurations more straightforward
+  - Added guidance in README for managing configuration options
 
 ## [0.6.0] - 2024-06-25
 
