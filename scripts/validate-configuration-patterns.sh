@@ -158,33 +158,33 @@ for file in cmd/*.go; do
         continue
     fi
 
-    ((TOTAL_FILES++))
+    TOTAL_FILES=$((TOTAL_FILES + 1))
 
     passed=true
 
     # Run checks
     if ! check_viper_set_default "$file"; then
         passed=false
-        ((VIOLATIONS++))
+        VIOLATIONS=$((VIOLATIONS + 1))
     fi
 
     result=0
     check_new_config_signature "$file" || result=$?
     if [ $result -eq 1 ]; then
         passed=false
-        ((VIOLATIONS++))
+        VIOLATIONS=$((VIOLATIONS + 1))
     elif [ $result -eq 2 ]; then
-        ((WARNINGS++))
+        WARNINGS=$((WARNINGS + 1))
     fi
 
     if ! check_manual_precedence "$file"; then
         passed=false
-        ((VIOLATIONS++))
+        VIOLATIONS=$((VIOLATIONS + 1))
     fi
 
     if ! check_rune_pattern "$file"; then
         passed=false
-        ((VIOLATIONS++))
+        VIOLATIONS=$((VIOLATIONS + 1))
     fi
 
     if [ "$passed" = true ]; then
