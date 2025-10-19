@@ -147,20 +147,15 @@ tasks:
       - task: docs:config-yaml
     silent: true
 
-  check-validation:
-    desc: Run validation checks (runs after formatting)
-    deps:
-      - lint
-      - check-defaults
-      - validate-config-patterns
-      - deps:check
-      - test
-
   check:
     desc: Run all quality checks
     cmds:
       - task: format
-      - task: check-validation
+      - task: lint
+      - task: check-defaults
+      - task: validate-config-patterns
+      - task: deps:check
+      - task: test
 
   build:
     desc: Build the binary
