@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added Markdown and YAML output format support
   - Provided dependency injection for registry access
   - Created clean interfaces for document generation
+- Added comprehensive configuration pattern validation:
+  - Created `validate-configuration-patterns.sh` linter to enforce ckeletin-go best practices
+  - Validates no direct `viper.SetDefault()` calls in command files (must use registry)
+  - Ensures `NewXConfig` functions accept `cmd *cobra.Command` parameter
+  - Detects manual precedence logic anti-patterns
+  - Verifies `runE` functions use proper `getConfigValue` pattern
+  - Filters out false positives from documentation comments
+- Added configuration patterns documentation:
+  - Created `docs/CONFIGURATION_PATTERNS.md` with comprehensive guide
+  - Explains flag/config/env variable precedence problem and solution
+  - Provides examples of correct and incorrect patterns
+  - Documents `getConfigValue` helper function usage
+- Integrated validation into development workflow:
+  - Added `validate-config-patterns` task to Taskfile.yml
+  - Included in `task check` quality checks
+  - Added pre-commit hook in `.lefthook.yml` to prevent violations
 
 ### Changed
 
@@ -33,6 +49,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced testability with 100% test coverage for config package
   - Made adding new command configurations more straightforward
   - Added guidance in README for managing configuration options
+
+### Security
+
+- Fixed vulnerability in mapstructure dependency:
+  - Upgraded `github.com/go-viper/mapstructure/v2` from v2.2.1 to v2.3.0
+  - Resolves GO-2025-3787: potential information leak in logs when processing malformed data
 
 ## [0.6.0] - 2024-06-25
 

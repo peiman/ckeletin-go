@@ -8,5 +8,7 @@ pre-commit:
       run: task lint
     deps-verify:
       run: task deps:verify
+    validate-config-patterns:
+      run: task validate-config-patterns
     test:
       run: task test

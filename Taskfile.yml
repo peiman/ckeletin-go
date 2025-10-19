@@ -85,6 +85,11 @@ tasks:
       - ./scripts/check-defaults.sh
     silent: false
 
+  validate-config-patterns:
+    desc: Validate configuration pattern compliance (ckeletin-go best practices)
+    cmds:
+      - ./scripts/validate-configuration-patterns.sh
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -148,6 +153,7 @@ tasks:
       - format
       - lint
       - check-defaults
+      - validate-config-patterns
       - deps:check
       - test
 
