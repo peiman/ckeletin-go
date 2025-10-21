@@ -28,3 +28,8 @@ func DocsOptions() []ConfigOption {
 		},
 	}
 }
+
+// Self-register docs options provider at init time
+func init() {
+	RegisterOptionsProvider(DocsOptions)
+}

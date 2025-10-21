@@ -8,15 +8,10 @@ import (
 	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-type UIRunner interface {
-	RunUI(message, col string) error
-}
-
 var (
-	pingRunner UIRunner = ui.NewDefaultUIRunner() // default UI runner, can be replaced in tests
+	pingRunner ui.UIRunner = ui.NewDefaultUIRunner() // default UI runner, can be replaced in tests
 )
 
 // PingConfig holds all configuration for the ping command
@@ -59,26 +54,17 @@ var pingCmd = &cobra.Command{
 	Short: "Responds with a pong",
 	Long: `The ping command demonstrates configuration, logging, and optional Bubble Tea UI.
 - Without arguments, prints "Pong".
-- Use --message and --color to override defaults.
-- Use --ui to launch an interactive Bubble Tea UI.`,
+- Supports overriding its output and an optional interactive UI.`,
 	RunE: runPing,
 }
 
 func init() {
-	pingCmd.Flags().String("message", "", "Custom output message")
-	pingCmd.Flags().String("color", "", "Output color")
-	pingCmd.Flags().Bool("ui", false, "Enable UI")
-
-	// Bind flags to Viper
-	if err := viper.BindPFlag("app.ping.output_message", pingCmd.Flags().Lookup("message")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'message' flag")
-	}
-	if err := viper.BindPFlag("app.ping.output_color", pingCmd.Flags().Lookup("color")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'color' flag")
-	}
-	if err := viper.BindPFlag("app.ping.ui", pingCmd.Flags().Lookup("ui")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'ui' flag")
-	}
+	// Auto-register flags from config registry for app.ping.* keys.
+	RegisterFlagsForPrefixWithOverrides(pingCmd, "app.ping.", map[string]string{
+		"app.ping.output_message": "message",
+		"app.ping.output_color":   "color",
+		"app.ping.ui":             "ui",
+	})
 
 	// Add pingCmd to RootCmd
 	RootCmd.AddCommand(pingCmd)

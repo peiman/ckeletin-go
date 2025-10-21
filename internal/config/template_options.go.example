@@ -1,0 +1,37 @@
+// internal/config/template_options.go.example
+// Example options file for a new command named "template".
+// Copy to internal/config/<command>_options.go and adapt keys/descriptions/types.
+
+//go:build ignore
+// +build ignore
+
+package config
+
+// TemplateOptions returns configuration options for the template command
+func TemplateOptions() []ConfigOption {
+    return []ConfigOption{
+        {
+            Key:          "app.template.option",
+            DefaultValue: "",
+            Description:  "Description of this option",
+            Type:         "string",
+            Required:     false,
+            Example:      "example-value",
+        },
+        {
+            Key:          "app.template.feature",
+            DefaultValue: false,
+            Description:  "Enable/disable a feature",
+            Type:         "bool",
+            Required:     false,
+            Example:      "true",
+        },
+    }
+}
+
+// Self-register template options provider at init time
+func init() {
+    RegisterOptionsProvider(TemplateOptions)
+}
+
+

@@ -14,25 +14,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added Markdown and YAML output format support
   - Provided dependency injection for registry access
   - Created clean interfaces for document generation
-- Added comprehensive configuration pattern validation:
-  - Created `validate-configuration-patterns.sh` linter to enforce ckeletin-go best practices
-  - Validates no direct `viper.SetDefault()` calls in command files (must use registry)
-  - Ensures `NewXConfig` functions accept `cmd *cobra.Command` parameter
-  - Detects manual precedence logic anti-patterns
-  - Verifies `runE` functions use proper `getConfigValue` pattern
-  - Filters out false positives from documentation comments
-- Added configuration patterns documentation:
-  - Created `docs/CONFIGURATION_PATTERNS.md` with comprehensive guide
-  - Explains flag/config/env variable precedence problem and solution
-  - Provides examples of correct and incorrect patterns
-  - Documents `getConfigValue` helper function usage
-- Integrated validation into development workflow:
-  - Added `validate-config-patterns` task to Taskfile.yml
-  - Included in `task check` quality checks
-  - Added pre-commit hook in `.lefthook.yml` to prevent violations
+- Implemented self-registering configuration system:
+  - Added `cmd/flags.go` for automated flag registration from config registry
+  - Commands now define options inline and self-register via `init()` functions
+  - Flags are auto-generated using `RegisterFlagsForPrefixWithOverrides()`
+  - Added `getKeyValue()` helper for simplified configuration value retrieval
+  - Created `internal/config/template_options.go.example` template for new commands
+  - Added `task generate:command` to scaffold new commands and their options
+  - Pattern prevents configuration violations by design (no manual validation needed)
 
 ### Changed
 
+- **BREAKING**: Evolved configuration pattern from manual to self-registering:
+  - `internal/config/registry.go` now uses provider registry pattern
+  - Commands use `RegisterFlagsForPrefixWithOverrides()` instead of manual flag definitions
+  - `cmd/docs.go` and `cmd/ping.go` updated to use new auto-registration
+  - `internal/config/{docs,ping}_options.go` now self-register in `init()`
+  - Eliminates boilerplate and makes configuration violations impossible by design
+  - Updated `cmd/template_command.go.example` to reflect new pattern
+  - Updated README with comprehensive documentation of new approach
 - Refactored documentation command architecture:
   - Moved document generation logic from cmd/docs.go to new internal/docs package
   - Created a clean separation between command interface and document generation
@@ -42,13 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced mockability with function variables for testing
   - Added dependency injection for registry access to improve testability
 - Enhanced test coverage for document generation
-- Refactored configuration system for improved modularity:
-  - Separated command-specific options into dedicated files
-  - Created clear distinction between core and command options
-  - Improved documentation with better file headers and comments
-  - Enhanced testability with 100% test coverage for config package
-  - Made adding new command configurations more straightforward
-  - Added guidance in README for managing configuration options
 
 ### Security
 

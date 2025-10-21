@@ -36,3 +36,8 @@ func PingOptions() []ConfigOption {
 		},
 	}
 }
+
+// Self-register ping options provider at init time
+func init() {
+	RegisterOptionsProvider(PingOptions)
+}

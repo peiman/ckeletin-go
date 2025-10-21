@@ -16,6 +16,8 @@ Configuration can be provided in multiple ways, in order of precedence:
 | Key | Type | Default | Environment Variable | Description |
 |-----|------|---------|---------------------|-------------|
 | `app.log_level` | string | `info` | `CKELETIN_GO_APP_LOG_LEVEL` | Logging level for the application (trace, debug, info, warn, error, fatal, panic) |
+| `app.docs.output_format` | string | `markdown` | `CKELETIN_GO_APP_DOCS_OUTPUT_FORMAT` | Output format for documentation (markdown, yaml) |
+| `app.docs.output_file` | string | `` | `CKELETIN_GO_APP_DOCS_OUTPUT_FILE` | Output file for documentation (defaults to stdout) |
 | `app.ping.output_message` | string | `Pong` | `CKELETIN_GO_APP_PING_OUTPUT_MESSAGE` | Default message to display for the ping command |
 | `app.ping.output_color` | string | `white` | `CKELETIN_GO_APP_PING_OUTPUT_COLOR` | Text color for ping command output (white, red, green, blue, cyan, yellow, magenta) |
 | `app.ping.ui` | bool | `false` | `CKELETIN_GO_APP_PING_UI` | Enable interactive UI for the ping command |
@@ -28,6 +30,13 @@ Configuration can be provided in multiple ways, in order of precedence:
 app:
   # Logging level for the application (trace, debug, info, warn, error, fatal, panic)
   log_level: debug
+
+  docs:
+    # Output format for documentation (markdown, yaml)
+    output_format: yaml
+
+    # Output file for documentation (defaults to stdout)
+    output_file: /path/to/output.md
 
   ping:
     # Default message to display for the ping command
@@ -46,6 +55,12 @@ app:
 ```bash
 # Logging level for the application (trace, debug, info, warn, error, fatal, panic)
 export CKELETIN_GO_APP_LOG_LEVEL=debug
+
+# Output format for documentation (markdown, yaml)
+export CKELETIN_GO_APP_DOCS_OUTPUT_FORMAT=yaml
+
+# Output file for documentation (defaults to stdout)
+export CKELETIN_GO_APP_DOCS_OUTPUT_FILE=/path/to/output.md
 
 # Default message to display for the ping command
 export CKELETIN_GO_APP_PING_OUTPUT_MESSAGE=Hello World!

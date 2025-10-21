@@ -6,7 +6,6 @@ import (
 	"github.com/peiman/ckeletin-go/internal/docs"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // docsCmd represents the docs command
@@ -36,26 +35,20 @@ func init() {
 	// Add the docs command to the root command
 	RootCmd.AddCommand(docsCmd)
 
-	// Add flags to config command
-	configCmd.Flags().StringP("format", "f", docs.FormatMarkdown, "Output format (markdown, yaml)")
-	configCmd.Flags().StringP("output", "o", "", "Output file (defaults to stdout)")
-
-	// Bind flags to Viper using consistent naming convention
-	if err := viper.BindPFlag("app.docs.output_format", configCmd.Flags().Lookup("format")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'format' flag")
-	}
-	if err := viper.BindPFlag("app.docs.output_file", configCmd.Flags().Lookup("output")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'output' flag")
-	}
+	// Auto-register flags from config registry for app.docs.* keys.
+	RegisterFlagsForPrefixWithOverrides(configCmd, "app.docs.", map[string]string{
+		"app.docs.output_format": "format",
+		"app.docs.output_file":   "output",
+	})
 
 	// Setup command configuration inheritance
 	setupCommandConfig(configCmd)
 }
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
-	// Get configuration values from viper/flags
-	outputFormat := getConfigValue[string](cmd, "format", "app.docs.output_format")
-	outputFile := getConfigValue[string](cmd, "output", "app.docs.output_file")
+	// Get configuration values from Viper by key (flags already bound)
+	outputFormat := getKeyValue[string]("app.docs.output_format")
+	outputFile := getKeyValue[string]("app.docs.output_file")
 
 	log.Debug().
 		Str("format", outputFormat).
@@ -85,3 +78,5 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 	generator.SetAppInfo(appInfo)
 	return generator.Generate()
 }
+
+// Options for the docs command live in internal/config/docs_options.go

@@ -252,3 +252,15 @@ func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string)
 
 	return value
 }
+
+// getKeyValue retrieves a configuration value from Viper by key only.
+// Flags should already be bound to Viper; this function prefers Viper's merged value.
+func getKeyValue[T any](viperKey string) T {
+	var zero T
+	if v := viper.Get(viperKey); v != nil {
+		if typedValue, ok := v.(T); ok {
+			return typedValue
+		}
+	}
+	return zero
+}

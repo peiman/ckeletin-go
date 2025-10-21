@@ -2,6 +2,13 @@ app:
   # Logging level for the application (trace, debug, info, warn, error, fatal, panic)
   log_level: debug
 
+  docs:
+    # Output format for documentation (markdown, yaml)
+    output_format: yaml
+
+    # Output file for documentation (defaults to stdout)
+    output_file: /path/to/output.md
+
   ping:
     # Default message to display for the ping command
     output_message: Hello World!

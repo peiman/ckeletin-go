@@ -212,8 +212,7 @@ All configuration options are organized in a modular structure:
 
 - `internal/config/options.go`: Core `ConfigOption` type definition and methods
 - `internal/config/core_options.go`: Application-wide settings that affect all commands
-- `internal/config/ping_options.go`: Settings specific to the ping command
-- `internal/config/docs_options.go`: Settings specific to the docs command  
+- Command options are co-located with their command files (e.g., `cmd/ping.go`, `cmd/docs.go`) and self-register into the configuration registry
 - `internal/config/registry.go`: Aggregates all options into a single registry
 
 Benefits of this modular approach:
@@ -464,25 +463,30 @@ task build
 
 ### Adding New Commands
 
-Add a new command:
+Add a new command following Cobra best practices: each command in its own file, cleanly separated and easily testable.
 
-This follows Cobra's best practice: each command in its own file, cleanly separated and easily testable.
-
-For faster development, you can also copy and modify the template file:
+For faster development, copy and modify the template file:
 
 ```bash
 cp cmd/template_command.go.example cmd/hello.go
 ```
 
-Then edit the file to implement your command following the established pattern.
+Then edit the file to implement your command and its configuration options. Flags and help will be auto-generated from the options metadata.
+
+You can also scaffold both files with Task:
+
+```bash
+task generate:command name=hello
+```
 
 ### Command Implementation Pattern
 
-The project uses an idiomatic Cobra/Viper pattern with command inheritance:
+The project uses an idiomatic Cobra/Viper pattern with command inheritance and self-registered configuration providers:
 
 1. The root command's `PersistentPreRunE` initializes global configuration
 2. Child commands inherit this behavior through Cobra's command chain
-3. Command-specific configuration is handled through the `setupCommandConfig` helper
+3. Command-specific configuration is declared in the command file (e.g., `cmd/<command>.go`) and self-registered via `config.RegisterOptionsProvider`
+4. Flags and help text are auto-registered from the registry using `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)`
 
 Benefits of this pattern:
 
@@ -493,12 +497,13 @@ Benefits of this pattern:
 
 When implementing a new command:
 
-1. Use the `setupCommandConfig(cmd)` helper in your command's `init()` function
-2. Use the `getConfigValue[T](cmd, flagName, viperKey)` helper to get configuration values
+1. In `cmd/<command>.go`, define `<Command>Options() []config.ConfigOption` and call `config.RegisterOptionsProvider(<Command>Options)` in `init()`
+2. Still in `cmd/<command>.go`, call `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)` to create flags and bind them to Viper
+3. Use `getConfigValue[T](cmd, flagName, viperKey)` in your config constructor to honor flag precedence over config
 
 ### Options Pattern for Command Configuration
 
-The project implements the Options Pattern for command configuration, providing several benefits:
+The project implements the Options Pattern for command configuration, with a single source of truth for defaults and docs in the options registry. Benefits:
 
 1. **Testability**: Commands can be easily tested with different configurations
 2. **Modularity**: Configuration is encapsulated in dedicated structs
@@ -561,30 +566,30 @@ See `cmd/ping.go` and `cmd/template_command.go.example` for working examples of 
 
 ### Modifying Configurations
 
-Configuration has been centralized in `internal/config/registry.go` for clarity and maintainability. To add or modify configurations:
+Configuration options live alongside their commands and self-register with the global registry. To add or modify configurations:
 
-1. **Add new options to the registry**: Add a new entry to the `Registry()` function in `internal/config/registry.go`.
+1. **Add options**: In `cmd/<command>.go`, implement `<Command>Options() []config.ConfigOption` with keys like `app.<command>.<option>`.
+2. **Self-register**: In `init()`, call `config.RegisterOptionsProvider(<Command>Options)`.
+3. **Flags binding**: In the same command file, call `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)` instead of manual flag definitions and binds.
+4. **Read values**: In your config constructor, use `getConfigValue[T](cmd, flagName, viperKey)` so CLI flags override config/env.
+5. **Docs**: Run `task docs:config` to regenerate documentation.
 
-2. **Bind command flags**: Use `viper.BindPFlag()` in your command files to bind flags to configuration keys:
+Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via the registry in `cmd/root.go`.
 
-   ```go
-   cmd.Flags().String("setting", "", "Description of the setting")
-   viper.BindPFlag("app.myfeature.setting", cmd.Flags().Lookup("setting"))
-   ```
+### What’s Framework vs. What You Should Edit
 
-3. **Access configuration**: Use Viper's `Get*` methods in your code:
+- Framework (avoid modifying unless you are changing the scaffold itself):
+  - `cmd/root.go` (bootstrap, root wiring, `setupCommandConfig`, helpers like `getConfigValue`/`getKeyValue`)
+  - `cmd/flags.go` (auto-registration of flags from options)
+  - `internal/config/options.go` (types), `internal/config/registry.go` (provider registry + `SetDefaults`)
+  - `internal/logger/*`, `internal/ui/*`, `internal/docs/*` (shared subsystems)
+  - `Taskfile.yml`, scripts under `scripts/`
 
-   ```go
-   value := viper.GetString("app.myfeature.setting")
-   ```
-
-4. **Generate documentation**: After adding new configuration options, regenerate the documentation:
-
-   ```bash
-   task docs
-   ```
-
-Remember: **Never** use `viper.SetDefault()` directly. The `check-defaults` task will flag any violations.
+- User-editable (where you implement your app):
+  - New commands under `cmd/<command>.go`
+  - Command options under `internal/config/<command>_options.go`
+  - Documentation content under `docs/` as needed
+  - Optional UI customizations under `internal/ui/*` for your app-specific UI
 
 ### Customizing the UI
 

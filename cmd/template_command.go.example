@@ -8,11 +8,10 @@
 package cmd
 
 import (
-	"fmt"
+    "fmt"
 
-	"github.com/rs/zerolog/log"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+    "github.com/rs/zerolog/log"
+    "github.com/spf13/cobra"
 )
 
 // =============================
@@ -69,33 +68,25 @@ func NewTemplateConfig(cmd *cobra.Command, opts ...TemplateOption) TemplateConfi
 var templateCmd = &cobra.Command{
 	Use:   "template",
 	Short: "One line description",
-	Long: `Detailed multi-line description of what this command does.
-- Include key features
-- Example usage patterns
-- Any important considerations`,
+    Long: `Detailed description of what this command does.
+- Focus on behavior; flags will be listed automatically in help.
+- Include example usage patterns and considerations.`,
 	RunE: runTemplate,
 }
 
 func init() {
-	// Define command-specific flags
-	templateCmd.Flags().String("option", "", "Description of this option")
-	templateCmd.Flags().Bool("feature", false, "Enable/disable a feature")
-
-	// Bind flags to Viper using consistent naming convention
-	if err := viper.BindPFlag("app.template.option", templateCmd.Flags().Lookup("option")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'option' flag")
-	}
-	if err := viper.BindPFlag("app.template.feature", templateCmd.Flags().Lookup("feature")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'feature' flag")
-	}
+    // Auto-register flags from configuration registry.
+    // Convention: key suffix becomes flag name (output_message -> --output-message).
+    // Provide overrides only when you need custom names or short flags.
+    RegisterFlagsForPrefixWithOverrides(templateCmd, "app.template.", nil)
 
 	// Add command to root and setup configuration inheritance
 	RootCmd.AddCommand(templateCmd)
 	setupCommandConfig(templateCmd)
 
-	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
-	// All defaults MUST be defined in internal/config/registry.go
-	// See internal/config/registry.go for all configuration options
+    // IMPORTANT: Never set defaults directly with viper.SetDefault() here.
+    // All defaults MUST be defined in internal/config/<command>_options.go
+    // and registered via config.RegisterOptionsProvider in that file's init().
 }
 
 // =============================
@@ -146,3 +137,6 @@ func someOperation(cfg TemplateConfig) error {
 	}
 	return nil
 }
+
+// See internal/config/template_options.go.example for how to define and register
+// options for a new command.

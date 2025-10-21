@@ -85,11 +85,6 @@ tasks:
       - ./scripts/check-defaults.sh
     silent: false
 
-  validate-config-patterns:
-    desc: Validate configuration pattern compliance (ckeletin-go best practices)
-    cmds:
-      - ./scripts/validate-configuration-patterns.sh
-
   test:
     desc: Run tests with coverage
     cmd: |
@@ -153,7 +148,6 @@ tasks:
       - task: format
       - task: lint
       - task: check-defaults
-      - task: validate-config-patterns
       - task: deps:check
       - task: test
 
@@ -178,3 +172,21 @@ tasks:
     cmds:
       - go clean
       - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
+
+  generate:command:
+    desc: Scaffold a new command and its options
+    vars:
+      NAME: "{{.name}}"
+      CMD_FILE: "cmd/{{.NAME}}.go"
+      OPT_FILE: "internal/config/{{.NAME}}_options.go"
+    cmds:
+      - |
+        if [ -z "{{.NAME}}" ]; then
+          echo "Usage: task generate:command name=<command_name>" >&2; exit 1; fi
+      - |
+        cp cmd/template_command.go.example {{.CMD_FILE}} && \
+        sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}}
+      - |
+        cp internal/config/template_options.go.example {{.OPT_FILE}} && \
+        sed -i '' "s/template/{{.NAME}}/g" {{.OPT_FILE}}
+      - echo "Scaffolded command at {{.CMD_FILE}} and options at {{.OPT_FILE}}"
