@@ -63,10 +63,14 @@ tasks:
     silent: true
 
   format:
-    desc: Format code
+    desc: Format all Go code
     cmds:
-      - goimports -w .
-      - gofmt -s -w .
+      - ./scripts/format-go.sh fix
+
+  format:check:
+    desc: Check if Go code is formatted (CI mode)
+    cmds:
+      - ./scripts/format-go.sh check
 
   lint:
     desc: Run all linters
@@ -145,7 +149,7 @@ tasks:
   check:
     desc: Run all quality checks
     cmds:
-      - task: format
+      - task: format:check
       - task: lint
       - task: check-defaults
       - task: deps:check
