@@ -3,52 +3,18 @@
 package cmd
 
 import (
-	"fmt"
-
+	"github.com/peiman/ckeletin-go/internal/ping"
 	"github.com/peiman/ckeletin-go/internal/ui"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-var (
-	pingRunner ui.UIRunner = ui.NewDefaultUIRunner() // default UI runner, can be replaced in tests
-)
-
-// PingConfig holds all configuration for the ping command
-// This struct is built using the Options Pattern for testability and clarity
-// Defaults are set in internal/config/registry.go and loaded via Viper
-// Use functional options to override values as needed
-type PingConfig struct {
-	Message string
-	Color   string
-	UI      bool
+// uiRunnerFactory is a function that creates a new UI runner
+// This allows tests to inject a mock runner
+var uiRunnerFactory = func() ui.UIRunner {
+	return ui.NewDefaultUIRunner()
 }
 
-type PingOption func(*PingConfig)
-
-func WithPingMessage(msg string) PingOption {
-	return func(cfg *PingConfig) { cfg.Message = msg }
-}
-func WithPingColor(color string) PingOption {
-	return func(cfg *PingConfig) { cfg.Color = color }
-}
-func WithPingUI(ui bool) PingOption {
-	return func(cfg *PingConfig) { cfg.UI = ui }
-}
-
-// NewPingConfig builds a PingConfig from options, with values loaded from Viper/flags by default
-func NewPingConfig(cmd *cobra.Command, opts ...PingOption) PingConfig {
-	cfg := PingConfig{
-		Message: getConfigValue[string](cmd, "message", "app.ping.output_message"),
-		Color:   getConfigValue[string](cmd, "color", "app.ping.output_color"),
-		UI:      getConfigValue[bool](cmd, "ui", "app.ping.ui"),
-	}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-	return cfg
-}
-
+// pingCmd represents the ping command
 var pingCmd = &cobra.Command{
 	Use:   "ping",
 	Short: "Responds with a pong",
@@ -73,47 +39,27 @@ func init() {
 	setupCommandConfig(pingCmd)
 
 	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
-	// All defaults MUST be defined in internal/config/registry.go
-	// See internal/config/registry.go for all configuration options
+	// All defaults MUST be defined in internal/config/ping_options.go
+	// See internal/config/ping_options.go for all configuration options
 }
 
+// runPing is a thin CLI wrapper that delegates to internal/ping.Executor
 func runPing(cmd *cobra.Command, args []string) error {
-	log.Debug().Msg("Starting runPing execution")
+	// Get configuration values from Viper
+	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
+	color := getConfigValue[string](cmd, "color", "app.ping.output_color")
+	enableUI := getConfigValue[bool](cmd, "ui", "app.ping.ui")
 
-	cfg := NewPingConfig(cmd)
+	// Create configuration for ping executor
+	cfg := ping.NewConfig(message, color, enableUI)
 
-	log.Debug().
-		Str("message", cfg.Message).
-		Str("color", cfg.Color).
-		Bool("ui_enabled", cfg.UI).
-		Msg("Configuration loaded")
+	// Create executor with dependencies (dependency injection)
+	executor := ping.NewExecutor(
+		cfg,
+		uiRunnerFactory(), // UI runner dependency (uses factory for testability)
+		cmd.OutOrStdout(), // Output writer dependency
+	)
 
-	writer := cmd.OutOrStdout()
-	log.Debug().
-		Str("writer_type", fmt.Sprintf("%T", writer)).
-		Msg("Using writer")
-
-	if cfg.UI {
-		log.Info().Str("message", cfg.Message).Str("color", cfg.Color).Msg("Starting UI")
-		if err := pingRunner.RunUI(cfg.Message, cfg.Color); err != nil {
-			log.Error().Err(err).Msg("Failed to run UI")
-			return err
-		}
-		return nil
-	}
-
-	// Non-UI mode: print the message
-	err := ui.PrintColoredMessage(writer, cfg.Message, cfg.Color)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("message", cfg.Message).
-			Str("color", cfg.Color).
-			Msg("Failed to print colored message")
-		// Wrap the error to provide context
-		return fmt.Errorf("failed to print colored message: %w", err)
-	}
-
-	log.Debug().Msg("runPing completed successfully")
-	return nil
+	// Execute business logic
+	return executor.Execute()
 }
