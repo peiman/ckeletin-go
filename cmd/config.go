@@ -1,4 +1,6 @@
 // cmd/config.go
+//
+// ckeletin:allow-custom-command
 
 package cmd
 
