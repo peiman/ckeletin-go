@@ -249,25 +249,64 @@ func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string)
 		switch any(value).(type) {
 		case string:
 			if v, err := cmd.Flags().GetString(flagName); err == nil {
-				// We need to use interface conversion since Go can't directly assign
-				// to the type parameter value - this is a bit verbose but type-safe
-				value = any(v).(T)
+				// Use safe type assertion with two-value form
+				if convertedVal, ok := any(v).(T); ok {
+					value = convertedVal
+				} else {
+					log.Warn().
+						Str("flag", flagName).
+						Str("expected_type", fmt.Sprintf("%T", value)).
+						Str("actual_type", fmt.Sprintf("%T", v)).
+						Msg("Type assertion failed for string flag, using current value")
+				}
 			}
 		case bool:
 			if v, err := cmd.Flags().GetBool(flagName); err == nil {
-				value = any(v).(T)
+				if convertedVal, ok := any(v).(T); ok {
+					value = convertedVal
+				} else {
+					log.Warn().
+						Str("flag", flagName).
+						Str("expected_type", fmt.Sprintf("%T", value)).
+						Str("actual_type", fmt.Sprintf("%T", v)).
+						Msg("Type assertion failed for bool flag, using current value")
+				}
 			}
 		case int:
 			if v, err := cmd.Flags().GetInt(flagName); err == nil {
-				value = any(v).(T)
+				if convertedVal, ok := any(v).(T); ok {
+					value = convertedVal
+				} else {
+					log.Warn().
+						Str("flag", flagName).
+						Str("expected_type", fmt.Sprintf("%T", value)).
+						Str("actual_type", fmt.Sprintf("%T", v)).
+						Msg("Type assertion failed for int flag, using current value")
+				}
 			}
 		case float64:
 			if v, err := cmd.Flags().GetFloat64(flagName); err == nil {
-				value = any(v).(T)
+				if convertedVal, ok := any(v).(T); ok {
+					value = convertedVal
+				} else {
+					log.Warn().
+						Str("flag", flagName).
+						Str("expected_type", fmt.Sprintf("%T", value)).
+						Str("actual_type", fmt.Sprintf("%T", v)).
+						Msg("Type assertion failed for float64 flag, using current value")
+				}
 			}
 		case []string:
 			if v, err := cmd.Flags().GetStringSlice(flagName); err == nil {
-				value = any(v).(T)
+				if convertedVal, ok := any(v).(T); ok {
+					value = convertedVal
+				} else {
+					log.Warn().
+						Str("flag", flagName).
+						Str("expected_type", fmt.Sprintf("%T", value)).
+						Str("actual_type", fmt.Sprintf("%T", v)).
+						Msg("Type assertion failed for string slice flag, using current value")
+				}
 			}
 		}
 	}
