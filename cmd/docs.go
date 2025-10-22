@@ -27,8 +27,8 @@ func init() {
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
 	// Get configuration values from Viper by key (flags already bound)
-	outputFormat := getKeyValue[string]("app.docs.output_format")
-	outputFile := getKeyValue[string]("app.docs.output_file")
+	outputFormat := getKeyValue[string](config.KeyAppDocsOutputFormat)
+	outputFile := getKeyValue[string](config.KeyAppDocsOutputFile)
 
 	log.Debug().
 		Str("format", outputFormat).

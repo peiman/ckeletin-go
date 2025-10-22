@@ -128,7 +128,7 @@ func init() {
 	}
 
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
-	if err := viper.BindPFlag("app.log_level", RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
+	if err := viper.BindPFlag(config.KeyAppLogLevel, RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'log-level'")
 	}
 }
@@ -136,16 +136,38 @@ func init() {
 func initConfig() error {
 	configPaths := ConfigPaths()
 
+	var configFilePath string
 	if cfgFile != "" {
+		configFilePath = cfgFile
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			return err
 		}
+		// Check if default config file exists
+		defaultConfigPath := filepath.Join(home, configPaths.DefaultFullName)
+		if _, err := os.Stat(defaultConfigPath); err == nil {
+			configFilePath = defaultConfigPath
+		}
 		viper.AddConfigPath(home)
 		viper.SetConfigName(configPaths.DefaultName)
 		viper.SetConfigType(configPaths.Extension)
+	}
+
+	// Security validation if config file path is known
+	if configFilePath != "" {
+		// Validate file size before reading
+		if err := config.ValidateConfigFileSize(configFilePath, config.MaxConfigFileSize); err != nil {
+			log.Error().Err(err).Str("path", configFilePath).Msg("Config file size validation failed")
+			return fmt.Errorf("config file size validation failed: %w", err)
+		}
+
+		// Validate file permissions
+		if err := config.ValidateConfigFilePermissions(configFilePath); err != nil {
+			log.Error().Err(err).Str("path", configFilePath).Msg("Config file permission validation failed")
+			return fmt.Errorf("config file permission validation failed: %w", err)
+		}
 	}
 
 	// Set up environment variable handling with proper prefix

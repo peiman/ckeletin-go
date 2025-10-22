@@ -184,6 +184,12 @@ tasks:
       - go clean
       - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
 
+  generate:constants:
+    desc: Generate type-safe config key constants
+    cmds:
+      - go run scripts/generate-config-constants.go
+      - task: format
+
   generate:command:
     desc: Scaffold a new ultra-thin command with metadata and options
     vars:

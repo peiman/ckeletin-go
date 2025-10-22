@@ -52,7 +52,7 @@ func TestInitConfig(t *testing.T) {
 			name:               "Invalid config file path",
 			setupConfigFile:    "/invalid/path/to/config.yaml",
 			expectedError:      true,
-			expectedErrContain: "failed to read config file",
+			expectedErrContain: "config file", // Accepts both "config file size validation failed" and "failed to read config file"
 		},
 		{
 			name:            "No config file set",

@@ -1,0 +1,84 @@
+// internal/config/security.go
+//
+// Security validation functions for configuration files
+
+package config
+
+import (
+	"fmt"
+	"os"
+	"runtime"
+
+	"github.com/rs/zerolog/log"
+)
+
+// ValidateConfigFilePermissions checks if a config file has secure permissions.
+// On Unix-like systems, it ensures the file is not world-writable and warns if group-writable.
+// On Windows, this check is skipped as Windows has a different permission model.
+func ValidateConfigFilePermissions(path string) error {
+	// Skip on Windows - different permission model
+	if runtime.GOOS == "windows" {
+		log.Debug().Str("path", path).Msg("Skipping permission check on Windows")
+		return nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat config file: %w", err)
+	}
+
+	mode := info.Mode()
+	perm := mode.Perm()
+
+	// Check if world-writable (dangerous - anyone can modify config)
+	if perm&0002 != 0 {
+		return fmt.Errorf("config file %s is world-writable (permissions: %04o), refusing to use for security reasons",
+			path, perm)
+	}
+
+	// Warn if group-writable (potentially dangerous depending on group membership)
+	if perm&0020 != 0 {
+		log.Warn().
+			Str("path", path).
+			Str("permissions", fmt.Sprintf("%04o", perm)).
+			Msg("Config file is group-writable, consider restricting to 0600 or 0400")
+	}
+
+	// Recommend stricter permissions if too permissive
+	if perm&0077 != 0 {
+		log.Info().
+			Str("path", path).
+			Str("current", fmt.Sprintf("%04o", perm)).
+			Str("recommended", "0600").
+			Msg("Config file has permissive permissions, recommend tightening")
+	}
+
+	log.Debug().
+		Str("path", path).
+		Str("permissions", fmt.Sprintf("%04o", perm)).
+		Msg("Config file permissions validated")
+
+	return nil
+}
+
+// ValidateConfigFileSize checks if a config file size is within acceptable limits.
+// This prevents DoS attacks via extremely large config files.
+func ValidateConfigFileSize(path string, maxSize int64) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("failed to stat config file: %w", err)
+	}
+
+	if info.Size() > maxSize {
+		return fmt.Errorf("config file %s is too large (%d bytes > %d bytes maximum), refusing to read for security reasons",
+			path, info.Size(), maxSize)
+	}
+
+	log.Debug().
+		Str("path", path).
+		Int64("size", info.Size()).
+		Int64("max_size", maxSize).
+		Msg("Config file size validated")
+
+	return nil
+}

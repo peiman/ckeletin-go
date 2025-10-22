@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/peiman/ckeletin-go/internal/config/commands"
 	"github.com/peiman/ckeletin-go/internal/ping"
 	"github.com/peiman/ckeletin-go/internal/ui"
@@ -22,9 +23,9 @@ func runPing(cmd *cobra.Command, args []string) error {
 // runPingWithUIRunner is the internal implementation that allows dependency injection for testing
 func runPingWithUIRunner(cmd *cobra.Command, args []string, uiRunner ui.UIRunner) error {
 	cfg := ping.Config{
-		Message: getConfigValue[string](cmd, "message", "app.ping.output_message"),
-		Color:   getConfigValue[string](cmd, "color", "app.ping.output_color"),
-		UI:      getConfigValue[bool](cmd, "ui", "app.ping.ui"),
+		Message: getConfigValue[string](cmd, "message", config.KeyAppPingOutputMessage),
+		Color:   getConfigValue[string](cmd, "color", config.KeyAppPingOutputColor),
+		UI:      getConfigValue[bool](cmd, "ui", config.KeyAppPingUi),
 	}
 	return ping.NewExecutor(cfg, uiRunner, cmd.OutOrStdout()).Execute()
 }
