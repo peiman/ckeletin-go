@@ -22,15 +22,19 @@ import (
 //  2. Auto-registering flags from the config registry
 //  3. Applying custom flag overrides from metadata
 //
+// Returns an error if flag registration fails, allowing callers to handle errors gracefully.
+//
 // Usage:
 //
-//	var myCmd = NewCommand(config.MyMetadata, runMy)
+//	cmd, err := NewCommand(config.MyMetadata, runMy)
+//	if err != nil {
+//	    return err
+//	}
+//
+// For init() functions where you want to panic on error, use MustNewCommand instead.
 //
 // The runE function signature must be: func(*cobra.Command, []string) error
-//
-// Note: This function will panic if flag registration fails, as it's called during
-// initialization and there's no way to recover from invalid command configuration.
-func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string) error) *cobra.Command {
+func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string) error) (*cobra.Command, error) {
 	cmd := &cobra.Command{
 		Use:    meta.Use,
 		Short:  meta.Short,
@@ -43,11 +47,28 @@ func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string)
 	// This reads all ConfigOptions with keys starting with meta.ConfigPrefix
 	// and creates Cobra flags for them automatically
 	if err := RegisterFlagsForPrefixWithOverrides(cmd, meta.ConfigPrefix+".", meta.FlagOverrides); err != nil {
-		// Panic is acceptable here as this is called during init()
-		// and indicates a programming error in command configuration
-		panic(fmt.Sprintf("failed to register flags for command %s: %v", meta.Use, err))
+		return nil, fmt.Errorf("failed to register flags for command %s: %w", meta.Use, err)
 	}
 
+	return cmd, nil
+}
+
+// MustNewCommand creates a Cobra command and panics on error.
+//
+// This is a convenience wrapper for NewCommand intended for use in init() functions
+// where there's no way to handle errors gracefully. For testable code or runtime
+// command creation, use NewCommand instead.
+//
+// Usage in init():
+//
+//	var myCmd = MustNewCommand(config.MyMetadata, runMy)
+//
+// The runE function signature must be: func(*cobra.Command, []string) error
+func MustNewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string) error) *cobra.Command {
+	cmd, err := NewCommand(meta, runE)
+	if err != nil {
+		panic(err)
+	}
 	return cmd
 }
 

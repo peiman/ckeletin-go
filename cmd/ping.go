@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var pingCmd = NewCommand(commands.PingMetadata, runPing)
+var pingCmd = MustNewCommand(commands.PingMetadata, runPing)
 
 func init() {
 	MustAddToRoot(pingCmd)

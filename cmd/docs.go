@@ -17,7 +17,7 @@ var docsCmd = &cobra.Command{
 	Long:  `Generate documentation about the application, including configuration options.`,
 }
 
-var docsConfigCmd = NewCommand(commands.DocsConfigMetadata, runDocsConfig)
+var docsConfigCmd = MustNewCommand(commands.DocsConfigMetadata, runDocsConfig)
 
 func init() {
 	docsCmd.AddCommand(docsConfigCmd)
