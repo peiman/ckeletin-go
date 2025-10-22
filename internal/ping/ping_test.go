@@ -32,6 +32,27 @@ func (e *errorWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 
+// setupTestLogger creates a test logger and returns a cleanup function
+// that restores the original logger state. This prevents race conditions
+// when tests run in parallel.
+func setupTestLogger(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+
+	// Save original logger
+	oldLogger := log.Logger
+
+	// Create test logger
+	logBuf := &bytes.Buffer{}
+	log.Logger = zerolog.New(logBuf).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+
+	// Return buffer and cleanup function
+	cleanup := func() {
+		log.Logger = oldLogger
+	}
+
+	return logBuf, cleanup
+}
+
 func TestConfig(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -83,9 +104,9 @@ func TestConfig(t *testing.T) {
 }
 
 func TestExecutor_Execute_NonUIMode(t *testing.T) {
-	// SETUP PHASE: Setup logging
-	logBuf := &bytes.Buffer{}
-	log.Logger = zerolog.New(logBuf).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+	// SETUP PHASE: Setup logging with cleanup to prevent race conditions
+	_, cleanup := setupTestLogger(t)
+	defer cleanup()
 
 	tests := []struct {
 		name       string
@@ -146,9 +167,9 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 }
 
 func TestExecutor_Execute_UIMode(t *testing.T) {
-	// SETUP PHASE: Setup logging
-	logBuf := &bytes.Buffer{}
-	log.Logger = zerolog.New(logBuf).With().Timestamp().Logger().Level(zerolog.DebugLevel)
+	// SETUP PHASE: Setup logging with cleanup to prevent race conditions
+	_, cleanup := setupTestLogger(t)
+	defer cleanup()
 
 	tests := []struct {
 		name          string
