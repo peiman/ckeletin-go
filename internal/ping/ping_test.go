@@ -68,6 +68,7 @@ func TestConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			if tt.cfg.Message != tt.expected.Message {
 				t.Errorf("Message = %v, want %v", tt.cfg.Message, tt.expected.Message)
 			}
@@ -116,6 +117,7 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// SETUP PHASE: Create output buffer and executor
 			outBuf := &bytes.Buffer{}
 			mockRunner := &mockUIRunner{}
@@ -184,6 +186,7 @@ func TestExecutor_Execute_UIMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// SETUP PHASE: Create mock UI runner and executor
 			mockRunner := &mockUIRunner{ReturnError: tt.uiRunnerError}
 			outBuf := &bytes.Buffer{}

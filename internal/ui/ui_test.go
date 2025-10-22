@@ -76,6 +76,7 @@ func TestRunUIWithMock(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			mockRunner := &MockUIRunner{
 				ReturnError: tt.mockError,
 			}
@@ -144,6 +145,7 @@ func TestModelUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			updatedModel, cmd := m.Update(tt.msg)
 			if updatedModel.(model).done != tt.wantDone {
 				t.Errorf("Update() done = %v, want %v", updatedModel.(model).done, tt.wantDone)
@@ -190,6 +192,7 @@ func TestRunUI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			runner := NewDefaultUIRunner()
 			err := runner.RunUI(tt.message, tt.color)
 

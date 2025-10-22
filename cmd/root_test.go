@@ -70,11 +70,8 @@ func TestInitConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
-			// Save original values to restore after test
-			origHome := os.Getenv("HOME")
-
 			// Skip test if HOME is required but not available
-			if tt.skipIfNoHome && origHome == "" {
+			if tt.skipIfNoHome && os.Getenv("HOME") == "" {
 				t.Skip("This test requires HOME environment variable to be set")
 			}
 
@@ -83,11 +80,8 @@ func TestInitConfig(t *testing.T) {
 			origUsed := configFileUsed
 			origBinaryName := binaryName
 
-			// Create a cleanup function to restore all values
+			// Create a cleanup function to restore package-level values
 			defer func() {
-				if origHome != "" {
-					os.Setenv("HOME", origHome)
-				}
 				cfgFile = origCfgFile
 				configFileStatus = origStatus
 				configFileUsed = origUsed
@@ -97,12 +91,9 @@ func TestInitConfig(t *testing.T) {
 			// Reset viper state
 			viper.Reset()
 
-			// Setup HOME environment if specified
-			if tt.setupHome == "" {
-				os.Unsetenv("HOME")
-			} else {
-				os.Setenv("HOME", tt.setupHome)
-			}
+			// Setup HOME environment (t.Setenv handles cleanup automatically)
+			// Note: We set HOME even if it's empty string to simulate unset HOME
+			t.Setenv("HOME", tt.setupHome)
 
 			// Setup binary name if specified
 			if tt.setupBinaryName != "" {
@@ -112,14 +103,9 @@ func TestInitConfig(t *testing.T) {
 			// Setup temporary directory if needed
 			var tmpDir string
 			if tt.setupTempDir {
-				var err error
-				tmpDir, err = os.MkdirTemp("", "ckeletin-test")
-				if err != nil {
-					t.Fatalf("Failed to create temp dir: %v", err)
-				}
-				// Set HOME to temp dir if temp dir is created
-				os.Setenv("HOME", tmpDir)
-				defer os.RemoveAll(tmpDir)
+				tmpDir = t.TempDir() // Automatic cleanup
+				// Set HOME to temp dir (t.Setenv handles cleanup automatically)
+				t.Setenv("HOME", tmpDir)
 			}
 
 			// Setup config file path if specified
@@ -457,33 +443,10 @@ func TestEnvironmentVariables(t *testing.T) {
 			// SETUP PHASE
 			// Save original values
 			origBinaryName := binaryName
-			origEnvVars := make(map[string]string)
 
-			// Save existing env vars that we'll modify
-			for k := range tt.envVars {
-				origEnvVars[k] = os.Getenv(k)
-			}
-
-			// Setup cleanup
+			// Setup cleanup for package-level variables
 			defer func() {
-				// Restore binary name
 				binaryName = origBinaryName
-
-				// Restore original environment variables
-				for k, v := range origEnvVars {
-					if v == "" {
-						os.Unsetenv(k)
-					} else {
-						os.Setenv(k, v)
-					}
-				}
-
-				// Unset any new env vars we set
-				for k := range tt.envVars {
-					if _, exists := origEnvVars[k]; !exists {
-						os.Unsetenv(k)
-					}
-				}
 			}()
 
 			// Set test binary name
@@ -492,9 +455,9 @@ func TestEnvironmentVariables(t *testing.T) {
 			// Reset viper
 			viper.Reset()
 
-			// Set environment variables for this test
+			// Set environment variables for this test (t.Setenv handles cleanup automatically)
 			for k, v := range tt.envVars {
-				os.Setenv(k, v)
+				t.Setenv(k, v)
 			}
 
 			// Initialize configuration with the new environment

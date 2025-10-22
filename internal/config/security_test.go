@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateConfigFilePermissions(t *testing.T) {
+	t.Parallel()
 	// Skip permission tests on Windows
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping permission tests on Windows")
@@ -58,6 +59,7 @@ func TestValidateConfigFilePermissions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create temporary file
 			tmpDir := t.TempDir()
 			tmpFile := filepath.Join(tmpDir, "config.yaml")
@@ -89,6 +91,7 @@ func TestValidateConfigFilePermissions(t *testing.T) {
 }
 
 func TestValidateConfigFilePermissions_NonexistentFile(t *testing.T) {
+	t.Parallel()
 	if runtime.GOOS == "windows" {
 		t.Skip("Skipping permission tests on Windows")
 	}
@@ -122,6 +125,7 @@ func TestValidateConfigFilePermissions_Windows(t *testing.T) {
 }
 
 func TestValidateConfigFileSize(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		fileSize    int
@@ -165,6 +169,7 @@ func TestValidateConfigFileSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// Create temporary file
 			tmpDir := t.TempDir()
 			tmpFile := filepath.Join(tmpDir, "config.yaml")
@@ -193,6 +198,7 @@ func TestValidateConfigFileSize(t *testing.T) {
 }
 
 func TestValidateConfigFileSize_NonexistentFile(t *testing.T) {
+	t.Parallel()
 	err := ValidateConfigFileSize("/nonexistent/path/config.yaml", 1000)
 	if err == nil {
 		t.Error("ValidateConfigFileSize() should error for nonexistent file")
@@ -203,6 +209,7 @@ func TestValidateConfigFileSize_NonexistentFile(t *testing.T) {
 }
 
 func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "config.yaml")
 

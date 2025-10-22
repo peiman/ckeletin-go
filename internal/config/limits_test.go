@@ -8,6 +8,7 @@ import (
 )
 
 func TestValidateConfigValue_Strings(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		key         string
@@ -51,6 +52,7 @@ func TestValidateConfigValue_Strings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
 			if (err != nil) != tt.wantErr {
@@ -68,6 +70,7 @@ func TestValidateConfigValue_Strings(t *testing.T) {
 }
 
 func TestValidateConfigValue_StringSlices(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		key         string
@@ -121,6 +124,7 @@ func TestValidateConfigValue_StringSlices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
 			if (err != nil) != tt.wantErr {
@@ -138,6 +142,7 @@ func TestValidateConfigValue_StringSlices(t *testing.T) {
 }
 
 func TestValidateConfigValue_InterfaceSlices(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		key         string
@@ -169,6 +174,7 @@ func TestValidateConfigValue_InterfaceSlices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
 			if (err != nil) != tt.wantErr {
@@ -186,6 +192,7 @@ func TestValidateConfigValue_InterfaceSlices(t *testing.T) {
 }
 
 func TestValidateConfigValue_NestedMaps(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		key         string
@@ -227,6 +234,7 @@ func TestValidateConfigValue_NestedMaps(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
 			if (err != nil) != tt.wantErr {
@@ -244,6 +252,7 @@ func TestValidateConfigValue_NestedMaps(t *testing.T) {
 }
 
 func TestValidateConfigValue_NumericTypes(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		key   string
@@ -266,6 +275,7 @@ func TestValidateConfigValue_NumericTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 			if err != nil {
 				t.Errorf("ValidateConfigValue() for numeric type should not error, got: %v", err)
@@ -275,6 +285,7 @@ func TestValidateConfigValue_NumericTypes(t *testing.T) {
 }
 
 func TestValidateConfigValue_NilValue(t *testing.T) {
+	t.Parallel()
 	err := ValidateConfigValue("test.key", nil)
 	if err != nil {
 		t.Errorf("ValidateConfigValue() for nil value should not error, got: %v", err)
@@ -282,6 +293,7 @@ func TestValidateConfigValue_NilValue(t *testing.T) {
 }
 
 func TestValidateAllConfigValues(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		values    map[string]interface{}
@@ -322,6 +334,7 @@ func TestValidateAllConfigValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			errors := ValidateAllConfigValues(tt.values)
 
 			if len(errors) != tt.wantCount {

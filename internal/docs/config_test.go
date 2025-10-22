@@ -67,6 +67,7 @@ func TestConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			// ASSERTION PHASE
 			if tt.cfg.OutputFormat != tt.wantFormat {
 				t.Errorf("Expected format %s, got %s", tt.wantFormat, tt.cfg.OutputFormat)

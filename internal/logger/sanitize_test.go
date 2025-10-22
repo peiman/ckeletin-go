@@ -4,12 +4,12 @@ package logger
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 )
 
 func TestSanitizeLogString(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		input    string
@@ -64,6 +64,7 @@ func TestSanitizeLogString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := SanitizeLogString(tt.input)
 			if got != tt.expected {
 				t.Errorf("SanitizeLogString() = %q, want %q", got, tt.expected)
@@ -73,12 +74,10 @@ func TestSanitizeLogString(t *testing.T) {
 }
 
 func TestSanitizePath(t *testing.T) {
-	// Save and restore HOME
-	oldHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", oldHome)
-
+	// Note: Cannot use t.Parallel() when using t.Setenv()
+	// Use t.Setenv for automatic cleanup
 	testHome := "/home/testuser"
-	os.Setenv("HOME", testHome)
+	t.Setenv("HOME", testHome)
 
 	tests := []struct {
 		name     string
@@ -114,6 +113,7 @@ func TestSanitizePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := SanitizePath(tt.input)
 			if got != tt.expected {
 				t.Errorf("SanitizePath() = %q, want %q", got, tt.expected)
@@ -123,6 +123,7 @@ func TestSanitizePath(t *testing.T) {
 }
 
 func TestSanitizeError(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		err      error
@@ -152,6 +153,7 @@ func TestSanitizeError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := SanitizeError(tt.err)
 			if got != tt.expected {
 				t.Errorf("SanitizeError() = %q, want %q", got, tt.expected)
@@ -161,6 +163,7 @@ func TestSanitizeError(t *testing.T) {
 }
 
 func TestSetMaxLogLength(t *testing.T) {
+	// Note: Cannot use t.Parallel() because this test modifies package-level variable
 	// Save and restore original value
 	original := maxLogStringLength
 	defer func() { maxLogStringLength = original }()
@@ -209,6 +212,7 @@ func TestSetMaxLogLength(t *testing.T) {
 }
 
 func TestSanitizeLogString_Truncation(t *testing.T) {
+	// Note: Cannot use t.Parallel() because this test modifies package-level variable
 	// Test with custom max length
 	original := maxLogStringLength
 	defer func() { maxLogStringLength = original }()
