@@ -39,14 +39,15 @@ func SanitizeLogString(s string) string {
 // SanitizePath removes sensitive information from file paths before logging.
 // This prevents leakage of usernames and directory structures.
 func SanitizePath(path string) string {
-	// Replace home directory with ~ to avoid exposing usernames
-	if home := os.Getenv("HOME"); home != "" {
-		path = strings.Replace(path, home, "~", 1)
+	// Handle Windows-style home paths first (takes precedence on Windows)
+	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
+		path = strings.ReplaceAll(path, userProfile, "~")
 	}
 
-	// Also handle Windows-style home paths
-	if userProfile := os.Getenv("USERPROFILE"); userProfile != "" {
-		path = strings.Replace(path, userProfile, "~", 1)
+	// Replace Unix-style home directory with ~ to avoid exposing usernames
+	// Using ReplaceAll to handle paths that might contain home directory multiple times
+	if home := os.Getenv("HOME"); home != "" {
+		path = strings.ReplaceAll(path, home, "~")
 	}
 
 	// Still sanitize for control characters
