@@ -37,7 +37,7 @@ func NewMockWriteCloser(content string, closeErr error) *MockWriteCloser {
 func TestNewGenerator(t *testing.T) {
 	// SETUP PHASE
 	writer := &bytes.Buffer{}
-	cfg := NewConfig(writer)
+	cfg := Config{Writer: writer, OutputFormat: FormatMarkdown, OutputFile: "", Registry: config.Registry}
 
 	// EXECUTION PHASE
 	generator := NewGenerator(cfg)
@@ -51,7 +51,7 @@ func TestNewGenerator(t *testing.T) {
 func TestSetAppInfo(t *testing.T) {
 	// SETUP PHASE
 	writer := &bytes.Buffer{}
-	cfg := NewConfig(writer)
+	cfg := Config{Writer: writer, OutputFormat: FormatMarkdown, OutputFile: "", Registry: config.Registry}
 	generator := NewGenerator(cfg)
 
 	appInfo := AppInfo{
@@ -80,7 +80,7 @@ func TestSetAppInfo(t *testing.T) {
 func TestGenerate_UnsupportedFormat(t *testing.T) {
 	// SETUP PHASE
 	writer := &bytes.Buffer{}
-	cfg := NewConfig(writer, WithOutputFormat("invalid"))
+	cfg := Config{Writer: writer, OutputFormat: "invalid", OutputFile: "", Registry: config.Registry}
 	generator := NewGenerator(cfg)
 
 	// EXECUTION PHASE
@@ -98,7 +98,7 @@ func TestGenerate_UnsupportedFormat(t *testing.T) {
 func TestGenerate_FileError(t *testing.T) {
 	// SETUP PHASE
 	writer := &bytes.Buffer{}
-	cfg := NewConfig(writer, WithOutputFile("test.md"))
+	cfg := Config{Writer: writer, OutputFormat: FormatMarkdown, OutputFile: "test.md", Registry: config.Registry}
 	generator := NewGenerator(cfg)
 
 	// Mock file opening to simulate error

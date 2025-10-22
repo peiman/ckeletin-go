@@ -89,6 +89,12 @@ tasks:
       - ./scripts/check-defaults.sh
     silent: false
 
+  validate-commands:
+    desc: Validate command files follow ultra-thin patterns
+    cmds:
+      - ./scripts/validate-command-patterns.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -152,6 +158,7 @@ tasks:
       - task: format:check
       - task: lint
       - task: check-defaults
+      - task: validate-commands
       - task: deps:check
       - task: test
 
@@ -178,19 +185,29 @@ tasks:
       - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
 
   generate:command:
-    desc: Scaffold a new command and its options
+    desc: Scaffold a new ultra-thin command with metadata and options
     vars:
       NAME: "{{.name}}"
       CMD_FILE: "cmd/{{.NAME}}.go"
-      OPT_FILE: "internal/config/{{.NAME}}_options.go"
+      CFG_FILE: "internal/config/commands/{{.NAME}}_config.go"
     cmds:
       - |
         if [ -z "{{.NAME}}" ]; then
           echo "Usage: task generate:command name=<command_name>" >&2; exit 1; fi
       - |
         cp cmd/template_command.go.example {{.CMD_FILE}} && \
-        sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}}
+        sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}} && \
+        sed -i '' "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
       - |
-        cp internal/config/template_options.go.example {{.OPT_FILE}} && \
-        sed -i '' "s/template/{{.NAME}}/g" {{.OPT_FILE}}
-      - echo "Scaffolded command at {{.CMD_FILE}} and options at {{.OPT_FILE}}"
+        cp internal/config/commands/template_config.go.example {{.CFG_FILE}} && \
+        sed -i '' "s/template/{{.NAME}}/g" {{.CFG_FILE}} && \
+        sed -i '' "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
+      - echo "✅ Scaffolded ultra-thin command"
+      - echo "   Command {{.CMD_FILE}}"
+      - echo "   Config {{.CFG_FILE}}"
+      - echo ""
+      - echo "Next steps"
+      - echo "1. Create business logic in internal/{{.NAME}}/"
+      - echo "2. Update metadata and options in {{.CFG_FILE}}"
+      - echo "3. Update runTemplate function in {{.CMD_FILE}}"
+      - echo "4. Run task validate-commands to verify pattern"

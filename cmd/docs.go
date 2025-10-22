@@ -3,46 +3,26 @@
 package cmd
 
 import (
+	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/internal/config/commands"
 	"github.com/peiman/ckeletin-go/internal/docs"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
-// docsCmd represents the docs command
+// docsCmd represents the docs command (parent command)
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
 	Long:  `Generate documentation about the application, including configuration options.`,
 }
 
-// configCmd represents the config command
-var configCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Generate configuration documentation",
-	Long: `Generate documentation about all configuration options.
-
-This command generates detailed documentation about all available configuration
-options, including their default values, types, and environment variable names.
-
-The documentation can be output in various formats using the --format flag.`,
-	RunE: runDocsConfig,
-}
+var configCmd = NewCommand(commands.DocsConfigMetadata, runDocsConfig)
 
 func init() {
-	// Add the config subcommand to the docs command
 	docsCmd.AddCommand(configCmd)
-
-	// Add the docs command to the root command
-	RootCmd.AddCommand(docsCmd)
-
-	// Auto-register flags from config registry for app.docs.* keys.
-	RegisterFlagsForPrefixWithOverrides(configCmd, "app.docs.", map[string]string{
-		"app.docs.output_format": "format",
-		"app.docs.output_file":   "output",
-	})
-
-	// Setup command configuration inheritance
 	setupCommandConfig(configCmd)
+	MustAddToRoot(docsCmd)
 }
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
@@ -67,16 +47,15 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 	appInfo.ConfigPaths.DefaultFullName = paths.DefaultFullName
 
 	// Create document generator configuration
-	cfg := docs.NewConfig(
-		cmd.OutOrStdout(),
-		docs.WithOutputFormat(outputFormat),
-		docs.WithOutputFile(outputFile),
-	)
+	cfg := docs.Config{
+		Writer:       cmd.OutOrStdout(),
+		OutputFormat: outputFormat,
+		OutputFile:   outputFile,
+		Registry:     config.Registry,
+	}
 
 	// Create generator and generate documentation
 	generator := docs.NewGenerator(cfg)
 	generator.SetAppInfo(appInfo)
 	return generator.Generate()
 }
-
-// Options for the docs command live in internal/config/docs_options.go

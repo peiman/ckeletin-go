@@ -27,7 +27,7 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 	appInfo.ConfigPaths.DefaultFullName = ".testapp.yaml"
 
 	// Create generator
-	cfg := NewConfig(&buf, WithOutputFormat(FormatMarkdown))
+	cfg := Config{Writer: &buf, OutputFormat: FormatMarkdown, OutputFile: "", Registry: config.Registry}
 	generator := NewGenerator(cfg)
 
 	// EXECUTION PHASE
@@ -114,7 +114,7 @@ func TestGenerateMarkdownDocs_YAMLError(t *testing.T) {
 		generateYAMLContentFunc = origGenerateYAMLContent
 	}()
 
-	generator := NewGenerator(NewConfig(&buf))
+	generator := NewGenerator(Config{Writer: &buf, OutputFormat: FormatMarkdown, OutputFile: "", Registry: config.Registry})
 
 	// EXECUTION PHASE
 	err := generator.GenerateMarkdownDocs(&buf, appInfo)
@@ -144,9 +144,14 @@ func TestGenerateMarkdownDocs_EmptyRegistry(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Create a generator config with a custom registry function that returns empty registry
-	cfg := NewConfig(&buf, WithOutputFormat(FormatMarkdown), WithRegistryFunc(func() []config.ConfigOption {
-		return []config.ConfigOption{}
-	}))
+	cfg := Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "",
+		Registry: func() []config.ConfigOption {
+			return []config.ConfigOption{}
+		},
+	}
 	generator := NewGenerator(cfg)
 
 	// EXECUTION PHASE

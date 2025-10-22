@@ -1,0 +1,49 @@
+// internal/config/commands/template_config.go
+//
+// Template command configuration: metadata + options
+//
+// This file is the single source of truth for the template command configuration.
+// It combines command metadata (Use, Short, Long, flags) with configuration options.
+
+package commands
+
+import "github.com/peiman/ckeletin-go/internal/config"
+
+// TemplateMetadata defines all metadata for the template command
+var TemplateMetadata = config.CommandMetadata{
+	Use:   "template",
+	Short: "Short description of the template command",
+	Long: `Long description of the template command.
+
+This is a template for creating new commands. Replace "template" with your
+command name throughout this file.`,
+	ConfigPrefix: "app.template",
+	FlagOverrides: map[string]string{
+		"app.template.example_option": "example-flag",
+	},
+	Examples: []string{
+		"template",
+		"template --example-flag value",
+	},
+	SeeAlso: []string{"ping", "docs"},
+}
+
+// TemplateOptions returns configuration options for the template command
+func TemplateOptions() []config.ConfigOption {
+	return []config.ConfigOption{
+		{
+			Key:          "app.template.example_option",
+			DefaultValue: "default_value",
+			Description:  "Description of the example option",
+			Type:         "string",
+			Required:     false,
+			Example:      "example_value",
+		},
+		// Add more options as needed
+	}
+}
+
+// Self-register template options provider at init time
+func init() {
+	config.RegisterOptionsProvider(TemplateOptions)
+}

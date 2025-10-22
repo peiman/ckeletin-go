@@ -1,10 +1,12 @@
 // internal/config/registry_test.go
 
-package config
+package config_test
 
 import (
 	"testing"
 
+	"github.com/peiman/ckeletin-go/internal/config"
+	_ "github.com/peiman/ckeletin-go/internal/config/commands" // Import to trigger init() registration
 	"github.com/spf13/viper"
 )
 
@@ -18,7 +20,7 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 	}
 
 	// EXECUTION PHASE
-	registry := Registry()
+	registry := config.Registry()
 
 	// ASSERTION PHASE
 	// Check that the registry has the expected minimum number of entries
@@ -48,11 +50,11 @@ func TestSetDefaults(t *testing.T) {
 
 	// EXECUTION PHASE
 	// Apply defaults
-	SetDefaults()
+	config.SetDefaults()
 
 	// ASSERTION PHASE
 	// Check that defaults were set
-	registry := Registry()
+	registry := config.Registry()
 	for _, opt := range registry {
 		// Skip nil defaults as they can't be reliably tested
 		if opt.DefaultValue == nil {
@@ -86,7 +88,7 @@ func TestRegistryIncludesCommandOptions(t *testing.T) {
 	}
 
 	// EXECUTION PHASE
-	registry := Registry()
+	registry := config.Registry()
 
 	// ASSERTION PHASE
 	// Mark keys as found

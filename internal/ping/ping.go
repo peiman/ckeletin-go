@@ -10,6 +10,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Config holds configuration for the ping command
+type Config struct {
+	Message string
+	Color   string
+	UI      bool
+}
+
 // Executor handles the execution of the ping command
 type Executor struct {
 	cfg      Config

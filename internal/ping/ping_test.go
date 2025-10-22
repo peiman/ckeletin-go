@@ -32,21 +32,19 @@ func (e *errorWriter) Write(p []byte) (int, error) {
 	return 0, fmt.Errorf("write error")
 }
 
-func TestNewConfig(t *testing.T) {
+func TestConfig(t *testing.T) {
 	tests := []struct {
 		name     string
-		message  string
-		color    string
-		ui       bool
-		opts     []Option
+		cfg      Config
 		expected Config
 	}{
 		{
-			name:    "Default values",
-			message: "Hello",
-			color:   "white",
-			ui:      false,
-			opts:    nil,
+			name: "Basic config",
+			cfg: Config{
+				Message: "Hello",
+				Color:   "white",
+				UI:      false,
+			},
 			expected: Config{
 				Message: "Hello",
 				Color:   "white",
@@ -54,14 +52,11 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name:    "With options",
-			message: "Default",
-			color:   "white",
-			ui:      false,
-			opts: []Option{
-				WithMessage("Custom"),
-				WithColor("red"),
-				WithUI(true),
+			name: "Custom config",
+			cfg: Config{
+				Message: "Custom",
+				Color:   "red",
+				UI:      true,
 			},
 			expected: Config{
 				Message: "Custom",
@@ -73,16 +68,14 @@ func TestNewConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := NewConfig(tt.message, tt.color, tt.ui, tt.opts...)
-
-			if cfg.Message != tt.expected.Message {
-				t.Errorf("Message = %v, want %v", cfg.Message, tt.expected.Message)
+			if tt.cfg.Message != tt.expected.Message {
+				t.Errorf("Message = %v, want %v", tt.cfg.Message, tt.expected.Message)
 			}
-			if cfg.Color != tt.expected.Color {
-				t.Errorf("Color = %v, want %v", cfg.Color, tt.expected.Color)
+			if tt.cfg.Color != tt.expected.Color {
+				t.Errorf("Color = %v, want %v", tt.cfg.Color, tt.expected.Color)
 			}
-			if cfg.UI != tt.expected.UI {
-				t.Errorf("UI = %v, want %v", cfg.UI, tt.expected.UI)
+			if tt.cfg.UI != tt.expected.UI {
+				t.Errorf("UI = %v, want %v", tt.cfg.UI, tt.expected.UI)
 			}
 		})
 	}

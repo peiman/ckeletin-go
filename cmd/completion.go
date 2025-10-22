@@ -1,4 +1,5 @@
 // cmd/completion.go
+// ckeletin:allow-custom-command
 
 package cmd
 

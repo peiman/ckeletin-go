@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -73,13 +74,23 @@ func (g *Generator) Generate() error {
 
 // GenerateMarkdown is a convenience function to generate markdown documentation directly
 func GenerateMarkdown(writer io.Writer, appInfo AppInfo) error {
-	g := NewGenerator(NewConfig(writer, WithOutputFormat(FormatMarkdown)))
+	g := NewGenerator(Config{
+		Writer:       writer,
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "",
+		Registry:     config.Registry,
+	})
 	g.SetAppInfo(appInfo)
 	return g.GenerateMarkdownDocs(writer, appInfo)
 }
 
 // GenerateYAML is a convenience function to generate YAML configuration template directly
 func GenerateYAML(writer io.Writer) error {
-	g := NewGenerator(NewConfig(writer, WithOutputFormat(FormatYAML)))
+	g := NewGenerator(Config{
+		Writer:       writer,
+		OutputFormat: FormatYAML,
+		OutputFile:   "",
+		Registry:     config.Registry,
+	})
 	return g.GenerateYAMLDocs(writer)
 }

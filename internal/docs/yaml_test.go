@@ -35,7 +35,12 @@ func TestGenerateYAMLDocs(t *testing.T) {
 	}
 
 	// Create generator with mock registry
-	cfg := NewConfig(&buf, WithOutputFormat(FormatYAML), WithRegistryFunc(mockRegistry))
+	cfg := Config{
+		Writer:       &buf,
+		OutputFormat: FormatYAML,
+		OutputFile:   "",
+		Registry:     mockRegistry,
+	}
 	generator := NewGenerator(cfg)
 
 	// EXECUTION PHASE
@@ -140,9 +145,14 @@ func TestGenerateYAMLDocs_EmptyRegistry(t *testing.T) {
 	var buf bytes.Buffer
 
 	// Create generator with empty registry
-	cfg := NewConfig(&buf, WithOutputFormat(FormatYAML), WithRegistryFunc(func() []config.ConfigOption {
-		return []config.ConfigOption{}
-	}))
+	cfg := Config{
+		Writer:       &buf,
+		OutputFormat: FormatYAML,
+		OutputFile:   "",
+		Registry: func() []config.ConfigOption {
+			return []config.ConfigOption{}
+		},
+	}
 	generator := NewGenerator(cfg)
 
 	// EXECUTION PHASE

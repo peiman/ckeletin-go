@@ -1,142 +1,23 @@
-// cmd/template_command.go.example
-// This is a template for creating new commands following the idiomatic Cobra/Viper pattern
-// Copy this file to cmd/<command_name>.go and adapt as needed
-
-//go:build ignore
-// +build ignore
+// cmd/template.go
 
 package cmd
 
 import (
-    "fmt"
-
-    "github.com/rs/zerolog/log"
-    "github.com/spf13/cobra"
+	"github.com/peiman/ckeletin-go/internal/config/commands"
+	"github.com/peiman/ckeletin-go/internal/template"
+	"github.com/spf13/cobra"
 )
 
-// =============================
-// OPTIONS PATTERN IMPLEMENTATION
-// =============================
-
-// TemplateConfig holds all configuration for the template command
-// This struct is built using the Options Pattern for testability and clarity
-// Defaults are set in internal/config/registry.go and loaded via Viper
-// Use functional options to override values as needed
-type TemplateConfig struct {
-	Option  string // String configuration option
-	Feature bool   // Boolean feature flag
-	// Add more configuration fields as needed for your command
-}
-
-// TemplateOption defines a function type that modifies a TemplateConfig
-// This is the core of the functional Options Pattern
-type TemplateOption func(*TemplateConfig)
-
-// WithOption returns a function that sets the Option field
-// This pattern allows for clean, chainable configuration
-func WithOption(option string) TemplateOption {
-	return func(cfg *TemplateConfig) { cfg.Option = option }
-}
-
-// WithFeature returns a function that sets the Feature field
-func WithFeature(feature bool) TemplateOption {
-	return func(cfg *TemplateConfig) { cfg.Feature = feature }
-}
-
-// NewTemplateConfig builds a TemplateConfig from options, with values loaded from Viper/flags by default
-// This constructor combines default values from configuration with any overrides passed as options
-func NewTemplateConfig(cmd *cobra.Command, opts ...TemplateOption) TemplateConfig {
-	// Start with defaults from Viper/flags using the getConfigValue helper
-	// This provides a consistent pattern for all commands
-	cfg := TemplateConfig{
-		Option:  getConfigValue[string](cmd, "option", "app.template.option"),
-		Feature: getConfigValue[bool](cmd, "feature", "app.template.feature"),
-	}
-
-	// Apply any override options that were passed in
-	for _, opt := range opts {
-		opt(&cfg)
-	}
-
-	return cfg
-}
-
-// =============================
-// COMMAND DEFINITION
-// =============================
-
-var templateCmd = &cobra.Command{
-	Use:   "template",
-	Short: "One line description",
-    Long: `Detailed description of what this command does.
-- Focus on behavior; flags will be listed automatically in help.
-- Include example usage patterns and considerations.`,
-	RunE: runTemplate,
-}
+var templateCmd = NewCommand(commands.TemplateMetadata, runTemplate)
 
 func init() {
-    // Auto-register flags from configuration registry.
-    // Convention: key suffix becomes flag name (output_message -> --output-message).
-    // Provide overrides only when you need custom names or short flags.
-    RegisterFlagsForPrefixWithOverrides(templateCmd, "app.template.", nil)
-
-	// Add command to root and setup configuration inheritance
-	RootCmd.AddCommand(templateCmd)
-	setupCommandConfig(templateCmd)
-
-    // IMPORTANT: Never set defaults directly with viper.SetDefault() here.
-    // All defaults MUST be defined in internal/config/<command>_options.go
-    // and registered via config.RegisterOptionsProvider in that file's init().
+	MustAddToRoot(templateCmd)
 }
-
-// =============================
-// COMMAND IMPLEMENTATION
-// =============================
 
 func runTemplate(cmd *cobra.Command, args []string) error {
-	log.Debug().Msg("Starting runTemplate execution")
-
-	// Build command config using Options Pattern
-	// In normal execution, use without options to get values from flags/config
-	cfg := NewTemplateConfig(cmd)
-
-	// For testing, you can override configuration values:
-	// cfg := NewTemplateConfig(cmd, WithOption("test"), WithFeature(true))
-
-	// Log configuration for debugging
-	log.Debug().
-		Str("option", cfg.Option).
-		Bool("feature_enabled", cfg.Feature).
-		Msg("Configuration loaded")
-
-	// IMPLEMENT COMMAND LOGIC HERE
-	// Now use cfg.Option and cfg.Feature instead of calling Viper or getConfigValue directly
-	// This makes your code more testable and modular
-
-	// Example of error handling pattern
-	if err := someOperation(cfg); err != nil {
-		log.Error().Err(err).Msg("Operation failed")
-		return fmt.Errorf("command failed: %w", err)
+	cfg := template.Config{
+		ExampleOption: getConfigValue[string](cmd, "example-flag", "app.template.example_option"),
+		// Add more config fields as needed
 	}
-
-	log.Debug().Msg("runTemplate completed successfully")
-	return nil
+	return template.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
 }
-
-// =============================
-// COMMAND HELPERS
-// =============================
-
-// Placeholder function for example only - remove in real command
-// Shows how to use the config struct for command operations
-func someOperation(cfg TemplateConfig) error {
-	// Using the configuration values from the struct
-	// rather than accessing Viper directly improves testability
-	if cfg.Feature {
-		log.Info().Str("option", cfg.Option).Msg("Feature enabled")
-	}
-	return nil
-}
-
-// See internal/config/template_options.go.example for how to define and register
-// options for a new command.
