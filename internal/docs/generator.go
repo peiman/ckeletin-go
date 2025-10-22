@@ -64,11 +64,17 @@ func (g *Generator) Generate() error {
 		err = fmt.Errorf("unsupported format: %s", g.cfg.OutputFormat)
 	}
 
-	// If there was no error from the operation but there was a close error, return the close error
-	if err == nil && closeErr != nil {
+	// Handle both generation and close errors appropriately
+	if err != nil && closeErr != nil {
+		// Both errors occurred - wrap both for full context
+		log.Warn().Err(closeErr).Msg("File close also failed after generation error")
+		return fmt.Errorf("generation failed: %w (note: file close also failed: %v)", err, closeErr)
+	} else if closeErr != nil {
+		// Only close error - generation succeeded
 		return fmt.Errorf("failed to close output file: %w", closeErr)
 	}
 
+	// Either no errors or only generation error
 	return err
 }
 
