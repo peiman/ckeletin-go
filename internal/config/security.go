@@ -32,8 +32,14 @@ func ValidateConfigFilePermissions(path string) error {
 
 	// Check if world-writable (dangerous - anyone can modify config)
 	if perm&0002 != 0 {
-		return fmt.Errorf("config file %s is world-writable (permissions: %04o), refusing to use for security reasons",
-			path, perm)
+		return fmt.Errorf(`config file %s is world-writable (permissions: %04o)
+
+Security Issue: Anyone on the system can modify this configuration file.
+
+How to fix:
+  chmod 600 %s
+
+This will set owner-only read/write permissions.`, path, perm, path)
 	}
 
 	// Warn if group-writable (potentially dangerous depending on group membership)
@@ -70,8 +76,20 @@ func ValidateConfigFileSize(path string, maxSize int64) error {
 	}
 
 	if info.Size() > maxSize {
-		return fmt.Errorf("config file %s is too large (%d bytes > %d bytes maximum), refusing to read for security reasons",
-			path, info.Size(), maxSize)
+		return fmt.Errorf(`config file %s is too large (%d bytes > %d bytes maximum)
+
+Security Issue: Large config files can cause denial-of-service.
+
+Suggestions:
+  - Remove unnecessary configuration
+  - Split into multiple smaller files
+  - Check for accidental binary data in config file
+
+Current size: %d bytes (%.2f MB)
+Maximum allowed: %d bytes (%.2f MB)`,
+			path, info.Size(), maxSize,
+			info.Size(), float64(info.Size())/(1024*1024),
+			maxSize, float64(maxSize)/(1024*1024))
 	}
 
 	log.Debug().

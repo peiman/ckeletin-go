@@ -39,14 +39,14 @@ func TestValidateConfigValue_Strings(t *testing.T) {
 			key:         "test.key",
 			value:       strings.Repeat("x", MaxStringValueLength+1),
 			wantErr:     true,
-			errContains: "exceeds max string length",
+			errContains: "exceeds maximum string length",
 		},
 		{
 			name:        "Very large string",
 			key:         "test.key",
 			value:       strings.Repeat("x", MaxStringValueLength*2),
 			wantErr:     true,
-			errContains: "exceeds max string length",
+			errContains: "exceeds maximum string length",
 		},
 	}
 
@@ -101,14 +101,14 @@ func TestValidateConfigValue_StringSlices(t *testing.T) {
 			key:         "test.key",
 			value:       make([]string, MaxSliceLength+1),
 			wantErr:     true,
-			errContains: "exceeds max length",
+			errContains: "exceeds maximum length",
 		},
 		{
 			name:        "Slice with oversized string",
 			key:         "test.key",
 			value:       []string{"normal", strings.Repeat("x", MaxStringValueLength+1)},
 			wantErr:     true,
-			errContains: "exceeds max string length",
+			errContains: "exceeds maximum string length",
 		},
 		{
 			name: "Slice with all valid strings",
@@ -161,14 +161,14 @@ func TestValidateConfigValue_InterfaceSlices(t *testing.T) {
 			key:         "test.key",
 			value:       make([]interface{}, MaxSliceLength+1),
 			wantErr:     true,
-			errContains: "exceeds max length",
+			errContains: "exceeds maximum length",
 		},
 		{
 			name:        "Interface slice with oversized string",
 			key:         "test.key",
 			value:       []interface{}{"normal", strings.Repeat("x", MaxStringValueLength+1)},
 			wantErr:     true,
-			errContains: "exceeds max string length",
+			errContains: "exceeds maximum string length",
 		},
 	}
 
@@ -216,7 +216,7 @@ func TestValidateConfigValue_NestedMaps(t *testing.T) {
 				"nested": strings.Repeat("x", MaxStringValueLength+1),
 			},
 			wantErr:     true,
-			errContains: "exceeds max string length",
+			errContains: "exceeds maximum string length",
 		},
 		{
 			name: "Deeply nested map",
