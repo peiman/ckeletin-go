@@ -9,6 +9,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +27,9 @@ import (
 //	var myCmd = NewCommand(config.MyMetadata, runMy)
 //
 // The runE function signature must be: func(*cobra.Command, []string) error
+//
+// Note: This function will panic if flag registration fails, as it's called during
+// initialization and there's no way to recover from invalid command configuration.
 func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string) error) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    meta.Use,
@@ -37,7 +42,11 @@ func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string)
 	// Auto-register flags from config registry based on ConfigPrefix
 	// This reads all ConfigOptions with keys starting with meta.ConfigPrefix
 	// and creates Cobra flags for them automatically
-	RegisterFlagsForPrefixWithOverrides(cmd, meta.ConfigPrefix+".", meta.FlagOverrides)
+	if err := RegisterFlagsForPrefixWithOverrides(cmd, meta.ConfigPrefix+".", meta.FlagOverrides); err != nil {
+		// Panic is acceptable here as this is called during init()
+		// and indicates a programming error in command configuration
+		panic(fmt.Sprintf("failed to register flags for command %s: %v", meta.Use, err))
+	}
 
 	return cmd
 }

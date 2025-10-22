@@ -105,7 +105,7 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 		// Log config status after logger is initialized
 		if configFileStatus != "" {
 			if configFileUsed != "" {
-				log.Info().Str("config_file", configFileUsed).Msg(configFileStatus)
+				log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
 			} else {
 				log.Debug().Msg(configFileStatus)
 			}

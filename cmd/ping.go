@@ -9,11 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// uiRunnerFactory allows tests to inject a mock runner
-var uiRunnerFactory = func() ui.UIRunner {
-	return ui.NewDefaultUIRunner()
-}
-
 var pingCmd = NewCommand(commands.PingMetadata, runPing)
 
 func init() {
@@ -21,10 +16,15 @@ func init() {
 }
 
 func runPing(cmd *cobra.Command, args []string) error {
+	return runPingWithUIRunner(cmd, args, ui.NewDefaultUIRunner())
+}
+
+// runPingWithUIRunner is the internal implementation that allows dependency injection for testing
+func runPingWithUIRunner(cmd *cobra.Command, args []string, uiRunner ui.UIRunner) error {
 	cfg := ping.Config{
 		Message: getConfigValue[string](cmd, "message", "app.ping.output_message"),
 		Color:   getConfigValue[string](cmd, "color", "app.ping.output_color"),
 		UI:      getConfigValue[bool](cmd, "ui", "app.ping.ui"),
 	}
-	return ping.NewExecutor(cfg, uiRunnerFactory(), cmd.OutOrStdout()).Execute()
+	return ping.NewExecutor(cfg, uiRunner, cmd.OutOrStdout()).Execute()
 }

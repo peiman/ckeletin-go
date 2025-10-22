@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/config"
-	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -30,13 +29,9 @@ func (m *mockUIRunner) RunUI(message, col string) error {
 
 // TestPingCommand tests the ping command integration with configuration
 func TestPingCommand(t *testing.T) {
-	// SETUP PHASE: Setup debug logging and save original factory
+	// SETUP PHASE: Setup debug logging
 	logBuf := &bytes.Buffer{}
 	log.Logger = zerolog.New(logBuf).With().Timestamp().Logger().Level(zerolog.DebugLevel)
-
-	// Save and restore original factory
-	originalFactory := uiRunnerFactory
-	defer func() { uiRunnerFactory = originalFactory }()
 
 	tests := []struct {
 		name            string
@@ -94,23 +89,23 @@ func TestPingCommand(t *testing.T) {
 				t.Fatalf("Failed to load test fixture %s: %v", tt.testFixturePath, err)
 			}
 
-			// Inject mock UI runner
-			uiRunnerFactory = func() ui.UIRunner {
-				return tt.mockRunner
-			}
-
 			// Create a new command instance for each test to avoid state pollution
 			cmd := &cobra.Command{
-				Use:  "ping",
-				RunE: runPing,
+				Use: "ping",
+				RunE: func(cmd *cobra.Command, args []string) error {
+					// Use the injected mock runner for this test
+					return runPingWithUIRunner(cmd, args, tt.mockRunner)
+				},
 			}
 
 			// Register flags
-			RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+			if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 				"app.ping.output_message": "message",
 				"app.ping.output_color":   "color",
 				"app.ping.ui":             "ui",
-			})
+			}); err != nil {
+				t.Fatalf("Failed to register flags: %v", err)
+			}
 
 			cmd.SetOut(tt.writer)
 			cmd.SetArgs(tt.args)
@@ -121,7 +116,7 @@ func TestPingCommand(t *testing.T) {
 			tt.writer.Reset()
 
 			// EXECUTION PHASE: Run the ping command
-			err := runPing(cmd, []string{})
+			err := runPingWithUIRunner(cmd, []string{}, tt.mockRunner)
 
 			// ASSERTION PHASE: Check error and output
 			if (err != nil) != tt.wantErr {
@@ -147,24 +142,31 @@ func TestPingCommandFlags(t *testing.T) {
 	viper.Set("app.ping.output_color", "blue")
 	viper.Set("app.ping.ui", false)
 
+	// Create mock UI runner
+	mockRunner := &mockUIRunner{}
+
 	// Create command
 	cmd := &cobra.Command{
-		Use:  "ping",
-		RunE: runPing,
+		Use: "ping",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPingWithUIRunner(cmd, args, mockRunner)
+		},
 	}
 
 	// Register flags
-	RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+	if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 		"app.ping.output_message": "message",
 		"app.ping.output_color":   "color",
 		"app.ping.ui":             "ui",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to register flags: %v", err)
+	}
 
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 
 	// EXECUTION PHASE: No flags set, should use viper values
-	err := runPing(cmd, []string{})
+	err := runPingWithUIRunner(cmd, []string{}, mockRunner)
 	if err != nil {
 		t.Fatalf("runPing() failed: %v", err)
 	}
@@ -184,7 +186,7 @@ func TestPingCommandFlags(t *testing.T) {
 	}
 
 	outBuf.Reset()
-	err = runPing(cmd, []string{})
+	err = runPingWithUIRunner(cmd, []string{}, mockRunner)
 	if err != nil {
 		t.Fatalf("runPing() with flags failed: %v", err)
 	}
@@ -202,24 +204,31 @@ func TestPingConfigDefaults(t *testing.T) {
 	viper.Reset()
 	config.SetDefaults()
 
+	// Create mock UI runner
+	mockRunner := &mockUIRunner{}
+
 	// Create command
 	cmd := &cobra.Command{
-		Use:  "ping",
-		RunE: runPing,
+		Use: "ping",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runPingWithUIRunner(cmd, args, mockRunner)
+		},
 	}
 
 	// Register flags
-	RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+	if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 		"app.ping.output_message": "message",
 		"app.ping.output_color":   "color",
 		"app.ping.ui":             "ui",
-	})
+	}); err != nil {
+		t.Fatalf("Failed to register flags: %v", err)
+	}
 
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 
 	// EXECUTION PHASE: Run with defaults
-	err := runPing(cmd, []string{})
+	err := runPingWithUIRunner(cmd, []string{}, mockRunner)
 
 	// ASSERTION PHASE: Check that defaults were used
 	if err != nil {
