@@ -243,9 +243,27 @@ func setupCommandConfig(cmd *cobra.Command) {
 }
 
 // getConfigValue retrieves a configuration value with the following precedence:
-// 1. Command line flag (if set)
-// 2. Configuration from viper (environment variable or config file)
-// This consolidates the common pattern of checking if a flag is set and using its value
+//  1. Command line flag (if explicitly set via --flagName)
+//  2. Configuration from viper (environment variable or config file)
+//  3. Zero value of type T (if neither flag nor config is set)
+//
+// The function uses type parameters to provide type-safe configuration retrieval.
+// It handles type assertions safely, logging warnings if type conversion fails.
+//
+// Supported types: string, bool, int, float64, []string
+//
+// Example usage:
+//
+//	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
+//	enabled := getConfigValue[bool](cmd, "ui", "app.ping.ui")
+//
+// Parameters:
+//   - cmd: The cobra.Command instance containing flags
+//   - flagName: The name of the command-line flag (e.g., "message")
+//   - viperKey: The viper configuration key (e.g., "app.ping.output_message")
+//
+// Returns:
+//   - The configuration value of type T, or zero value if not found
 func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string) T {
 	var value T
 
@@ -328,7 +346,26 @@ func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string)
 }
 
 // getKeyValue retrieves a configuration value from Viper by key only.
-// Flags should already be bound to Viper; this function prefers Viper's merged value.
+//
+// This function is used when flags are already bound to Viper and you want to
+// retrieve the merged value (environment variables, config file, or defaults).
+// It does NOT check command-line flags directly - use getConfigValue for that.
+//
+// The function returns the zero value of type T if the key is not found or
+// if type conversion fails.
+//
+// Supported types: any type T that can be stored in Viper
+//
+// Example usage:
+//
+//	format := getKeyValue[string]("app.docs.output_format")
+//	count := getKeyValue[int]("app.max_items")
+//
+// Parameters:
+//   - viperKey: The full viper configuration key (e.g., "app.docs.output_format")
+//
+// Returns:
+//   - The configuration value of type T, or zero value if not found/conversion fails
 func getKeyValue[T any](viperKey string) T {
 	var zero T
 	if v := viper.Get(viperKey); v != nil {
