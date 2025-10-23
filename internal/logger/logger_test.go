@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
@@ -166,5 +167,57 @@ func TestInit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSaveAndRestoreLoggerState(t *testing.T) {
+	// SETUP PHASE
+	// Create a test logger and level
+	testBuf := &bytes.Buffer{}
+	testLogger := zerolog.New(testBuf).With().Timestamp().Logger()
+	testLevel := zerolog.DebugLevel
+
+	// Set the test state
+	log.Logger = testLogger
+	zerolog.SetGlobalLevel(testLevel)
+
+	// Save the state
+	savedLogger, savedLevel := SaveLoggerState()
+
+	// Verify saved state matches what we set
+	if savedLevel != testLevel {
+		t.Errorf("SaveLoggerState() saved level = %v, want %v", savedLevel, testLevel)
+	}
+
+	// EXECUTION PHASE
+	// Modify the logger and level
+	newBuf := &bytes.Buffer{}
+	newLogger := zerolog.New(newBuf).With().Str("modified", "true").Logger()
+	newLevel := zerolog.WarnLevel
+
+	log.Logger = newLogger
+	zerolog.SetGlobalLevel(newLevel)
+
+	// Verify state was changed
+	if zerolog.GlobalLevel() != newLevel {
+		t.Errorf("Failed to modify global level, got %v, want %v", zerolog.GlobalLevel(), newLevel)
+	}
+
+	// Restore the original state
+	RestoreLoggerState(savedLogger, savedLevel)
+
+	// ASSERTION PHASE
+	// Verify the logger and level were restored
+	if zerolog.GlobalLevel() != testLevel {
+		t.Errorf("RestoreLoggerState() level = %v, want %v", zerolog.GlobalLevel(), testLevel)
+	}
+
+	// Test that the logger is writing to the original buffer
+	log.Info().Msg("test message")
+	if !bytes.Contains(testBuf.Bytes(), []byte("test message")) {
+		t.Errorf("Restored logger is not writing to original buffer")
+	}
+	if bytes.Contains(newBuf.Bytes(), []byte("test message")) {
+		t.Errorf("Restored logger is still writing to new buffer")
 	}
 }

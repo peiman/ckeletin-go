@@ -236,3 +236,98 @@ func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateConfigFileSecurity(t *testing.T) {
+	// Skip permission tests on Windows
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping security validation tests on Windows")
+	}
+
+	tests := []struct {
+		name        string
+		fileSize    int64
+		maxSize     int64
+		permissions os.FileMode
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:        "Valid file with secure permissions",
+			fileSize:    100,
+			maxSize:     1000,
+			permissions: 0600,
+			wantErr:     false,
+		},
+		{
+			name:        "File too large",
+			fileSize:    2000,
+			maxSize:     1000,
+			permissions: 0600,
+			wantErr:     true,
+			errContains: "too large",
+		},
+		{
+			name:        "File with world-writable permissions",
+			fileSize:    100,
+			maxSize:     1000,
+			permissions: 0666,
+			wantErr:     true,
+			errContains: "world-writable",
+		},
+		{
+			name:        "Both size and permission violations - size checked first",
+			fileSize:    2000,
+			maxSize:     1000,
+			permissions: 0666,
+			wantErr:     true,
+			errContains: "too large", // Size is checked first
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a temporary file with the specified size
+			tmpDir := t.TempDir()
+			tmpFile := filepath.Join(tmpDir, "config.yaml")
+
+			// Write file with specified size
+			content := make([]byte, tt.fileSize)
+			for i := range content {
+				content[i] = 'a'
+			}
+			if err := os.WriteFile(tmpFile, content, 0600); err != nil {
+				t.Fatalf("Failed to create test file: %v", err)
+			}
+
+			// Set the exact permissions we want (avoiding umask issues)
+			if err := os.Chmod(tmpFile, tt.permissions); err != nil {
+				t.Fatalf("Failed to set file permissions: %v", err)
+			}
+
+			// Run validation
+			err := ValidateConfigFileSecurity(tmpFile, tt.maxSize)
+
+			// Check error expectation
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfigFileSecurity() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// Check error message
+			if tt.wantErr && err != nil {
+				if !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("ValidateConfigFileSecurity() error = %v, should contain %q", err, tt.errContains)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateConfigFileSecurity_NonexistentFile(t *testing.T) {
+	err := ValidateConfigFileSecurity("/nonexistent/path/config.yaml", 1000)
+	if err == nil {
+		t.Error("ValidateConfigFileSecurity() should error for nonexistent file")
+	}
+	if !strings.Contains(err.Error(), "failed to stat") {
+		t.Errorf("Expected error message to contain 'failed to stat', got: %v", err)
+	}
+}

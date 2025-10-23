@@ -33,14 +33,8 @@ func Validate(configPath string) (*Result, error) {
 		return nil, fmt.Errorf("config file not found: %w", err)
 	}
 
-	// 2. Validate file size
-	if err := config.ValidateConfigFileSize(configPath, config.MaxConfigFileSize); err != nil {
-		result.Valid = false
-		result.Errors = append(result.Errors, err)
-	}
-
-	// 3. Validate file permissions
-	if err := config.ValidateConfigFilePermissions(configPath); err != nil {
+	// 2. Validate file security (size and permissions)
+	if err := config.ValidateConfigFileSecurity(configPath, config.MaxConfigFileSize); err != nil {
 		result.Valid = false
 		result.Errors = append(result.Errors, err)
 	}

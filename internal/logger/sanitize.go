@@ -7,6 +7,7 @@ package logger
 import (
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -15,8 +16,19 @@ var (
 	controlCharsRegex = regexp.MustCompile(`[\x00-\x1F\x7F]+`)
 
 	// Maximum length for logged strings to prevent log flooding
-	maxLogStringLength = 1000
+	// Default is 1000, but can be overridden via LOG_TRUNCATE_LIMIT environment variable
+	maxLogStringLength = initMaxLogLength()
 )
+
+// initMaxLogLength initializes the max log length from environment variable or uses default
+func initMaxLogLength() int {
+	if envVal := os.Getenv("LOG_TRUNCATE_LIMIT"); envVal != "" {
+		if limit, err := strconv.Atoi(envVal); err == nil && limit > 0 {
+			return limit
+		}
+	}
+	return 1000 // default value
+}
 
 // SanitizeLogString removes potentially dangerous characters from log output
 // and truncates excessively long strings to prevent log flooding attacks.

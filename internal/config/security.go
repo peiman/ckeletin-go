@@ -100,3 +100,26 @@ Maximum allowed: %d bytes (%.2f MB)`,
 
 	return nil
 }
+
+// ValidateConfigFileSecurity performs comprehensive security validation on a config file.
+// It combines both size and permission checks in a single convenient function.
+// This is the recommended function to use for config file security validation.
+//
+// It checks:
+//   - File size is within acceptable limits (prevents DoS)
+//   - File permissions are secure (prevents unauthorized modification)
+//
+// Returns the first validation error encountered, if any.
+func ValidateConfigFileSecurity(path string, maxSize int64) error {
+	// Validate file size first (cheaper check)
+	if err := ValidateConfigFileSize(path, maxSize); err != nil {
+		return err
+	}
+
+	// Validate file permissions
+	if err := ValidateConfigFilePermissions(path); err != nil {
+		return err
+	}
+
+	return nil
+}

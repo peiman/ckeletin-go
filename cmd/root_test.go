@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/internal/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -70,6 +71,10 @@ func TestInitConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
+			// Save logger state and restore after test
+			savedLogger, savedLevel := logger.SaveLoggerState()
+			defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
 			// Skip test if HOME is required but not available
 			if tt.skipIfNoHome && os.Getenv("HOME") == "" {
 				t.Skip("This test requires HOME environment variable to be set")

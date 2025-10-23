@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/docs"
+	"github.com/peiman/ckeletin-go/internal/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -94,13 +95,16 @@ func TestRunDocsConfig(t *testing.T) {
 // TestDocsCommands tests the initialization and correct setup of the docs commands
 func TestDocsCommands(t *testing.T) {
 	// SETUP PHASE
+	// Reset Viper state for clean testing
+	viper.Reset()
+
+	// Save logger state and restore after test
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
 	// Capture the log output
 	consoleBuf := &bytes.Buffer{}
-	origLogger := log.Logger
 	log.Logger = zerolog.New(consoleBuf)
-	defer func() {
-		log.Logger = origLogger
-	}()
 
 	// Reset RootCmd for clean testing
 	oldRoot := RootCmd

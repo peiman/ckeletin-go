@@ -215,6 +215,77 @@ func TestIntDefault(t *testing.T) {
 	}
 }
 
+func TestIntDefault_AllUintTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  int
+	}{
+		{
+			name:  "Uint64 value",
+			input: uint64(200),
+			want:  200,
+		},
+		{
+			name:  "Uint32 value",
+			input: uint32(150),
+			want:  150,
+		},
+		{
+			name:  "Uint16 value",
+			input: uint16(75),
+			want:  75,
+		},
+		{
+			name:  "Uint8 value",
+			input: uint8(50),
+			want:  50,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := intDefault(tt.input)
+			if got != tt.want {
+				t.Errorf("intDefault() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIntDefault_Int64Overflow(t *testing.T) {
+	// Test int64 overflow handling
+	// We test with values that would overflow int on 32-bit systems
+	tests := []struct {
+		name     string
+		input    int64
+		checkPos bool // true if checking positive overflow
+	}{
+		{
+			name:     "Very large positive int64",
+			input:    9223372036854775807, // math.MaxInt64
+			checkPos: true,
+		},
+		{
+			name:     "Very large negative int64",
+			input:    -9223372036854775808, // math.MinInt64
+			checkPos: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := intDefault(tt.input)
+			// Just verify it doesn't panic and returns a value
+			// On 64-bit systems, these values fit in int
+			// On 32-bit systems, they would be clamped
+			if got == 0 {
+				t.Errorf("intDefault() should handle large int64, got 0")
+			}
+		})
+	}
+}
+
 func TestFloatDefault(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -270,6 +341,64 @@ func TestFloatDefault(t *testing.T) {
 			name:  "Invalid type",
 			input: true,
 			want:  0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := floatDefault(tt.input)
+			if got != tt.want {
+				t.Errorf("floatDefault() = %f, want %f", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFloatDefault_AllIntTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input interface{}
+		want  float64
+	}{
+		{
+			name:  "Int32 value",
+			input: int32(123),
+			want:  123.0,
+		},
+		{
+			name:  "Int16 value",
+			input: int16(456),
+			want:  456.0,
+		},
+		{
+			name:  "Int8 value",
+			input: int8(78),
+			want:  78.0,
+		},
+		{
+			name:  "Uint value",
+			input: uint(999),
+			want:  999.0,
+		},
+		{
+			name:  "Uint64 value",
+			input: uint64(12345),
+			want:  12345.0,
+		},
+		{
+			name:  "Uint32 value",
+			input: uint32(6789),
+			want:  6789.0,
+		},
+		{
+			name:  "Uint16 value",
+			input: uint16(321),
+			want:  321.0,
+		},
+		{
+			name:  "Uint8 value",
+			input: uint8(99),
+			want:  99.0,
 		},
 	}
 

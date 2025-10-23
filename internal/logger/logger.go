@@ -35,3 +35,20 @@ func Init(out io.Writer) error {
 
 	return nil
 }
+
+// SaveLoggerState returns the current global logger and log level for later restoration.
+// This is useful in tests to avoid global state pollution.
+// Use with RestoreLoggerState in a defer statement:
+//
+//	savedLogger, savedLevel := logger.SaveLoggerState()
+//	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+func SaveLoggerState() (zerolog.Logger, zerolog.Level) {
+	return log.Logger, zerolog.GlobalLevel()
+}
+
+// RestoreLoggerState restores the global logger and log level to a previously saved state.
+// This is useful in tests to avoid global state pollution.
+func RestoreLoggerState(logger zerolog.Logger, level zerolog.Level) {
+	log.Logger = logger
+	zerolog.SetGlobalLevel(level)
+}

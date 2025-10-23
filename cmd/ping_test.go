@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/internal/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -29,7 +30,11 @@ func (m *mockUIRunner) RunUI(message, col string) error {
 
 // TestPingCommand tests the ping command integration with configuration
 func TestPingCommand(t *testing.T) {
-	// SETUP PHASE: Setup debug logging
+	// SETUP PHASE: Save logger state and restore after test
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Setup debug logging
 	logBuf := &bytes.Buffer{}
 	log.Logger = zerolog.New(logBuf).With().Timestamp().Logger().Level(zerolog.DebugLevel)
 

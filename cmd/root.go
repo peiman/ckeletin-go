@@ -160,16 +160,10 @@ func initConfig() error {
 
 	// Security validation if config file path is known
 	if configFilePath != "" {
-		// Validate file size before reading
-		if err := config.ValidateConfigFileSize(configFilePath, config.MaxConfigFileSize); err != nil {
-			log.Error().Err(err).Str("path", configFilePath).Msg("Config file size validation failed")
-			return fmt.Errorf("config file size validation failed: %w", err)
-		}
-
-		// Validate file permissions
-		if err := config.ValidateConfigFilePermissions(configFilePath); err != nil {
-			log.Error().Err(err).Str("path", configFilePath).Msg("Config file permission validation failed")
-			return fmt.Errorf("config file permission validation failed: %w", err)
+		// Validate file security (size and permissions)
+		if err := config.ValidateConfigFileSecurity(configFilePath, config.MaxConfigFileSize); err != nil {
+			log.Error().Err(err).Str("path", configFilePath).Msg("Config file security validation failed")
+			return fmt.Errorf("config file security validation failed: %w", err)
 		}
 	}
 

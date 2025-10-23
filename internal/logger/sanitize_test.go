@@ -227,3 +227,65 @@ func TestSanitizeLogString_Truncation(t *testing.T) {
 		t.Errorf("SanitizeLogString() with custom length = %q, want %q", got, expected)
 	}
 }
+
+func TestInitMaxLogLength(t *testing.T) {
+	// Note: Cannot use t.Parallel() because this test uses t.Setenv()
+	tests := []struct {
+		name        string
+		envValue    string
+		expectedLen int
+	}{
+		{
+			name:        "Default value when env not set",
+			envValue:    "",
+			expectedLen: 1000,
+		},
+		{
+			name:        "Valid positive value",
+			envValue:    "500",
+			expectedLen: 500,
+		},
+		{
+			name:        "Large valid value",
+			envValue:    "5000",
+			expectedLen: 5000,
+		},
+		{
+			name:        "Invalid negative value uses default",
+			envValue:    "-100",
+			expectedLen: 1000,
+		},
+		{
+			name:        "Invalid zero value uses default",
+			envValue:    "0",
+			expectedLen: 1000,
+		},
+		{
+			name:        "Invalid non-numeric value uses default",
+			envValue:    "invalid",
+			expectedLen: 1000,
+		},
+		{
+			name:        "Invalid float value uses default",
+			envValue:    "100.5",
+			expectedLen: 1000,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup environment variable
+			if tt.envValue != "" {
+				t.Setenv("LOG_TRUNCATE_LIMIT", tt.envValue)
+			}
+
+			// Call the initialization function
+			got := initMaxLogLength()
+
+			// Verify result
+			if got != tt.expectedLen {
+				t.Errorf("initMaxLogLength() = %d, want %d", got, tt.expectedLen)
+			}
+		})
+	}
+}
