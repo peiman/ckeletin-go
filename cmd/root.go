@@ -24,14 +24,18 @@ var (
 	binaryName       = "ckeletin-go"
 	configFileStatus string
 	configFileUsed   string
+
+	// Compiled regex patterns for EnvPrefix()
+	// Compiled once at package initialization for better performance
+	nonAlphanumericRegex = regexp.MustCompile(`[^A-Z0-9]`)
+	onlyUnderscoresRegex = regexp.MustCompile(`^_+$`)
 )
 
 // EnvPrefix returns a sanitized environment variable prefix based on the binary name
 func EnvPrefix() string {
 	// Convert to uppercase and replace non-alphanumeric characters with underscore
 	prefix := strings.ToUpper(binaryName)
-	re := regexp.MustCompile(`[^A-Z0-9]`)
-	prefix = re.ReplaceAllString(prefix, "_")
+	prefix = nonAlphanumericRegex.ReplaceAllString(prefix, "_")
 
 	// Ensure it doesn't start with a number (invalid for env vars)
 	if prefix != "" && prefix[0] >= '0' && prefix[0] <= '9' {
@@ -39,8 +43,7 @@ func EnvPrefix() string {
 	}
 
 	// Handle case where all characters were special and got replaced
-	re = regexp.MustCompile(`^_+$`)
-	if re.MatchString(prefix) {
+	if onlyUnderscoresRegex.MatchString(prefix) {
 		prefix = "_"
 	}
 
