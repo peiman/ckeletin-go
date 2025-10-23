@@ -181,6 +181,16 @@ func initConfig() error {
 	// All defaults MUST be defined in internal/config/registry.go
 	config.SetDefaults()
 
+	// Validate default values to ensure they don't exceed limits
+	// This catches programming errors in default value definitions
+	if errs := config.ValidateAllConfigValues(viper.AllSettings()); len(errs) > 0 {
+		log.Error().Int("error_count", len(errs)).Msg("Invalid default configuration values detected")
+		for i, err := range errs {
+			log.Error().Int("error_num", i+1).Err(err).Msg("Default validation error")
+		}
+		return fmt.Errorf("configuration has %d invalid default value(s) - this is a programming error", len(errs))
+	}
+
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			configFileStatus = "No config file found, using defaults and environment variables"
