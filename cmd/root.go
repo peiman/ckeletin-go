@@ -242,7 +242,7 @@ func setupCommandConfig(cmd *cobra.Command) {
 	}
 }
 
-// getConfigValue retrieves a configuration value with the following precedence:
+// getConfigValueWithFlags retrieves a configuration value with the following precedence:
 //  1. Command line flag (if explicitly set via --flagName)
 //  2. Configuration from viper (environment variable or config file)
 //  3. Zero value of type T (if neither flag nor config is set)
@@ -254,8 +254,8 @@ func setupCommandConfig(cmd *cobra.Command) {
 //
 // Example usage:
 //
-//	message := getConfigValue[string](cmd, "message", "app.ping.output_message")
-//	enabled := getConfigValue[bool](cmd, "ui", "app.ping.ui")
+//	message := getConfigValueWithFlags[string](cmd, "message", "app.ping.output_message")
+//	enabled := getConfigValueWithFlags[bool](cmd, "ui", "app.ping.ui")
 //
 // Parameters:
 //   - cmd: The cobra.Command instance containing flags
@@ -264,7 +264,7 @@ func setupCommandConfig(cmd *cobra.Command) {
 //
 // Returns:
 //   - The configuration value of type T, or zero value if not found
-func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string) T {
+func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName string, viperKey string) T {
 	var value T
 
 	// Get the value from viper first (this will be from config file or env var)
@@ -349,7 +349,7 @@ func getConfigValue[T any](cmd *cobra.Command, flagName string, viperKey string)
 //
 // This function is used when flags are already bound to Viper and you want to
 // retrieve the merged value (environment variables, config file, or defaults).
-// It does NOT check command-line flags directly - use getConfigValue for that.
+// It does NOT check command-line flags directly - use getConfigValueWithFlags for that.
 //
 // The function returns the zero value of type T if the key is not found or
 // if type conversion fails.

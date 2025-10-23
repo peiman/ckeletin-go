@@ -95,7 +95,7 @@ func init() {
 
 func runMycommand(cmd *cobra.Command, args []string) error {
     cfg := mycommand.Config{
-        SomeOption: getConfigValue[string](cmd, "flag-name", "app.mycommand.some_option"),
+        SomeOption: getConfigValueWithFlags[string](cmd, "flag-name", "app.mycommand.some_option"),
     }
     return mycommand.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
 }

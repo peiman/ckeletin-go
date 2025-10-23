@@ -102,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Made rules more discoverable with specific file names
 - Refactored Viper initialization to use a centralized, idiomatic Cobra/Viper pattern with `PersistentPreRunE` and command inheritance.
 - Introduced `setupCommandConfig` helper for consistent command configuration across all commands.
-- Added `getConfigValue[T]` generic helper for type-safe and simplified configuration retrieval.
+- Added `getConfigValueWithFlags[T]` generic helper for type-safe and simplified configuration retrieval.
   - Enhanced to support string, bool, int, float64, and string slice types
   - Added comprehensive tests for all type handling scenarios
   - Improved flag overriding behavior with proper type conversions

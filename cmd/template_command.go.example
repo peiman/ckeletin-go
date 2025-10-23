@@ -16,7 +16,7 @@ func init() {
 
 func runTemplate(cmd *cobra.Command, args []string) error {
 	cfg := template.Config{
-		ExampleOption: getConfigValue[string](cmd, "example-flag", "app.template.example_option"),
+		ExampleOption: getConfigValueWithFlags[string](cmd, "example-flag", "app.template.example_option"),
 		// Add more config fields as needed
 	}
 	return template.NewExecutor(cfg, cmd.OutOrStdout()).Execute()

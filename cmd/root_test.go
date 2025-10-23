@@ -540,7 +540,7 @@ func TestSetupCommandConfig(t *testing.T) {
 	}
 }
 
-// TestGetConfigValue_Types tests the getConfigValue function with different types
+// TestGetConfigValue_Types tests the getConfigValueWithFlags function with different types
 func TestGetConfigValue_Types(t *testing.T) {
 	// SETUP PHASE
 	// Reset viper for a clean test
@@ -563,31 +563,31 @@ func TestGetConfigValue_Types(t *testing.T) {
 
 	// EXECUTION & ASSERTION PHASE
 	// Test string type
-	strVal := getConfigValue[string](cmd, "string", "test.string")
+	strVal := getConfigValueWithFlags[string](cmd, "string", "test.string")
 	if strVal != "string-value" {
 		t.Errorf("Expected string value to be 'string-value', got '%s'", strVal)
 	}
 
 	// Test bool type
-	boolVal := getConfigValue[bool](cmd, "bool", "test.bool")
+	boolVal := getConfigValueWithFlags[bool](cmd, "bool", "test.bool")
 	if boolVal != true {
 		t.Errorf("Expected bool value to be true, got %v", boolVal)
 	}
 
 	// Test int type
-	intVal := getConfigValue[int](cmd, "int", "test.int")
+	intVal := getConfigValueWithFlags[int](cmd, "int", "test.int")
 	if intVal != 42 {
 		t.Errorf("Expected int value to be 42, got %d", intVal)
 	}
 
 	// Test float type
-	floatVal := getConfigValue[float64](cmd, "float", "test.float")
+	floatVal := getConfigValueWithFlags[float64](cmd, "float", "test.float")
 	if floatVal != 3.14 {
 		t.Errorf("Expected float value to be 3.14, got %f", floatVal)
 	}
 
 	// Test string slice type
-	sliceVal := getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+	sliceVal := getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
 	if len(sliceVal) != 3 || sliceVal[0] != "value1" || sliceVal[1] != "value2" || sliceVal[2] != "value3" {
 		t.Errorf("Expected string slice value to be [value1 value2 value3], got %v", sliceVal)
 	}
@@ -610,28 +610,28 @@ func TestGetConfigValue_Types(t *testing.T) {
 	}
 
 	// Verify flag values override viper values
-	strVal = getConfigValue[string](cmd, "string", "test.string")
+	strVal = getConfigValueWithFlags[string](cmd, "string", "test.string")
 	if strVal != "flag-value" {
 		t.Errorf("Expected string flag value to be 'flag-value', got '%s'", strVal)
 	}
 
-	boolVal = getConfigValue[bool](cmd, "bool", "test.bool")
+	boolVal = getConfigValueWithFlags[bool](cmd, "bool", "test.bool")
 	if boolVal != false {
 		t.Errorf("Expected bool flag value to be false, got %v", boolVal)
 	}
 
-	intVal = getConfigValue[int](cmd, "int", "test.int")
+	intVal = getConfigValueWithFlags[int](cmd, "int", "test.int")
 	if intVal != 99 {
 		t.Errorf("Expected int flag value to be 99, got %d", intVal)
 	}
 
-	floatVal = getConfigValue[float64](cmd, "float", "test.float")
+	floatVal = getConfigValueWithFlags[float64](cmd, "float", "test.float")
 	if floatVal != 6.28 {
 		t.Errorf("Expected float flag value to be 6.28, got %f", floatVal)
 	}
 
 	// Verify string slice flag value overrides viper value
-	sliceVal = getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+	sliceVal = getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
 	expectedSlice := []string{"flag1", "flag2", "flag3", "flag4"}
 	if len(sliceVal) != len(expectedSlice) {
 		t.Errorf("Expected string slice flag length to be %d, got %d", len(expectedSlice), len(sliceVal))
@@ -644,7 +644,7 @@ func TestGetConfigValue_Types(t *testing.T) {
 	}
 }
 
-// TestGetConfigValue_StringSlice specifically tests the string slice handling in getConfigValue
+// TestGetConfigValue_StringSlice specifically tests the string slice handling in getConfigValueWithFlags
 func TestGetConfigValue_StringSlice(t *testing.T) {
 	// SETUP PHASE
 	// Reset viper for a clean test
@@ -704,7 +704,7 @@ func TestGetConfigValue_StringSlice(t *testing.T) {
 			}
 
 			// EXECUTION PHASE
-			result := getConfigValue[[]string](cmd, "stringslice", "test.stringslice")
+			result := getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
 
 			// ASSERTION PHASE
 			if len(result) != len(tt.expectedResult) {

@@ -499,7 +499,7 @@ When implementing a new command:
 
 1. In `cmd/<command>.go`, define `<Command>Options() []config.ConfigOption` and call `config.RegisterOptionsProvider(<Command>Options)` in `init()`
 2. Still in `cmd/<command>.go`, call `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)` to create flags and bind them to Viper
-3. Use `getConfigValue[T](cmd, flagName, viperKey)` in your config constructor to honor flag precedence over config
+3. Use `getConfigValueWithFlags[T](cmd, flagName, viperKey)` in your config constructor to honor flag precedence over config
 
 ### Options Pattern for Command Configuration
 
@@ -542,8 +542,8 @@ To implement the Options Pattern for a new command:
    ```go
    func NewCommandConfig(cmd *cobra.Command, opts ...CommandOption) CommandConfig {
      cfg := CommandConfig{
-       Option1: getConfigValue[string](cmd, "option1", "app.command.option1"),
-       Option2: getConfigValue[bool](cmd, "option2", "app.command.option2"),
+       Option1: getConfigValueWithFlags[string](cmd, "option1", "app.command.option1"),
+       Option2: getConfigValueWithFlags[bool](cmd, "option2", "app.command.option2"),
      }
      for _, opt := range opts {
        opt(&cfg)
@@ -571,7 +571,7 @@ Configuration options live alongside their commands and self-register with the g
 1. **Add options**: In `cmd/<command>.go`, implement `<Command>Options() []config.ConfigOption` with keys like `app.<command>.<option>`.
 2. **Self-register**: In `init()`, call `config.RegisterOptionsProvider(<Command>Options)`.
 3. **Flags binding**: In the same command file, call `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)` instead of manual flag definitions and binds.
-4. **Read values**: In your config constructor, use `getConfigValue[T](cmd, flagName, viperKey)` so CLI flags override config/env.
+4. **Read values**: In your config constructor, use `getConfigValueWithFlags[T](cmd, flagName, viperKey)` so CLI flags override config/env.
 5. **Docs**: Run `task docs:config` to regenerate documentation.
 
 Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via the registry in `cmd/root.go`.
@@ -579,7 +579,7 @@ Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via 
 ### What’s Framework vs. What You Should Edit
 
 - Framework (avoid modifying unless you are changing the scaffold itself):
-  - `cmd/root.go` (bootstrap, root wiring, `setupCommandConfig`, helpers like `getConfigValue`/`getKeyValue`)
+  - `cmd/root.go` (bootstrap, root wiring, `setupCommandConfig`, helpers like `getConfigValueWithFlags`/`getKeyValue`)
   - `cmd/flags.go` (auto-registration of flags from options)
   - `internal/config/options.go` (types), `internal/config/registry.go` (provider registry + `SetDefaults`)
   - `internal/logger/*`, `internal/ui/*`, `internal/docs/*` (shared subsystems)

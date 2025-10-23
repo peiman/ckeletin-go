@@ -23,9 +23,9 @@ func runPing(cmd *cobra.Command, args []string) error {
 // runPingWithUIRunner is the internal implementation that allows dependency injection for testing
 func runPingWithUIRunner(cmd *cobra.Command, args []string, uiRunner ui.UIRunner) error {
 	cfg := ping.Config{
-		Message: getConfigValue[string](cmd, "message", config.KeyAppPingOutputMessage),
-		Color:   getConfigValue[string](cmd, "color", config.KeyAppPingOutputColor),
-		UI:      getConfigValue[bool](cmd, "ui", config.KeyAppPingUi),
+		Message: getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutputMessage),
+		Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
+		UI:      getConfigValueWithFlags[bool](cmd, "ui", config.KeyAppPingUi),
 	}
 	return ping.NewExecutor(cfg, uiRunner, cmd.OutOrStdout()).Execute()
 }
