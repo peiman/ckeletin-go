@@ -12,8 +12,8 @@ import (
 
 func BenchmarkSanitizeLogString(b *testing.B) {
 	tests := []struct {
-		name   string
-		input  string
+		name  string
+		input string
 	}{
 		{"Short", "short string"},
 		{"Medium", strings.Repeat("x", 500)},

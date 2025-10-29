@@ -131,8 +131,8 @@ func BenchmarkRegisterFlagsForPrefixWithOverrides(b *testing.B) {
 	// Note: This creates new commands each iteration, so it measures the full cost
 
 	tests := []struct {
-		name    string
-		prefix  string
+		name   string
+		prefix string
 	}{
 		{"PingCommand", "app.ping."},
 		{"DocsCommand", "app.docs."},
