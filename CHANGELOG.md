@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dual logging system** with console and file outputs:
+  - Console: User-friendly, colored INFO+ messages for developers
+  - File: Detailed JSON DEBUG+ logs for debugging and auditing
+  - New configuration options: `--log-console-level`, `--log-file-enabled`, `--log-file-path`, `--log-file-level`, `--log-color`
+  - FilteredWriter pattern for independent per-output level control
+  - Secure file permissions (0600) and automatic directory creation
+  - Cleanup function to ensure proper file closure
+  - Only 12% performance overhead, zero allocations
+- **Log rotation with lumberjack**:
+  - Automatic rotation when file exceeds max size
+  - Configurable backup retention (count and age)
+  - Optional gzip compression of rotated logs
+  - New flags: `--log-file-max-size`, `--log-file-max-backups`, `--log-file-max-age`, `--log-file-compress`
+- **Log sampling for high-volume scenarios**:
+  - Reduce log volume during traffic spikes
+  - Configurable burst and sampling rates
+  - New flags: `--log-sampling-enabled`, `--log-sampling-initial`, `--log-sampling-thereafter`
+- **Runtime log level adjustment**:
+  - Change console/file log levels without restarting
+  - Functions: `logger.SetConsoleLevel()`, `logger.SetFileLevel()`, `logger.GetConsoleLevel()`, `logger.GetFileLevel()`
 - Performance benchmarking infrastructure with `task bench` commands and baseline documentation
 - Architecture Decision Records (ADRs) documenting 7 key architectural patterns
 - 20+ integration tests for error scenarios and edge cases
@@ -22,12 +42,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Test coverage improved to 89.4% overall with 40+ integration tests
+- **Logger initialization** now supports dual output (console + file)
+- **Backward compatibility maintained**: `--log-level` flag still works as before
+- Updated ADR-006 with dual logging implementation details
 
 ### Security
 
 - Fixed vulnerability in mapstructure dependency:
   - Upgraded `github.com/go-viper/mapstructure/v2` from v2.2.1 to v2.3.0
   - Resolves GO-2025-3787: potential information leak in logs when processing malformed data
+- **Log files created with secure 0600 permissions** (owner read/write only)
 
 ## [0.6.0] - 2024-06-25
 

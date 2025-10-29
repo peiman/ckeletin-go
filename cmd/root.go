@@ -119,6 +119,9 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 }
 
 func Execute() error {
+	// Ensure logger cleanup on exit
+	defer logger.Cleanup()
+
 	RootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
 	return RootCmd.Execute()
 }
@@ -130,9 +133,73 @@ func init() {
 		log.Fatal().Err(err).Msg("Failed to bind 'config' flag")
 	}
 
+	// Legacy log level flag (for backward compatibility)
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
 	if err := viper.BindPFlag(config.KeyAppLogLevel, RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'log-level'")
+	}
+
+	// Dual logging configuration flags
+	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")
+	if err := viper.BindPFlag(config.KeyAppLogConsoleLevel, RootCmd.PersistentFlags().Lookup("log-console-level")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-console-level'")
+	}
+
+	RootCmd.PersistentFlags().Bool("log-file-enabled", false, "Enable file logging to capture detailed logs")
+	if err := viper.BindPFlag(config.KeyAppLogFileEnabled, RootCmd.PersistentFlags().Lookup("log-file-enabled")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-enabled'")
+	}
+
+	RootCmd.PersistentFlags().String("log-file-path", "./logs/ckeletin-go.log", "Path to the log file")
+	if err := viper.BindPFlag(config.KeyAppLogFilePath, RootCmd.PersistentFlags().Lookup("log-file-path")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-path'")
+	}
+
+	RootCmd.PersistentFlags().String("log-file-level", "debug", "File log level (trace, debug, info, warn, error, fatal, panic)")
+	if err := viper.BindPFlag(config.KeyAppLogFileLevel, RootCmd.PersistentFlags().Lookup("log-file-level")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-level'")
+	}
+
+	RootCmd.PersistentFlags().String("log-color", "auto", "Enable colored console output (auto, true, false)")
+	if err := viper.BindPFlag(config.KeyAppLogColorEnabled, RootCmd.PersistentFlags().Lookup("log-color")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-color'")
+	}
+
+	// Log rotation configuration flags
+	RootCmd.PersistentFlags().Int("log-file-max-size", 100, "Maximum size in megabytes before log file is rotated")
+	if err := viper.BindPFlag(config.KeyAppLogFileMaxSize, RootCmd.PersistentFlags().Lookup("log-file-max-size")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-size'")
+	}
+
+	RootCmd.PersistentFlags().Int("log-file-max-backups", 3, "Maximum number of old log files to retain")
+	if err := viper.BindPFlag(config.KeyAppLogFileMaxBackups, RootCmd.PersistentFlags().Lookup("log-file-max-backups")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-backups'")
+	}
+
+	RootCmd.PersistentFlags().Int("log-file-max-age", 28, "Maximum number of days to retain old log files")
+	if err := viper.BindPFlag(config.KeyAppLogFileMaxAge, RootCmd.PersistentFlags().Lookup("log-file-max-age")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-age'")
+	}
+
+	RootCmd.PersistentFlags().Bool("log-file-compress", false, "Compress rotated log files with gzip")
+	if err := viper.BindPFlag(config.KeyAppLogFileCompress, RootCmd.PersistentFlags().Lookup("log-file-compress")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-compress'")
+	}
+
+	// Log sampling configuration flags
+	RootCmd.PersistentFlags().Bool("log-sampling-enabled", false, "Enable log sampling for high-volume scenarios")
+	if err := viper.BindPFlag(config.KeyAppLogSamplingEnabled, RootCmd.PersistentFlags().Lookup("log-sampling-enabled")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-enabled'")
+	}
+
+	RootCmd.PersistentFlags().Int("log-sampling-initial", 100, "Number of messages to log per second before sampling")
+	if err := viper.BindPFlag(config.KeyAppLogSamplingInitial, RootCmd.PersistentFlags().Lookup("log-sampling-initial")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-initial'")
+	}
+
+	RootCmd.PersistentFlags().Int("log-sampling-thereafter", 100, "Number of messages to log thereafter per second")
+	if err := viper.BindPFlag(config.KeyAppLogSamplingThereafter, RootCmd.PersistentFlags().Lookup("log-sampling-thereafter")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-thereafter'")
 	}
 }
 

@@ -183,7 +183,7 @@ func TestInvalidFlagValues(t *testing.T) {
 			name:               "Invalid log level",
 			args:               []string{"--log-level", "invalid-level", "ping"},
 			wantExitCode:       0, // Logs warning but continues
-			wantStderrContains: "Invalid log level",
+			wantStderrContains: "Invalid console log level",
 		},
 		{
 			name:               "Unknown flag",
