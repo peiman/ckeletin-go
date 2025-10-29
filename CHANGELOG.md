@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Test coverage improved to 89.4% overall with 40+ integration tests
 
+### Security
+
+- Fixed vulnerability in mapstructure dependency:
+  - Upgraded `github.com/go-viper/mapstructure/v2` from v2.2.1 to v2.3.0
+  - Resolves GO-2025-3787: potential information leak in logs when processing malformed data
 
 ## [0.6.0] - 2024-06-25
 
