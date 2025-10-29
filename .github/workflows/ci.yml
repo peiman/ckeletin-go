@@ -62,8 +62,13 @@ jobs:
       - name: Build
         run: go build -v ./...
 
-      - name: Run Tests
-        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+      - name: Run Tests (Unix)
+        if: runner.os != 'Windows'
+        run: go test -v -race ./...
+
+      - name: Run Tests (Windows)
+        if: runner.os == 'Windows'
+        run: go test -v ./...
 
   # Main build job with full quality checks (Linux only)
   build:
