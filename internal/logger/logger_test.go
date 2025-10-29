@@ -228,14 +228,14 @@ func TestInitWithFileLogging(t *testing.T) {
 	logFile := tempDir + "/test.log"
 
 	tests := []struct {
-		name           string
-		fileEnabled    bool
-		filePath       string
-		fileLevel      string
-		consoleLevel   string
-		colorEnabled   string
-		expectFileLog  bool
-		expectedError  bool
+		name          string
+		fileEnabled   bool
+		filePath      string
+		fileLevel     string
+		consoleLevel  string
+		colorEnabled  string
+		expectFileLog bool
+		expectedError bool
 	}{
 		{
 			name:          "File logging disabled",
@@ -336,22 +336,22 @@ func TestInitWithFileLogging(t *testing.T) {
 
 func TestRuntimeLevelAdjustment(t *testing.T) {
 	tests := []struct {
-		name         string
-		setLevel     zerolog.Level
-		getterFunc   func() zerolog.Level
-		setterFunc   func(zerolog.Level)
+		name       string
+		setLevel   zerolog.Level
+		getterFunc func() zerolog.Level
+		setterFunc func(zerolog.Level)
 	}{
 		{
-			name:         "Console level adjustment",
-			setLevel:     zerolog.WarnLevel,
-			getterFunc:   GetConsoleLevel,
-			setterFunc:   SetConsoleLevel,
+			name:       "Console level adjustment",
+			setLevel:   zerolog.WarnLevel,
+			getterFunc: GetConsoleLevel,
+			setterFunc: SetConsoleLevel,
 		},
 		{
-			name:         "File level adjustment",
-			setLevel:     zerolog.ErrorLevel,
-			getterFunc:   GetFileLevel,
-			setterFunc:   SetFileLevel,
+			name:       "File level adjustment",
+			setLevel:   zerolog.ErrorLevel,
+			getterFunc: GetFileLevel,
+			setterFunc: SetFileLevel,
 		},
 	}
 
