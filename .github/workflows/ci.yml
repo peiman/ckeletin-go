@@ -123,6 +123,14 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
+      - name: Add Go binaries to PATH
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Verify golangci-lint Version
+        run: |
+          echo "golangci-lint version after setup:"
+          golangci-lint --version
+
       - name: Run Quality Checks
         run: task check
 

@@ -1,5 +1,8 @@
 # golangci-lint configuration
 # See: https://golangci-lint.run/usage/configuration/
+#
+# NOTE: This config requires golangci-lint v2.x
+# Installed via: task setup (installs @latest from Taskfile.yml)
 
 version: 2
 
