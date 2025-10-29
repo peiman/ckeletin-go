@@ -54,6 +54,11 @@ coverage.txt
 test-output.json
 coverage.html
 
+# Benchmark results
+bench-results.txt
+bench-old.txt
+bench-new.txt
+
 # Aider
 .aider*
 
