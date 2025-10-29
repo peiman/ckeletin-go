@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -24,12 +25,17 @@ var binaryPath string
 
 // TestMain builds the binary before running tests
 func TestMain(m *testing.M) {
-	// Build the binary
-	cmd := exec.Command("go", "build", "-o", "ckeletin-go-test", "../../main.go")
+	// Build the binary with platform-specific name
+	binaryName := "ckeletin-go-test"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	cmd := exec.Command("go", "build", "-o", binaryName, "../../main.go")
 	if err := cmd.Run(); err != nil {
 		panic("Failed to build binary: " + err.Error())
 	}
-	binaryPath = "./ckeletin-go-test"
+	binaryPath = "./" + binaryName
 
 	// Run tests
 	code := m.Run()
