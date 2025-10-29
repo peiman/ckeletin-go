@@ -28,7 +28,10 @@ install_tool() {
     fi
 }
 
-# Install essential tools
+# Install task runner first (required for all task commands)
+install_tool "task" "github.com/go-task/task/v3/cmd/task@latest"
+
+# Install essential development tools
 install_tool "goimports" "golang.org/x/tools/cmd/goimports@latest"
 install_tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck@latest"
 install_tool "gotestsum" "gotest.tools/gotestsum@latest"
