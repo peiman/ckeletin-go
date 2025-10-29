@@ -140,8 +140,8 @@ changelog:
 brews:
   - name: "{{ .ProjectName }}"
 
-    # Skip if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
-    skip: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
+    # Skip upload if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
 
     repository:
       owner: '{{ .Env.HOMEBREW_TAP_OWNER }}'
