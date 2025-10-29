@@ -50,8 +50,8 @@ func (e *Executor) Execute() error {
 	if e.cfg.UI {
 		log.Info().Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Starting UI")
 		if err := e.uiRunner.RunUI(e.cfg.Message, e.cfg.Color); err != nil {
-			log.Error().Err(err).Msg("Failed to run UI")
-			return err
+			log.Error().Err(err).Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Failed to run UI")
+			return fmt.Errorf("failed to run UI with message %q and color %q: %w", e.cfg.Message, e.cfg.Color, err)
 		}
 		return nil
 	}
@@ -65,7 +65,7 @@ func (e *Executor) Execute() error {
 			Str("color", e.cfg.Color).
 			Msg("Failed to print colored message")
 		// Wrap the error to provide context
-		return fmt.Errorf("failed to print colored message: %w", err)
+		return fmt.Errorf("failed to print colored message %q in color %q: %w", e.cfg.Message, e.cfg.Color, err)
 	}
 
 	log.Debug().Msg("Ping execution completed successfully")

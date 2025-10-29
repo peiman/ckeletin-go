@@ -260,6 +260,12 @@ func TestExecutor_Execute_WriteError(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to print colored message") {
 		t.Errorf("Execute() error = %v, expected to contain 'failed to print colored message'", err)
 	}
+	if !strings.Contains(err.Error(), "Test Message") {
+		t.Errorf("Execute() error = %v, expected to contain message 'Test Message'", err)
+	}
+	if !strings.Contains(err.Error(), "white") {
+		t.Errorf("Execute() error = %v, expected to contain color 'white'", err)
+	}
 }
 
 func TestExecutor_Execute_InvalidColor(t *testing.T) {
@@ -283,5 +289,8 @@ func TestExecutor_Execute_InvalidColor(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "failed to print colored message") {
 		t.Errorf("Execute() error = %v, expected to contain 'failed to print colored message'", err)
+	}
+	if !strings.Contains(err.Error(), "invalid_color") {
+		t.Errorf("Execute() error = %v, expected to contain color 'invalid_color'", err)
 	}
 }
