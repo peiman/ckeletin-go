@@ -39,27 +39,33 @@ Located in `.claude/hooks.json`:
 - Consistent development environment
 - Faster onboarding for new sessions
 
-## Commit Message Hook (BeforeToolCall)
+## Claude Attribution in Git Commits
 
-**This project has a BeforeToolCall hook that validates git commit messages!**
+**This project disables Claude Code attribution in git commits!**
 
-The hook prevents commits with Claude Code attribution text:
+There are two layers of protection:
+
+### 1. Built-in Setting (Primary)
+The `includeCoAuthoredBy: false` setting in `~/.claude/settings.json` prevents Claude Code from automatically adding attribution text to commits. This is the primary solution and works immediately.
+
+### 2. Commit Message Validation Hook (Backup)
+A PreToolUse hook in `.claude/hooks.json` validates git commit messages as a backup check:
 - Checks for "Generated with [Claude Code]"
 - Checks for "Co-Authored-By: Claude"
 - Blocks the commit if either is found
-- Ensures clean, professional commit messages
+- Requires new session to activate
 
 ### Hook Configuration
 Located in `.claude/hooks.json`:
 ```json
 {
-  "BeforeToolCall": [
+  "PreToolUse": [
     {
       "matcher": "Bash",
       "hooks": [
         {
           "type": "command",
-          "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh \"$CLAUDE_TOOL_PARAMETERS\""
+          "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh"
         }
       ]
     }
@@ -70,8 +76,8 @@ Located in `.claude/hooks.json`:
 ### Why This Matters
 - Prevents AI attribution in commit history
 - Maintains professional commit messages
-- Automatic enforcement (no manual checking)
-- Fails fast with clear error message
+- Automatic enforcement via built-in setting
+- Hook provides backup validation
 
 ## Task Command Usage (CRITICAL)
 
@@ -118,6 +124,9 @@ Located in `.claude/hooks.json`:
 4. Re-run the task command to verify the fix
 
 ## Git Workflow
+
+### Claude Attribution
+Commits in this project **do not include Claude Code attribution** due to the `includeCoAuthoredBy: false` setting. All commits should follow the conventional commit format only.
 
 ### Committing Changes
 1. Run `task check` first

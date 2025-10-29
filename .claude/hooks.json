@@ -11,13 +11,13 @@
         ]
       }
     ],
-    "BeforeToolCall": [
+    "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh \"$CLAUDE_TOOL_PARAMETERS\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh"
           }
         ]
       }
