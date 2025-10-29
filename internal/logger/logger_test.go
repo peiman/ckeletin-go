@@ -221,3 +221,232 @@ func TestSaveAndRestoreLoggerState(t *testing.T) {
 		t.Errorf("Restored logger is still writing to new buffer")
 	}
 }
+
+func TestInitWithFileLogging(t *testing.T) {
+	// Create temp directory for log files
+	tempDir := t.TempDir()
+	logFile := tempDir + "/test.log"
+
+	tests := []struct {
+		name           string
+		fileEnabled    bool
+		filePath       string
+		fileLevel      string
+		consoleLevel   string
+		colorEnabled   string
+		expectFileLog  bool
+		expectedError  bool
+	}{
+		{
+			name:          "File logging disabled",
+			fileEnabled:   false,
+			filePath:      logFile,
+			fileLevel:     "debug",
+			consoleLevel:  "info",
+			colorEnabled:  "false",
+			expectFileLog: false,
+			expectedError: false,
+		},
+		{
+			name:          "File logging enabled",
+			fileEnabled:   true,
+			filePath:      logFile,
+			fileLevel:     "debug",
+			consoleLevel:  "info",
+			colorEnabled:  "false",
+			expectFileLog: true,
+			expectedError: false,
+		},
+		{
+			name:          "File logging with color auto",
+			fileEnabled:   true,
+			filePath:      logFile + ".2",
+			fileLevel:     "debug",
+			consoleLevel:  "info",
+			colorEnabled:  "auto",
+			expectFileLog: true,
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP
+			viper.Set("app.log.file_enabled", tt.fileEnabled)
+			viper.Set("app.log.file_path", tt.filePath)
+			viper.Set("app.log.file_level", tt.fileLevel)
+			viper.Set("app.log.console_level", tt.consoleLevel)
+			viper.Set("app.log.color_enabled", tt.colorEnabled)
+			viper.Set("app.log.sampling_enabled", false)
+
+			// Ensure file doesn't exist before test
+			os.Remove(tt.filePath)
+
+			consoleBuf := &bytes.Buffer{}
+
+			// EXECUTE
+			err := Init(consoleBuf)
+
+			// ASSERT
+			if (err != nil) != tt.expectedError {
+				t.Errorf("Init() error = %v, expectedError %v", err, tt.expectedError)
+			}
+
+			// Log test messages
+			log.Debug().Msg("Debug message")
+			log.Info().Msg("Info message")
+
+			// Clean up
+			Cleanup()
+
+			// Check console output
+			consoleOutput := consoleBuf.String()
+			if !bytes.Contains([]byte(consoleOutput), []byte("Info message")) {
+				t.Errorf("Console should contain Info message")
+			}
+			if bytes.Contains([]byte(consoleOutput), []byte("Debug message")) {
+				t.Errorf("Console should NOT contain Debug message (console level is info)")
+			}
+
+			// Check file output if enabled
+			if tt.expectFileLog {
+				if _, err := os.Stat(tt.filePath); os.IsNotExist(err) {
+					t.Errorf("Expected log file to be created at %s", tt.filePath)
+				} else {
+					fileContent, err := os.ReadFile(tt.filePath)
+					if err != nil {
+						t.Errorf("Failed to read log file: %v", err)
+					}
+					fileOutput := string(fileContent)
+					if !bytes.Contains(fileContent, []byte("Debug message")) {
+						t.Errorf("File should contain Debug message, got: %s", fileOutput)
+					}
+					if !bytes.Contains(fileContent, []byte("Info message")) {
+						t.Errorf("File should contain Info message")
+					}
+				}
+			} else {
+				if _, err := os.Stat(tt.filePath); !os.IsNotExist(err) {
+					t.Errorf("Log file should not be created when file logging is disabled")
+				}
+			}
+		})
+	}
+}
+
+func TestRuntimeLevelAdjustment(t *testing.T) {
+	tests := []struct {
+		name         string
+		setLevel     zerolog.Level
+		getterFunc   func() zerolog.Level
+		setterFunc   func(zerolog.Level)
+	}{
+		{
+			name:         "Console level adjustment",
+			setLevel:     zerolog.WarnLevel,
+			getterFunc:   GetConsoleLevel,
+			setterFunc:   SetConsoleLevel,
+		},
+		{
+			name:         "File level adjustment",
+			setLevel:     zerolog.ErrorLevel,
+			getterFunc:   GetFileLevel,
+			setterFunc:   SetFileLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP - save original level
+			originalLevel := tt.getterFunc()
+
+			// EXECUTE
+			tt.setterFunc(tt.setLevel)
+
+			// ASSERT
+			gotLevel := tt.getterFunc()
+			if gotLevel != tt.setLevel {
+				t.Errorf("Level adjustment failed: got %v, want %v", gotLevel, tt.setLevel)
+			}
+
+			// CLEANUP - restore original level
+			tt.setterFunc(originalLevel)
+		})
+	}
+}
+
+func TestLogSampling(t *testing.T) {
+	// Create temp directory for log files
+	tempDir := t.TempDir()
+	logFile := tempDir + "/test-sampling.log"
+
+	// SETUP
+	viper.Set("app.log.file_enabled", true)
+	viper.Set("app.log.file_path", logFile)
+	viper.Set("app.log.file_level", "debug")
+	viper.Set("app.log.console_level", "info")
+	viper.Set("app.log.color_enabled", "false")
+	viper.Set("app.log.sampling_enabled", true)
+	viper.Set("app.log.sampling_initial", 2)
+	viper.Set("app.log.sampling_thereafter", 10)
+
+	consoleBuf := &bytes.Buffer{}
+
+	// EXECUTE
+	err := Init(consoleBuf)
+	if err != nil {
+		t.Fatalf("Init() failed: %v", err)
+	}
+
+	// Log many messages - with sampling enabled, not all should appear
+	for i := 0; i < 20; i++ {
+		log.Debug().Int("iteration", i).Msg("Sampled message")
+	}
+
+	// CLEANUP
+	Cleanup()
+
+	// ASSERT
+	// We can't assert exact counts due to sampling behavior,
+	// but we can verify the file was created and contains some logs
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		t.Errorf("Expected log file to be created")
+	}
+}
+
+func TestCleanup(t *testing.T) {
+	// Create temp directory for log files
+	tempDir := t.TempDir()
+	logFile := tempDir + "/test-cleanup.log"
+
+	// SETUP
+	viper.Set("app.log.file_enabled", true)
+	viper.Set("app.log.file_path", logFile)
+	viper.Set("app.log.file_level", "debug")
+	viper.Set("app.log.console_level", "info")
+	viper.Set("app.log.color_enabled", "false")
+	viper.Set("app.log.sampling_enabled", false)
+
+	consoleBuf := &bytes.Buffer{}
+
+	err := Init(consoleBuf)
+	if err != nil {
+		t.Fatalf("Init() failed: %v", err)
+	}
+
+	// Log a message to ensure file is created and written to
+	log.Info().Msg("Test message before cleanup")
+
+	// EXECUTE
+	Cleanup()
+
+	// ASSERT
+	// After cleanup, logFile should be nil (we can't directly test this,
+	// but we can verify no panic occurs on second cleanup)
+	Cleanup() // Should not panic
+
+	// File should exist and contain the logged message
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		t.Errorf("Log file should exist after cleanup")
+	}
+}

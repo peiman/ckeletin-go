@@ -727,3 +727,117 @@ func TestGetConfigValue_StringSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestLoggingFlagBindings(t *testing.T) {
+	// This test verifies that all logging flags are properly defined
+	tests := []struct {
+		name     string
+		flagName string
+	}{
+		// Console and file logging flags
+		{name: "log-console-level flag exists", flagName: "log-console-level"},
+		{name: "log-file-enabled flag exists", flagName: "log-file-enabled"},
+		{name: "log-file-path flag exists", flagName: "log-file-path"},
+		{name: "log-file-level flag exists", flagName: "log-file-level"},
+		// Log rotation flags
+		{name: "log-file-max-size flag exists", flagName: "log-file-max-size"},
+		{name: "log-file-max-backups flag exists", flagName: "log-file-max-backups"},
+		{name: "log-file-max-age flag exists", flagName: "log-file-max-age"},
+		{name: "log-file-compress flag exists", flagName: "log-file-compress"},
+		// Log sampling flags
+		{name: "log-sampling-enabled flag exists", flagName: "log-sampling-enabled"},
+		{name: "log-sampling-initial flag exists", flagName: "log-sampling-initial"},
+		{name: "log-sampling-thereafter flag exists", flagName: "log-sampling-thereafter"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Verify flag exists in persistent flags
+			flag := RootCmd.PersistentFlags().Lookup(tt.flagName)
+			if flag == nil {
+				t.Errorf("Flag %s not found in RootCmd persistent flags", tt.flagName)
+			}
+		})
+	}
+}
+
+func TestLoggingFlagsIntegration(t *testing.T) {
+	// This test verifies that the logging system works with the flags
+	tempDir := t.TempDir()
+	logFile := filepath.Join(tempDir, "test.log")
+
+	tests := []struct {
+		name             string
+		fileEnabled      bool
+		filePath         string
+		consoleLevel     string
+		fileLevel        string
+		expectFileExists bool
+	}{
+		{
+			name:             "File logging disabled",
+			fileEnabled:      false,
+			filePath:         logFile + ".1",
+			consoleLevel:     "info",
+			fileLevel:        "debug",
+			expectFileExists: false,
+		},
+		{
+			name:             "File logging enabled",
+			fileEnabled:      true,
+			filePath:         logFile + ".2",
+			consoleLevel:     "info",
+			fileLevel:        "debug",
+			expectFileExists: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP
+			viper.Reset()
+			viper.Set("app.log.file_enabled", tt.fileEnabled)
+			viper.Set("app.log.file_path", tt.filePath)
+			viper.Set("app.log.console_level", tt.consoleLevel)
+			viper.Set("app.log.file_level", tt.fileLevel)
+			viper.Set("app.log.color_enabled", "false")
+			viper.Set("app.log.sampling_enabled", false)
+
+			// Save and restore logger state
+			savedLogger, savedLevel := logger.SaveLoggerState()
+			defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+			consoleBuf := &bytes.Buffer{}
+
+			// EXECUTE
+			err := logger.Init(consoleBuf)
+			if err != nil {
+				t.Fatalf("Failed to initialize logger: %v", err)
+			}
+
+			// Log some messages
+			log.Debug().Msg("Debug message")
+			log.Info().Msg("Info message")
+
+			// Cleanup
+			logger.Cleanup()
+
+			// ASSERT
+			if tt.expectFileExists {
+				if _, err := os.Stat(tt.filePath); os.IsNotExist(err) {
+					t.Errorf("Expected log file to exist at %s", tt.filePath)
+				}
+			} else {
+				if _, err := os.Stat(tt.filePath); !os.IsNotExist(err) {
+					t.Errorf("Expected log file NOT to exist at %s", tt.filePath)
+				}
+			}
+
+			// Verify console contains info message
+			consoleOutput := consoleBuf.String()
+			if !strings.Contains(consoleOutput, "Info message") {
+				t.Errorf("Console output should contain 'Info message'")
+			}
+		})
+	}
+}
