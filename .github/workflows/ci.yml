@@ -123,21 +123,6 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
-      - name: Add Go binaries to PATH
-        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
-
-      - name: Debug golangci-lint
-        run: |
-          echo "=== Debugging golangci-lint installation ==="
-          echo "PATH: $PATH"
-          echo "Which golangci-lint: $(which golangci-lint)"
-          echo "Version from which: $(golangci-lint --version)"
-          echo "~/go/bin version:"
-          ls -la ~/go/bin/golangci-lint || echo "Not found in ~/go/bin"
-          ~/go/bin/golangci-lint --version || echo "Can't execute ~/go/bin/golangci-lint"
-          echo "Search for all golangci-lint:"
-          find ~ -name "golangci-lint" 2>/dev/null || echo "Find failed"
-
       - name: Run Quality Checks
         run: task check
 

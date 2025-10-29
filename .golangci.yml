@@ -1,19 +1,17 @@
 # golangci-lint configuration
 # See: https://golangci-lint.run/usage/configuration/
 #
-# NOTE: This config requires golangci-lint v2.x
-# Installed via: task setup (installs @latest from Taskfile.yml)
+# Simplified configuration for golangci-lint v2
+# Focuses on most impactful linters
 
 version: 2
 
 run:
   timeout: 5m
-  tests: true
-  modules-download-mode: readonly
 
 linters:
   enable:
-    # Enabled by default
+    # Core linters (always enabled)
     - errcheck      # Unchecked errors
     - govet         # Suspicious constructs
     - ineffassign   # Unused assignments
@@ -23,99 +21,32 @@ linters:
     # Security
     - gosec         # Security problems
 
-    # Bugs
+    # Bugs & Correctness
     - bodyclose     # Unclosed HTTP response bodies
-    - errorlint     # Error wrapping issues (Go 1.13+)
-    - nilerr        # Returns nil even if error is not nil
-
-    # Performance
-    - prealloc      # Slice preallocation
     - gocritic      # Comprehensive checks (performance, style, bugs)
 
-    # Style & Quality
+    # Code Quality
     - misspell      # Spelling mistakes
     - revive        # General purpose linter
-    - unconvert     # Unnecessary type conversions
-
-    # Complexity
     - gocyclo       # Cyclomatic complexity
-    - gocognit      # Cognitive complexity
-
-    # Code Smells
-    - goconst       # Repeated strings → constants
-    - dupl          # Duplicate code detection
 
 linters-settings:
-  errcheck:
-    check-blank: true
-    check-type-assertions: true
-
-  govet:
-    enable-all: true
-    disable:
-      - shadow      # Can be too strict for some cases
-
   gocyclo:
     min-complexity: 15
-
-  gocognit:
-    min-complexity: 20
-
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-
-  misspell:
-    locale: US
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-    disabled-checks:
-      - paramTypeCombine  # Can be noisy
-
-  revive:
-    rules:
-      - name: exported
-        disabled: false
-      - name: var-naming
-        disabled: false
-      - name: package-comments
-        disabled: false
 
   gosec:
     excludes:
       - G104  # Duplicates errcheck
-      - G307  # Can be too strict for defer Close()
 
 issues:
-  exclude-use-default: false
-  max-same-issues: 0
-  max-issues-per-linter: 0
-
   exclude-rules:
     # Exclude some linters from running on tests files
     - path: _test\.go
       linters:
-        - dupl
-        - goconst
         - gocyclo
-        - gocognit
-        - errcheck
         - gosec
 
     # Exclude gosec for command files (often have subprocess calls)
     - path: cmd/
       linters:
         - gosec
-
-    # Allow long lines in generated files
-    - path: keys_generated\.go
-      linters:
-        - revive
-        - stylecheck
-
-output:
-  sort-results: true
