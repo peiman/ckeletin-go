@@ -4,6 +4,7 @@ package logger
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -79,7 +80,7 @@ func BenchmarkSanitizeLogStringWithCustomMaxLength(b *testing.B) {
 	maxLengths := []int{100, 500, 1000, 5000}
 
 	for _, maxLen := range maxLengths {
-		b.Run(string(rune(maxLen)), func(b *testing.B) {
+		b.Run(strconv.Itoa(maxLen), func(b *testing.B) {
 			SetMaxLogLength(maxLen)
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
