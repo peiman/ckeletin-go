@@ -39,6 +39,40 @@ Located in `.claude/hooks.json`:
 - Consistent development environment
 - Faster onboarding for new sessions
 
+## Commit Message Hook (BeforeToolCall)
+
+**This project has a BeforeToolCall hook that validates git commit messages!**
+
+The hook prevents commits with Claude Code attribution text:
+- Checks for "Generated with [Claude Code]"
+- Checks for "Co-Authored-By: Claude"
+- Blocks the commit if either is found
+- Ensures clean, professional commit messages
+
+### Hook Configuration
+Located in `.claude/hooks.json`:
+```json
+{
+  "BeforeToolCall": [
+    {
+      "matcher": "Bash",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh \"$CLAUDE_TOOL_PARAMETERS\""
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Why This Matters
+- Prevents AI attribution in commit history
+- Maintains professional commit messages
+- Automatic enforcement (no manual checking)
+- Fails fast with clear error message
+
 ## Task Command Usage (CRITICAL)
 
 **ALWAYS use task commands instead of direct go/script commands.**
