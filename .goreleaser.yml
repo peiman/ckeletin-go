@@ -1,0 +1,221 @@
+# GoReleaser configuration for ckeletin-go
+# See: https://goreleaser.com
+#
+# CUSTOMIZATION FOR FORKS:
+#
+# Required:
+#   - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
+#     This is the SINGLE SOURCE for binary name in GoReleaser
+#
+# Optional (Homebrew tap):
+#   - Set HOMEBREW_TAP_OWNER env var in CI to your GitHub username
+#   - Create a 'homebrew-tap' repository in your GitHub account
+#   - If not set, Homebrew tap updates are automatically skipped
+#
+# Auto-detected (no changes needed):
+#   - Module path (from go.mod via .ModulePath)
+#   - Repository owner/name (from git remote)
+#   - Repository URLs (from git config)
+
+version: 2
+
+# Metadata - Single source of truth for binary/project name
+# IMPORTANT: Must match BINARY_NAME in Taskfile.yml
+project_name: ckeletin-go
+
+# Build configuration
+# Binary name automatically uses 'project_name' defined above
+builds:
+  - main: ./main.go
+
+    # Build for multiple platforms
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Exclude unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+    # Inject version information (matching Taskfile.yml pattern)
+    # Uses .ModulePath to automatically detect module from go.mod (single source of truth)
+    ldflags:
+      - -s -w
+      - -X '{{ .ModulePath }}/cmd.binaryName={{ .ProjectName }}'
+      - -X '{{ .ModulePath }}/cmd.Version={{ .Version }}'
+      - -X '{{ .ModulePath }}/cmd.Commit={{ .Commit }}'
+      - -X '{{ .ModulePath }}/cmd.Date={{ .Date }}'
+
+    # Ensure reproducible builds
+    env:
+      - CGO_ENABLED=0
+
+    # Build flags
+    flags:
+      - -trimpath
+
+# Archive configuration
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+    # Use zip for Windows
+    format_overrides:
+      - goos: windows
+        format: zip
+
+    # Include additional files in archives
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - docs/**/*
+
+# Checksums for verification
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+# Generate SBOM (Software Bill of Materials) for security compliance
+sboms:
+  - id: default
+    artifacts: archive
+    documents:
+      - >-
+        {{ .ProjectName }}_
+        {{- .Version }}_
+        {{- .Os }}_
+        {{- .Arch }}_sbom.spdx.json
+
+# Snapshot builds (for testing without tags)
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+# Changelog configuration
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - typo
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Others'
+      order: 999
+
+# Homebrew tap (macOS package manager)
+# NOTE: Homebrew tap is OPTIONAL. To enable:
+#   1. Create a homebrew-tap repository in your GitHub account
+#   2. Set HOMEBREW_TAP_OWNER environment variable to your GitHub username
+#   3. Set HOMEBREW_TAP_GITHUB_TOKEN secret in CI
+# If HOMEBREW_TAP_OWNER is not set, Homebrew tap updates are skipped
+brews:
+  - name: "{{ .ProjectName }}"
+
+    # Skip if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
+    skip: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
+
+    repository:
+      owner: '{{ .Env.HOMEBREW_TAP_OWNER }}'
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    # Folder inside the repository
+    directory: Formula
+
+    # Git author used to commit to the repository
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    # Template for the commit message
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Description for Homebrew
+    description: "A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications"
+
+    homepage: "{{ .GitURL }}"
+
+    license: "MIT"
+
+    # Install instructions for Homebrew
+    install: |
+      bin.install "{{ .ProjectName }}"
+
+    # Test instructions
+    test: |
+      system "#{bin}/{{ .ProjectName }}", "--version"
+
+# Release configuration
+# GitHub repository is auto-detected from git remote
+release:
+  # Draft release (set to false for automatic release)
+  draft: false
+
+  # Prerelease detection
+  prerelease: auto
+
+  # Release name template
+  name_template: "Release {{.Version}}"
+
+  # Header template for release notes
+  header: |
+    ## Release {{.Version}} ({{ .Date }})
+
+    Thank you for using {{ .ProjectName }}!
+
+  # Footer template for release notes
+  footer: |
+    ---
+
+    **Full Changelog**: {{ .ReleaseURL }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ## Installation
+
+    ### Download Binary
+    Download the appropriate binary for your platform from the assets below.
+    {{ if index .Env "HOMEBREW_TAP_OWNER" }}
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install {{ .Env.HOMEBREW_TAP_OWNER }}/tap/{{ .ProjectName }}
+    ```
+    {{ end }}
+    ### Verify Checksums
+    ```bash
+    sha256sum -c checksums.txt
+    ```
+
+# Announce (optional - can be enabled later)
+# announce:
+#   twitter:
+#     enabled: false
+#   discord:
+#     enabled: false

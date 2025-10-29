@@ -217,6 +217,7 @@ tasks:
     cmds:
       - go clean
       - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
+      - rm -rf ./dist
 
   generate:constants:
     desc: Generate type-safe config key constants
@@ -251,3 +252,48 @@ tasks:
       - echo "2. Update metadata and options in {{.CFG_FILE}}"
       - echo "3. Update runTemplate function in {{.CMD_FILE}}"
       - echo "4. Run task validate-commands to verify pattern"
+
+  release:check:
+    desc: Check if GoReleaser is installed
+    cmds:
+      - |
+        if ! command -v goreleaser &> /dev/null; then
+          echo "❌ GoReleaser is not installed."
+          echo ""
+          echo "Install GoReleaser:"
+          echo "  macOS:   brew install goreleaser"
+          echo "  Linux:   https://goreleaser.com/install/"
+          echo "  Go:      go install github.com/goreleaser/goreleaser@latest"
+          exit 1
+        fi
+        echo "✅ GoReleaser is installed: $(goreleaser --version)"
+    silent: false
+
+  release:test:
+    desc: Test GoReleaser configuration (snapshot build, no release)
+    deps: [release:check]
+    cmds:
+      - echo "Building snapshot release (no tags required)..."
+      - goreleaser release --snapshot --clean --skip=publish
+      - echo ""
+      - echo "✅ Snapshot build successful!"
+      - echo "Artifacts are in ./dist/"
+      - echo ""
+      - echo "To test the binaries (Linux, macOS, Windows)"
+    silent: false
+
+  release:build:
+    desc: Build release artifacts locally (requires git tag)
+    deps: [release:check]
+    cmds:
+      - echo "Building release artifacts..."
+      - goreleaser build --clean --snapshot
+      - echo ""
+      - echo "✅ Build successful!"
+      - echo "   Binaries are in ./dist/"
+
+  release:clean:
+    desc: Clean GoReleaser artifacts
+    cmds:
+      - rm -rf ./dist
+      - echo "✅ Cleaned release artifacts"

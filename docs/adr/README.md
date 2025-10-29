@@ -35,6 +35,7 @@ What becomes easier or more difficult to do because of this change?
 - [ADR-005](005-auto-generated-config-constants.md) - Auto-Generated Configuration Constants
 - [ADR-006](006-structured-logging-with-zerolog.md) - Structured Logging with Zerolog
 - [ADR-007](007-bubble-tea-for-interactive-ui.md) - Bubble Tea for Interactive UI
+- [ADR-008](008-release-automation-with-goreleaser.md) - Release Automation with GoReleaser
 
 ## Creating a New ADR
 

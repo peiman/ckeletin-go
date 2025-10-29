@@ -79,6 +79,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3.5.2
+        with:
+          fetch-depth: 0 # GoReleaser needs full git history
 
       - name: Validate SEMVER Tag
         id: validate_tag
@@ -107,47 +109,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install yq via Go
-        run: |
-          GO111MODULE=on go install github.com/mikefarah/yq/v4@v${{ env.YQ_VERSION }}
-          echo "$HOME/go/bin" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Extract BINARY_NAME from Taskfile.yml
-        id: extract_binary_name
-        run: |
-          # Safely extract the app name using a variable
-          APP_NAME=$(yq e '.vars.BINARY_NAME' Taskfile.yml)
-          # Use GitHub environment file for safer variable handling
-          echo "APP_NAME=${APP_NAME}" >> $GITHUB_ENV
-
-      - name: Validate APP_NAME
-        run: |
-          if [ -z "${{ env.APP_NAME }}" ]; then
-            echo "❌ APP_NAME is not set."
-            exit 1
-          fi
-          echo "✅ APP_NAME is set to ${{ env.APP_NAME }}"
-
-      - name: Install Task
-        run: |
-          INSTALL_DIR="$HOME/.local/bin"
-          TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
-          mkdir -p "$INSTALL_DIR"
-          curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR"
-          echo "$INSTALL_DIR" >> $GITHUB_PATH
-        shell: bash
-
-      - name: Build Binary
-        run: task build
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
         with:
-          files: |
-            ./${{ env.APP_NAME }}
-          tag_name: ${{ env.tag_name }}
-          name: Release ${{ env.tag_name }}
-          body: |
-            Release of version ${{ env.tag_name }}.
-          token: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

@@ -141,10 +141,33 @@ Each command manages its own configuration and defaults, promoting modularity an
 
 ### Installation
 
+#### Option 1: Download Pre-built Binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/peiman/ckeletin-go/releases).
+
 ```bash
-git clone https://github.com/yourusername/ckeletin-go.git
+# Example for Linux amd64
+curl -L https://github.com/peiman/ckeletin-go/releases/latest/download/ckeletin-go_linux_amd64.tar.gz | tar xz
+sudo mv ckeletin-go /usr/local/bin/
+```
+
+#### Option 2: Homebrew (macOS/Linux) - If Enabled
+
+If the maintainer has configured a Homebrew tap:
+
+```bash
+brew install peiman/tap/ckeletin-go
+```
+
+**Note**: Homebrew tap is optional and must be explicitly enabled by the project maintainer.
+
+#### Option 3: Build from Source
+
+```bash
+git clone https://github.com/peiman/ckeletin-go.git
 cd ckeletin-go
 task setup
+task build
 ```
 
 ### Using the Scaffold
@@ -425,6 +448,10 @@ A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea togeth
 - `task build`: Build the binary.
 - `task run`: Run the binary.
 - `task clean`: Clean artifacts.
+- `task release:check`: Check if GoReleaser is installed.
+- `task release:test`: Test release build locally (snapshot).
+- `task release:build`: Build release artifacts without publishing.
+- `task release:clean`: Clean GoReleaser artifacts.
 
 ### Pre-Commit Hooks with Lefthook
 
@@ -433,6 +460,84 @@ A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea togeth
 ### Continuous Integration
 
 GitHub Actions runs `task check` on each commit or pull request, maintaining code standards and reliability.
+
+### Creating Releases
+
+This project uses [GoReleaser](https://goreleaser.com/) for automated, professional releases.
+
+#### Release Process
+
+1. **Prepare the release**:
+   ```bash
+   # Ensure all changes are committed
+   git status
+
+   # Run quality checks
+   task check
+
+   # Update CHANGELOG.md with release notes
+   vim CHANGELOG.md
+   ```
+
+2. **Create and push a semantic version tag**:
+   ```bash
+   # Create annotated tag (e.g., v1.0.0, v1.1.0, v1.0.1)
+   git tag -a v1.0.0 -m "Release v1.0.0"
+
+   # Push the tag
+   git push origin v1.0.0
+   ```
+
+3. **CI automatically**:
+   - Validates the semantic version tag
+   - Runs quality checks
+   - Builds binaries for multiple platforms (Linux, macOS, Windows)
+   - Generates checksums and SBOM
+   - Creates GitHub release with changelog
+   - Updates Homebrew tap
+
+#### Local Release Testing
+
+Test the release process locally before pushing a tag:
+
+```bash
+# Check if GoReleaser is installed
+task release:check
+
+# Build snapshot release (no tag required)
+task release:test
+
+# Test the generated binaries
+./dist/ckeletin-go_linux_amd64_v1/ckeletin-go --version
+```
+
+#### Supported Platforms
+
+- **Linux**: amd64, arm64
+- **macOS**: amd64 (Intel), arm64 (Apple Silicon)
+- **Windows**: amd64
+
+#### Release Artifacts
+
+Each release includes:
+- Platform-specific binaries (archives: tar.gz, zip)
+- `checksums.txt` for verification
+- SBOM (Software Bill of Materials) in SPDX format
+- Automated changelog from git commits
+
+#### Enabling Homebrew Tap (Optional)
+
+Homebrew tap is disabled by default. To enable it:
+
+1. Create a `homebrew-tap` repository in your GitHub account
+2. Add GitHub secrets to your repository:
+   - `HOMEBREW_TAP_OWNER` - Your GitHub username
+   - `HOMEBREW_TAP_GITHUB_TOKEN` - Token with repo access
+3. Update CI workflow to pass the environment variable to GoReleaser
+
+Once enabled, releases will automatically update your Homebrew tap.
+
+For more details, see [ADR-008: Release Automation](docs/adr/008-release-automation-with-goreleaser.md).
 
 ---
 
