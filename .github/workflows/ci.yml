@@ -133,7 +133,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage.txt
-          fail_ci_if_error: false
+          fail_ci_if_error: true
           verbose: true
           flags: unittests
           name: codecov-ckeletin-go
