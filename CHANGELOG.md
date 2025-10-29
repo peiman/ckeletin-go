@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **GoReleaser for automated releases** (see [ADR-008](docs/adr/008-release-automation-with-goreleaser.md)):
+  - Multi-platform builds: Linux, macOS, Windows (amd64 and arm64)
+  - Automated GitHub releases with changelog
+  - Homebrew tap support for easy installation (`brew install peiman/tap/ckeletin-go`)
+  - Checksum generation (SHA256) for build verification
+  - SBOM (Software Bill of Materials) in SPDX format for security compliance
+  - New Taskfile tasks: `release:check`, `release:test`, `release:build`, `release:clean`
+  - Snapshot builds for local testing without git tags
+  - Professional release artifacts (tar.gz, zip archives)
 - **Dual logging system** with console and file outputs:
   - Console: User-friendly, colored INFO+ messages for developers
   - File: Detailed JSON DEBUG+ logs for debugging and auditing

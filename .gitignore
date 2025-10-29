@@ -54,6 +54,9 @@ ckeletin-go.yaml
 # Build output directory
 /build/
 
+# GoReleaser dist directory
+/dist/
+
 # Test coverage
 coverage.txt
 test-output.json

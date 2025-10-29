@@ -1,0 +1,198 @@
+# GoReleaser configuration for ckeletin-go
+# See: https://goreleaser.com
+
+version: 2
+
+# Metadata
+project_name: ckeletin-go
+
+# Build configuration
+builds:
+  - id: ckeletin-go
+    main: ./main.go
+    binary: ckeletin-go
+
+    # Build for multiple platforms
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Exclude unsupported combinations
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+    # Inject version information (matching Taskfile.yml pattern)
+    ldflags:
+      - -s -w
+      - -X 'github.com/peiman/ckeletin-go/cmd.binaryName={{ .ProjectName }}'
+      - -X 'github.com/peiman/ckeletin-go/cmd.Version={{ .Version }}'
+      - -X 'github.com/peiman/ckeletin-go/cmd.Commit={{ .Commit }}'
+      - -X 'github.com/peiman/ckeletin-go/cmd.Date={{ .Date }}'
+
+    # Ensure reproducible builds
+    env:
+      - CGO_ENABLED=0
+
+    # Build flags
+    flags:
+      - -trimpath
+
+# Archive configuration
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+    # Use zip for Windows
+    format_overrides:
+      - goos: windows
+        format: zip
+
+    # Include additional files in archives
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - docs/**/*
+
+# Checksums for verification
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+# Generate SBOM (Software Bill of Materials) for security compliance
+sboms:
+  - id: default
+    artifacts: archive
+    documents:
+      - >-
+        {{ .ProjectName }}_
+        {{- .Version }}_
+        {{- .Os }}_
+        {{- .Arch }}_sbom.spdx.json
+
+# Snapshot builds (for testing without tags)
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+# Changelog configuration
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - typo
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Others'
+      order: 999
+
+# Homebrew tap (macOS package manager)
+brews:
+  - name: ckeletin-go
+    repository:
+      owner: peiman
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    # Folder inside the repository
+    directory: Formula
+
+    # Git author used to commit to the repository
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+
+    # Template for the commit message
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+    # Description for Homebrew
+    description: "A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications"
+
+    homepage: "https://github.com/peiman/ckeletin-go"
+
+    license: "MIT"
+
+    # Install instructions for Homebrew
+    install: |
+      bin.install "ckeletin-go"
+
+    # Test instructions
+    test: |
+      system "#{bin}/ckeletin-go", "--version"
+
+# Release configuration
+release:
+  github:
+    owner: peiman
+    name: ckeletin-go
+
+  # Draft release (set to false for automatic release)
+  draft: false
+
+  # Prerelease detection
+  prerelease: auto
+
+  # Release name template
+  name_template: "Release {{.Version}}"
+
+  # Header template for release notes
+  header: |
+    ## Release {{.Version}} ({{ .Date }})
+
+    Thank you for using ckeletin-go!
+
+  # Footer template for release notes
+  footer: |
+    ---
+
+    **Full Changelog**: https://github.com/peiman/ckeletin-go/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+    ## Installation
+
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install peiman/tap/ckeletin-go
+    ```
+
+    ### Download Binary
+    Download the appropriate binary for your platform from the assets below.
+
+    ### Verify Checksums
+    ```bash
+    sha256sum -c checksums.txt
+    ```
+
+# Announce (optional - can be enabled later)
+# announce:
+#   twitter:
+#     enabled: false
+#   discord:
+#     enabled: false

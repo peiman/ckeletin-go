@@ -447,6 +447,9 @@ git push -u origin <branch-name>
 | `task generate:constants` | After config registry changes | Regenerates config constants |
 | `task deps:check` | Weekly/monthly | Checks for dependency updates |
 | `task vuln` | Before releases | Scans for vulnerabilities |
+| `task release:check` | Before creating releases | Checks if GoReleaser is installed |
+| `task release:test` | Before tagging | Tests release build locally |
+| `task release:clean` | After testing releases | Cleans GoReleaser artifacts |
 
 ## Getting Help
 
