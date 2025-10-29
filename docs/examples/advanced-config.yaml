@@ -1,0 +1,156 @@
+# Advanced Configuration Example for ckeletin-go
+#
+# This configuration demonstrates all available options with
+# their default values and explanations.
+#
+# Uncomment and modify settings as needed for your use case.
+
+app:
+  # =============================================================================
+  # LOGGING CONFIGURATION
+  # =============================================================================
+
+  # Legacy log level (for backward compatibility)
+  # New configs should use log.console_level instead
+  log_level: info
+
+  log:
+    # Console logging
+    console_level: info        # Log level for console output
+                               # Options: trace, debug, info, warn, error, fatal, panic
+                               # Recommended: info for production, debug for development
+
+    color_enabled: auto        # Enable colored console output
+                               # Options:
+                               #   auto - Detect TTY and enable if appropriate (recommended)
+                               #   true - Always enable colors
+                               #   false - Never use colors (for log parsers)
+
+    # File logging
+    file_enabled: true         # Enable logging to file
+                               # Recommended: true for production, false for development
+
+    file_path: ./logs/ckeletin-go.log  # Path to log file
+                                        # Directories will be created automatically
+                                        # Can use absolute or relative paths
+
+    file_level: debug          # Log level for file output
+                               # Typically more verbose than console
+                               # Options: trace, debug, info, warn, error, fatal, panic
+                               # Recommended: debug or trace for troubleshooting
+
+    # File rotation settings (via lumberjack)
+    file_max_size: 100         # Maximum size in megabytes before rotation
+                               # Default: 100 MB
+                               # Recommended: 100-500 MB depending on log volume
+
+    file_max_backups: 3        # Maximum number of old log files to keep
+                               # Default: 3
+                               # Set to 0 for unlimited backups
+
+    file_max_age: 28           # Maximum age in days to keep old log files
+                               # Default: 28 days
+                               # Files older than this will be deleted
+
+    file_compress: true        # Compress rotated log files with gzip
+                               # Default: true
+                               # Recommended: true to save disk space
+
+    # Sampling configuration (for high-volume logging)
+    sampling_enabled: false    # Enable log sampling to reduce volume
+                               # Default: false
+                               # Enable if logging impacts performance
+
+    sampling_initial: 100      # Log first N messages per second
+                               # Then apply sampling_thereafter
+
+    sampling_thereafter: 100   # After initial burst, log every Nth message
+                               # Example: 100 means log 1 out of every 100 messages
+
+  # =============================================================================
+  # PING COMMAND CONFIGURATION
+  # =============================================================================
+
+  ping:
+    output_message: "Pong"     # Default message to display
+                               # Can be overridden with --message flag
+                               # Example: "Hello, World!"
+
+    output_color: white        # Color for console output
+                               # Options: white, red, green, yellow, blue,
+                               #          magenta, cyan, black
+                               # Can be overridden with --color flag
+
+    ui: false                  # Enable Bubble Tea interactive UI
+                               # Default: false (text output)
+                               # Set to true for interactive terminal UI
+                               # Can be overridden with --ui flag
+
+  # =============================================================================
+  # DOCS COMMAND CONFIGURATION
+  # =============================================================================
+
+  docs:
+    format: markdown           # Output format for documentation
+                               # Options: markdown, yaml
+                               # Can be overridden with --format flag
+
+    output: ""                 # Output file path
+                               # Default: "" (stdout)
+                               # Example: docs/configuration.md
+                               # Can be overridden with --output flag
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+#
+# All configuration options can also be set via environment variables:
+#
+# Format: CKELETIN_GO_<KEY> where <KEY> is the config key in uppercase
+# with dots replaced by underscores.
+#
+# Examples:
+#   export CKELETIN_GO_APP_LOG_LEVEL=debug
+#   export CKELETIN_GO_APP_LOG_FILE_ENABLED=true
+#   export CKELETIN_GO_APP_PING_OUTPUT_MESSAGE="Hello from env"
+#
+# Environment variables take precedence over config file values.
+
+# =============================================================================
+# COMMAND-LINE FLAGS
+# =============================================================================
+#
+# Most settings can be overridden via command-line flags:
+#
+# Global flags:
+#   --log-level string     Set log level (trace, debug, info, warn, error)
+#   --config string        Path to config file (default: ./config.yaml)
+#
+# Ping command flags:
+#   --message string       Override output message
+#   --color string         Override output color
+#   --ui                   Enable interactive UI
+#
+# Docs command flags:
+#   --format string        Output format (markdown, yaml)
+#   --output string        Output file path
+#
+# Flags take precedence over environment variables and config file.
+
+# =============================================================================
+# CONFIGURATION PRECEDENCE
+# =============================================================================
+#
+# Configuration values are resolved in this order (highest to lowest priority):
+#
+# 1. Command-line flags (highest priority)
+# 2. Environment variables
+# 3. Configuration file (this file)
+# 4. Default values from registry (lowest priority)
+#
+# Example:
+#   Default: output_message = "Pong"
+#   Config file: output_message = "Hello"
+#   Environment: CKELETIN_GO_APP_PING_OUTPUT_MESSAGE = "Env Hello"
+#   Flag: --message "Flag Hello"
+#   Result: "Flag Hello" (flag takes precedence)

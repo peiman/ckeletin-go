@@ -1,0 +1,26 @@
+# Basic Configuration Example for ckeletin-go
+#
+# This is a minimal working configuration that demonstrates
+# the most commonly used settings.
+#
+# Save this file as config.yaml in your project root or
+# ~/.ckeletin-go/config.yaml for user-specific settings.
+
+# Application-wide logging configuration
+app:
+  log_level: info              # Options: trace, debug, info, warn, error, fatal
+
+  # Log configuration
+  log:
+    console_level: info        # Console output level
+    color_enabled: auto        # Options: auto, true, false
+
+    file_enabled: false        # Enable file logging if you need persistent logs
+    file_path: ./logs/app.log  # Where to write logs if file_enabled is true
+    file_level: debug          # File logging level (typically more verbose)
+
+  # Ping command configuration
+  ping:
+    output_message: "Pong"     # Default message to display
+    output_color: white        # Color for output (white, red, green, blue, etc.)
+    ui: false                  # Use Bubble Tea interactive UI

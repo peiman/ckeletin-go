@@ -14,6 +14,7 @@ on:
 env:
   GO_VERSION: '1.24.x'       # Define Go version here
   YQ_VERSION: '4.34.1'       # Define yq version here
+  TASK_VERSION: '3.39.2'     # Define Task version here
 
 jobs:
   build:
@@ -42,14 +43,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Cache Task Binary
+        id: cache-task
+        uses: actions/cache@v3
+        with:
+          path: ~/.local/bin/task
+          key: ${{ runner.os }}-task-${{ env.TASK_VERSION }}
+
       - name: Install Task
+        if: steps.cache-task.outputs.cache-hit != 'true'
         run: |
           INSTALL_DIR="$HOME/.local/bin"
           TASK_INSTALL_SCRIPT_URL="https://taskfile.dev/install.sh"
           mkdir -p "$INSTALL_DIR"
-          curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR"
+          curl -sL "$TASK_INSTALL_SCRIPT_URL" | sh -s -- -b "$INSTALL_DIR" v${{ env.TASK_VERSION }}
           echo "$INSTALL_DIR" >> "$GITHUB_PATH"
         shell: bash
+
+      - name: Add Task to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Display Task Version
         run: task --version

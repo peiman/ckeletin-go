@@ -1,0 +1,208 @@
+# Production Configuration Example for ckeletin-go
+#
+# This configuration demonstrates best practices for production deployments.
+#
+# Recommended practices:
+# - Use environment variables for sensitive/environment-specific values
+# - Enable file logging with rotation
+# - Set appropriate log levels (info/warn for console, debug for file)
+# - Enable log compression to save disk space
+# - Configure appropriate retention policies
+
+app:
+  # =============================================================================
+  # PRODUCTION LOGGING CONFIGURATION
+  # =============================================================================
+
+  log:
+    # Console logging - visible to users/operators
+    console_level: info        # Production: info or warn
+                               # Only show important messages in console
+                               # Reduces noise in container/systemd logs
+
+    color_enabled: auto        # Auto-detect TTY
+                               # Disables colors when piped to log aggregators
+
+    # File logging - for debugging and audit trail
+    file_enabled: true         # Always enable in production
+                               # Critical for troubleshooting production issues
+
+    file_path: /var/log/ckeletin-go/app.log  # Standard Linux log location
+                                              # Or use: ./logs/ckeletin-go.log
+                                              # Ensure directory exists and is writable
+
+    file_level: debug          # Capture detailed information in files
+                               # File logs are for debugging, can be verbose
+                               # Consider 'trace' if you need very detailed logs
+
+    # File rotation - critical for production
+    file_max_size: 100         # 100 MB per file
+                               # Adjust based on log volume
+                               # High traffic: 50-100 MB
+                               # Low traffic: 100-500 MB
+
+    file_max_backups: 7        # Keep 7 rotated files (1 week of daily logs)
+                               # Adjust based on compliance requirements
+                               # Some orgs require 30-90 days
+
+    file_max_age: 30           # Delete logs older than 30 days
+                               # Adjust based on:
+                               # - Compliance requirements
+                               # - Disk space availability
+                               # - Typical troubleshooting window
+
+    file_compress: true        # Always compress in production
+                               # Saves significant disk space
+                               # 5-10x compression typical for logs
+
+    # Sampling - use if logging impacts performance
+    sampling_enabled: false    # Start with false
+                               # Enable if you observe performance impact
+                               # Monitor log volume and adjust if needed
+
+    sampling_initial: 100      # If enabled: log first 100/sec
+    sampling_thereafter: 100   # Then log 1 in 100 messages
+
+  # =============================================================================
+  # APPLICATION CONFIGURATION
+  # =============================================================================
+
+  ping:
+    output_message: "Service is healthy"  # Production-appropriate message
+    output_color: green                   # Green for success/healthy status
+    ui: false                             # Disable UI in production/containers
+                                          # UI requires interactive terminal
+
+  docs:
+    format: markdown           # Default documentation format
+    output: ""                 # Stdout by default
+
+# =============================================================================
+# PRODUCTION DEPLOYMENT CHECKLIST
+# =============================================================================
+#
+# Before deploying to production:
+#
+# 1. Log Configuration:
+#    ✅ File logging enabled
+#    ✅ Log rotation configured
+#    ✅ Compression enabled
+#    ✅ Appropriate retention period
+#    ✅ Log directory exists and is writable
+#    ✅ Console level set to info or warn
+#    ✅ File level set to debug
+#
+# 2. File Paths:
+#    ✅ Log directory follows system conventions
+#       - Linux: /var/log/ckeletin-go/
+#       - Docker: /app/logs/ (mounted volume)
+#       - systemd: /var/log/ or journal
+#    ✅ Permissions set correctly (writable by app user)
+#    ✅ Disk space monitoring in place
+#
+# 3. Environment Variables:
+#    ✅ Sensitive values in environment, not config file
+#    ✅ Environment-specific values (URLs, hosts) in env vars
+#    ✅ Configuration file checked into version control
+#
+# 4. Monitoring:
+#    ✅ Log rotation working (check after first rotation)
+#    ✅ Disk space sufficient for retention period
+#    ✅ Log aggregation configured (if using)
+#    ✅ Error log alerts configured
+#
+# 5. Security:
+#    ✅ Log files not world-readable
+#    ✅ No sensitive data in logs (passwords, tokens, PII)
+#    ✅ Log directory permissions: 755 or 750
+#    ✅ Log file permissions: 644 or 640
+
+# =============================================================================
+# CONTAINER/DOCKER CONSIDERATIONS
+# =============================================================================
+#
+# When running in containers:
+#
+# 1. Log to stdout for container orchestration:
+#    app:
+#      log:
+#        file_enabled: false
+#        console_level: info
+#
+# 2. Or mount a volume for file logging:
+#    docker run -v /host/logs:/app/logs ...
+#    app:
+#      log:
+#        file_enabled: true
+#        file_path: /app/logs/ckeletin-go.log
+#
+# 3. Use environment variables for configuration:
+#    docker run -e CKELETIN_GO_APP_LOG_LEVEL=debug ...
+
+# =============================================================================
+# SYSTEMD CONSIDERATIONS
+# =============================================================================
+#
+# When running as a systemd service:
+#
+# 1. Log to journald (recommended):
+#    app:
+#      log:
+#        file_enabled: false  # systemd captures stdout
+#        console_level: info
+#
+#    View logs: journalctl -u ckeletin-go -f
+#
+# 2. Or use file logging with proper permissions:
+#    app:
+#      log:
+#        file_enabled: true
+#        file_path: /var/log/ckeletin-go/app.log
+#
+#    Ensure systemd service runs as appropriate user with permissions
+
+# =============================================================================
+# KUBERNETES CONSIDERATIONS
+# =============================================================================
+#
+# When deploying to Kubernetes:
+#
+# 1. Log to stdout (recommended):
+#    app:
+#      log:
+#        file_enabled: false
+#        console_level: info
+#
+#    Logs collected by kubectl logs or log aggregator
+#
+# 2. ConfigMap for configuration:
+#    kubectl create configmap ckeletin-config --from-file=config.yaml
+#
+# 3. Environment variables from ConfigMap/Secrets:
+#    env:
+#      - name: CKELETIN_GO_APP_LOG_LEVEL
+#        valueFrom:
+#          configMapKeyRef:
+#            name: ckeletin-config
+#            key: log_level
+
+# =============================================================================
+# PERFORMANCE TUNING
+# =============================================================================
+#
+# If you experience performance issues related to logging:
+#
+# 1. Reduce console log level:
+#    console_level: warn  # Only warnings and errors
+#
+# 2. Enable sampling:
+#    sampling_enabled: true
+#    sampling_initial: 100
+#    sampling_thereafter: 50  # Log 1 in 50 after initial burst
+#
+# 3. Consider async logging (if implemented):
+#    # Check project documentation for async logging options
+#
+# 4. Monitor log volume:
+#    # Check file sizes regularly
+#    # Adjust rotation settings if needed
