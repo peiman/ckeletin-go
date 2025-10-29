@@ -9,39 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Created new `internal/docs` package for document generation:
-  - Implemented Generator pattern with configuration via Options Pattern
-  - Added Markdown and YAML output format support
-  - Provided dependency injection for registry access
-  - Created clean interfaces for document generation
-- Implemented self-registering configuration system:
-  - Added `cmd/flags.go` for automated flag registration from config registry
-  - Commands now define options inline and self-register via `init()` functions
-  - Flags are auto-generated using `RegisterFlagsForPrefixWithOverrides()`
-  - Added `getKeyValue()` helper for simplified configuration value retrieval
-  - Created `internal/config/template_options.go.example` template for new commands
-  - Added `task generate:command` to scaffold new commands and their options
-  - Pattern prevents configuration violations by design (no manual validation needed)
+- Performance benchmarking infrastructure with `task bench` commands and baseline documentation
+- Architecture Decision Records (ADRs) documenting 7 key architectural patterns
+- 20+ integration tests for error scenarios and edge cases
+- SessionStart hook for automatic development tool installation
+
+### Fixed
+
+- Type switch bug in `boolDefault()` where zero values of int64/int32/int16/int8 incorrectly evaluated to true
+- Benchmark name conversion using `strconv.Itoa()` instead of `string(rune())` for readable output
 
 ### Changed
 
-- **BREAKING**: Evolved configuration pattern from manual to self-registering:
-  - `internal/config/registry.go` now uses provider registry pattern
-  - Commands use `RegisterFlagsForPrefixWithOverrides()` instead of manual flag definitions
-  - `cmd/docs.go` and `cmd/ping.go` updated to use new auto-registration
-  - `internal/config/{docs,ping}_options.go` now self-register in `init()`
-  - Eliminates boilerplate and makes configuration violations impossible by design
-  - Updated `cmd/template_command.go.example` to reflect new pattern
-  - Updated README with comprehensive documentation of new approach
-- Refactored documentation command architecture:
-  - Moved document generation logic from cmd/docs.go to new internal/docs package
-  - Created a clean separation between command interface and document generation
-  - Implemented a proper Generator pattern with configuration via Options Pattern
-  - Made document generation more testable and maintainable
-  - Improved error handling and file management
-  - Enhanced mockability with function variables for testing
-  - Added dependency injection for registry access to improve testability
-- Enhanced test coverage for document generation
+- Test coverage improved to 89.4% overall with 40+ integration tests
 
 ### Security
 

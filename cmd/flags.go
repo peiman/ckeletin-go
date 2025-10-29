@@ -106,7 +106,31 @@ func boolDefault(v interface{}) bool {
 
 	// Try numeric types (0 = false, non-zero = true)
 	switch t := v.(type) {
-	case int, int64, int32, int16, int8:
+	case int:
+		if t != 0 {
+			log.Debug().Interface("value", v).Msg("Converting non-zero numeric to true")
+			return true
+		}
+		return false
+	case int64:
+		if t != 0 {
+			log.Debug().Interface("value", v).Msg("Converting non-zero numeric to true")
+			return true
+		}
+		return false
+	case int32:
+		if t != 0 {
+			log.Debug().Interface("value", v).Msg("Converting non-zero numeric to true")
+			return true
+		}
+		return false
+	case int16:
+		if t != 0 {
+			log.Debug().Interface("value", v).Msg("Converting non-zero numeric to true")
+			return true
+		}
+		return false
+	case int8:
 		if t != 0 {
 			log.Debug().Interface("value", v).Msg("Converting non-zero numeric to true")
 			return true

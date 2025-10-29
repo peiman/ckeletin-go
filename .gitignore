@@ -25,10 +25,15 @@ go.work
 # IDEs and editors
 .idea/
 .vscode/
+.cursor/
 .cursorrules
 *.swp
 *.swo
 *~
+
+# Claude Code (keep hooks.json, ignore local state)
+.claude/*
+!.claude/hooks.json
 
 # OS generated files
 .DS_Store
@@ -53,6 +58,11 @@ ckeletin-go.yaml
 coverage.txt
 test-output.json
 coverage.html
+
+# Benchmark results
+bench-results.txt
+bench-old.txt
+bench-new.txt
 
 # Aider
 .aider*

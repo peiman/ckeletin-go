@@ -116,6 +116,41 @@ func TestBoolDefault(t *testing.T) {
 			want:  true,
 		},
 		{
+			name:  "Zero int64",
+			input: int64(0),
+			want:  false,
+		},
+		{
+			name:  "Non-zero int32",
+			input: int32(50),
+			want:  true,
+		},
+		{
+			name:  "Zero int32",
+			input: int32(0),
+			want:  false,
+		},
+		{
+			name:  "Non-zero int16",
+			input: int16(25),
+			want:  true,
+		},
+		{
+			name:  "Zero int16",
+			input: int16(0),
+			want:  false,
+		},
+		{
+			name:  "Non-zero int8",
+			input: int8(10),
+			want:  true,
+		},
+		{
+			name:  "Zero int8",
+			input: int8(0),
+			want:  false,
+		},
+		{
 			name:  "Invalid type (float)",
 			input: 3.14,
 			want:  false,

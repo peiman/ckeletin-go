@@ -127,6 +127,40 @@ tasks:
       - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
     silent: true
 
+  bench:
+    desc: Run all benchmarks
+    cmd: |
+      go test -bench=. -benchmem ./... -run=^$ | tee bench-results.txt
+      echo "Benchmark results saved to bench-results.txt"
+    silent: false
+
+  bench:cmd:
+    desc: Run benchmarks for cmd package
+    cmd: |
+      go test -bench=. -benchmem ./cmd -run=^$
+
+  bench:config:
+    desc: Run benchmarks for config package
+    cmd: |
+      go test -bench=. -benchmem ./internal/config -run=^$
+
+  bench:logger:
+    desc: Run benchmarks for logger package
+    cmd: |
+      go test -bench=. -benchmem ./internal/logger -run=^$
+
+  bench:compare:
+    desc: Compare benchmark results (requires benchstat)
+    cmds:
+      - |
+        if [ ! -f bench-old.txt ]; then
+          echo "No baseline found. Run 'task bench' first and copy bench-results.txt to bench-old.txt"
+          exit 1
+        fi
+      - task: bench
+      - cp bench-results.txt bench-new.txt
+      - benchstat bench-old.txt bench-new.txt
+
   docs:config:
     desc: Generate configuration documentation
     cmds:
