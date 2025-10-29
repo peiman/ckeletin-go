@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added performance benchmarking infrastructure:
+  - Created comprehensive benchmarks for type conversions, config retrieval, and logging
+  - Added `task bench` command to run all benchmarks
+  - Added `task bench:cmd`, `task bench:config`, `task bench:logger` for targeted benchmarking
+  - Added `task bench:compare` to compare benchmark results using benchstat
+  - Documented performance characteristics in `docs/benchmarks.md`
+  - Established performance baseline: sub-microsecond config operations, zero allocations for most operations
+- Added Architecture Decision Records (ADRs) documentation:
+  - Created `docs/adr/` directory with 7 comprehensive ADRs
+  - Documented ultra-thin command pattern (ADR-001)
+  - Documented centralized configuration registry (ADR-002)
+  - Documented dependency injection approach (ADR-003)
+  - Documented security validation strategy (ADR-004)
+  - Documented auto-generated config constants (ADR-005)
+  - Documented structured logging with Zerolog (ADR-006)
+  - Documented Bubble Tea UI framework choice (ADR-007)
+- Enhanced error handling and validation:
+  - Added 20+ integration tests for error scenarios
+  - Improved error messages for config file issues (size, permissions, malformed YAML)
+  - Added validation for edge cases (empty strings, unicode, special characters)
+  - Added concurrent execution safety tests
+- Added git commit hook to remove Claude Code attribution from commits
 - Created new `internal/docs` package for document generation:
   - Implemented Generator pattern with configuration via Options Pattern
   - Added Markdown and YAML output format support
@@ -23,8 +45,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `task generate:command` to scaffold new commands and their options
   - Pattern prevents configuration violations by design (no manual validation needed)
 
+### Fixed
+
+- Fixed type switch bug in `boolDefault()` function that caused incorrect boolean conversion:
+  - **Issue**: `int64(0)`, `int32(0)`, `int16(0)`, `int8(0)` incorrectly evaluated to `true` instead of `false`
+  - **Impact**: Config options with zero integer values would have been parsed incorrectly
+  - **Resolution**: Separated combined type switch cases into individual handlers for each integer type
+  - Added comprehensive test coverage for all integer type conversions
+  - Test coverage improved from 85.9% to 86.7% in cmd package
+
 ### Changed
 
+- Improved test coverage and quality:
+  - Overall test coverage: 89.4%
+  - Integration tests increased from ~20 to 40+ tests
+  - Added error scenario coverage for config validation, flag parsing, and command handling
+  - All packages maintain >75% coverage, with critical packages at 90%+
 - **BREAKING**: Evolved configuration pattern from manual to self-registering:
   - `internal/config/registry.go` now uses provider registry pattern
   - Commands use `RegisterFlagsForPrefixWithOverrides()` instead of manual flag definitions
