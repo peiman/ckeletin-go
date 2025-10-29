@@ -11,6 +11,12 @@ on:
     branches:
       - main
 
+# Concurrency controls to prevent wasting CI minutes
+# Cancel in-progress runs for PRs, but let main branch builds complete
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 env:
   GO_VERSION: '1.24.x'       # Define Go version here
   YQ_VERSION: '4.34.1'       # Define yq version here
@@ -26,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -69,16 +75,20 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
-      - name: Run Quality Checks and Upload Coverage
+      - name: Run Quality Checks
+        run: task check
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: env.CODECOV_TOKEN != ''
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          task check
-          # Using environment file command for GitHub Actions 
-          # instead of direct environment variable commands
-          if [ -n "$CODECOV_TOKEN" ]; then
-            bash <(curl -s https://codecov.io/bash) -t "$CODECOV_TOKEN"
-          fi
+        with:
+          files: ./coverage.txt
+          fail_ci_if_error: false
+          verbose: true
+          flags: unittests
+          name: codecov-ckeletin-go
 
   release:
     runs-on: ubuntu-latest
@@ -90,7 +100,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3.5.2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0 # GoReleaser needs full git history
 
