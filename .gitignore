@@ -25,10 +25,15 @@ go.work
 # IDEs and editors
 .idea/
 .vscode/
+.cursor/
 .cursorrules
 *.swp
 *.swo
 *~
+
+# Claude Code (keep hooks.json, ignore local state)
+.claude/*
+!.claude/hooks.json
 
 # OS generated files
 .DS_Store

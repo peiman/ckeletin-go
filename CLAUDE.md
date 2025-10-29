@@ -2,13 +2,50 @@
 
 This document provides guidelines specifically for Claude Code when working on the ckeletin-go project.
 
+## Automatic Setup (SessionStart Hook)
+
+**This project has a SessionStart hook that automatically sets up the development environment!**
+
+When you start a new Claude Code session:
+- `scripts/install_tools.sh` runs automatically via `.claude/hooks.json`
+- All required development tools are installed (goimports, golangci-lint, gotestsum, etc.)
+- Tools are installed in `/root/go/bin` and added to PATH
+- The setup is idempotent - it only installs missing tools
+- You'll see a success message when tools are ready
+
+### Hook Configuration
+Located in `.claude/hooks.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/install_tools.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Why This Matters
+- No manual `task setup` needed
+- Tools are always available in new sessions
+- Consistent development environment
+- Faster onboarding for new sessions
+
 ## Task Command Usage (CRITICAL)
 
 **ALWAYS use task commands instead of direct go/script commands.**
 
 ### At the Start of Each Session
-1. Read `Taskfile.yml` to understand available task commands
-2. If tools are missing, run: `task setup`
+1. Tools are automatically installed by the SessionStart hook (no action needed!)
+2. Read `Taskfile.yml` to understand available task commands
 3. Before making any changes, understand the project structure
 
 ### Common Task Commands
@@ -126,11 +163,10 @@ Types: feat, fix, docs, test, refactor, style, ci, build, deps, perf, chore
 
 ### Starting Work
 ```bash
+# Tools are auto-installed by SessionStart hook!
+
 # Read the Taskfile
 cat Taskfile.yml
-
-# Install tools if needed
-task setup
 
 # Understand the codebase
 ls -la
