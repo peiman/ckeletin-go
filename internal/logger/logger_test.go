@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -448,5 +449,168 @@ func TestCleanup(t *testing.T) {
 	// File should exist and contain the logged message
 	if _, err := os.Stat(logFile); os.IsNotExist(err) {
 		t.Errorf("Log file should exist after cleanup")
+	}
+}
+
+func TestIsColorEnabled(t *testing.T) {
+	tests := []struct {
+		name           string
+		colorConfig    string
+		output         io.Writer
+		expectedResult bool
+	}{
+		{
+			name:           "Explicit true",
+			colorConfig:    "true",
+			output:         &bytes.Buffer{},
+			expectedResult: true,
+		},
+		{
+			name:           "Explicit false",
+			colorConfig:    "false",
+			output:         &bytes.Buffer{},
+			expectedResult: false,
+		},
+		{
+			name:           "Auto with buffer (not TTY)",
+			colorConfig:    "auto",
+			output:         &bytes.Buffer{},
+			expectedResult: false,
+		},
+		{
+			name:           "Empty string (auto)",
+			colorConfig:    "",
+			output:         &bytes.Buffer{},
+			expectedResult: false,
+		},
+		{
+			name:           "Invalid value",
+			colorConfig:    "invalid",
+			output:         &bytes.Buffer{},
+			expectedResult: false,
+		},
+		{
+			name:           "Auto with file",
+			colorConfig:    "auto",
+			output:         os.Stdout,
+			expectedResult: false, // CI environment, likely not a TTY
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP
+			originalValue := viper.Get("app.log.color_enabled")
+			defer viper.Set("app.log.color_enabled", originalValue)
+			viper.Set("app.log.color_enabled", tt.colorConfig)
+
+			// EXECUTE
+			result := isColorEnabled(tt.output)
+
+			// ASSERT
+			if result != tt.expectedResult {
+				t.Errorf("isColorEnabled() = %v, want %v", result, tt.expectedResult)
+			}
+		})
+	}
+}
+
+func TestGetFileLogLevel(t *testing.T) {
+	tests := []struct {
+		name          string
+		fileLevel     string
+		expectedLevel zerolog.Level
+	}{
+		{
+			name:          "File level set to debug",
+			fileLevel:     "debug",
+			expectedLevel: zerolog.DebugLevel,
+		},
+		{
+			name:          "File level empty",
+			fileLevel:     "",
+			expectedLevel: zerolog.NoLevel,
+		},
+		{
+			name:          "File level set to trace",
+			fileLevel:     "trace",
+			expectedLevel: zerolog.TraceLevel,
+		},
+		{
+			name:          "Invalid file level, defaults to debug",
+			fileLevel:     "invalid",
+			expectedLevel: zerolog.DebugLevel,
+		},
+		{
+			name:          "File level set to error",
+			fileLevel:     "error",
+			expectedLevel: zerolog.ErrorLevel,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP
+			viper.Set("app.log.file_level", tt.fileLevel)
+
+			// EXECUTE
+			result := getFileLogLevel()
+
+			// ASSERT
+			if result != tt.expectedLevel {
+				t.Errorf("getFileLogLevel() = %v, want %v", result, tt.expectedLevel)
+			}
+		})
+	}
+}
+
+func TestOpenLogFileWithRotation(t *testing.T) {
+	tests := []struct {
+		name        string
+		path        string
+		expectError bool
+	}{
+		{
+			name:        "Valid path",
+			path:        t.TempDir() + "/logs/app.log",
+			expectError: false,
+		},
+		{
+			name:        "Path with multiple nested dirs",
+			path:        t.TempDir() + "/deep/nested/path/app.log",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP
+			viper.Set("app.log.file_max_size", 100)
+			viper.Set("app.log.file_max_backups", 3)
+			viper.Set("app.log.file_max_age", 28)
+			viper.Set("app.log.file_compress", false)
+
+			// EXECUTE
+			writer, err := openLogFileWithRotation(tt.path)
+
+			// ASSERT
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if writer != nil {
+				writer.Close()
+			}
+
+			// Verify directory was created
+			if !tt.expectError {
+				dir := filepath.Dir(tt.path)
+				if _, err := os.Stat(dir); os.IsNotExist(err) {
+					t.Errorf("Expected directory %s to be created", dir)
+				}
+			}
+		})
 	}
 }
