@@ -45,7 +45,7 @@ jobs:
 
       - name: Cache Task Binary
         id: cache-task
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.local/bin/task
           key: ${{ runner.os }}-task-${{ env.TASK_VERSION }}
