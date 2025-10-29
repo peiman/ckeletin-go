@@ -17,6 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Secure file permissions (0600) and automatic directory creation
   - Cleanup function to ensure proper file closure
   - Only 12% performance overhead, zero allocations
+- **Log rotation with lumberjack**:
+  - Automatic rotation when file exceeds max size
+  - Configurable backup retention (count and age)
+  - Optional gzip compression of rotated logs
+  - New flags: `--log-file-max-size`, `--log-file-max-backups`, `--log-file-max-age`, `--log-file-compress`
+- **Log sampling for high-volume scenarios**:
+  - Reduce log volume during traffic spikes
+  - Configurable burst and sampling rates
+  - New flags: `--log-sampling-enabled`, `--log-sampling-initial`, `--log-sampling-thereafter`
+- **Runtime log level adjustment**:
+  - Change console/file log levels without restarting
+  - Functions: `logger.SetConsoleLevel()`, `logger.SetFileLevel()`, `logger.GetConsoleLevel()`, `logger.GetFileLevel()`
 - Performance benchmarking infrastructure with `task bench` commands and baseline documentation
 - Architecture Decision Records (ADRs) documenting 7 key architectural patterns
 - 20+ integration tests for error scenarios and edge cases

@@ -12,11 +12,16 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
 	// logFile holds the open log file handle for cleanup
-	logFile *os.File
+	logFile io.Closer
+	// currentConsoleLevel holds the current console log level for runtime adjustment
+	currentConsoleLevel zerolog.Level
+	// currentFileLevel holds the current file log level for runtime adjustment
+	currentFileLevel zerolog.Level
 )
 
 // Init initializes the logger with options from Viper.
@@ -45,6 +50,7 @@ func Init(out io.Writer) error {
 
 	// Get console log level (with backward compatibility)
 	consoleLevel := getConsoleLogLevel()
+	currentConsoleLevel = consoleLevel
 
 	// Determine if color should be enabled
 	colorEnabled := isColorEnabled(out)
@@ -66,9 +72,10 @@ func Init(out io.Writer) error {
 	// File writer (if enabled)
 	if viper.GetBool(config.KeyAppLogFileEnabled) {
 		fileLevel := getFileLogLevel()
+		currentFileLevel = fileLevel
 		filePath := viper.GetString(config.KeyAppLogFilePath)
 
-		fileWriter, err := openLogFile(filePath)
+		fileWriter, err := openLogFileWithRotation(filePath)
 		if err != nil {
 			// Log warning but continue with console-only logging
 			log.Warn().
@@ -91,7 +98,24 @@ func Init(out io.Writer) error {
 	multi := zerolog.MultiLevelWriter(writers...)
 
 	// Create logger with timestamp
-	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+	logger := zerolog.New(multi).With().Timestamp().Logger()
+
+	// Apply sampling if enabled
+	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
+		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
+		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
+		logger = logger.Sample(&zerolog.BurstSampler{
+			Burst:       uint32(initial),
+			Period:      time.Second,
+			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)},
+		})
+		log.Info().
+			Int("initial", initial).
+			Int("thereafter", thereafter).
+			Msg("Log sampling enabled")
+	}
+
+	log.Logger = logger
 
 	// Set global log level to the most verbose level
 	// This allows both writers to filter independently
@@ -202,22 +226,53 @@ func isColorEnabled(out io.Writer) bool {
 	}
 }
 
-// openLogFile opens the log file with secure permissions.
+// openLogFileWithRotation opens the log file with lumberjack rotation support.
 // Creates parent directories if they don't exist.
-func openLogFile(path string) (*os.File, error) {
+func openLogFileWithRotation(path string) (io.WriteCloser, error) {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
-	// Open file with secure permissions (owner read/write only)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log file: %w", err)
+	// Configure lumberjack for log rotation
+	logger := &lumberjack.Logger{
+		Filename:   path,
+		MaxSize:    viper.GetInt(config.KeyAppLogFileMaxSize),    // megabytes
+		MaxBackups: viper.GetInt(config.KeyAppLogFileMaxBackups), // number of backups
+		MaxAge:     viper.GetInt(config.KeyAppLogFileMaxAge),     // days
+		Compress:   viper.GetBool(config.KeyAppLogFileCompress),  // compress with gzip
 	}
 
-	return file, nil
+	return logger, nil
+}
+
+// SetConsoleLevel dynamically changes the console log level at runtime.
+// This allows adjusting verbosity without restarting the application.
+func SetConsoleLevel(level zerolog.Level) {
+	currentConsoleLevel = level
+	log.Info().
+		Str("level", level.String()).
+		Msg("Console log level changed")
+}
+
+// SetFileLevel dynamically changes the file log level at runtime.
+// This allows adjusting file log verbosity without restarting the application.
+func SetFileLevel(level zerolog.Level) {
+	currentFileLevel = level
+	log.Info().
+		Str("level", level.String()).
+		Msg("File log level changed")
+}
+
+// GetConsoleLevel returns the current console log level.
+func GetConsoleLevel() zerolog.Level {
+	return currentConsoleLevel
+}
+
+// GetFileLevel returns the current file log level.
+func GetFileLevel() zerolog.Level {
+	return currentFileLevel
 }
 
 // SaveLoggerState returns the current global logger and log level for later restoration.

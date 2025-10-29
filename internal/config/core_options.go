@@ -64,6 +64,64 @@ func CoreOptions() []ConfigOption {
 			Required:     false,
 			Example:      "true",
 		},
+		// Log rotation options (lumberjack)
+		{
+			Key:          "app.log.file_max_size",
+			DefaultValue: 100,
+			Description:  "Maximum size in megabytes before log file is rotated",
+			Type:         "int",
+			Required:     false,
+			Example:      "100",
+		},
+		{
+			Key:          "app.log.file_max_backups",
+			DefaultValue: 3,
+			Description:  "Maximum number of old log files to retain",
+			Type:         "int",
+			Required:     false,
+			Example:      "3",
+		},
+		{
+			Key:          "app.log.file_max_age",
+			DefaultValue: 28,
+			Description:  "Maximum number of days to retain old log files",
+			Type:         "int",
+			Required:     false,
+			Example:      "28",
+		},
+		{
+			Key:          "app.log.file_compress",
+			DefaultValue: false,
+			Description:  "Compress rotated log files with gzip",
+			Type:         "bool",
+			Required:     false,
+			Example:      "true",
+		},
+		// Log sampling options
+		{
+			Key:          "app.log.sampling_enabled",
+			DefaultValue: false,
+			Description:  "Enable log sampling for high-volume scenarios",
+			Type:         "bool",
+			Required:     false,
+			Example:      "true",
+		},
+		{
+			Key:          "app.log.sampling_initial",
+			DefaultValue: 100,
+			Description:  "Number of messages to log per second before sampling",
+			Type:         "int",
+			Required:     false,
+			Example:      "100",
+		},
+		{
+			Key:          "app.log.sampling_thereafter",
+			DefaultValue: 100,
+			Description:  "Number of messages to log thereafter per second",
+			Type:         "int",
+			Required:     false,
+			Example:      "100",
+		},
 		// Add other application-wide settings here
 	}
 }

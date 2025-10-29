@@ -5,15 +5,22 @@ package config
 // Configuration key constants - automatically generated from registry
 // These constants provide compile-time safety when referencing config keys
 const (
-	KeyAppLogLevel          = "app.log_level"           // Logging level for the application (trace, debug, info, warn, error, fatal, pa...
-	KeyAppLogConsoleLevel   = "app.log.console_level"   // Console log level (trace, debug, info, warn, error, fatal, panic). If empty, ...
-	KeyAppLogFileEnabled    = "app.log.file_enabled"    // Enable file logging to capture detailed logs
-	KeyAppLogFilePath       = "app.log.file_path"       // Path to the log file (created with secure 0600 permissions)
-	KeyAppLogFileLevel      = "app.log.file_level"      // File log level (trace, debug, info, warn, error, fatal, panic)
-	KeyAppLogColorEnabled   = "app.log.color_enabled"   // Enable colored console output (auto, true, false). Auto detects TTY.
-	KeyAppDocsOutputFormat  = "app.docs.output_format"  // Output format for documentation (markdown, yaml)
-	KeyAppDocsOutputFile    = "app.docs.output_file"    // Output file for documentation (defaults to stdout)
-	KeyAppPingOutputMessage = "app.ping.output_message" // Default message to display for the ping command
-	KeyAppPingOutputColor   = "app.ping.output_color"   // Text color for ping command output (white, red, green, blue, cyan, yellow, ma...
-	KeyAppPingUi            = "app.ping.ui"             // Enable interactive UI for the ping command
+	KeyAppLogLevel              = "app.log_level"               // Logging level for the application (trace, debug, info, warn, error, fatal, pa...
+	KeyAppLogConsoleLevel       = "app.log.console_level"       // Console log level (trace, debug, info, warn, error, fatal, panic). If empty, ...
+	KeyAppLogFileEnabled        = "app.log.file_enabled"        // Enable file logging to capture detailed logs
+	KeyAppLogFilePath           = "app.log.file_path"           // Path to the log file (created with secure 0600 permissions)
+	KeyAppLogFileLevel          = "app.log.file_level"          // File log level (trace, debug, info, warn, error, fatal, panic)
+	KeyAppLogColorEnabled       = "app.log.color_enabled"       // Enable colored console output (auto, true, false). Auto detects TTY.
+	KeyAppLogFileMaxSize        = "app.log.file_max_size"       // Maximum size in megabytes before log file is rotated
+	KeyAppLogFileMaxBackups     = "app.log.file_max_backups"    // Maximum number of old log files to retain
+	KeyAppLogFileMaxAge         = "app.log.file_max_age"        // Maximum number of days to retain old log files
+	KeyAppLogFileCompress       = "app.log.file_compress"       // Compress rotated log files with gzip
+	KeyAppLogSamplingEnabled    = "app.log.sampling_enabled"    // Enable log sampling for high-volume scenarios
+	KeyAppLogSamplingInitial    = "app.log.sampling_initial"    // Number of messages to log per second before sampling
+	KeyAppLogSamplingThereafter = "app.log.sampling_thereafter" // Number of messages to log thereafter per second
+	KeyAppDocsOutputFormat      = "app.docs.output_format"      // Output format for documentation (markdown, yaml)
+	KeyAppDocsOutputFile        = "app.docs.output_file"        // Output file for documentation (defaults to stdout)
+	KeyAppPingOutputMessage     = "app.ping.output_message"     // Default message to display for the ping command
+	KeyAppPingOutputColor       = "app.ping.output_color"       // Text color for ping command output (white, red, green, blue, cyan, yellow, ma...
+	KeyAppPingUi                = "app.ping.ui"                 // Enable interactive UI for the ping command
 )

@@ -1,7 +1,7 @@
 # ADR-006: Structured Logging with Zerolog
 
 ## Status
-Accepted (Updated: 2025-10-29 - Added dual logging support)
+Accepted (Updated: 2025-10-29 - Added dual logging, log rotation, sampling, and runtime adjustment)
 
 ## Context
 
@@ -164,4 +164,107 @@ Benchmark results (see `internal/logger/filtered_writer_bench_test.go`):
 {"level":"debug","time":"2025-10-29T01:35:41Z","message":"No config file found, using defaults"}
 {"level":"debug","command":"ping","time":"2025-10-29T01:35:41Z","message":"Applying command-specific configuration"}
 {"level":"info","time":"2025-10-29T01:35:41Z","message":"Application started successfully"}
+```
+
+## Advanced Features
+
+### Log Rotation (Lumberjack)
+
+Automatic log rotation prevents disk exhaustion:
+
+```yaml
+app:
+  log:
+    file_max_size: 100      # MB before rotation
+    file_max_backups: 3     # Old files to keep
+    file_max_age: 28        # Days to retain
+    file_compress: true     # Gzip old logs
+```
+
+**Features:**
+- Automatic rotation when file exceeds max size
+- Keeps specified number of backup files
+- Removes old logs after max age
+- Optional gzip compression of rotated logs
+
+### Log Sampling
+
+Reduce log volume in high-traffic scenarios:
+
+```yaml
+app:
+  log:
+    sampling_enabled: true
+    sampling_initial: 100      # Log first 100/sec
+    sampling_thereafter: 10    # Then log 10/sec
+```
+
+**Use case:** During traffic spikes, log first 100 messages per second, then sample 1 in 10 thereafter.
+
+### Runtime Level Adjustment
+
+Change log levels without restarting:
+
+```go
+// Adjust console verbosity
+logger.SetConsoleLevel(zerolog.DebugLevel)
+
+// Adjust file verbosity
+logger.SetFileLevel(zerolog.TraceLevel)
+
+// Query current levels
+consoleLevel := logger.GetConsoleLevel()
+fileLevel := logger.GetFileLevel()
+```
+
+**Use case:** Enable debug logging temporarily for troubleshooting, then revert to info level.
+
+## Configuration Reference
+
+### Complete Configuration
+
+```yaml
+app:
+  log_level: info              # Legacy (backward compatible)
+  log:
+    # Dual logging
+    console_level: info        # Console log level
+    file_enabled: true         # Enable file logging
+    file_path: ./logs/app.log  # Log file path
+    file_level: debug          # File log level
+    color_enabled: auto        # Console colors (auto/true/false)
+
+    # Log rotation (lumberjack)
+    file_max_size: 100         # MB before rotation
+    file_max_backups: 3        # Old files to keep
+    file_max_age: 28           # Days to retain
+    file_compress: false       # Gzip old logs
+
+    # Log sampling
+    sampling_enabled: false    # Enable sampling
+    sampling_initial: 100      # First N/sec
+    sampling_thereafter: 100   # Sample thereafter
+```
+
+### Command-Line Flags
+
+```bash
+# Basic flags
+--log-level info
+--log-console-level info
+--log-file-enabled
+--log-file-path ./logs/app.log
+--log-file-level debug
+--log-color auto
+
+# Rotation flags
+--log-file-max-size 100
+--log-file-max-backups 3
+--log-file-max-age 28
+--log-file-compress
+
+# Sampling flags
+--log-sampling-enabled
+--log-sampling-initial 100
+--log-sampling-thereafter 10
 ```
