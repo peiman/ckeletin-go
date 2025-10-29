@@ -84,8 +84,18 @@ Maintain existing ldflags injection pattern:
 
 ### Configuration
 - `.goreleaser.yml` - Main configuration file
+  - `project_name` should match `BINARY_NAME` in Taskfile.yml
+  - Module path auto-detected from `go.mod` using `.ModulePath` template
+  - GitHub repository auto-detected from git remote
+  - Homebrew tap owner must be updated when forking (user-specific)
 - `.github/workflows/ci.yml` - CI integration with `goreleaser-action`
 - `Taskfile.yml` - Development tasks for local testing
+
+### Customization for Forks
+When forking this project, update the following in `.goreleaser.yml`:
+1. `project_name` (line 14) - Match to your `BINARY_NAME` in Taskfile.yml
+2. `brews.repository.owner` (line 124) - Your GitHub username
+3. Module path and repository are auto-detected (no changes needed)
 
 ### GitHub Secrets Required
 - `CKELETIN_GITHUB_TOKEN` - For creating GitHub releases

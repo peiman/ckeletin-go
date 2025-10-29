@@ -1,9 +1,16 @@
 # GoReleaser configuration for ckeletin-go
 # See: https://goreleaser.com
+#
+# IMPORTANT: When customizing this project:
+# - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
+# - Update 'brews.repository.owner' to your GitHub username (line 124)
+# - Module path is auto-detected from go.mod (single source of truth)
+# - GitHub repository is auto-detected from git remote
 
 version: 2
 
 # Metadata
+# NOTE: Should match BINARY_NAME in Taskfile.yml
 project_name: ckeletin-go
 
 # Build configuration
@@ -28,12 +35,13 @@ builds:
         goarch: arm64
 
     # Inject version information (matching Taskfile.yml pattern)
+    # Uses .ModulePath to automatically detect module from go.mod (single source of truth)
     ldflags:
       - -s -w
-      - -X 'github.com/peiman/ckeletin-go/cmd.binaryName={{ .ProjectName }}'
-      - -X 'github.com/peiman/ckeletin-go/cmd.Version={{ .Version }}'
-      - -X 'github.com/peiman/ckeletin-go/cmd.Commit={{ .Commit }}'
-      - -X 'github.com/peiman/ckeletin-go/cmd.Date={{ .Date }}'
+      - -X '{{ .ModulePath }}/cmd.binaryName={{ .ProjectName }}'
+      - -X '{{ .ModulePath }}/cmd.Version={{ .Version }}'
+      - -X '{{ .ModulePath }}/cmd.Commit={{ .Commit }}'
+      - -X '{{ .ModulePath }}/cmd.Date={{ .Date }}'
 
     # Ensure reproducible builds
     env:
@@ -115,10 +123,12 @@ changelog:
       order: 999
 
 # Homebrew tap (macOS package manager)
+# NOTE: When forking this project, update the repository owner to your GitHub username
+# and ensure you have a homebrew-tap repository created
 brews:
-  - name: ckeletin-go
+  - name: "{{ .ProjectName }}"
     repository:
-      owner: peiman
+      owner: peiman  # TODO: Update this to your GitHub username when forking
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
@@ -136,24 +146,21 @@ brews:
     # Description for Homebrew
     description: "A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications"
 
-    homepage: "https://github.com/peiman/ckeletin-go"
+    homepage: "{{ .GitURL }}"
 
     license: "MIT"
 
     # Install instructions for Homebrew
     install: |
-      bin.install "ckeletin-go"
+      bin.install "{{ .ProjectName }}"
 
     # Test instructions
     test: |
-      system "#{bin}/ckeletin-go", "--version"
+      system "#{bin}/{{ .ProjectName }}", "--version"
 
 # Release configuration
+# GitHub repository is auto-detected from git remote
 release:
-  github:
-    owner: peiman
-    name: ckeletin-go
-
   # Draft release (set to false for automatic release)
   draft: false
 
@@ -167,19 +174,19 @@ release:
   header: |
     ## Release {{.Version}} ({{ .Date }})
 
-    Thank you for using ckeletin-go!
+    Thank you for using {{ .ProjectName }}!
 
   # Footer template for release notes
   footer: |
     ---
 
-    **Full Changelog**: https://github.com/peiman/ckeletin-go/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: {{ .ReleaseURL }}/compare/{{ .PreviousTag }}...{{ .Tag }}
 
     ## Installation
 
     ### Homebrew (macOS/Linux)
     ```bash
-    brew install peiman/tap/ckeletin-go
+    brew install {{ .Env.HOMEBREW_TAP_OWNER | default "peiman" }}/tap/{{ .ProjectName }}
     ```
 
     ### Download Binary
