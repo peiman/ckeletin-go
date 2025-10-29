@@ -3,21 +3,22 @@
 #
 # IMPORTANT: When customizing this project:
 # - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
-# - Update 'brews.repository.owner' to your GitHub username (line 124)
+#   This is the SINGLE SOURCE for binary name in GoReleaser - all other
+#   references (builds, archives, homebrew) automatically use this value
+# - Update 'brews.repository.owner' to your GitHub username (line 121)
 # - Module path is auto-detected from go.mod (single source of truth)
 # - GitHub repository is auto-detected from git remote
 
 version: 2
 
-# Metadata
-# NOTE: Should match BINARY_NAME in Taskfile.yml
+# Metadata - Single source of truth for binary/project name
+# NOTE: MUST match BINARY_NAME in Taskfile.yml
 project_name: ckeletin-go
 
 # Build configuration
+# Binary name automatically uses 'project_name' defined above
 builds:
-  - id: ckeletin-go
-    main: ./main.go
-    binary: ckeletin-go
+  - main: ./main.go
 
     # Build for multiple platforms
     goos:

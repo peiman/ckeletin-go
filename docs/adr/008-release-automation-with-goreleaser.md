@@ -93,9 +93,18 @@ Maintain existing ldflags injection pattern:
 
 ### Customization for Forks
 When forking this project, update the following in `.goreleaser.yml`:
-1. `project_name` (line 14) - Match to your `BINARY_NAME` in Taskfile.yml
-2. `brews.repository.owner` (line 124) - Your GitHub username
+1. **`project_name`** (line 16) - **MUST** match your `BINARY_NAME` in Taskfile.yml
+   - This is the single source of truth for binary name in GoReleaser
+   - Automatically used for builds, archives, and Homebrew formula
+2. **`brews.repository.owner`** (line 126) - Your GitHub username
 3. Module path and repository are auto-detected (no changes needed)
+
+### Single Source of Truth
+The configuration respects the "single source of truth" principle:
+- **project_name** - Single source for binary name in GoReleaser
+- **BINARY_NAME** (Taskfile.yml) - Single source for local builds
+- **go.mod module** - Single source for Go module path (auto-detected via `.ModulePath`)
+- **git remote** - Single source for repository URLs (auto-detected via `.GitURL`, `.ReleaseURL`)
 
 ### GitHub Secrets Required
 - `CKELETIN_GITHUB_TOKEN` - For creating GitHub releases
