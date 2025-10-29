@@ -9,81 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added performance benchmarking infrastructure:
-  - Created comprehensive benchmarks for type conversions, config retrieval, and logging
-  - Added `task bench` command to run all benchmarks
-  - Added `task bench:cmd`, `task bench:config`, `task bench:logger` for targeted benchmarking
-  - Added `task bench:compare` to compare benchmark results using benchstat
-  - Documented performance characteristics in `docs/benchmarks.md`
-  - Established performance baseline: sub-microsecond config operations, zero allocations for most operations
-- Added Architecture Decision Records (ADRs) documentation:
-  - Created `docs/adr/` directory with 7 comprehensive ADRs
-  - Documented ultra-thin command pattern (ADR-001)
-  - Documented centralized configuration registry (ADR-002)
-  - Documented dependency injection approach (ADR-003)
-  - Documented security validation strategy (ADR-004)
-  - Documented auto-generated config constants (ADR-005)
-  - Documented structured logging with Zerolog (ADR-006)
-  - Documented Bubble Tea UI framework choice (ADR-007)
-- Enhanced error handling and validation:
-  - Added 20+ integration tests for error scenarios
-  - Improved error messages for config file issues (size, permissions, malformed YAML)
-  - Added validation for edge cases (empty strings, unicode, special characters)
-  - Added concurrent execution safety tests
-- Added git commit hook to remove Claude Code attribution from commits
-- Created new `internal/docs` package for document generation:
-  - Implemented Generator pattern with configuration via Options Pattern
-  - Added Markdown and YAML output format support
-  - Provided dependency injection for registry access
-  - Created clean interfaces for document generation
-- Implemented self-registering configuration system:
-  - Added `cmd/flags.go` for automated flag registration from config registry
-  - Commands now define options inline and self-register via `init()` functions
-  - Flags are auto-generated using `RegisterFlagsForPrefixWithOverrides()`
-  - Added `getKeyValue()` helper for simplified configuration value retrieval
-  - Created `internal/config/template_options.go.example` template for new commands
-  - Added `task generate:command` to scaffold new commands and their options
-  - Pattern prevents configuration violations by design (no manual validation needed)
+- Performance benchmarking infrastructure with `task bench` commands and baseline documentation
+- Architecture Decision Records (ADRs) documenting 7 key architectural patterns
+- 20+ integration tests for error scenarios and edge cases
+- SessionStart hook for automatic development tool installation
 
 ### Fixed
 
-- Fixed type switch bug in `boolDefault()` function that caused incorrect boolean conversion:
-  - **Issue**: `int64(0)`, `int32(0)`, `int16(0)`, `int8(0)` incorrectly evaluated to `true` instead of `false`
-  - **Impact**: Config options with zero integer values would have been parsed incorrectly
-  - **Resolution**: Separated combined type switch cases into individual handlers for each integer type
-  - Added comprehensive test coverage for all integer type conversions
-  - Test coverage improved from 85.9% to 86.7% in cmd package
+- Type switch bug in `boolDefault()` where zero values of int64/int32/int16/int8 incorrectly evaluated to true
+- Benchmark name conversion using `strconv.Itoa()` instead of `string(rune())` for readable output
 
 ### Changed
 
-- Improved test coverage and quality:
-  - Overall test coverage: 89.4%
-  - Integration tests increased from ~20 to 40+ tests
-  - Added error scenario coverage for config validation, flag parsing, and command handling
-  - All packages maintain >75% coverage, with critical packages at 90%+
-- **BREAKING**: Evolved configuration pattern from manual to self-registering:
-  - `internal/config/registry.go` now uses provider registry pattern
-  - Commands use `RegisterFlagsForPrefixWithOverrides()` instead of manual flag definitions
-  - `cmd/docs.go` and `cmd/ping.go` updated to use new auto-registration
-  - `internal/config/{docs,ping}_options.go` now self-register in `init()`
-  - Eliminates boilerplate and makes configuration violations impossible by design
-  - Updated `cmd/template_command.go.example` to reflect new pattern
-  - Updated README with comprehensive documentation of new approach
-- Refactored documentation command architecture:
-  - Moved document generation logic from cmd/docs.go to new internal/docs package
-  - Created a clean separation between command interface and document generation
-  - Implemented a proper Generator pattern with configuration via Options Pattern
-  - Made document generation more testable and maintainable
-  - Improved error handling and file management
-  - Enhanced mockability with function variables for testing
-  - Added dependency injection for registry access to improve testability
-- Enhanced test coverage for document generation
+- Test coverage improved to 89.4% overall with 40+ integration tests
 
-### Security
-
-- Fixed vulnerability in mapstructure dependency:
-  - Upgraded `github.com/go-viper/mapstructure/v2` from v2.2.1 to v2.3.0
-  - Resolves GO-2025-3787: potential information leak in logs when processing malformed data
 
 ## [0.6.0] - 2024-06-25
 
