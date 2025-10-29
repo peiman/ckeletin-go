@@ -141,13 +141,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 
 ### Installation
 
-#### Option 1: Homebrew (macOS/Linux)
-
-```bash
-brew install peiman/tap/ckeletin-go
-```
-
-#### Option 2: Download Pre-built Binary
+#### Option 1: Download Pre-built Binary
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/peiman/ckeletin-go/releases).
 
@@ -156,6 +150,16 @@ Download the latest release for your platform from [GitHub Releases](https://git
 curl -L https://github.com/peiman/ckeletin-go/releases/latest/download/ckeletin-go_linux_amd64.tar.gz | tar xz
 sudo mv ckeletin-go /usr/local/bin/
 ```
+
+#### Option 2: Homebrew (macOS/Linux) - If Enabled
+
+If the maintainer has configured a Homebrew tap:
+
+```bash
+brew install peiman/tap/ckeletin-go
+```
+
+**Note**: Homebrew tap is optional and must be explicitly enabled by the project maintainer.
 
 #### Option 3: Build from Source
 
@@ -520,6 +524,18 @@ Each release includes:
 - `checksums.txt` for verification
 - SBOM (Software Bill of Materials) in SPDX format
 - Automated changelog from git commits
+
+#### Enabling Homebrew Tap (Optional)
+
+Homebrew tap is disabled by default. To enable it:
+
+1. Create a `homebrew-tap` repository in your GitHub account
+2. Add GitHub secrets to your repository:
+   - `HOMEBREW_TAP_OWNER` - Your GitHub username
+   - `HOMEBREW_TAP_GITHUB_TOKEN` - Token with repo access
+3. Update CI workflow to pass the environment variable to GoReleaser
+
+Once enabled, releases will automatically update your Homebrew tap.
 
 For more details, see [ADR-008: Release Automation](docs/adr/008-release-automation-with-goreleaser.md).
 

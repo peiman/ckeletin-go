@@ -92,12 +92,23 @@ Maintain existing ldflags injection pattern:
 - `Taskfile.yml` - Development tasks for local testing
 
 ### Customization for Forks
-When forking this project, update the following in `.goreleaser.yml`:
-1. **`project_name`** (line 16) - **MUST** match your `BINARY_NAME` in Taskfile.yml
+When forking this project:
+
+**Required Changes:**
+1. **`project_name`** in `.goreleaser.yml` (line 16) - **MUST** match your `BINARY_NAME` in Taskfile.yml
    - This is the single source of truth for binary name in GoReleaser
    - Automatically used for builds, archives, and Homebrew formula
-2. **`brews.repository.owner`** (line 126) - Your GitHub username
-3. Module path and repository are auto-detected (no changes needed)
+
+**Optional - Homebrew Tap:**
+2. Homebrew tap is **OPTIONAL** and disabled by default
+   - To enable, set `HOMEBREW_TAP_OWNER` environment variable in CI
+   - Create a `homebrew-tap` repository in your GitHub account
+   - Add `HOMEBREW_TAP_GITHUB_TOKEN` secret to CI
+
+**Auto-Detected (no changes needed):**
+- Module path (from `go.mod`)
+- Repository owner/name (from git remote)
+- Repository URLs (from git config)
 
 ### Single Source of Truth
 The configuration respects the "single source of truth" principle:
@@ -105,10 +116,16 @@ The configuration respects the "single source of truth" principle:
 - **BINARY_NAME** (Taskfile.yml) - Single source for local builds
 - **go.mod module** - Single source for Go module path (auto-detected via `.ModulePath`)
 - **git remote** - Single source for repository URLs (auto-detected via `.GitURL`, `.ReleaseURL`)
+- **HOMEBREW_TAP_OWNER** (env var) - Optional, user-specific GitHub username for tap
 
 ### GitHub Secrets Required
-- `CKELETIN_GITHUB_TOKEN` - For creating GitHub releases
-- `HOMEBREW_TAP_GITHUB_TOKEN` - For updating Homebrew tap
+
+**Minimum (for basic releases):**
+- `GITHUB_TOKEN` or `CKELETIN_GITHUB_TOKEN` - For creating GitHub releases
+
+**Optional (for Homebrew tap):**
+- `HOMEBREW_TAP_OWNER` - Environment variable with your GitHub username
+- `HOMEBREW_TAP_GITHUB_TOKEN` - For updating your Homebrew tap repository
 
 ### Release Process
 1. Ensure all changes are committed and pushed

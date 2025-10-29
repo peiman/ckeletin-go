@@ -1,18 +1,26 @@
 # GoReleaser configuration for ckeletin-go
 # See: https://goreleaser.com
 #
-# IMPORTANT: When customizing this project:
-# - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
-#   This is the SINGLE SOURCE for binary name in GoReleaser - all other
-#   references (builds, archives, homebrew) automatically use this value
-# - Update 'brews.repository.owner' to your GitHub username (line 121)
-# - Module path is auto-detected from go.mod (single source of truth)
-# - GitHub repository is auto-detected from git remote
+# CUSTOMIZATION FOR FORKS:
+#
+# Required:
+#   - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
+#     This is the SINGLE SOURCE for binary name in GoReleaser
+#
+# Optional (Homebrew tap):
+#   - Set HOMEBREW_TAP_OWNER env var in CI to your GitHub username
+#   - Create a 'homebrew-tap' repository in your GitHub account
+#   - If not set, Homebrew tap updates are automatically skipped
+#
+# Auto-detected (no changes needed):
+#   - Module path (from go.mod via .ModulePath)
+#   - Repository owner/name (from git remote)
+#   - Repository URLs (from git config)
 
 version: 2
 
 # Metadata - Single source of truth for binary/project name
-# NOTE: MUST match BINARY_NAME in Taskfile.yml
+# IMPORTANT: Must match BINARY_NAME in Taskfile.yml
 project_name: ckeletin-go
 
 # Build configuration
@@ -124,12 +132,19 @@ changelog:
       order: 999
 
 # Homebrew tap (macOS package manager)
-# NOTE: When forking this project, update the repository owner to your GitHub username
-# and ensure you have a homebrew-tap repository created
+# NOTE: Homebrew tap is OPTIONAL. To enable:
+#   1. Create a homebrew-tap repository in your GitHub account
+#   2. Set HOMEBREW_TAP_OWNER environment variable to your GitHub username
+#   3. Set HOMEBREW_TAP_GITHUB_TOKEN secret in CI
+# If HOMEBREW_TAP_OWNER is not set, Homebrew tap updates are skipped
 brews:
   - name: "{{ .ProjectName }}"
+
+    # Skip if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
+    skip: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
+
     repository:
-      owner: peiman  # TODO: Update this to your GitHub username when forking
+      owner: '{{ .Env.HOMEBREW_TAP_OWNER }}'
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
@@ -185,14 +200,14 @@ release:
 
     ## Installation
 
-    ### Homebrew (macOS/Linux)
-    ```bash
-    brew install {{ .Env.HOMEBREW_TAP_OWNER | default "peiman" }}/tap/{{ .ProjectName }}
-    ```
-
     ### Download Binary
     Download the appropriate binary for your platform from the assets below.
-
+    {{ if index .Env "HOMEBREW_TAP_OWNER" }}
+    ### Homebrew (macOS/Linux)
+    ```bash
+    brew install {{ .Env.HOMEBREW_TAP_OWNER }}/tap/{{ .ProjectName }}
+    ```
+    {{ end }}
     ### Verify Checksums
     ```bash
     sha256sum -c checksums.txt
