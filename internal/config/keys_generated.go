@@ -6,6 +6,11 @@ package config
 // These constants provide compile-time safety when referencing config keys
 const (
 	KeyAppLogLevel          = "app.log_level"           // Logging level for the application (trace, debug, info, warn, error, fatal, pa...
+	KeyAppLogConsoleLevel   = "app.log.console_level"   // Console log level (trace, debug, info, warn, error, fatal, panic). If empty, ...
+	KeyAppLogFileEnabled    = "app.log.file_enabled"    // Enable file logging to capture detailed logs
+	KeyAppLogFilePath       = "app.log.file_path"       // Path to the log file (created with secure 0600 permissions)
+	KeyAppLogFileLevel      = "app.log.file_level"      // File log level (trace, debug, info, warn, error, fatal, panic)
+	KeyAppLogColorEnabled   = "app.log.color_enabled"   // Enable colored console output (auto, true, false). Auto detects TTY.
 	KeyAppDocsOutputFormat  = "app.docs.output_format"  // Output format for documentation (markdown, yaml)
 	KeyAppDocsOutputFile    = "app.docs.output_file"    // Output file for documentation (defaults to stdout)
 	KeyAppPingOutputMessage = "app.ping.output_message" // Default message to display for the ping command

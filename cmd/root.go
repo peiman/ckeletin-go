@@ -119,6 +119,9 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 }
 
 func Execute() error {
+	// Ensure logger cleanup on exit
+	defer logger.Cleanup()
+
 	RootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
 	return RootCmd.Execute()
 }
@@ -130,9 +133,36 @@ func init() {
 		log.Fatal().Err(err).Msg("Failed to bind 'config' flag")
 	}
 
+	// Legacy log level flag (for backward compatibility)
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
 	if err := viper.BindPFlag(config.KeyAppLogLevel, RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
 		log.Fatal().Err(err).Msg("Failed to bind 'log-level'")
+	}
+
+	// Dual logging configuration flags
+	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")
+	if err := viper.BindPFlag(config.KeyAppLogConsoleLevel, RootCmd.PersistentFlags().Lookup("log-console-level")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-console-level'")
+	}
+
+	RootCmd.PersistentFlags().Bool("log-file-enabled", false, "Enable file logging to capture detailed logs")
+	if err := viper.BindPFlag(config.KeyAppLogFileEnabled, RootCmd.PersistentFlags().Lookup("log-file-enabled")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-enabled'")
+	}
+
+	RootCmd.PersistentFlags().String("log-file-path", "./logs/ckeletin-go.log", "Path to the log file")
+	if err := viper.BindPFlag(config.KeyAppLogFilePath, RootCmd.PersistentFlags().Lookup("log-file-path")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-path'")
+	}
+
+	RootCmd.PersistentFlags().String("log-file-level", "debug", "File log level (trace, debug, info, warn, error, fatal, panic)")
+	if err := viper.BindPFlag(config.KeyAppLogFileLevel, RootCmd.PersistentFlags().Lookup("log-file-level")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-file-level'")
+	}
+
+	RootCmd.PersistentFlags().String("log-color", "auto", "Enable colored console output (auto, true, false)")
+	if err := viper.BindPFlag(config.KeyAppLogColorEnabled, RootCmd.PersistentFlags().Lookup("log-color")); err != nil {
+		log.Fatal().Err(err).Msg("Failed to bind 'log-color'")
 	}
 }
 

@@ -3,6 +3,7 @@
 // Demo program to showcase dual logging functionality.
 // Run with: go run internal/logger/demo_dual_logging.go
 //
+//go:build ignore
 // +build ignore
 
 package main

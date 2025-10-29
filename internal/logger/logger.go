@@ -1,39 +1,223 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/mattn/go-isatty"
+	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
+var (
+	// logFile holds the open log file handle for cleanup
+	logFile *os.File
+)
+
 // Init initializes the logger with options from Viper.
+// Supports dual logging: console (user-friendly) + file (detailed JSON).
 // Call this once in rootCmd's PersistentPreRunE or main initialization.
+//
+// Configuration:
+//   - app.log_level or app.log.console_level: Console log level (default: info)
+//   - app.log.file_enabled: Enable file logging (default: false)
+//   - app.log.file_path: Log file path (default: ./logs/ckeletin-go.log)
+//   - app.log.file_level: File log level (default: debug)
+//   - app.log.color_enabled: Color output (auto/true/false, default: auto)
+//
+// Example:
+//
+//	if err := logger.Init(nil); err != nil {
+//	    return err
+//	}
+//	defer logger.Cleanup()
 func Init(out io.Writer) error {
 	if out == nil {
-		out = os.Stderr
+		out = os.Stdout
 	}
 
-	logLevelStr := viper.GetString("app.log_level")
-	level, err := zerolog.ParseLevel(logLevelStr)
+	var writers []io.Writer
+
+	// Get console log level (with backward compatibility)
+	consoleLevel := getConsoleLogLevel()
+
+	// Determine if color should be enabled
+	colorEnabled := isColorEnabled(out)
+
+	// Console writer with filtering
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        out,
+		TimeFormat: time.RFC3339,
+		NoColor:    !colorEnabled,
+	}
+
+	filteredConsole := FilteredWriter{
+		Writer:   consoleWriter,
+		MinLevel: consoleLevel,
+	}
+
+	writers = append(writers, filteredConsole)
+
+	// File writer (if enabled)
+	if viper.GetBool(config.KeyAppLogFileEnabled) {
+		fileLevel := getFileLogLevel()
+		filePath := viper.GetString(config.KeyAppLogFilePath)
+
+		fileWriter, err := openLogFile(filePath)
+		if err != nil {
+			// Log warning but continue with console-only logging
+			log.Warn().
+				Err(err).
+				Str("path", SanitizePath(filePath)).
+				Msg("Failed to open log file, continuing with console-only logging")
+		} else {
+			logFile = fileWriter
+
+			filteredFile := FilteredWriter{
+				Writer:   fileWriter,
+				MinLevel: fileLevel,
+			}
+
+			writers = append(writers, filteredFile)
+		}
+	}
+
+	// Create multi-writer
+	multi := zerolog.MultiLevelWriter(writers...)
+
+	// Create logger with timestamp
+	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+
+	// Set global log level to the most verbose level
+	// This allows both writers to filter independently
+	globalLevel := getGlobalLogLevel(consoleLevel)
+	zerolog.SetGlobalLevel(globalLevel)
+
+	// Log file logging status after logger is configured
+	if viper.GetBool(config.KeyAppLogFileEnabled) && logFile != nil {
+		filePath := viper.GetString(config.KeyAppLogFilePath)
+		fileLevel := getFileLogLevel()
+		log.Info().
+			Str("path", SanitizePath(filePath)).
+			Str("file_level", fileLevel.String()).
+			Msg("File logging enabled")
+	}
+
+	return nil
+}
+
+// Cleanup closes any open log files and performs cleanup.
+// Should be called with defer after Init().
+func Cleanup() {
+	if logFile != nil {
+		if err := logFile.Close(); err != nil {
+			// Can't use logger here as it might be cleaning up
+			fmt.Fprintf(os.Stderr, "Warning: failed to close log file: %v\n", err)
+		}
+		logFile = nil
+	}
+}
+
+// getConsoleLogLevel determines the console log level from configuration.
+// Supports backward compatibility with app.log_level.
+func getConsoleLogLevel() zerolog.Level {
+	// Try new config key first
+	consoleLevelStr := viper.GetString(config.KeyAppLogConsoleLevel)
+	if consoleLevelStr == "" {
+		// Fall back to legacy config key for backward compatibility
+		consoleLevelStr = viper.GetString(config.KeyAppLogLevel)
+	}
+
+	level, err := zerolog.ParseLevel(consoleLevelStr)
 	if err != nil {
 		level = zerolog.InfoLevel
 		log.Warn().
 			Err(err).
-			Str("provided_level", logLevelStr).
-			Msg("Invalid log level provided, defaulting to 'info'")
+			Str("provided_level", consoleLevelStr).
+			Msg("Invalid console log level, defaulting to 'info'")
 	}
-	zerolog.SetGlobalLevel(level)
 
-	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: out, TimeFormat: time.RFC3339}).
-		With().
-		Timestamp().
-		Logger()
+	return level
+}
 
-	return nil
+// getFileLogLevel determines the file log level from configuration.
+func getFileLogLevel() zerolog.Level {
+	fileLevelStr := viper.GetString(config.KeyAppLogFileLevel)
+
+	level, err := zerolog.ParseLevel(fileLevelStr)
+	if err != nil {
+		level = zerolog.DebugLevel
+		log.Warn().
+			Err(err).
+			Str("provided_level", fileLevelStr).
+			Msg("Invalid file log level, defaulting to 'debug'")
+	}
+
+	return level
+}
+
+// getGlobalLogLevel determines the global log level.
+// This should be the most verbose level to allow per-writer filtering.
+func getGlobalLogLevel(consoleLevel zerolog.Level) zerolog.Level {
+	if !viper.GetBool(config.KeyAppLogFileEnabled) {
+		return consoleLevel
+	}
+
+	fileLevel := getFileLogLevel()
+
+	// Return the more verbose level (lower numeric value)
+	// TraceLevel=-1, DebugLevel=0, InfoLevel=1, etc.
+	if fileLevel < consoleLevel {
+		return fileLevel
+	}
+
+	return consoleLevel
+}
+
+// isColorEnabled determines if colored output should be enabled.
+func isColorEnabled(out io.Writer) bool {
+	colorConfig := viper.GetString(config.KeyAppLogColorEnabled)
+
+	switch colorConfig {
+	case "true":
+		return true
+	case "false":
+		return false
+	case "auto", "":
+		// Auto-detect: check if output is a TTY
+		if file, ok := out.(*os.File); ok {
+			return isatty.IsTerminal(file.Fd())
+		}
+		return false
+	default:
+		log.Warn().
+			Str("value", colorConfig).
+			Msg("Invalid color_enabled value, using auto-detection")
+		return false
+	}
+}
+
+// openLogFile opens the log file with secure permissions.
+// Creates parent directories if they don't exist.
+func openLogFile(path string) (*os.File, error) {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// Open file with secure permissions (owner read/write only)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	return file, nil
 }
 
 // SaveLoggerState returns the current global logger and log level for later restoration.
