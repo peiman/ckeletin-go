@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated Go version from 1.24 to 1.25 in go.mod and CI workflow
 - Updated CI test matrix to test against Go 1.24.x and 1.25.x
 
+### Security
+
+- Added explicit permissions to lint-workflows.yml following principle of least privilege (CodeQL security recommendation)
+
 ### Fixed
 
 - Fixed CI build failure by updating Taskfile to install golangci-lint v2 (required for .golangci.yml v2 configuration)

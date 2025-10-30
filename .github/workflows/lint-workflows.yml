@@ -13,6 +13,8 @@ jobs:
   lint:
     name: Lint workflows yaml
     runs-on: ubuntu-latest
+    permissions:
+      contents: read  # Only need read access to checkout workflow files
 
     steps:
       - name: Checkout
