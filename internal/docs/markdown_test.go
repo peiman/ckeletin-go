@@ -65,8 +65,9 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 		t.Errorf("Missing environment variable prefix")
 	}
 
-	if !strings.Contains(output, "Configuration file (/home/user/.testapp.yaml)") {
-		t.Errorf("Missing config file path")
+	// Path should be sanitized to use ~ instead of /home/user
+	if !strings.Contains(output, "Configuration file (~/.testapp.yaml)") {
+		t.Errorf("Missing sanitized config file path")
 	}
 
 	// Check table headers and basic structure
@@ -189,5 +190,51 @@ func TestGenerateMarkdownDocs_EmptyRegistry(t *testing.T) {
 	// Check that the blocks are properly closed
 	if !strings.Contains(output, "```yaml") || !strings.Contains(output, "```bash") {
 		t.Errorf("Missing code blocks with empty registry")
+	}
+}
+
+// TestMarkdownGenerationNoUserPaths tests that generated docs don't contain user-specific paths
+// This test will initially FAIL - generated docs contain actual user paths like /Users/peiman/
+func TestMarkdownGenerationNoUserPaths(t *testing.T) {
+	// SETUP PHASE
+	var buf bytes.Buffer
+
+	// Simulate a user-specific path
+	appInfo := AppInfo{
+		BinaryName: "test-app",
+		EnvPrefix:  "TEST_APP",
+	}
+	appInfo.ConfigPaths.DefaultPath = "/Users/someuser/.test-app.yaml"
+	appInfo.ConfigPaths.DefaultFullName = ".test-app.yaml"
+
+	cfg := Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		Registry:     func() []config.ConfigOption { return []config.ConfigOption{} },
+	}
+
+	gen := NewGenerator(cfg)
+
+	// EXECUTION PHASE
+	err := gen.GenerateMarkdownDocs(&buf, appInfo)
+
+	// ASSERTION PHASE
+	if err != nil {
+		t.Fatalf("GenerateMarkdownDocs failed: %v", err)
+	}
+
+	output := buf.String()
+
+	// Should NOT contain user-specific paths
+	if strings.Contains(output, "/Users/") {
+		t.Error("Generated markdown should not contain /Users/ paths")
+	}
+	if strings.Contains(output, "someuser") {
+		t.Error("Generated markdown should not contain usernames")
+	}
+
+	// SHOULD contain generic placeholder
+	if !strings.Contains(output, "$HOME") && !strings.Contains(output, "~") {
+		t.Error("Generated markdown should use $HOME or ~ for home directory")
 	}
 }
