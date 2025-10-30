@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.24.x', '1.25.x']
+        go-version: ['1.25.x']  # Only test Go 1.25+ (project requires go 1.25)
 
     permissions:
       contents: read
