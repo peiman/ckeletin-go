@@ -29,6 +29,7 @@ func ValidateConfigValue(key string, value interface{}) error {
 	switch v := value.(type) {
 	case string:
 		if len(v) > MaxStringValueLength {
+			//nolint:staticcheck // User-facing error message intentionally formatted with newlines
 			return fmt.Errorf(`config value for "%s" exceeds maximum string length
 
 Current length: %d bytes (%.2f KB)
@@ -42,6 +43,7 @@ Suggestion: Reduce the length of this configuration value or split it into multi
 
 	case []string:
 		if len(v) > MaxSliceLength {
+			//nolint:staticcheck // User-facing error message intentionally formatted with newlines
 			return fmt.Errorf(`config array "%s" exceeds maximum length
 
 Current length: %d elements
@@ -53,6 +55,7 @@ Suggestion: Split into multiple arrays or reduce the number of items.`,
 		// Also validate each string in the slice
 		for i, s := range v {
 			if len(s) > MaxStringValueLength {
+				//nolint:staticcheck // User-facing error message intentionally formatted with newlines
 				return fmt.Errorf(`config array element %d in "%s" exceeds maximum string length
 
 Element value: "%s..." (first 50 chars)
@@ -69,6 +72,7 @@ Suggestion: Reduce the length of this array element.`,
 
 	case []interface{}:
 		if len(v) > MaxSliceLength {
+			//nolint:staticcheck // User-facing error message intentionally formatted with newlines
 			return fmt.Errorf(`config array "%s" exceeds maximum length
 
 Current length: %d elements
@@ -81,6 +85,7 @@ Suggestion: Split into multiple arrays or reduce the number of items.`,
 		for i, item := range v {
 			if s, ok := item.(string); ok {
 				if len(s) > MaxStringValueLength {
+					//nolint:staticcheck // User-facing error message intentionally formatted with newlines
 					return fmt.Errorf(`config array element %d in "%s" exceeds maximum string length
 
 Element value: "%s..." (first 50 chars)

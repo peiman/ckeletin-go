@@ -29,5 +29,6 @@ type Config struct {
 
 // Variable to facilitate testing file operations
 var openOutputFile = func(path string) (io.WriteCloser, error) {
+	//nolint:gosec // 0644 is appropriate for documentation files (readable by all)
 	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 }

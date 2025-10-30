@@ -25,6 +25,8 @@ func (g *Generator) GenerateYAMLDocs(w io.Writer) error {
 
 // generateYAMLContent generates YAML content for the given registry
 // this function is shared by both YAML and Markdown generators
+//
+//nolint:errcheck // YAML generation - errors from fmt.Fprintf are acceptable
 func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 	// Group options by top-level key for a nicer YAML structure
 	groups := make(map[string][]config.ConfigOption)

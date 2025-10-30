@@ -1,0 +1,29 @@
+# Codecov Configuration
+# See: https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 80%          # Minimum coverage for entire project
+        threshold: 1%        # Allow 1% drop before failing
+        informational: false # Fail CI if below target
+
+    # Coverage for new code in PR
+    patch:
+      default:
+        target: 80%          # New code must have 80% coverage
+        informational: false # Fail CI if below target
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: false
+
+# Ignore paths
+ignore:
+  - "**/*_test.go"
+  - "scripts/**/*"
+  - "docs/**/*"
+  - "test/**/*"

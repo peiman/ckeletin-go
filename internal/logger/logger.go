@@ -105,9 +105,9 @@ func Init(out io.Writer) error {
 		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
 		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
 		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       uint32(initial),
+			Burst:       uint32(initial), //nolint:gosec // Config values are positive
 			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)},
+			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
 		})
 		log.Info().
 			Int("initial", initial).

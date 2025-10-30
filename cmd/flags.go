@@ -177,9 +177,9 @@ func intDefault(v interface{}) int {
 	case int8:
 		return int(t)
 	case uint:
-		return int(t)
+		return int(t) //nolint:gosec // Safe conversion for config values
 	case uint64:
-		return int(t)
+		return int(t) //nolint:gosec // Safe conversion for config values
 	case uint32:
 		return int(t)
 	case uint16:

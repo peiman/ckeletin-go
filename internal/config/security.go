@@ -32,6 +32,7 @@ func ValidateConfigFilePermissions(path string) error {
 
 	// Check if world-writable (dangerous - anyone can modify config)
 	if perm&0002 != 0 {
+		//nolint:staticcheck // User-facing security error message intentionally formatted with newlines
 		return fmt.Errorf(`config file %s is world-writable (permissions: %04o)
 
 Security Issue: Anyone on the system can modify this configuration file.

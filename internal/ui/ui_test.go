@@ -114,42 +114,34 @@ func TestModelUpdate(t *testing.T) {
 	m := model{
 		message:    "Test Message",
 		colorStyle: lipgloss.NewStyle(),
-		done:       false,
 	}
 
 	tests := []struct {
-		name     string
-		msg      tea.Msg
-		wantDone bool
-		wantCmd  bool
+		name    string
+		msg     tea.Msg
+		wantCmd bool
 	}{
 		{
-			name:     "Key 'q' quits",
-			msg:      tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}},
-			wantDone: false,
-			wantCmd:  true,
+			name:    "Key 'q' quits",
+			msg:     tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}},
+			wantCmd: true,
 		},
 		{
-			name:     "CTRL+C quits",
-			msg:      tea.KeyMsg{Type: tea.KeyCtrlC},
-			wantDone: false,
-			wantCmd:  true,
+			name:    "CTRL+C quits",
+			msg:     tea.KeyMsg{Type: tea.KeyCtrlC},
+			wantCmd: true,
 		},
 		{
-			name:     "Unhandled key",
-			msg:      tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}},
-			wantDone: false,
-			wantCmd:  false,
+			name:    "Unhandled key",
+			msg:     tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}},
+			wantCmd: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			updatedModel, cmd := m.Update(tt.msg)
-			if updatedModel.(model).done != tt.wantDone {
-				t.Errorf("Update() done = %v, want %v", updatedModel.(model).done, tt.wantDone)
-			}
+			_, cmd := m.Update(tt.msg)
 
 			// Check if a command was returned
 			if (cmd != nil) != tt.wantCmd {

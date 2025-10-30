@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated Go version from 1.24 to 1.25 in go.mod and CI workflow
+- Updated CI test matrix to test against Go 1.24.x and 1.25.x
+
+### Fixed
+
+- Fixed CI build failure by updating Taskfile to install golangci-lint v2 (required for .golangci.yml v2 configuration)
+- Fixed Go standard library vulnerabilities (GO-2025-4007, GO-2025-4009, GO-2025-4010, GO-2025-4011) by upgrading to Go 1.25
+
 ## [0.7.0] - 2025-10-29
 
 ### Added
