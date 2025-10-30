@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
-  GO_VERSION: '1.24.x'       # Define Go version here
+  GO_VERSION: '1.25.x'       # Define Go version here
   YQ_VERSION: '4.34.1'       # Define yq version here
   TASK_VERSION: '3.39.2'     # Define Task version here
 
@@ -31,7 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        go-version: ['1.23.x', '1.24.x']
+        go-version: ['1.24.x', '1.25.x']
 
     permissions:
       contents: read
