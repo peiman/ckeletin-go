@@ -65,9 +65,10 @@ docker run -v $(pwd)/config.yaml:/app/config.yaml ...
 The application searches for configuration files in this order:
 
 1. Path specified by `--config` flag (highest priority)
-2. `./config.yaml` (current directory)
-3. `~/.ckeletin-go/config.yaml` (user home directory)
-4. `/etc/ckeletin-go/config.yaml` (system-wide)
+2. `./.ckeletin-go.yaml` (current directory)
+3. `~/.ckeletin-go.yaml` (user home directory)
+
+If no configuration file is found, the application uses default values from the registry.
 
 ## Configuration Precedence
 
