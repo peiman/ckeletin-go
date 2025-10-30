@@ -1026,3 +1026,70 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 		t.Errorf("Expected config from current dir (%s), got: %s", currentDir, configFileUsed)
 	}
 }
+
+// TestConfigFromHomeDirectoryOnly tests config discovery when config only exists in home directory
+func TestConfigFromHomeDirectoryOnly(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Create temp directory structure
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	currentDir := filepath.Join(tempDir, "current")
+	os.MkdirAll(homeDir, 0755)
+	os.MkdirAll(currentDir, 0755)
+
+	// Write config ONLY to home directory (not current directory)
+	homeConfigContent := []byte("app:\n  log_level: warn\n")
+	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
+	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write home config: %v", err)
+	}
+
+	// Save originals
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	oldWd, _ := os.Getwd()
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+		os.Chdir(oldWd)
+	}()
+
+	// Reset viper state
+	viper.Reset()
+
+	// No --config flag set
+	cfgFile = ""
+
+	// Set HOME to home directory and change to empty current directory
+	t.Setenv("HOME", homeDir)
+	os.Chdir(currentDir)
+
+	// Setup logger
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err = initConfig()
+
+	// ASSERTION PHASE
+	if err != nil {
+		t.Fatalf("initConfig should succeed with home directory config: %v", err)
+	}
+
+	// Home directory config should be loaded
+	logLevel := viper.GetString("app.log_level")
+	if logLevel != "warn" {
+		t.Errorf("Expected log_level='warn' from home dir, got: %s", logLevel)
+	}
+
+	// Config file path should be from home directory
+	if configFileUsed != "" && !strings.Contains(configFileUsed, homeDir) {
+		t.Errorf("Expected config from home dir (%s), got: %s", homeDir, configFileUsed)
+	}
+}
