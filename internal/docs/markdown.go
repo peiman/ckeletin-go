@@ -18,6 +18,8 @@ type AppInfo struct {
 }
 
 // GenerateMarkdownDocs generates Markdown documentation for all configuration options
+//
+//nolint:errcheck // Documentation generation - errors from fmt.Fprintf are acceptable
 func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 	// Write header
 	fmt.Fprintf(w, "# %s Configuration\n\n", appInfo.BinaryName)

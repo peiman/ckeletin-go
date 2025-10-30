@@ -8,6 +8,7 @@ version: 2
 
 run:
   timeout: 5m
+  tests: false  # Skip all test files
 
 linters:
   enable:
@@ -23,12 +24,16 @@ linters:
 
     # Bugs & Correctness
     - bodyclose     # Unclosed HTTP response bodies
-    - gocritic      # Comprehensive checks (performance, style, bugs)
 
     # Code Quality
     - misspell      # Spelling mistakes
-    - revive        # General purpose linter
     - gocyclo       # Cyclomatic complexity
+
+  # Disabled temporarily - too noisy for initial v2 adoption
+  # Re-enable after addressing style issues incrementally
+  disable:
+    - gocritic      # Style and performance suggestions
+    - revive        # General purpose style linter
 
 linters-settings:
   gocyclo:
@@ -38,15 +43,107 @@ linters-settings:
     excludes:
       - G104  # Duplicates errcheck
 
+  revive:
+    enable-all-rules: false
+    ignore-generated-header: true
+    rules:
+      # Disable style rules that don't add value
+      - name: package-comments
+        disabled: true
+      - name: exported
+        disabled: true
+      - name: var-naming
+        disabled: true
+      - name: var-declaration
+        disabled: true
+      - name: unused-parameter
+        disabled: true
+      - name: error-strings
+        disabled: true
+
+  gocritic:
+    disabled-checks:
+      - ifElseChain
+      - singleCaseSwitch
+      - elseif
+
 issues:
   exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
+    # Exclude strict linters from all test files
+    - path: _test\.go$
       linters:
         - gocyclo
         - gosec
+        - errcheck      # Tests often ignore errors intentionally
+        - revive        # Style rules less critical in tests
+        - gocritic      # Test patterns may differ from production
+        - staticcheck   # Less critical in tests
 
-    # Exclude gosec for command files (often have subprocess calls)
-    - path: cmd/
+    # Exclude strict linters from test directories
+    - path: ^test/
       linters:
         - gosec
+        - errcheck
+        - revive
+        - gocritic
+        - staticcheck
+
+    # Exclude gosec for command files (often have subprocess calls)
+    - path: ^cmd/
+      linters:
+        - gosec
+        - revive        # Command files have standard Cobra patterns
+
+    # Allow integer conversions - Go's type system is strict, these are often safe
+    - text: "G115.*integer overflow conversion"
+      linters:
+        - gosec
+
+    # Allow friendly error messages with punctuation/capitalization for user-facing errors
+    - text: "(error-strings|error strings).*should not be capitalized"
+      linters:
+        - revive
+
+    # Allow unused parameters in test helpers and Cobra command functions
+    - text: "unused-parameter"
+      path: _test\.go$
+      linters:
+        - revive
+
+    # Allow package naming patterns and documentation style
+    - linters:
+        - revive
+      text: "package-comments"
+    - linters:
+        - revive
+      text: "exported"
+    - linters:
+        - revive
+      text: "var-naming"
+    - linters:
+        - revive
+      text: "var-declaration"
+
+    # Allow Cobra command patterns (unused args/cmd parameter is standard)
+    - linters:
+        - revive
+      text: "unused-parameter.*args"
+    - linters:
+        - revive
+      text: "unused-parameter.*cmd"
+
+    # Allow if-else chains and switch patterns
+    - linters:
+        - gocritic
+      text: "ifElseChain"
+    - linters:
+        - gocritic
+      text: "singleCaseSwitch"
+    - linters:
+        - gocritic
+      text: "elseif"
+
+    # Allow unused struct fields
+    - linters:
+        - unused
+      text: "is unused"

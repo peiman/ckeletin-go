@@ -32,7 +32,7 @@ func (g *Generator) SetAppInfo(info AppInfo) {
 
 // Generate produces documentation in the configured format
 func (g *Generator) Generate() error {
-	var writer io.Writer = g.cfg.Writer
+	writer := g.cfg.Writer
 	var file io.WriteCloser
 	var closeErr error
 

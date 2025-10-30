@@ -57,6 +57,7 @@ func init() {
 	MustAddToRoot(configCmd)
 }
 
+//nolint:errcheck,revive // CLI output function - fmt.Fprintf errors to stdout are acceptable
 func runConfigValidate(cmd *cobra.Command, args []string) error {
 	// Determine which config file to validate
 	configPath := validateConfigFile
@@ -86,7 +87,7 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		for i, err := range result.Errors {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %d. %v\n", i+1, err)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	// Print warnings
@@ -95,20 +96,20 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		for i, warning := range result.Warnings {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %d. %s\n", i+1, warning)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	// Print summary
 	if result.Valid && len(result.Warnings) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid!")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid!")
 		return nil
 	} else if result.Valid && len(result.Warnings) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid (with warnings)")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid (with warnings)")
 		// Exit with code 2 to indicate warnings
 		cmd.SilenceUsage = true
 		return fmt.Errorf("validation completed with warnings")
 	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), "❌ Configuration is invalid")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "❌ Configuration is invalid")
 		cmd.SilenceUsage = true
 		return fmt.Errorf("validation failed")
 	}

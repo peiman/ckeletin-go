@@ -105,7 +105,6 @@ func GetLipglossColor(col string) (lipgloss.Color, error) {
 type model struct {
 	message    string
 	colorStyle lipgloss.Style
-	done       bool
 }
 
 // Init initializes the model (no-op)
