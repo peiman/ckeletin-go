@@ -110,6 +110,11 @@ tasks:
     cmd: |
       gotestsum --format pkgname --watch --hide-summary=skipped
 
+  test:integration:
+    desc: Run integration tests (disables cache with -count=1)
+    cmd: |
+      gotestsum --format pkgname -- -v -count=1 ./test/integration/...
+
   test:coverage-text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:

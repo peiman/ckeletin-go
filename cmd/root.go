@@ -182,8 +182,9 @@ func bindFlags(cmd *cobra.Command) error {
 	var errs []error
 
 	// Helper function to collect binding errors
+	// Use cmd.Root() to get flags from RootCmd even when called from subcommands
 	bindFlag := func(key string, flagName string) {
-		if err := viper.BindPFlag(key, cmd.PersistentFlags().Lookup(flagName)); err != nil {
+		if err := viper.BindPFlag(key, cmd.Root().PersistentFlags().Lookup(flagName)); err != nil {
 			errs = append(errs, fmt.Errorf("bind flag %q to key %q: %w", flagName, key, err))
 		}
 	}

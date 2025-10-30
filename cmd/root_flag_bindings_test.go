@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -267,4 +268,74 @@ func TestBindFlags_Integration(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestBindFlags_FromSubcommand tests that bindFlags() works when called from a subcommand.
+// This is a regression test for the bug where bindFlags(cmd) looked up flags on
+// cmd.PersistentFlags() instead of cmd.Root().PersistentFlags(), causing all subcommands
+// to fail with "flag for X is nil" errors.
+func TestBindFlags_FromSubcommand(t *testing.T) {
+	// SETUP
+	viper.Reset()
+
+	// Create a mock subcommand (simulating ping, config, etc.)
+	mockSubCmd := &cobra.Command{
+		Use:   "mock",
+		Short: "Mock subcommand for testing",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+	}
+
+	// Add it to RootCmd (this is what happens in init() for real subcommands)
+	RootCmd.AddCommand(mockSubCmd)
+
+	// EXECUTION
+	// Call bindFlags() with the subcommand (not RootCmd)
+	// This simulates what happens in PersistentPreRunE when a subcommand is executed
+	err := bindFlags(mockSubCmd)
+
+	// ASSERTION
+	if err != nil {
+		t.Fatalf("bindFlags(subcommand) failed: %v\n"+
+			"This indicates bindFlags() is looking up flags on the subcommand instead of root.\n"+
+			"Ensure bindFlags() uses cmd.Root().PersistentFlags().Lookup() not cmd.PersistentFlags().Lookup()",
+			err)
+	}
+
+	// Verify a sample of flags were actually bound
+	testCases := []struct {
+		viperKey string
+		flagName string
+	}{
+		{config.KeyAppLogLevel, "log-level"},
+		{config.KeyAppLogFileEnabled, "log-file-enabled"},
+		{"config", "config"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.flagName, func(t *testing.T) {
+			// Verify the flag exists on RootCmd (persistent flags)
+			flag := RootCmd.PersistentFlags().Lookup(tc.flagName)
+			if flag == nil {
+				t.Fatalf("Flag %q not found on RootCmd", tc.flagName)
+			}
+
+			// Verify it can be accessed via the subcommand's inherited flags
+			inheritedFlag := mockSubCmd.Flag(tc.flagName)
+			if inheritedFlag == nil {
+				t.Fatalf("Flag %q not inherited by subcommand", tc.flagName)
+			}
+
+			// Verify binding exists by manually binding and checking no error
+			// (In real execution, viper.BindPFlag is called inside bindFlags)
+			err := viper.BindPFlag(tc.viperKey, flag)
+			if err != nil {
+				t.Errorf("Failed to bind %q to %q: %v", tc.flagName, tc.viperKey, err)
+			}
+		})
+	}
+
+	// CLEANUP
+	RootCmd.RemoveCommand(mockSubCmd)
 }
