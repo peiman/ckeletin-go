@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -335,44 +336,126 @@ func TestInitWithFileLogging(t *testing.T) {
 	}
 }
 
+// TestRuntimeLevelAdjustment tests that changing log levels at runtime actually affects filtering
+// This test will initially FAIL - runtime level changes don't affect actual log output
 func TestRuntimeLevelAdjustment(t *testing.T) {
-	tests := []struct {
-		name       string
-		setLevel   zerolog.Level
-		getterFunc func() zerolog.Level
-		setterFunc func(zerolog.Level)
-	}{
-		{
-			name:       "Console level adjustment",
-			setLevel:   zerolog.WarnLevel,
-			getterFunc: GetConsoleLevel,
-			setterFunc: SetConsoleLevel,
-		},
-		{
-			name:       "File level adjustment",
-			setLevel:   zerolog.ErrorLevel,
-			getterFunc: GetFileLevel,
-			setterFunc: SetFileLevel,
-		},
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	// Initialize logger with INFO level
+	buf := &bytes.Buffer{}
+	viper.Set("app.log.console_level", "info")
+	viper.Set("app.log.file_enabled", false)
+	viper.Set("app.log.sampling_enabled", false)
+
+	err := Init(buf)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// SETUP - save original level
-			originalLevel := tt.getterFunc()
+	// Test 1: Debug messages filtered at INFO level
+	buf.Reset()
+	log.Debug().Msg("debug_before_change")
+	log.Info().Msg("info_before_change")
 
-			// EXECUTE
-			tt.setterFunc(tt.setLevel)
+	output := buf.String()
+	if strings.Contains(output, "debug_before_change") {
+		t.Error("Debug message should be filtered at INFO level")
+	}
+	if !strings.Contains(output, "info_before_change") {
+		t.Error("Info message should appear at INFO level")
+	}
 
-			// ASSERT
-			gotLevel := tt.getterFunc()
-			if gotLevel != tt.setLevel {
-				t.Errorf("Level adjustment failed: got %v, want %v", gotLevel, tt.setLevel)
-			}
+	// Test 2: Change level to DEBUG
+	buf.Reset()
+	SetConsoleLevel(zerolog.DebugLevel)
 
-			// CLEANUP - restore original level
-			tt.setterFunc(originalLevel)
-		})
+	// Test 3: Debug messages now appear
+	buf.Reset()
+	log.Debug().Msg("debug_after_change")
+	log.Info().Msg("info_after_change")
+
+	output = buf.String()
+	if !strings.Contains(output, "debug_after_change") {
+		t.Error("Debug message should appear after SetConsoleLevel(DEBUG)")
+	}
+	if !strings.Contains(output, "info_after_change") {
+		t.Error("Info message should still appear after level change")
+	}
+
+	// Test 4: Getter reflects new level
+	if GetConsoleLevel() != zerolog.DebugLevel {
+		t.Errorf("GetConsoleLevel() = %v, want %v", GetConsoleLevel(), zerolog.DebugLevel)
+	}
+
+	// Test 5: Change back to WARN
+	buf.Reset()
+	SetConsoleLevel(zerolog.WarnLevel)
+
+	buf.Reset()
+	log.Info().Msg("info_at_warn")
+	log.Warn().Msg("warn_at_warn")
+
+	output = buf.String()
+	if strings.Contains(output, "info_at_warn") {
+		t.Error("Info message should be filtered at WARN level")
+	}
+	if !strings.Contains(output, "warn_at_warn") {
+		t.Error("Warn message should appear at WARN level")
+	}
+}
+
+// TestRuntimeFileLevelAdjustment tests runtime adjustment for file logging
+// This test will initially FAIL - runtime level changes don't affect file output
+func TestRuntimeFileLevelAdjustment(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	tempDir := t.TempDir()
+	logFile := filepath.Join(tempDir, "test.log")
+
+	viper.Set("app.log.console_level", "error") // Console at ERROR
+	viper.Set("app.log.file_enabled", true)
+	viper.Set("app.log.file_path", logFile)
+	viper.Set("app.log.file_level", "info") // File at INFO
+	viper.Set("app.log.sampling_enabled", false)
+	viper.Set("app.log.color_enabled", "false")
+
+	consoleBuf := &bytes.Buffer{}
+	err := Init(consoleBuf)
+	if err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+	defer Cleanup()
+
+	// Debug filtered in both initially
+	log.Debug().Msg("debug_initial")
+
+	// Adjust file level to DEBUG
+	SetFileLevel(zerolog.DebugLevel)
+
+	log.Debug().Msg("debug_after_file_change")
+
+	Cleanup() // Ensure file is flushed
+
+	fileContent, err := os.ReadFile(logFile)
+	if err != nil {
+		t.Fatalf("Failed to read log file: %v", err)
+	}
+	output := string(fileContent)
+
+	if strings.Contains(output, "debug_initial") {
+		t.Error("Initial debug should be filtered")
+	}
+	if !strings.Contains(output, "debug_after_file_change") {
+		t.Error("Debug should appear in file after SetFileLevel(DEBUG)")
+	}
+
+	// Verify console still filters (at ERROR level)
+	if strings.Contains(consoleBuf.String(), "debug") {
+		t.Error("Console should still filter debug messages")
 	}
 }
 

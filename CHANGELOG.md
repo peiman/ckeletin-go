@@ -20,6 +20,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed CI build failure by updating Taskfile to install golangci-lint v2 (required for .golangci.yml v2 configuration)
 - Fixed Go standard library vulnerabilities (GO-2025-4007, GO-2025-4009, GO-2025-4010, GO-2025-4011) by upgrading to Go 1.25
+- **Configuration discovery improvements**:
+  - Config search now includes current directory (`./.ckeletin-go.yaml`) with higher priority than home directory
+  - Application no longer requires `$HOME` environment variable (gracefully falls back to current directory search only)
+  - Updated configuration search documentation to match actual implementation
+- **Runtime log-level adjustment now functional**:
+  - `logger.SetConsoleLevel()` and `logger.SetFileLevel()` now rebuild the logger stack to apply level changes
+  - Added comprehensive tests verifying runtime level changes affect actual log filtering
+  - Logger now stores writer references for dynamic rebuilding
+- **Configuration validation**:
+  - Fixed incorrect config keys in example files (`docs/examples/advanced-config.yaml`, `docs/examples/production-config.yaml`)
+  - Changed `app.docs.format` → `app.docs.output_format` and `app.docs.output` → `app.docs.output_file`
+  - Added validation script (`scripts/validate-example-configs.sh`) to catch config key errors
+- **Documentation path sanitization**:
+  - Generated documentation now uses `~` notation instead of exposing user-specific paths like `/Users/username`
+  - Added `sanitizeConfigPath()` helper to replace home directories with tilde notation
+  - Prevents user-specific information leakage in version-controlled documentation
+- **Exit code documentation**:
+  - Updated `config validate` command documentation to accurately reflect exit codes (0 for valid, 1 for errors or warnings)
 
 ## [0.7.0] - 2025-10-29
 

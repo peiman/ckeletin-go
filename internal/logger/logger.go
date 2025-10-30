@@ -22,6 +22,12 @@ var (
 	currentConsoleLevel zerolog.Level
 	// currentFileLevel holds the current file log level for runtime adjustment
 	currentFileLevel zerolog.Level
+	// currentConsoleWriter holds the console writer for rebuilding
+	currentConsoleWriter io.Writer
+	// currentFileWriter holds the file writer for rebuilding
+	currentFileWriter io.WriteCloser
+	// currentColorEnabled stores whether colors are enabled
+	currentColorEnabled bool
 )
 
 // Init initializes the logger with options from Viper.
@@ -46,6 +52,9 @@ func Init(out io.Writer) error {
 		out = os.Stdout
 	}
 
+	// Store console writer for rebuilding
+	currentConsoleWriter = out
+
 	var writers []io.Writer
 
 	// Get console log level (with backward compatibility)
@@ -54,6 +63,7 @@ func Init(out io.Writer) error {
 
 	// Determine if color should be enabled
 	colorEnabled := isColorEnabled(out)
+	currentColorEnabled = colorEnabled
 
 	// Console writer with filtering
 	consoleWriter := zerolog.ConsoleWriter{
@@ -84,6 +94,7 @@ func Init(out io.Writer) error {
 				Msg("Failed to open log file, continuing with console-only logging")
 		} else {
 			logFile = fileWriter
+			currentFileWriter = fileWriter // Store for rebuilding
 
 			filteredFile := FilteredWriter{
 				Writer:   fileWriter,
@@ -247,10 +258,67 @@ func openLogFileWithRotation(path string) (io.WriteCloser, error) {
 	return logger, nil
 }
 
+// rebuildLogger recreates the logger with current level settings.
+// This is called when runtime log level adjustments are made.
+func rebuildLogger() {
+	var writers []io.Writer
+
+	// Recreate console writer with current level
+	consoleWriter := zerolog.ConsoleWriter{
+		Out:        currentConsoleWriter,
+		TimeFormat: time.RFC3339,
+		NoColor:    !currentColorEnabled,
+	}
+
+	filteredConsole := FilteredWriter{
+		Writer:   consoleWriter,
+		MinLevel: currentConsoleLevel,
+	}
+
+	writers = append(writers, filteredConsole)
+
+	// Add file writer if it exists
+	if currentFileWriter != nil {
+		filteredFile := FilteredWriter{
+			Writer:   currentFileWriter,
+			MinLevel: currentFileLevel,
+		}
+		writers = append(writers, filteredFile)
+	}
+
+	// Create multi-writer
+	multi := zerolog.MultiLevelWriter(writers...)
+
+	// Create logger with timestamp
+	logger := zerolog.New(multi).With().Timestamp().Logger()
+
+	// Apply sampling if enabled
+	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
+		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
+		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
+		logger = logger.Sample(&zerolog.BurstSampler{
+			Burst:       uint32(initial), //nolint:gosec // Config values are positive
+			Period:      time.Second,
+			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
+		})
+	}
+
+	// Update global logger
+	log.Logger = logger
+
+	// Update global log level to the most verbose level
+	globalLevel := currentConsoleLevel
+	if currentFileWriter != nil && currentFileLevel < currentConsoleLevel {
+		globalLevel = currentFileLevel
+	}
+	zerolog.SetGlobalLevel(globalLevel)
+}
+
 // SetConsoleLevel dynamically changes the console log level at runtime.
 // This allows adjusting verbosity without restarting the application.
 func SetConsoleLevel(level zerolog.Level) {
 	currentConsoleLevel = level
+	rebuildLogger()
 	log.Info().
 		Str("level", level.String()).
 		Msg("Console log level changed")
@@ -260,6 +328,7 @@ func SetConsoleLevel(level zerolog.Level) {
 // This allows adjusting file log verbosity without restarting the application.
 func SetFileLevel(level zerolog.Level) {
 	currentFileLevel = level
+	rebuildLogger()
 	log.Info().
 		Str("level", level.String()).
 		Msg("File log level changed")

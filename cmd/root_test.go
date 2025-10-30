@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -33,14 +34,10 @@ func TestInitConfig(t *testing.T) {
 		skipIfNoHome       bool             // Skip test if HOME cannot be determined
 	}{
 		{
-			name:               "No HOME environment variable",
-			setupHome:          "",
-			expectedError:      true,
-			expectedErrContain: "$HOME is not defined",
-			skipIfNoHome:       true,
-			customAssert: func(t *testing.T) {
-				// This custom assert is not needed anymore since we expect an error
-			},
+			name:           "No HOME environment variable",
+			setupHome:      "",
+			expectedError:  false, // Now works without HOME (Issue #1 fix)
+			expectedStatus: "No config file found, using defaults and environment variables",
 		},
 		{
 			name:            "Config path setup with temp directory",
@@ -839,5 +836,266 @@ func TestLoggingFlagsIntegration(t *testing.T) {
 				t.Errorf("Console output should contain 'Info message'")
 			}
 		})
+	}
+}
+
+// ============================================================================
+// TDD Tests for Issue #1 + #7: $HOME Fallback + Config Search Path
+// ============================================================================
+
+// TestInitConfigWithoutHomeDir tests that initConfig works without $HOME environment variable
+// This test will initially FAIL - initConfig currently returns error without HOME
+func TestInitConfigWithoutHomeDir(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Save originals
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+	}()
+
+	// Reset viper state
+	viper.Reset()
+
+	// Unset HOME completely
+	t.Setenv("HOME", "")
+
+	// No --config flag set
+	cfgFile = ""
+
+	// Setup logger for capturing output
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err := initConfig()
+
+	// ASSERTION PHASE
+	// Should NOT return error - app should work without HOME
+	if err != nil {
+		t.Errorf("initConfig should work without HOME environment variable, got error: %v", err)
+	}
+
+	// Should use defaults (no config file found is OK)
+	if err == nil && configFileStatus == "" {
+		t.Error("configFileStatus should be set even when no config file is found")
+	}
+}
+
+// TestConfigFromCurrentDirectory tests that config is discovered from current directory
+// This test will initially FAIL - only searches home directory currently
+func TestConfigFromCurrentDirectory(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Create temp dir and change to it
+	tempDir := t.TempDir()
+	oldWd, _ := os.Getwd()
+	defer os.Chdir(oldWd)
+	os.Chdir(tempDir)
+
+	// Create config file in current directory
+	configContent := []byte("app:\n  log_level: debug\n")
+	configPath := filepath.Join(tempDir, ".ckeletin-go.yaml")
+	err := os.WriteFile(configPath, configContent, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write test config: %v", err)
+	}
+
+	// Save originals
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+	}()
+
+	// Reset viper state
+	viper.Reset()
+
+	// No --config flag set
+	cfgFile = ""
+
+	// Setup HOME to different directory so we know it's finding current dir config
+	homeDir := filepath.Join(tempDir, "home")
+	os.MkdirAll(homeDir, 0755)
+	t.Setenv("HOME", homeDir)
+
+	// Setup logger
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err = initConfig()
+
+	// ASSERTION PHASE
+	if err != nil {
+		t.Fatalf("initConfig should succeed with current directory config: %v", err)
+	}
+
+	// Should find config from current directory
+	if viper.GetString("app.log_level") != "debug" {
+		t.Errorf("Expected log_level='debug' from current dir config, got: %s", viper.GetString("app.log_level"))
+	}
+
+	// Config file should be discovered
+	if !strings.Contains(configFileStatus, "Using config file") {
+		t.Errorf("Expected 'Using config file' status, got: %s", configFileStatus)
+	}
+}
+
+// TestConfigPriorityCurrentDirFirst tests that current directory config has priority over home directory
+// This test will initially FAIL - current directory search doesn't exist yet
+func TestConfigPriorityCurrentDirFirst(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Create temp directory structure
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	currentDir := filepath.Join(tempDir, "current")
+	os.MkdirAll(homeDir, 0755)
+	os.MkdirAll(currentDir, 0755)
+
+	// Write different values to home and current directory configs
+	homeConfigContent := []byte("app:\n  log_level: info\n")
+	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
+	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write home config: %v", err)
+	}
+
+	currentConfigContent := []byte("app:\n  log_level: debug\n")
+	currentConfig := filepath.Join(currentDir, ".ckeletin-go.yaml")
+	err = os.WriteFile(currentConfig, currentConfigContent, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write current dir config: %v", err)
+	}
+
+	// Save originals
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	oldWd, _ := os.Getwd()
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+		os.Chdir(oldWd)
+	}()
+
+	// Reset viper state
+	viper.Reset()
+
+	// No --config flag set
+	cfgFile = ""
+
+	// Set HOME to home directory and change to current directory
+	t.Setenv("HOME", homeDir)
+	os.Chdir(currentDir)
+
+	// Setup logger
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err = initConfig()
+
+	// ASSERTION PHASE
+	if err != nil {
+		t.Fatalf("initConfig should succeed with both configs present: %v", err)
+	}
+
+	// Current directory config should win (debug, not info)
+	logLevel := viper.GetString("app.log_level")
+	if logLevel != "debug" {
+		t.Errorf("Expected log_level='debug' from current dir (priority), got: %s", logLevel)
+	}
+
+	// Config file path should be from current directory
+	if configFileUsed != "" && !strings.Contains(configFileUsed, currentDir) {
+		t.Errorf("Expected config from current dir (%s), got: %s", currentDir, configFileUsed)
+	}
+}
+
+// TestConfigFromHomeDirectoryOnly tests config discovery when config only exists in home directory
+func TestConfigFromHomeDirectoryOnly(t *testing.T) {
+	// Skip on Windows due to path handling differences
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping home directory config test on Windows")
+	}
+
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	// Create temp directory structure
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	currentDir := filepath.Join(tempDir, "current")
+	os.MkdirAll(homeDir, 0755)
+	os.MkdirAll(currentDir, 0755)
+
+	// Write config ONLY to home directory (not current directory)
+	homeConfigContent := []byte("app:\n  log_level: warn\n")
+	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
+	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
+	if err != nil {
+		t.Fatalf("Failed to write home config: %v", err)
+	}
+
+	// Save originals
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	oldWd, _ := os.Getwd()
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+		os.Chdir(oldWd)
+	}()
+
+	// Reset viper state
+	viper.Reset()
+
+	// No --config flag set
+	cfgFile = ""
+
+	// Set HOME to home directory and change to empty current directory
+	t.Setenv("HOME", homeDir)
+	os.Chdir(currentDir)
+
+	// Setup logger
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err = initConfig()
+
+	// ASSERTION PHASE
+	if err != nil {
+		t.Fatalf("initConfig should succeed with home directory config: %v", err)
+	}
+
+	// Home directory config should be loaded
+	logLevel := viper.GetString("app.log_level")
+	if logLevel != "warn" {
+		t.Errorf("Expected log_level='warn' from home dir, got: %s", logLevel)
+	}
+
+	// Config file path should be from home directory
+	if configFileUsed != "" && !strings.Contains(configFileUsed, homeDir) {
+		t.Errorf("Expected config from home dir (%s), got: %s", homeDir, configFileUsed)
 	}
 }

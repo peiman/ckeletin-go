@@ -91,11 +91,11 @@ app:
   # =============================================================================
 
   docs:
-    format: markdown           # Output format for documentation
+    output_format: markdown    # Output format for documentation
                                # Options: markdown, yaml
                                # Can be overridden with --format flag
 
-    output: ""                 # Output file path
+    output_file: ""            # Output file path
                                # Default: "" (stdout)
                                # Example: docs/configuration.md
                                # Can be overridden with --output flag

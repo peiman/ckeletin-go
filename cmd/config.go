@@ -33,8 +33,7 @@ This command checks:
 
 Exit codes:
   0 - Configuration is valid
-  1 - Configuration is invalid (errors found)
-  2 - Configuration is valid but has warnings`,
+  1 - Configuration has errors or warnings`,
 	Example: `  # Validate default config file
   ckeletin-go config validate
 

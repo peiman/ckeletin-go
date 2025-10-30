@@ -211,18 +211,31 @@ func initConfig() error {
 		configFilePath = cfgFile
 		viper.SetConfigFile(cfgFile)
 	} else {
+		// Add current directory first (highest priority after --config)
+		viper.AddConfigPath(".")
+
+		// Add home directory with fallback for containerized environments
 		home, err := os.UserHomeDir()
-		if err != nil {
-			return err
+		if err == nil {
+			viper.AddConfigPath(home)
 		}
-		// Check if default config file exists
-		defaultConfigPath := filepath.Join(home, configPaths.DefaultFullName)
-		if _, err := os.Stat(defaultConfigPath); err == nil {
-			configFilePath = defaultConfigPath
-		}
-		viper.AddConfigPath(home)
+		// Note: No error if HOME is unavailable - will search current dir only
+
 		viper.SetConfigName(configPaths.DefaultName)
 		viper.SetConfigType(configPaths.Extension)
+
+		// Try to determine which config will be used (for security validation)
+		// Check current directory first
+		currentDirConfig := configPaths.DefaultFullName
+		if _, err := os.Stat(currentDirConfig); err == nil {
+			configFilePath = currentDirConfig
+		} else if home != "" {
+			// Check home directory if current dir doesn't have config
+			homeConfig := filepath.Join(home, configPaths.DefaultFullName)
+			if _, err := os.Stat(homeConfig); err == nil {
+				configFilePath = homeConfig
+			}
+		}
 	}
 
 	// Security validation if config file path is known
