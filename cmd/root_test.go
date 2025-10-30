@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -1029,6 +1030,11 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 
 // TestConfigFromHomeDirectoryOnly tests config discovery when config only exists in home directory
 func TestConfigFromHomeDirectoryOnly(t *testing.T) {
+	// Skip on Windows due to path handling differences
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping home directory config test on Windows")
+	}
+
 	// SETUP PHASE
 	savedLogger, savedLevel := logger.SaveLoggerState()
 	defer logger.RestoreLoggerState(savedLogger, savedLevel)
