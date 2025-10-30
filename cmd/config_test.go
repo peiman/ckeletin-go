@@ -53,7 +53,7 @@ func TestRunConfigValidate(t *testing.T) {
 `,
 			configPerms:       0600,
 			setValidateFile:   true,
-			wantErr:           true,
+			wantErr:           true, // Warnings also return error (exit code 1)
 			wantOutputContain: "valid (with warnings)",
 		},
 		{
