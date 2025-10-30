@@ -74,8 +74,8 @@ app:
                                           # UI requires interactive terminal
 
   docs:
-    format: markdown           # Default documentation format
-    output: ""                 # Stdout by default
+    output_format: markdown    # Default documentation format
+    output_file: ""            # Stdout by default
 
 # =============================================================================
 # PRODUCTION DEPLOYMENT CHECKLIST
