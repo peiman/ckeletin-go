@@ -183,6 +183,53 @@ func TestGenerate_CloseError(t *testing.T) {
 	}
 }
 
+func TestGenerate_BothGenerationAndCloseErrors(t *testing.T) {
+	// Test that both generation error AND close error are properly handled
+	// This tests the error aggregation path where both operations fail
+
+	// SETUP PHASE
+	closeErr := errors.New("disk full - close failed")
+
+	// Mock openOutputFile to return our mock file that will fail on close
+	origOpenOutputFile := openOutputFile
+	defer func() { openOutputFile = origOpenOutputFile }()
+
+	openOutputFile = func(path string) (io.WriteCloser, error) {
+		mockFile := &MockWriteCloser{
+			Buffer:   bytes.NewBuffer(nil),
+			closeErr: closeErr,
+		}
+		return mockFile, nil
+	}
+
+	// Create generator with unsupported format to trigger generation error
+	writer := &bytes.Buffer{}
+	cfg := Config{
+		Writer:       writer,
+		OutputFormat: "invalid-format", // This will cause generation error
+		OutputFile:   "test-output.md",
+		Registry:     config.Registry,
+	}
+	generator := NewGenerator(cfg)
+
+	// EXECUTION PHASE
+	err := generator.Generate()
+
+	// ASSERTION PHASE
+	if err == nil {
+		t.Fatal("Expected both generation and close errors to be returned")
+	}
+
+	// Verify error message contains both errors
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "generation failed") {
+		t.Errorf("Expected error to mention 'generation failed', got: %v", errMsg)
+	}
+	if !strings.Contains(errMsg, "close also failed") {
+		t.Errorf("Expected error to mention close failure, got: %v", errMsg)
+	}
+}
+
 // TestGenerateMarkdownConvenience tests the convenience function for generating markdown
 func TestGenerateMarkdownConvenience(t *testing.T) {
 	// SETUP PHASE

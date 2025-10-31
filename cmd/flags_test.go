@@ -351,6 +351,29 @@ func TestIntDefault_Uint32Overflow(t *testing.T) {
 			}
 		})
 	}
+
+	// Test uint32 specifically (in addition to uint tests above)
+	// On 64-bit systems, all uint32 values fit in int
+	// On 32-bit systems, values > max int would clamp
+	t.Run("uint32 max value", func(t *testing.T) {
+		input := ^uint32(0) // 4294967295
+		got := intDefault(input)
+
+		// Calculate expected value based on system architecture
+		maxInt := int(^uint(0) >> 1)
+		var want int
+		if uint32(maxInt) >= ^uint32(0) {
+			// 64-bit system: uint32 max fits in int
+			want = int(^uint32(0))
+		} else {
+			// 32-bit system: would clamp to max int
+			want = maxInt
+		}
+
+		if got != want {
+			t.Errorf("intDefault(%d) = %d, want %d", input, got, want)
+		}
+	})
 }
 
 func TestIntDefault_Int64Overflow(t *testing.T) {
