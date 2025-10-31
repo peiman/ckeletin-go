@@ -1,4 +1,4 @@
-# ADR-009: Task-Based Single Source of Truth for CI/Local Alignment
+# ADR-000: Task-Based Single Source of Truth for CI/Local Alignment
 
 ## Status
 Accepted

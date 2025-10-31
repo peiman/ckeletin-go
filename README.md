@@ -23,6 +23,7 @@
   - [Key Highlights](#key-highlights)
   - [Quick Start](#quick-start)
   - [Features](#features)
+  - [Architecture](#architecture)
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
@@ -128,6 +129,14 @@ Each command manages its own configuration and defaults, promoting modularity an
 - **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
 - **High Test Coverage & Quality Checks**: Ensure a robust codebase that meets production standards.
+
+---
+
+## Architecture
+
+This project follows well-documented architectural patterns captured in **[Architecture Decision Records (ADRs)](docs/adr/)**. These ADRs document key design decisions including ultra-thin commands, centralized configuration, dependency injection, structured logging, and the task-based development workflow.
+
+See **[docs/adr/](docs/adr/)** for the complete list and detailed rationale.
 
 ---
 

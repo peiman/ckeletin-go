@@ -213,6 +213,7 @@ ckeletin-go/
 
 | ADR | Topic | Key Principle |
 |-----|-------|---------------|
+| ADR-000 | Task-Based Workflow (Foundational) | Single source of truth for dev commands |
 | ADR-001 | Command Pattern | Commands are ultra-thin (~20-30 lines) |
 | ADR-002 | Config Registry | Centralized config with type safety |
 | ADR-003 | Testing Strategy | Dependency injection over mocking |
@@ -220,6 +221,7 @@ ckeletin-go/
 | ADR-005 | Config Constants | Auto-generated from registry |
 | ADR-006 | Logging | Structured logging with Zerolog |
 | ADR-007 | UI Framework | Bubble Tea for interactive UIs |
+| ADR-008 | Release Automation | Multi-platform releases with GoReleaser |
 
 **When to Update ADRs:**
 - Making architectural changes
