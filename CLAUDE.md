@@ -40,14 +40,15 @@ When you start a new session, development tools are automatically installed:
 |---------|---------|-------------|
 | `task check` | Run ALL quality checks | **Before every commit** |
 | `task format` | Format all Go code | When code needs formatting |
-| `task format:check` | Check formatting (no changes) | In CI or verification |
+| `task check:format` | Check formatting (no changes) | In CI or verification |
 | `task lint` | Run golangci-lint | Fix code quality issues |
 | `task test` | Run tests with coverage | During development |
 | `task test:integration` | Run integration tests | Full system testing |
 | `task bench` | Run benchmarks | Performance validation |
-| `task vuln` | Check for vulnerabilities | Security audit |
-| `task deps:check` | Check dependency updates | Maintenance |
-| `task generate:constants` | Regenerate config constants | After registry changes |
+| `task check:vuln` | Check for vulnerabilities | Security audit |
+| `task check:deps` | Check all dependency issues | Maintenance |
+| `task validate:constants` | Validate constants in sync | After registry changes |
+| `task generate:config:key-constants` | Regenerate config constants | After registry changes |
 
 ### Development Workflow
 
@@ -102,6 +103,35 @@ task check
 3. Fix the root cause (don't just make the error go away)
 4. Re-run the task to verify
 5. If stuck, ask the user for guidance
+
+### Task Naming Convention
+
+All tasks follow a simple `action:target` pattern:
+
+```bash
+# Action on target
+task check:format          # Check format
+task check:vuln            # Check vulnerabilities
+task check:deps:verify     # Check deps, verify subvariant
+task validate:commands     # Validate commands (enforces ADR-001)
+task validate:constants    # Validate constants (enforces ADR-005)
+task test:race             # Test with race detection
+task test:integration      # Integration test
+task generate:config:key-constants    # Generate constants
+task build:release         # Build release
+task clean:local           # Clean local artifacts
+
+# Standalone actions
+task format                # Format everything
+task test                  # Test everything
+task check                 # Check everything (orchestrator)
+```
+
+**Scripts are implementation details. Task is the interface.**
+
+Lefthook, CI, and local all use Task commands. If you rename scripts, only Taskfile.yml changes.
+
+See ADR-000 "Task Naming Convention" for full details.
 
 ## Git Workflow
 
@@ -247,7 +277,7 @@ ckeletin-go/
 
 2. **Generate Constants**
    ```bash
-   task generate:constants
+   task generate:config:key-constants
    # Creates internal/config/keys_generated.go
    ```
 
@@ -261,7 +291,7 @@ ckeletin-go/
 **Rules:**
 - **Never** hardcode config keys as strings
 - **Always** use generated constants from `config.Key*`
-- **Always** run `task generate:constants` after registry changes
+- **Always** run `task generate:config:key-constants` after registry changes
 - Add validation functions for complex config values
 
 ### Logging Standards
@@ -382,7 +412,7 @@ func TestFeature(t *testing.T) {
 
 2. **Config Key Magic Strings** - Using raw strings for config keys
    - Always use generated constants
-   - Run `task generate:constants` after registry changes
+   - Run `task generate:config:key-constants` after registry changes
 
 3. **Unstructured Logging** - Using `fmt.Println()` or basic log
    - Use `log.Info()`, `log.Error()`, etc.
@@ -446,12 +476,12 @@ git push -u origin <branch-name>
 | `task format` | Multiple times during dev | Formats all Go code |
 | `task lint` | When check fails | Shows detailed lint issues |
 | `task test` | After code changes | Runs tests with coverage |
-| `task generate:constants` | After config registry changes | Regenerates config constants |
-| `task deps:check` | Weekly/monthly | Checks for dependency updates |
-| `task vuln` | Before releases | Scans for vulnerabilities |
-| `task release:check` | Before creating releases | Checks if GoReleaser is installed |
-| `task release:test` | Before tagging | Tests release build locally |
-| `task release:clean` | After testing releases | Cleans GoReleaser artifacts |
+| `task generate:config:key-constants` | After config registry changes | Regenerates config constants |
+| `task check:deps` | Weekly/monthly | Checks for dependency updates |
+| `task check:vuln` | Before releases | Scans for vulnerabilities |
+| `task check:release` | Before creating releases | Checks if GoReleaser is installed |
+| `task test:release` | Before tagging | Tests release build locally |
+| `task clean:release` | After testing releases | Cleans GoReleaser artifacts |
 
 ## Getting Help
 

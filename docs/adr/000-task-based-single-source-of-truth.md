@@ -128,9 +128,13 @@ pre-commit:
   parallel: true
   commands:
     format:
-      run: ./scripts/format-go.sh fix {staged_files}
+      run: task format:staged -- {staged_files}
     lint:
       run: task lint
+    validate-constants:
+      run: task validate:constants
+    verify-deps:
+      run: task check:deps:verify
     test:
       run: task test
 ```
@@ -247,10 +251,90 @@ task check  # Run ALL checks - this is non-negotiable
 ```
 ```
 
+## Task Naming Convention
+
+### Pattern: action:target
+
+All tasks follow a simple, consistent pattern:
+
+```
+action:target[:subvariant]
+```
+
+Where:
+- **action** is what you're doing (check, validate, test, generate, build, clean, format, bench)
+- **target** is what you're doing it to (a resource, variant, or modifier)
+
+**Examples:**
+
+```yaml
+# Action applied to different targets
+check:format                  # Check format
+check:vuln                    # Check vulnerabilities
+check:deps                    # Check dependencies (orchestrator)
+check:deps:verify             # Check deps, verify subvariant
+check:deps:outdated           # Check deps, outdated subvariant
+validate:commands             # Validate commands
+validate:constants            # Validate constants
+generate:config:key-constants # Generate config key constants
+generate:config:template      # Generate config YAML template
+generate:docs                 # Generate docs (orchestrator)
+generate:docs:config          # Generate configuration documentation
+test:race                     # Test with race detection
+test:integration              # Integration test
+test:coverage:patch           # Test coverage, patch subvariant
+bench:cmd                     # Benchmark cmd package
+build:release                 # Build release artifacts
+clean:local                   # Clean local artifacts
+clean:release                 # Clean release artifacts
+format:staged                 # Format staged files
+
+# Standalone actions (no target needed)
+format                  # Format everything
+test                    # Test everything
+build                   # Build
+clean                   # Clean everything (orchestrator)
+check                   # Check everything (orchestrator)
+lint                    # Lint
+run                     # Run
+install                 # Install
+setup                   # Setup
+tidy                    # Tidy
+```
+
+**Benefits:**
+
+- **Simple**: One pattern to learn - `action:target`
+- **Discoverable**: `task check:<TAB>` shows all checks, `task test:<TAB>` shows all test variants
+- **Consistent**: Always read as "action on target"
+- **Scalable**: Easy to add new tasks following the same pattern
+
+### Why This Pattern Matters
+
+**Scripts are implementation details. Task is the interface.**
+
+```yaml
+# .lefthook.yml - uses Task commands, not scripts
+format:
+  run: task format:staged -- {staged_files}
+validate-constants:
+  run: task validate:constants
+verify-deps:
+  run: task check:deps:verify
+```
+
+**Benefits:**
+
+- Rename or refactor scripts → only update Taskfile.yml
+- Lefthook, CI, and local commands remain unchanged
+- Consistent "always use Task" rule with zero exceptions
+- Task is the SSOT interface for ALL environments (local, Lefthook, CI)
+
 ## Related ADRs
 
-- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands enforced via `task validate-commands`
-- [ADR-002](002-centralized-configuration-registry.md) - Config registry enforced via `task check-defaults`
+- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands enforced via `task validate:commands`
+- [ADR-002](002-centralized-configuration-registry.md) - Config registry enforced via `task validate:defaults`
+- [ADR-005](005-auto-generated-config-constants.md) - Config constants enforced via `task validate:constants`
 - [ADR-008](008-release-automation-with-goreleaser.md) - Release process uses `task check` as quality gate
 
 ## References

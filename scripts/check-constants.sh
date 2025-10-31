@@ -13,7 +13,7 @@ trap "rm -f $TEMP_FILE" EXIT
 # Run full generation task (includes formatting)
 # Suppress output and capture the file before git restore
 go run scripts/generate-config-constants.go > /dev/null 2>&1
-./scripts/format-go.sh fix internal/config/keys_generated.go > /dev/null 2>&1
+task format:staged -- internal/config/keys_generated.go > /dev/null 2>&1
 
 # Copy newly generated and formatted file to temp
 cp internal/config/keys_generated.go "$TEMP_FILE"

@@ -64,7 +64,7 @@ message := getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutp
 ## Workflow
 
 1. Add new config option to registry
-2. Run `task generate:constants` (or `go run scripts/generate-config-constants.go`)
+2. Run `task generate:config:key-constants` (or `go run scripts/generate-config-constants.go`)
 3. Use generated constant in code
 4. Pre-commit hook validates consistency automatically
 

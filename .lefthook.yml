@@ -4,14 +4,14 @@ pre-commit:
   commands:
     format:
       glob: "*.go"
-      run: ./scripts/format-go.sh fix {staged_files}
+      run: task format:staged -- {staged_files}
       stage_fixed: true
     lint:
       run: task lint
-    deps-verify:
-      run: task deps:verify
-    check-constants:
-      run: task check-constants
+    validate-constants:
+      run: task validate:constants
+    verify-deps:
+      run: task check:deps:verify
     test:
       run: task test
 
