@@ -124,49 +124,62 @@ func TestGenerate_FileError(t *testing.T) {
 }
 
 func TestGenerate_CloseError(t *testing.T) {
+	// REGRESSION TEST: Verify that close errors are properly propagated
+	// Bug: The deferred closeErr assignment happens after the function returns,
+	// so checking closeErr in the function body always sees nil.
+	//
+	// This test ensures that file.Close() errors are properly returned to the caller.
+
 	// SETUP PHASE
-	// Create a mock generator that just returns the close error
 	closeWasCalled := false
-	closeErr := errors.New("close error")
-	mockFile := &MockWriteCloser{
-		Buffer:   bytes.NewBuffer(nil),
-		closeErr: closeErr,
-		onClose:  func() { closeWasCalled = true },
+	closeErr := errors.New("disk full - close failed")
+
+	// Mock openOutputFile to return our mock file that will fail on close
+	origOpenOutputFile := openOutputFile
+	defer func() { openOutputFile = origOpenOutputFile }()
+
+	openOutputFile = func(path string) (io.WriteCloser, error) {
+		mockFile := &MockWriteCloser{
+			Buffer:   bytes.NewBuffer(nil),
+			closeErr: closeErr,
+			onClose:  func() { closeWasCalled = true },
+		}
+		return mockFile, nil
 	}
 
-	// Create a custom generate function that simulates the file close error
-	customGenerate := func() error {
-		// Write something to the mock file
-		_, err := mockFile.Write([]byte("test content"))
-		if err != nil {
-			return err
-		}
-
-		// Now close the file and handle the error as Generate would
-		closeErr := mockFile.Close()
-		if closeErr != nil {
-			return closeErr
-		}
-
-		return nil
+	// Create generator with output file (triggers file creation)
+	writer := &bytes.Buffer{}
+	cfg := Config{
+		Writer:       writer,
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "test-output.md", // Triggers file creation path
+		Registry:     config.Registry,
 	}
+	generator := NewGenerator(cfg)
+	generator.SetAppInfo(AppInfo{BinaryName: "test"})
 
 	// EXECUTION PHASE
-	err := customGenerate()
+	err := generator.Generate()
 
 	// ASSERTION PHASE
 	// Verify that Close was called
 	if !closeWasCalled {
-		t.Fatalf("Close was not called on the mock file")
+		t.Fatalf("Close was not called on the file - defer didn't run")
 	}
 
-	// Verify the close error is propagated
+	// CRITICAL: Verify the close error is propagated to caller
+	// This will FAIL with the current buggy implementation because closeErr
+	// is checked before the deferred function assigns it
 	if err == nil {
-		t.Errorf("Expected close error to be propagated, got nil")
+		t.Fatalf("Expected close error to be propagated, got nil\n" +
+			"This indicates the close-error aggregation bug:\n" +
+			"The defer sets closeErr AFTER the function returns, so checks for\n" +
+			"'if closeErr != nil' in the function body always see nil",
+		)
 	}
 
-	if err != closeErr {
-		t.Errorf("Expected error to be the close error, got %v", err)
+	if !strings.Contains(err.Error(), "close") {
+		t.Errorf("Expected error message to mention 'close', got: %v", err)
 	}
 }
 

@@ -288,6 +288,71 @@ func TestIntDefault_AllUintTypes(t *testing.T) {
 	}
 }
 
+func TestIntDefault_Uint64Overflow(t *testing.T) {
+	// Test uint64 overflow handling - these values are larger than math.MaxInt
+	// and should be clamped to max int, not silently wrapped to negative values
+	tests := []struct {
+		name  string
+		input uint64
+		want  int
+	}{
+		{
+			name:  "uint64 max value (should clamp to max int)",
+			input: ^uint64(0),         // math.MaxUint64
+			want:  int(^uint(0) >> 1), // max int
+		},
+		{
+			name:  "uint64 larger than max int (should clamp)",
+			input: uint64(^uint(0)>>1) + 1, // math.MaxInt + 1
+			want:  int(^uint(0) >> 1),      // max int
+		},
+		{
+			name:  "Small uint64 value (no overflow)",
+			input: uint64(100),
+			want:  100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := intDefault(tt.input)
+			if got != tt.want {
+				t.Errorf("intDefault(%d) = %d, want %d (should clamp, not wrap to negative)", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIntDefault_Uint32Overflow(t *testing.T) {
+	// Test uint/uint32 overflow on 32-bit systems
+	// These should also be checked and clamped
+	tests := []struct {
+		name  string
+		input uint
+		want  int
+	}{
+		{
+			name:  "uint max value (should clamp to max int)",
+			input: ^uint(0),           // max uint
+			want:  int(^uint(0) >> 1), // max int
+		},
+		{
+			name:  "Small uint value (no overflow)",
+			input: uint(100),
+			want:  100,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := intDefault(tt.input)
+			if got != tt.want {
+				t.Errorf("intDefault(%d) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIntDefault_Int64Overflow(t *testing.T) {
 	// Test int64 overflow handling
 	// We test with values that would overflow int on 32-bit systems
