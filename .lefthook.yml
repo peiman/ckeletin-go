@@ -12,3 +12,11 @@ pre-commit:
       run: task deps:verify
     test:
       run: task test
+
+pre-push:
+  parallel: true
+  commands:
+    coverage-project:
+      run: task test:coverage:project
+    coverage-patch:
+      run: task test:coverage:patch

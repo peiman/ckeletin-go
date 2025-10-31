@@ -132,6 +132,18 @@ tasks:
       - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
     silent: true
 
+  test:coverage:project:
+    desc: Check project coverage meets threshold (like codecov/project)
+    deps: [test]
+    cmds:
+      - ./scripts/check-coverage-project.sh
+
+  test:coverage:patch:
+    desc: Check patch coverage for changed lines (like codecov/patch)
+    deps: [test]
+    cmds:
+      - ./scripts/check-coverage-patch.sh
+
   bench:
     desc: Run all benchmarks
     cmd: |
