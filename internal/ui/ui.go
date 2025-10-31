@@ -48,6 +48,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 	if err != nil {
 		log.Error().
 			Err(err).
+			Str("component", "ui").
 			Str("message", message).
 			Str("color", col).
 			Msg("Failed to get color style")
@@ -62,6 +63,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 	// For testing - if newProgram is nil, just log success and return
 	if d.newProgram == nil {
 		log.Info().
+			Str("component", "ui").
 			Str("message", message).
 			Str("color", col).
 			Msg("UI ran successfully (test mode)")
@@ -74,6 +76,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 	if err != nil {
 		log.Error().
 			Err(err).
+			Str("component", "ui").
 			Str("message", message).
 			Str("color", col).
 			Msg("Failed to run UI")
@@ -81,6 +84,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 	}
 
 	log.Info().
+		Str("component", "ui").
 		Str("message", message).
 		Str("color", col).
 		Msg("UI ran successfully")
@@ -96,6 +100,7 @@ func GetLipglossColor(col string) (lipgloss.Color, error) {
 	err := fmt.Errorf("invalid color: %s", col)
 	log.Error().
 		Err(err).
+		Str("component", "ui").
 		Str("color", col).
 		Msg("Failed to get lipgloss color")
 	return "", err
