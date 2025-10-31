@@ -1,4 +1,15 @@
 // cmd/root.go
+//
+// Thread-Safety Notes:
+//
+// Viper configuration in this application follows a safe initialization pattern:
+//  1. All configuration is initialized during startup in PersistentPreRunE (single-threaded)
+//  2. Configuration is read-only after initialization completes
+//  3. No concurrent writes occur during command execution
+//  4. Commands execute sequentially (Cobra's execution model)
+//
+// This pattern ensures thread-safety without requiring locks or synchronization.
+// Viper itself is not thread-safe for writes, but our usage pattern avoids concurrent access.
 
 package cmd
 
@@ -98,9 +109,17 @@ var RootCmd = &cobra.Command{
 	Long: fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
 It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Bind flags to viper first (must happen before initConfig)
+		if err := bindFlags(cmd); err != nil {
+			return fmt.Errorf("failed to bind flags: %w", err)
+		}
+
+		// Initialize configuration
 		if err := initConfig(); err != nil {
 			return err
 		}
+
+		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
@@ -128,79 +147,70 @@ func Execute() error {
 
 func init() {
 	configPaths := ConfigPaths()
+
+	// Define all persistent flags (flag definitions only - bindings happen in bindFlags())
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("Config file (default is %s)", configPaths.DefaultPath))
-	if err := viper.BindPFlag("config", RootCmd.PersistentFlags().Lookup("config")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'config' flag")
-	}
 
 	// Legacy log level flag (for backward compatibility)
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
-	if err := viper.BindPFlag(config.KeyAppLogLevel, RootCmd.PersistentFlags().Lookup("log-level")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-level'")
-	}
 
 	// Dual logging configuration flags
 	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")
-	if err := viper.BindPFlag(config.KeyAppLogConsoleLevel, RootCmd.PersistentFlags().Lookup("log-console-level")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-console-level'")
-	}
-
 	RootCmd.PersistentFlags().Bool("log-file-enabled", false, "Enable file logging to capture detailed logs")
-	if err := viper.BindPFlag(config.KeyAppLogFileEnabled, RootCmd.PersistentFlags().Lookup("log-file-enabled")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-enabled'")
-	}
-
 	RootCmd.PersistentFlags().String("log-file-path", "./logs/ckeletin-go.log", "Path to the log file")
-	if err := viper.BindPFlag(config.KeyAppLogFilePath, RootCmd.PersistentFlags().Lookup("log-file-path")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-path'")
-	}
-
 	RootCmd.PersistentFlags().String("log-file-level", "debug", "File log level (trace, debug, info, warn, error, fatal, panic)")
-	if err := viper.BindPFlag(config.KeyAppLogFileLevel, RootCmd.PersistentFlags().Lookup("log-file-level")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-level'")
-	}
-
 	RootCmd.PersistentFlags().String("log-color", "auto", "Enable colored console output (auto, true, false)")
-	if err := viper.BindPFlag(config.KeyAppLogColorEnabled, RootCmd.PersistentFlags().Lookup("log-color")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-color'")
-	}
 
 	// Log rotation configuration flags
 	RootCmd.PersistentFlags().Int("log-file-max-size", 100, "Maximum size in megabytes before log file is rotated")
-	if err := viper.BindPFlag(config.KeyAppLogFileMaxSize, RootCmd.PersistentFlags().Lookup("log-file-max-size")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-size'")
-	}
-
 	RootCmd.PersistentFlags().Int("log-file-max-backups", 3, "Maximum number of old log files to retain")
-	if err := viper.BindPFlag(config.KeyAppLogFileMaxBackups, RootCmd.PersistentFlags().Lookup("log-file-max-backups")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-backups'")
-	}
-
 	RootCmd.PersistentFlags().Int("log-file-max-age", 28, "Maximum number of days to retain old log files")
-	if err := viper.BindPFlag(config.KeyAppLogFileMaxAge, RootCmd.PersistentFlags().Lookup("log-file-max-age")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-max-age'")
-	}
-
 	RootCmd.PersistentFlags().Bool("log-file-compress", false, "Compress rotated log files with gzip")
-	if err := viper.BindPFlag(config.KeyAppLogFileCompress, RootCmd.PersistentFlags().Lookup("log-file-compress")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-file-compress'")
-	}
 
 	// Log sampling configuration flags
 	RootCmd.PersistentFlags().Bool("log-sampling-enabled", false, "Enable log sampling for high-volume scenarios")
-	if err := viper.BindPFlag(config.KeyAppLogSamplingEnabled, RootCmd.PersistentFlags().Lookup("log-sampling-enabled")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-enabled'")
-	}
-
 	RootCmd.PersistentFlags().Int("log-sampling-initial", 100, "Number of messages to log per second before sampling")
-	if err := viper.BindPFlag(config.KeyAppLogSamplingInitial, RootCmd.PersistentFlags().Lookup("log-sampling-initial")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-initial'")
-	}
 
 	RootCmd.PersistentFlags().Int("log-sampling-thereafter", 100, "Number of messages to log thereafter per second")
-	if err := viper.BindPFlag(config.KeyAppLogSamplingThereafter, RootCmd.PersistentFlags().Lookup("log-sampling-thereafter")); err != nil {
-		log.Fatal().Err(err).Msg("Failed to bind 'log-sampling-thereafter'")
+}
+
+// bindFlags binds all persistent flags to viper configuration keys.
+// This function is called from PersistentPreRunE to allow proper error handling.
+// Unlike the previous init() pattern with log.Fatal(), this returns errors that can be
+// handled gracefully and makes the code testable.
+func bindFlags(cmd *cobra.Command) error {
+	var errs []error
+
+	// Helper function to collect binding errors
+	// Use cmd.Root() to get flags from RootCmd even when called from subcommands
+	bindFlag := func(key string, flagName string) {
+		if err := viper.BindPFlag(key, cmd.Root().PersistentFlags().Lookup(flagName)); err != nil {
+			errs = append(errs, fmt.Errorf("bind flag %q to key %q: %w", flagName, key, err))
+		}
 	}
+
+	// Bind all flags to their viper keys
+	bindFlag("config", "config")
+	bindFlag(config.KeyAppLogLevel, "log-level")
+	bindFlag(config.KeyAppLogConsoleLevel, "log-console-level")
+	bindFlag(config.KeyAppLogFileEnabled, "log-file-enabled")
+	bindFlag(config.KeyAppLogFilePath, "log-file-path")
+	bindFlag(config.KeyAppLogFileLevel, "log-file-level")
+	bindFlag(config.KeyAppLogColorEnabled, "log-color")
+	bindFlag(config.KeyAppLogFileMaxSize, "log-file-max-size")
+	bindFlag(config.KeyAppLogFileMaxBackups, "log-file-max-backups")
+	bindFlag(config.KeyAppLogFileMaxAge, "log-file-max-age")
+	bindFlag(config.KeyAppLogFileCompress, "log-file-compress")
+	bindFlag(config.KeyAppLogSamplingEnabled, "log-sampling-enabled")
+	bindFlag(config.KeyAppLogSamplingInitial, "log-sampling-initial")
+	bindFlag(config.KeyAppLogSamplingThereafter, "log-sampling-thereafter")
+
+	// Return combined error if any bindings failed
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to bind %d flag(s): %v", len(errs), errs)
+	}
+
+	return nil
 }
 
 func initConfig() error {
@@ -256,6 +266,9 @@ func initConfig() error {
 	// Set default values from registry
 	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
 	// All defaults MUST be defined in internal/config/registry.go
+	//
+	// Thread-safety: This is called during startup before any concurrent access.
+	// No synchronization needed as all config writes happen here in PersistentPreRunE.
 	config.SetDefaults()
 
 	// Validate default values to ensure they don't exceed limits

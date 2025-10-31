@@ -177,10 +177,36 @@ func intDefault(v interface{}) int {
 	case int8:
 		return int(t)
 	case uint:
-		return int(t) //nolint:gosec // Safe conversion for config values
+		// Check for overflow - uint can be larger than max int
+		maxInt := uint(^uint(0) >> 1)
+		if t > maxInt {
+			log.Warn().
+				Uint("value", t).
+				Msg("Unsigned integer overflow in config default, clamping to max int")
+			return int(maxInt)
+		}
+		return int(t)
 	case uint64:
-		return int(t) //nolint:gosec // Safe conversion for config values
+		// Check for overflow - uint64 can be larger than max int
+		maxInt := uint64(^uint(0) >> 1)
+		if t > maxInt {
+			log.Warn().
+				Uint64("value", t).
+				Msg("Unsigned integer overflow in config default, clamping to max int")
+			return int(maxInt)
+		}
+		return int(t)
 	case uint32:
+		// Check for overflow - uint32 can be larger than max int on 32-bit systems
+		// Convert to int64 first to check safely, then clamp if needed
+		asInt64 := int64(t)
+		maxInt := int64(^uint(0) >> 1)
+		if asInt64 > maxInt {
+			log.Warn().
+				Uint32("value", t).
+				Msg("Unsigned integer overflow in config default, clamping to max int")
+			return int(maxInt)
+		}
 		return int(t)
 	case uint16:
 		return int(t)

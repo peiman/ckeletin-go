@@ -135,7 +135,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 
 ### Prerequisites
 
-- **Go**: 1.20+ recommended.
+- **Go**: Version specified in `go.mod` (currently maintained at the latest stable release).
 - **Task**: Install from [taskfile.dev](https://taskfile.dev/#/installation).
 - **Git**: For version control.
 

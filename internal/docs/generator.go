@@ -34,7 +34,6 @@ func (g *Generator) SetAppInfo(info AppInfo) {
 func (g *Generator) Generate() error {
 	writer := g.cfg.Writer
 	var file io.WriteCloser
-	var closeErr error
 
 	// If output file is specified, create it
 	if g.cfg.OutputFile != "" {
@@ -43,17 +42,19 @@ func (g *Generator) Generate() error {
 		if err != nil {
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
+		// Defer close only for cleanup (in case of panic or early return)
+		// We'll explicitly close below to check the error
 		defer func() {
-			// Capture the close error
-			closeErr = file.Close()
-			if closeErr != nil {
-				log.Error().Err(closeErr).Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
+			// Only close if we haven't already closed explicitly
+			if file != nil {
+				_ = file.Close()
 			}
 		}()
 		writer = file
 		log.Info().Str("file", g.cfg.OutputFile).Msg("Writing documentation to file")
 	}
 
+	// Generate documentation
 	var err error
 	switch strings.ToLower(g.cfg.OutputFormat) {
 	case FormatMarkdown:
@@ -64,17 +65,25 @@ func (g *Generator) Generate() error {
 		err = fmt.Errorf("unsupported format: %s", g.cfg.OutputFormat)
 	}
 
-	// Handle both generation and close errors appropriately
-	if err != nil && closeErr != nil {
-		// Both errors occurred - wrap both for full context
-		log.Warn().Err(closeErr).Msg("File close also failed after generation error")
-		return fmt.Errorf("generation failed: %w (note: file close also failed: %v)", err, closeErr)
-	} else if closeErr != nil {
-		// Only close error - generation succeeded
-		return fmt.Errorf("failed to close output file: %w", closeErr)
+	// If we opened a file, close it explicitly and check for errors
+	if file != nil {
+		closeErr := file.Close()
+		file = nil // Mark as closed so defer doesn't try again
+
+		if closeErr != nil {
+			log.Error().Err(closeErr).Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
+			// Handle both generation and close errors
+			if err != nil {
+				// Both errors occurred - wrap both for full context
+				log.Warn().Err(closeErr).Msg("File close also failed after generation error")
+				return fmt.Errorf("generation failed: %w (note: file close also failed: %v)", err, closeErr)
+			}
+			// Only close error - generation succeeded
+			return fmt.Errorf("failed to close output file: %w", closeErr)
+		}
 	}
 
-	// Either no errors or only generation error
+	// Return generation error (if any)
 	return err
 }
 

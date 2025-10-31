@@ -110,6 +110,11 @@ tasks:
     cmd: |
       gotestsum --format pkgname --watch --hide-summary=skipped
 
+  test:integration:
+    desc: Run integration tests (disables cache with -count=1)
+    cmd: |
+      gotestsum --format pkgname -- -v -count=1 ./test/integration/...
+
   test:coverage-text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:
@@ -126,6 +131,18 @@ tasks:
       - echo "Coverage report saved to coverage.html"
       - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
     silent: true
+
+  test:coverage:project:
+    desc: Check project coverage meets threshold (like codecov/project)
+    deps: [test]
+    cmds:
+      - ./scripts/check-coverage-project.sh
+
+  test:coverage:patch:
+    desc: Check patch coverage for changed lines (like codecov/patch)
+    deps: [test]
+    cmds:
+      - ./scripts/check-coverage-patch.sh
 
   bench:
     desc: Run all benchmarks

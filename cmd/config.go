@@ -32,7 +32,7 @@ This command checks:
 - Unknown configuration keys
 
 Exit codes:
-  0 - Configuration is valid
+  0 - Configuration is valid (no warnings)
   1 - Configuration has errors or warnings`,
 	Example: `  # Validate default config file
   ckeletin-go config validate
@@ -98,16 +98,18 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
-	// Print summary
+	// Print summary and return appropriate status
 	if result.Valid && len(result.Warnings) == 0 {
+		// Exit code 0: Valid with no warnings
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid!")
 		return nil
 	} else if result.Valid && len(result.Warnings) > 0 {
+		// Exit code 1: Valid but with warnings (return error to get exit code 1)
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid (with warnings)")
-		// Exit with code 2 to indicate warnings
 		cmd.SilenceUsage = true
 		return fmt.Errorf("validation completed with warnings")
 	} else {
+		// Exit code 1: Invalid (has errors)
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "❌ Configuration is invalid")
 		cmd.SilenceUsage = true
 		return fmt.Errorf("validation failed")
