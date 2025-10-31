@@ -16,6 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated all documentation (ADRs, README.md, CONTRIBUTING.md, cmd/README.md) to use new task names
   - Examples: `check-defaults` → `validate:defaults`, `deps:check` → `check:deps`, `release:test` → `test:release`
   - Improved discoverability with consistent action-based grouping (all `check:*`, `validate:*`, `generate:*`, etc.)
+- **README.md refactoring** (SSOT/DRY compliance):
+  - Documented new `task doctor` command for environment diagnostics
+  - Documented `config validate` command with exit codes and security features
+  - Updated Architecture section to emphasize project vision and principles
+  - Simplified task lists to reference `task --list` and Taskfile.yml (avoiding duplication)
+  - Simplified configuration section to reference ADR-002 and generated docs
+  - Added references to ADR-000 for task-based workflow documentation
+  - Updated module path customization to reflect auto-detection
+  - Applied SSOT/DRY principles throughout - README now references canonical sources instead of duplicating content
 
 ### Security
 

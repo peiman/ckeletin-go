@@ -134,9 +134,14 @@ Each command manages its own configuration and defaults, promoting modularity an
 
 ## Architecture
 
-This project follows well-documented architectural patterns captured in **[Architecture Decision Records (ADRs)](docs/adr/)**. These ADRs document key design decisions including ultra-thin commands, centralized configuration, dependency injection, structured logging, and the task-based development workflow.
+**ckeletin-go follows a principled architecture emphasizing:**
+- **Separation of concerns** - CLI wiring separate from business logic
+- **Single source of truth** - One canonical place for all configuration, tasks, and patterns
+- **Type safety** - Auto-generated constants, strong typing throughout
+- **Testability** - Dependency injection, high coverage standards
+- **Automation** - Task-based workflow, auto-generated docs, enforced patterns
 
-See **[docs/adr/](docs/adr/)** for the complete list and detailed rationale.
+All architectural decisions are documented in **[Architecture Decision Records (ADRs)](docs/adr/)** with detailed rationale and implementation guidance.
 
 ---
 
@@ -226,9 +231,9 @@ When you clone this repository, it's important to update the `MODULE_PATH` in th
    module gitlab.com/yourusername/your-repo-name
    ```
 
-3. **Update References**: If the `MODULE_PATH` is used elsewhere in the project (e.g., in `Taskfile.yml` for build flags), update those references to match your new module path.
+3. **Run `go mod tidy`**: After making changes, run `go mod tidy` to clean up any unnecessary dependencies and ensure the `go.mod` and `go.sum` files are up to date.
 
-4. **Run `go mod tidy`**: After making changes, run `go mod tidy` to clean up any unnecessary dependencies and ensure the `go.mod` and `go.sum` files are up to date.
+   **Note:** `Taskfile.yml` automatically detects your module path using `go list -m` - no manual Taskfile updates needed.
 
 By following these steps, you can ensure that your version of the project is correctly configured and ready for further development or deployment.
 
@@ -240,81 +245,13 @@ By following these steps, you can ensure that your version of the project is cor
 
 ### Configuration Management
 
-All configuration options are organized in a modular structure:
+Configuration options are defined in command files and self-register with the central registry.
 
-- `internal/config/options.go`: Core `ConfigOption` type definition and methods
-- `internal/config/core_options.go`: Application-wide settings that affect all commands
-- Command options are co-located with their command files (e.g., `cmd/ping.go`, `cmd/docs.go`) and self-register into the configuration registry
-- `internal/config/registry.go`: Aggregates all options into a single registry
+**To add new configuration options:** See examples in `cmd/ping.go` or `cmd/docs.go`, or read [ADR-002](docs/adr/002-centralized-configuration-registry.md) for the complete pattern.
 
-Benefits of this modular approach:
+**For all available configuration options:** Run `task generate:docs:config` to generate [docs/configuration.md](docs/configuration.md).
 
-- Clean separation between command-specific and application-wide settings
-- Better maintainability as each command's options are isolated
-- Simple extension by adding new command option files
-- All options still accessible through a single registry
-- Self-documenting configuration
-- Improved testability with 100% test coverage
-
-### Adding New Configuration Options
-
-When adding a new configuration option for an existing command, add it to the appropriate file:
-
-```go
-// For ping command options, add to internal/config/ping_options.go
-func PingOptions() []ConfigOption {
-    return []ConfigOption{
-        // Existing options...
-        {
-            Key:          "app.ping.new_setting",
-            DefaultValue: "default-value",
-            Description:  "Description of what this setting does",
-            Type:         "string", 
-            Required:     false,
-            Example:      "example-value",
-        },
-    }
-}
-```
-
-For a new command, create a new file following the naming pattern `<command>_options.go`:
-
-```go
-// internal/config/mycommand_options.go
-package config
-
-func MyCommandOptions() []ConfigOption {
-    return []ConfigOption{
-        {
-            Key:          "app.mycommand.setting",
-            DefaultValue: "default-value",
-            Description:  "Description of what this setting does",
-            Type:         "string",
-            Required:     false,
-            Example:      "example-value",
-        },
-    }
-}
-```
-
-Then add it to the registry in `registry.go`:
-
-```go
-// in internal/config/registry.go
-func Registry() []ConfigOption {
-    // Start with application-wide core options
-    options := CoreOptions()
-
-    // Append command-specific options
-    options = append(options, PingOptions()...)
-    options = append(options, DocsOptions()...)
-    options = append(options, MyCommandOptions()...) // Add your new command options
-
-    return options
-}
-```
-
-**Important**: Never use `viper.SetDefault()` directly in command files. Our `validate:defaults` task will catch any violations of this rule.
+**Rule:** Never use `viper.SetDefault()` directly. The `task validate:defaults` check enforces this.
 
 ### Automatic Documentation Generation
 
@@ -391,9 +328,11 @@ Configuration values are resolved in this order:
 
 ### Available Tasks
 
-- `task check:deps:verify`: Verifies that dependencies haven't been modified
-- `task check:deps:outdated`: Checks for outdated dependencies
-- `task check:deps`: Runs all dependency checks (verification, outdated, vulnerabilities)
+- `task check:deps` - Run all dependency checks
+- `task check:deps:verify` - Verify dependency integrity
+- `task check:deps:outdated` - Check for outdated dependencies
+
+**See** `task --list` for complete task reference.
 
 ### Automated Checks
 
@@ -438,29 +377,68 @@ A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea togeth
 ./myapp ping --ui
 ```
 
+### `doctor` Command
+
+Check your development environment and verify all required tools are installed.
+
+#### Usage
+
+```bash
+task doctor
+```
+
+#### Checks
+
+- Go installation and version
+- Task installation and version
+- All development tools (goimports, golangci-lint, gotestsum, govulncheck, lefthook, go-mod-outdated)
+
+**If tools are missing:** Run `task setup` to install them.
+
+### `config validate` Command
+
+Validate configuration files for correctness, security, and completeness.
+
+#### Usage
+
+```bash
+# Validate default config
+./myapp config validate
+
+# Validate specific file
+./myapp config validate --file /path/to/config.yaml
+```
+
+#### Exit Codes
+
+- `0` - Configuration is valid
+- `1` - Configuration has errors or warnings
+
+**Security features:** File size limits, permission checks, value validation.
+
 ---
 
 ## Development Workflow
 
-### Taskfile Tasks
+This project follows a **task-based single source of truth** pattern where all development commands are defined in `Taskfile.yml` and used identically across local development, pre-commit hooks, and CI. See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md) for complete documentation.
 
-- `task setup`: Install tools.
-- `task format`: Format code.
-- `task lint`: Run linters.
-- `task check:vuln`: Check for vulnerabilities.
-- `task check:deps:verify`: Verify dependency integrity.
-- `task check:deps:outdated`: Check for outdated dependencies.
-- `task check:deps`: Run all dependency checks (verification, outdated, vulnerabilities).
-- `task test`: Run tests with coverage.
-- `task test:coverage:text`: Detailed coverage report.
-- `task check`: All checks (format, lint, deps, tests).
-- `task build`: Build the binary.
-- `task run`: Run the binary.
-- `task clean`: Clean artifacts.
-- `task check:release`: Check if GoReleaser is installed.
-- `task test:release`: Test release build locally (snapshot).
-- `task build:release`: Build release artifacts without publishing.
-- `task clean:release`: Clean GoReleaser artifacts.
+Tasks follow the `action:target[:subvariant]` naming pattern for consistency and discoverability.
+
+### Essential Task Commands
+
+This project uses [Task](https://taskfile.dev/) for all development commands.
+
+**Core workflow:**
+```bash
+task doctor    # Check your development environment
+task check     # Run all quality checks (mandatory before commits)
+task format    # Format all Go code
+task test      # Run tests with coverage
+task build     # Build the binary
+```
+
+**For the complete task list:** Run `task --list` or see [Taskfile.yml](Taskfile.yml).
+**For task naming pattern:** See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md).
 
 ### Pre-Commit Hooks with Lefthook
 
