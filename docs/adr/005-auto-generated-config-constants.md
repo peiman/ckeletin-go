@@ -68,11 +68,11 @@ message := getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutp
 3. Use generated constant in code
 4. Pre-commit hook validates consistency automatically
 
-The `task check-constants` command can be run manually to verify constants are current.
+The `task validate:constants` command can be run manually to verify constants are current.
 
 ## References
 - `scripts/generate-config-constants.go` - Generator
 - `scripts/check-constants.sh` - Pre-commit validation script
 - `internal/config/keys_generated.go` - Generated constants
 - `.lefthook.yml` - Pre-commit validation
-- `Taskfile.yml` - `task check-constants` command
+- `Taskfile.yml` - `task validate:constants` command

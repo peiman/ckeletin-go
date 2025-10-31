@@ -75,11 +75,12 @@ We adopt a **Task-based Single Source of Truth (SSOT)** pattern where:
 │                     Taskfile.yml (SSOT)                     │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  check:                                              │   │
-│  │    - task: format:check                              │   │
+│  │    - task: check:format                              │   │
 │  │    - task: lint                                      │   │
-│  │    - task: check-defaults      # Pattern enforcement│   │
-│  │    - task: validate-commands   # Pattern enforcement│   │
-│  │    - task: deps:check                                │   │
+│  │    - task: validate:defaults   # Pattern enforcement│   │
+│  │    - task: validate:commands   # Pattern enforcement│   │
+│  │    - task: validate:constants  # Pattern enforcement│   │
+│  │    - task: check:deps                                │   │
 │  │    - task: test                                      │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -102,12 +103,13 @@ We adopt a **Task-based Single Source of Truth (SSOT)** pattern where:
 check:
   desc: Run all quality checks
   cmds:
-    - task: format:check    # Formatting validation
-    - task: lint            # go vet + golangci-lint
-    - task: check-defaults  # ADR-002 enforcement
-    - task: validate-commands # ADR-001 enforcement
-    - task: deps:check      # Verification + vulnerabilities
-    - task: test            # Tests with coverage
+    - task: check:format          # Formatting validation
+    - task: lint                  # go vet + golangci-lint
+    - task: validate:defaults     # ADR-002 enforcement
+    - task: validate:commands     # ADR-001 enforcement
+    - task: validate:constants    # ADR-005 enforcement
+    - task: check:deps            # Verification + vulnerabilities
+    - task: test                  # Tests with coverage
 ```
 
 **GitHub Actions CI - Uses SSOT:**
@@ -160,8 +162,8 @@ $ task check
 - **Pattern Enforcement**: Architectural patterns validated in CI automatically
 - **Onboarding**: New developers learn one tool (`task`) not multiple
 - **Confidence**: Developers trust that local checks match CI
-- **Composability**: Tasks can be composed (check → deps:check → vuln)
-- **Granular Control**: Run specific checks (task vuln) or all (task check)
+- **Composability**: Tasks can be composed (check → check:deps → check:vuln)
+- **Granular Control**: Run specific checks (task check:vuln) or all (task check)
 
 ### Negative
 
@@ -186,8 +188,9 @@ This ADR enables **automated enforcement** of other architectural patterns:
 ```yaml
 check:
   cmds:
-    - task: check-defaults      # Enforces ADR-002 (No scattered SetDefaults)
-    - task: validate-commands   # Enforces ADR-001 (Ultra-thin commands)
+    - task: validate:defaults     # Enforces ADR-002 (No scattered SetDefaults)
+    - task: validate:commands     # Enforces ADR-001 (Ultra-thin commands)
+    - task: validate:constants    # Enforces ADR-005 (Auto-generated constants)
 ```
 
 Unlike most projects that document patterns but rely on manual code review, **this project validates architectural patterns in CI automatically**.
@@ -198,21 +201,22 @@ Tasks are composed in layers for flexibility:
 
 ```
 task check (everything)
-  ├─ task format:check
+  ├─ task check:format
   ├─ task lint
-  ├─ task check-defaults (custom validation)
-  ├─ task validate-commands (custom validation)
-  ├─ task deps:check (composed task)
-  │   ├─ task deps:verify
-  │   ├─ task deps:outdated
-  │   └─ task vuln
+  ├─ task validate:defaults (custom validation)
+  ├─ task validate:commands (custom validation)
+  ├─ task validate:constants (custom validation)
+  ├─ task check:deps (composed task)
+  │   ├─ task check:deps:verify
+  │   ├─ task check:deps:outdated
+  │   └─ task check:vuln
   └─ task test
 ```
 
 Developers can:
 - Run everything: `task check`
-- Run a category: `task deps:check`
-- Run individual check: `task vuln`
+- Run a category: `task check:deps`
+- Run individual check: `task check:vuln`
 
 CI always runs: `task check` (complete validation)
 

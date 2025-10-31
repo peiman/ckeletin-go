@@ -149,7 +149,7 @@ const (
 The registry enables comprehensive validation:
 
 ```bash
-task check-defaults  # Ensure no unauthorized viper.SetDefault() calls
+task validate:defaults  # Ensure no unauthorized viper.SetDefault() calls
 ```
 
 ```go

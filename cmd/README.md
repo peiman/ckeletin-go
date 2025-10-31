@@ -153,7 +153,7 @@ func (e *Executor) Execute() error {
 Run the validation script to ensure commands follow the pattern:
 
 ```bash
-task validate-commands
+task validate:commands
 ```
 
 ### Whitelisting Commands

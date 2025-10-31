@@ -28,7 +28,7 @@ if ! diff -q "$TEMP_FILE" internal/config/keys_generated.go > /dev/null 2>&1; th
     echo "The generated constants in internal/config/keys_generated.go do not match the current registry."
     echo ""
     echo "Please run:"
-    echo "  task generate:constants"
+    echo "  task generate:config:key-constants"
     echo ""
     echo "Then commit the updated file."
     exit 1

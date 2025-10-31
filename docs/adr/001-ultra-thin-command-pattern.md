@@ -75,7 +75,7 @@ func runPing(cmd *cobra.Command, args []string) error {
 Command files are validated to ensure they follow the ultra-thin pattern:
 
 ```bash
-task validate-commands
+task validate:commands
 ```
 
 This checks that command files:
