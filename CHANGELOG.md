@@ -11,12 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated Go version from 1.24 to 1.25 in go.mod and CI workflow
 - Updated CI test matrix to test against Go 1.24.x and 1.25.x
+- **Task naming pattern refactoring** (ADR-000 compliance):
+  - Refactored all task names to follow `action:target[:subvariant]` pattern
+  - Updated all documentation (ADRs, README.md, CONTRIBUTING.md, cmd/README.md) to use new task names
+  - Examples: `check-defaults` → `validate:defaults`, `deps:check` → `check:deps`, `release:test` → `test:release`
+  - Improved discoverability with consistent action-based grouping (all `check:*`, `validate:*`, `generate:*`, etc.)
 
 ### Security
 
 - Added explicit permissions to lint-workflows.yml following principle of least privilege (CodeQL security recommendation)
 
 ### Fixed
+
+- **ADR-006 logging compliance**:
+  - Added missing `component` field to 5 log statements in `internal/ui/ui.go` (lines 51, 66, 79, 87, 103)
+  - All logs in internal/ui package now consistently include component field for improved filtering and debugging
 
 - Fixed CI build failure by updating Taskfile to install golangci-lint v2 (required for .golangci.yml v2 configuration)
 - Fixed Go standard library vulnerabilities (GO-2025-4007, GO-2025-4009, GO-2025-4010, GO-2025-4011) by upgrading to Go 1.25

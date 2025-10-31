@@ -51,7 +51,7 @@ func (g *Generator) Generate() error {
 			}
 		}()
 		writer = file
-		log.Info().Str("file", g.cfg.OutputFile).Msg("Writing documentation to file")
+		log.Info().Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Writing documentation to file")
 	}
 
 	// Generate documentation
@@ -71,11 +71,11 @@ func (g *Generator) Generate() error {
 		file = nil // Mark as closed so defer doesn't try again
 
 		if closeErr != nil {
-			log.Error().Err(closeErr).Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
+			log.Error().Err(closeErr).Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
 			// Handle both generation and close errors
 			if err != nil {
 				// Both errors occurred - wrap both for full context
-				log.Warn().Err(closeErr).Msg("File close also failed after generation error")
+				log.Warn().Err(closeErr).Str("component", "docs").Msg("File close also failed after generation error")
 				return fmt.Errorf("generation failed: %w (note: file close also failed: %v)", err, closeErr)
 			}
 			// Only close error - generation succeeded

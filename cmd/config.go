@@ -56,7 +56,6 @@ func init() {
 	MustAddToRoot(configCmd)
 }
 
-//nolint:errcheck,revive // CLI output function - fmt.Fprintf errors to stdout are acceptable
 func runConfigValidate(cmd *cobra.Command, args []string) error {
 	// Determine which config file to validate
 	configPath := validateConfigFile
@@ -77,41 +76,14 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Print results
-	fmt.Fprintf(cmd.OutOrStdout(), "Validating: %s\n\n", result.ConfigFile)
+	// Format and display results
+	validator.FormatResult(result, cmd.OutOrStdout())
 
-	// Print errors
-	if len(result.Errors) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "❌ Errors (%d):\n", len(result.Errors))
-		for i, err := range result.Errors {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %d. %v\n", i+1, err)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout())
-	}
-
-	// Print warnings
-	if len(result.Warnings) > 0 {
-		fmt.Fprintf(cmd.OutOrStdout(), "⚠️  Warnings (%d):\n", len(result.Warnings))
-		for i, warning := range result.Warnings {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %d. %s\n", i+1, warning)
-		}
-		_, _ = fmt.Fprintln(cmd.OutOrStdout())
-	}
-
-	// Print summary and return appropriate status
-	if result.Valid && len(result.Warnings) == 0 {
-		// Exit code 0: Valid with no warnings
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid!")
-		return nil
-	} else if result.Valid && len(result.Warnings) > 0 {
-		// Exit code 1: Valid but with warnings (return error to get exit code 1)
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "✅ Configuration is valid (with warnings)")
+	// Determine exit code and suppress usage on validation errors
+	if exitErr := validator.ExitCodeForResult(result); exitErr != nil {
 		cmd.SilenceUsage = true
-		return fmt.Errorf("validation completed with warnings")
-	} else {
-		// Exit code 1: Invalid (has errors)
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "❌ Configuration is invalid")
-		cmd.SilenceUsage = true
-		return fmt.Errorf("validation failed")
+		return exitErr
 	}
+
+	return nil
 }

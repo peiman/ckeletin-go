@@ -35,22 +35,24 @@ func NewExecutor(cfg Config, uiRunner ui.UIRunner, writer io.Writer) *Executor {
 
 // Execute runs the ping command logic
 func (e *Executor) Execute() error {
-	log.Debug().Msg("Starting ping execution")
+	log.Debug().Str("component", "ping").Msg("Starting ping execution")
 
 	log.Debug().
+		Str("component", "ping").
 		Str("message", e.cfg.Message).
 		Str("color", e.cfg.Color).
 		Bool("ui_enabled", e.cfg.UI).
 		Msg("Configuration loaded")
 
 	log.Debug().
+		Str("component", "ping").
 		Str("writer_type", fmt.Sprintf("%T", e.writer)).
 		Msg("Using writer")
 
 	if e.cfg.UI {
-		log.Info().Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Starting UI")
+		log.Info().Str("component", "ping").Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Starting UI")
 		if err := e.uiRunner.RunUI(e.cfg.Message, e.cfg.Color); err != nil {
-			log.Error().Err(err).Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Failed to run UI")
+			log.Error().Err(err).Str("component", "ping").Str("message", e.cfg.Message).Str("color", e.cfg.Color).Msg("Failed to run UI")
 			return fmt.Errorf("failed to run UI with message %q and color %q: %w", e.cfg.Message, e.cfg.Color, err)
 		}
 		return nil
@@ -61,6 +63,7 @@ func (e *Executor) Execute() error {
 	if err != nil {
 		log.Error().
 			Err(err).
+			Str("component", "ping").
 			Str("message", e.cfg.Message).
 			Str("color", e.cfg.Color).
 			Msg("Failed to print colored message")
@@ -68,6 +71,6 @@ func (e *Executor) Execute() error {
 		return fmt.Errorf("failed to print colored message %q in color %q: %w", e.cfg.Message, e.cfg.Color, err)
 	}
 
-	log.Debug().Msg("Ping execution completed successfully")
+	log.Debug().Str("component", "ping").Msg("Ping execution completed successfully")
 	return nil
 }

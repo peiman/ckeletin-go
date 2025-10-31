@@ -48,9 +48,9 @@ Maintain existing ldflags injection pattern:
 - `cmd.Date` - Build date
 
 ### Development Workflow
-- **Local Testing**: `task release:test` - Snapshot builds without publishing
-- **Local Builds**: `task release:build` - Build without release
-- **Clean Artifacts**: `task release:clean` - Remove build artifacts
+- **Local Testing**: `task test:release` - Snapshot builds without publishing
+- **Local Builds**: `task build:release` - Build without release
+- **Clean Artifacts**: `task clean:release` - Remove build artifacts
 - **CI/CD**: Automatic release on semantic version tags
 
 ## Consequences
@@ -75,10 +75,10 @@ Maintain existing ldflags injection pattern:
 ### Mitigations
 
 - **Documentation**: Clear release process in README.md
-- **Task Commands**: `task release:*` abstracts GoReleaser complexity
+- **Task Commands**: `task check:release`, `task test:release`, `task build:release` abstract GoReleaser complexity
 - **CI Integration**: Automated process requires minimal manual intervention
 - **Local Testing**: Snapshot builds allow testing without tags
-- **Version Check**: `task release:check` validates GoReleaser installation
+- **Version Check**: `task check:release` validates GoReleaser installation
 
 ## Implementation Details
 
@@ -148,13 +148,13 @@ Test GoReleaser configuration locally:
 
 ```bash
 # Check if GoReleaser is installed
-task release:check
+task check:release
 
 # Test build without releasing
-task release:test
+task test:release
 
 # Clean artifacts
-task release:clean
+task clean:release
 ```
 
 ## Related ADRs

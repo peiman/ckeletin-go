@@ -3,7 +3,8 @@ version: '3'
 
 vars:
   BINARY_NAME: ckeletin-go
-  MODULE_PATH: github.com/peiman/ckeletin-go
+  MODULE_PATH:
+    sh: go list -m
   VERSION:
     sh: git describe --tags --always --dirty
   COMMIT:
@@ -36,30 +37,71 @@ tasks:
     - lefthook install
     silent: true
 
+  doctor:
+    desc: Check development environment and tool installation
+    cmds:
+      - |
+        echo "🔍 Checking development environment..."
+        echo ""
+
+        # Go version
+        echo "Go:"
+        go version || echo "  ❌ Go not found"
+        echo ""
+
+        # Task version
+        echo "Task:"
+        task --version || echo "  ❌ Task not found"
+        echo ""
+
+        # Development tools
+        echo "Development Tools:"
+
+        echo "  goimports:"
+        which goimports > /dev/null && goimports --help > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  golangci-lint:"
+        which golangci-lint > /dev/null && golangci-lint version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  gotestsum:"
+        which gotestsum > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  govulncheck:"
+        which govulncheck > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  lefthook:"
+        which lefthook > /dev/null && lefthook version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  go-mod-outdated:"
+        which go-mod-outdated > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo ""
+        echo "💡 If any tools are missing, run: task setup"
+
   tidy:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
       - go mod tidy
 
-  deps:verify:
+  check:deps:verify:
     desc: Verify that dependencies haven't been modified
     cmds:
       - go mod verify
     silent: true
 
-  deps:outdated:
+  check:deps:outdated:
     desc: Check for outdated dependencies
     cmds:
       - echo "Checking for outdated dependencies..."
       - go list -u -m -json all | go-mod-outdated -update -direct
     silent: true
 
-  deps:check:
+  check:deps:
     desc: Run all dependency checks
     cmds:
-      - task: deps:verify
-      - task: deps:outdated
-      - task: vuln
+      - task: check:deps:verify
+      - task: check:deps:outdated
+      - task: check:vuln
     silent: true
 
   format:
@@ -67,10 +109,20 @@ tasks:
     cmds:
       - ./scripts/format-go.sh fix
 
-  format:check:
+  format:staged:
+    desc: Format specific files (for pre-commit hooks)
+    cmds:
+      - ./scripts/format-go.sh fix {{.CLI_ARGS}}
+
+  check:format:
     desc: Check if Go code is formatted (CI mode)
     cmds:
       - ./scripts/format-go.sh check
+
+  check:vuln:
+    desc: Check for vulnerabilities
+    cmds:
+      - govulncheck ./...
 
   lint:
     desc: Run all linters
@@ -78,21 +130,22 @@ tasks:
       - go vet ./...
       - golangci-lint run
 
-  vuln:
-    desc: Check for vulnerabilities
-    cmds:
-      - govulncheck ./...
-
-  check-defaults:
-    desc: Check for unauthorized viper.SetDefault() calls
+  validate:defaults:
+    desc: Validate no unauthorized viper.SetDefault() calls (enforces ADR-002)
     cmds:
       - ./scripts/check-defaults.sh
     silent: false
 
-  validate-commands:
-    desc: Validate command files follow ultra-thin patterns
+  validate:commands:
+    desc: Validate command files follow ultra-thin patterns (enforces ADR-001)
     cmds:
       - ./scripts/validate-command-patterns.sh
+    silent: false
+
+  validate:constants:
+    desc: Validate config constants are in sync with registry (enforces ADR-005)
+    cmds:
+      - ./scripts/check-constants.sh
     silent: false
 
   test:
@@ -115,7 +168,7 @@ tasks:
     cmd: |
       gotestsum --format pkgname -- -v -count=1 ./test/integration/...
 
-  test:coverage-text:
+  test:coverage:text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:
       - gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -cover -coverprofile=coverage.txt -covermode=atomic ./...
@@ -123,7 +176,7 @@ tasks:
       - go tool cover -func=coverage.txt
     silent: false
 
-  test:coverage-html:
+  test:coverage:html:
     desc: Generate HTML coverage report and open in browser
     cmds:
       - task: test
@@ -178,7 +231,7 @@ tasks:
       - cp bench-results.txt bench-new.txt
       - benchstat bench-old.txt bench-new.txt
 
-  docs:config:
+  generate:docs:config:
     desc: Generate configuration documentation
     cmds:
       - echo "Generating configuration documentation..."
@@ -187,7 +240,7 @@ tasks:
       - echo "Configuration documentation saved to docs/configuration.md"
     deps: [build]
 
-  docs:config-yaml:
+  generate:config:template:
     desc: Generate YAML configuration template
     cmds:
       - echo "Generating YAML configuration template..."
@@ -196,21 +249,22 @@ tasks:
       - echo "YAML template saved to docs/config-template.yaml"
     deps: [build]
 
-  docs:
+  generate:docs:
     desc: Generate all documentation
     cmds:
-      - task: docs:config
-      - task: docs:config-yaml
+      - task: generate:docs:config
+      - task: generate:config:template
     silent: true
 
   check:
     desc: Run all quality checks
     cmds:
-      - task: format:check
+      - task: check:format
       - task: lint
-      - task: check-defaults
-      - task: validate-commands
-      - task: deps:check
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: check:deps
       - task: test
 
   build:
@@ -229,14 +283,25 @@ tasks:
     cmds:
       - go install {{.LDFLAGS}} ./...
 
-  clean:
-    desc: Clean build artifacts
+  clean:local:
+    desc: Clean local build artifacts
     cmds:
       - go clean
       - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
-      - rm -rf ./dist
 
-  generate:constants:
+  clean:release:
+    desc: Clean GoReleaser artifacts
+    cmds:
+      - rm -rf ./dist
+      - echo "✅ Cleaned release artifacts"
+
+  clean:
+    desc: Clean all artifacts
+    cmds:
+      - task: clean:local
+      - task: clean:release
+
+  generate:config:key-constants:
     desc: Generate type-safe config key constants
     cmds:
       - go run scripts/generate-config-constants.go
@@ -268,9 +333,9 @@ tasks:
       - echo "1. Create business logic in internal/{{.NAME}}/"
       - echo "2. Update metadata and options in {{.CFG_FILE}}"
       - echo "3. Update runTemplate function in {{.CMD_FILE}}"
-      - echo "4. Run task validate-commands to verify pattern"
+      - echo "4. Run task validate:commands to verify pattern"
 
-  release:check:
+  check:release:
     desc: Check if GoReleaser is installed
     cmds:
       - |
@@ -286,9 +351,9 @@ tasks:
         echo "✅ GoReleaser is installed: $(goreleaser --version)"
     silent: false
 
-  release:test:
+  test:release:
     desc: Test GoReleaser configuration (snapshot build, no release)
-    deps: [release:check]
+    deps: [check:release]
     cmds:
       - echo "Building snapshot release (no tags required)..."
       - goreleaser release --snapshot --clean --skip=publish
@@ -299,18 +364,12 @@ tasks:
       - echo "To test the binaries (Linux, macOS, Windows)"
     silent: false
 
-  release:build:
+  build:release:
     desc: Build release artifacts locally (requires git tag)
-    deps: [release:check]
+    deps: [check:release]
     cmds:
       - echo "Building release artifacts..."
       - goreleaser build --clean --snapshot
       - echo ""
       - echo "✅ Build successful!"
       - echo "   Binaries are in ./dist/"
-
-  release:clean:
-    desc: Clean GoReleaser artifacts
-    cmds:
-      - rm -rf ./dist
-      - echo "✅ Cleaned release artifacts"

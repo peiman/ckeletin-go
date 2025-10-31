@@ -32,7 +32,7 @@ var (
 	Version          = "dev"
 	Commit           = ""
 	Date             = ""
-	binaryName       = "ckeletin-go"
+	binaryName       = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
 	configFileStatus string
 	configFileUsed   string
 
@@ -146,6 +146,12 @@ func Execute() error {
 }
 
 func init() {
+	// Fallback for development/testing when ldflags aren't injected
+	// Production builds MUST inject binaryName via ldflags (see Taskfile.yml LDFLAGS)
+	if binaryName == "" {
+		binaryName = "ckeletin-go"
+	}
+
 	configPaths := ConfigPaths()
 
 	// Define all persistent flags (flag definitions only - bindings happen in bindFlags())

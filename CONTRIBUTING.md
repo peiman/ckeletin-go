@@ -173,7 +173,7 @@ func MycommandOptions() []config.ConfigOption {
 ### Step 3: Generate Type-Safe Constants
 
 ```bash
-task generate:constants
+task generate:config:key-constants
 ```
 
 This updates `internal/config/keys_generated.go` with new constants like:
@@ -304,7 +304,7 @@ func TestExecutor_Execute(t *testing.T) {
 
 ```bash
 # Validate ultra-thin pattern
-task validate-commands
+task validate:commands
 
 # Run tests
 task test
@@ -345,7 +345,7 @@ func CommandOptions() []config.ConfigOption {
 ### Step 2: Regenerate Constants
 
 ```bash
-task generate:constants
+task generate:config:key-constants
 ```
 
 ### Step 3: Update Command Config Struct
@@ -456,10 +456,10 @@ task test
 task test:race
 
 # View detailed coverage
-task test:coverage-text
+task test:coverage:text
 
 # Generate HTML coverage report
-task test:coverage-html
+task test:coverage:html
 
 # Run integration tests
 task test:integration

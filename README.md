@@ -23,6 +23,7 @@
   - [Key Highlights](#key-highlights)
   - [Quick Start](#quick-start)
   - [Features](#features)
+  - [Architecture](#architecture)
   - [Getting Started](#getting-started)
     - [Prerequisites](#prerequisites)
     - [Installation](#installation)
@@ -87,7 +88,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Key Highlights
 
 - **Single-Source Binary Name**: Update `BINARY_NAME` in `Taskfile.yml`, and `ldflags` handles the rest. No more hunting down references.
-- **Detailed Coverage Reports**: Use `task test:coverage-text` to see exactly what code paths need testing.
+- **Detailed Coverage Reports**: Use `task test:coverage:text` to see exactly what code paths need testing.
 - **Seamless Customization**: Easily add new commands, reconfigure settings, or integrate Bubble Tea UIs.
 
 ---
@@ -128,6 +129,14 @@ Each command manages its own configuration and defaults, promoting modularity an
 - **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
 - **High Test Coverage & Quality Checks**: Ensure a robust codebase that meets production standards.
+
+---
+
+## Architecture
+
+This project follows well-documented architectural patterns captured in **[Architecture Decision Records (ADRs)](docs/adr/)**. These ADRs document key design decisions including ultra-thin commands, centralized configuration, dependency injection, structured logging, and the task-based development workflow.
+
+See **[docs/adr/](docs/adr/)** for the complete list and detailed rationale.
 
 ---
 
@@ -305,14 +314,14 @@ func Registry() []ConfigOption {
 }
 ```
 
-**Important**: Never use `viper.SetDefault()` directly in command files. Our `check-defaults` task will catch any violations of this rule.
+**Important**: Never use `viper.SetDefault()` directly in command files. Our `validate:defaults` task will catch any violations of this rule.
 
 ### Automatic Documentation Generation
 
 Generate comprehensive configuration documentation with:
 
 ```bash
-task docs:config
+task generate:docs:config
 ```
 
 This creates a Markdown file at `docs/configuration.md` with:
@@ -325,7 +334,7 @@ This creates a Markdown file at `docs/configuration.md` with:
 For a configuration template, run:
 
 ```bash
-task docs:config-yaml
+task generate:config:template
 ```
 
 ### Configuration File
@@ -382,9 +391,9 @@ Configuration values are resolved in this order:
 
 ### Available Tasks
 
-- `task deps:verify`: Verifies that dependencies haven't been modified
-- `task deps:outdated`: Checks for outdated dependencies
-- `task deps:check`: Runs all dependency checks (verification, outdated, vulnerabilities)
+- `task check:deps:verify`: Verifies that dependencies haven't been modified
+- `task check:deps:outdated`: Checks for outdated dependencies
+- `task check:deps`: Runs all dependency checks (verification, outdated, vulnerabilities)
 
 ### Automated Checks
 
@@ -396,7 +405,7 @@ Dependency verification is automatically included in:
 
 ### Best Practices
 
-1. Run `task deps:check` before starting a new feature
+1. Run `task check:deps` before starting a new feature
 2. Update dependencies incrementally with `go get -u <package>` followed by `task tidy`
 3. Always run tests after dependency updates
 4. Document significant dependency changes in commit messages
@@ -438,20 +447,20 @@ A sample command showing how to use Cobra, Viper, Zerolog, and Bubble Tea togeth
 - `task setup`: Install tools.
 - `task format`: Format code.
 - `task lint`: Run linters.
-- `task vuln`: Check for vulnerabilities.
-- `task deps:verify`: Verify dependency integrity.
-- `task deps:outdated`: Check for outdated dependencies.
-- `task deps:check`: Run all dependency checks (verification, outdated, vulnerabilities).
+- `task check:vuln`: Check for vulnerabilities.
+- `task check:deps:verify`: Verify dependency integrity.
+- `task check:deps:outdated`: Check for outdated dependencies.
+- `task check:deps`: Run all dependency checks (verification, outdated, vulnerabilities).
 - `task test`: Run tests with coverage.
-- `task test:coverage-text`: Detailed coverage report.
+- `task test:coverage:text`: Detailed coverage report.
 - `task check`: All checks (format, lint, deps, tests).
 - `task build`: Build the binary.
 - `task run`: Run the binary.
 - `task clean`: Clean artifacts.
-- `task release:check`: Check if GoReleaser is installed.
-- `task release:test`: Test release build locally (snapshot).
-- `task release:build`: Build release artifacts without publishing.
-- `task release:clean`: Clean GoReleaser artifacts.
+- `task check:release`: Check if GoReleaser is installed.
+- `task test:release`: Test release build locally (snapshot).
+- `task build:release`: Build release artifacts without publishing.
+- `task clean:release`: Clean GoReleaser artifacts.
 
 ### Pre-Commit Hooks with Lefthook
 
@@ -502,10 +511,10 @@ Test the release process locally before pushing a tag:
 
 ```bash
 # Check if GoReleaser is installed
-task release:check
+task check:release
 
 # Build snapshot release (no tag required)
-task release:test
+task test:release
 
 # Test the generated binaries
 ./dist/ckeletin-go_linux_amd64_v1/ckeletin-go --version
@@ -677,7 +686,7 @@ Configuration options live alongside their commands and self-register with the g
 2. **Self-register**: In `init()`, call `config.RegisterOptionsProvider(<Command>Options)`.
 3. **Flags binding**: In the same command file, call `RegisterFlagsForPrefixWithOverrides(cmd, "app.<command>.", overrides)` instead of manual flag definitions and binds.
 4. **Read values**: In your config constructor, use `getConfigValueWithFlags[T](cmd, flagName, viperKey)` so CLI flags override config/env.
-5. **Docs**: Run `task docs:config` to regenerate documentation.
+5. **Docs**: Run `task generate:docs:config` to regenerate documentation.
 
 Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via the registry in `cmd/root.go`.
 
@@ -772,11 +781,11 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Additional Notes
 
-- `task test:coverage-text` identifies uncovered code paths for targeted testing improvements.
+- `task test:coverage:text` identifies uncovered code paths for targeted testing improvements.
 - Press `q` or `Ctrl-C` to exit UI mode.
 - Use quotes for special chars in arguments.
 - Run `go mod tidy` to keep dependencies clean.
-- Run `task deps:check` regularly to ensure dependencies are up-to-date and secure.
+- Run `task check:deps` regularly to ensure dependencies are up-to-date and secure.
 - Regularly run tests, lint, and format tasks to maintain code quality and style.
 - See [Test Fixtures Documentation](docs/test-fixtures.md) for information about available test fixtures.
 

@@ -1,4 +1,4 @@
-# ADR-009: Task-Based Single Source of Truth for CI/Local Alignment
+# ADR-000: Task-Based Single Source of Truth for CI/Local Alignment
 
 ## Status
 Accepted
@@ -75,11 +75,12 @@ We adopt a **Task-based Single Source of Truth (SSOT)** pattern where:
 │                     Taskfile.yml (SSOT)                     │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │  check:                                              │   │
-│  │    - task: format:check                              │   │
+│  │    - task: check:format                              │   │
 │  │    - task: lint                                      │   │
-│  │    - task: check-defaults      # Pattern enforcement│   │
-│  │    - task: validate-commands   # Pattern enforcement│   │
-│  │    - task: deps:check                                │   │
+│  │    - task: validate:defaults   # Pattern enforcement│   │
+│  │    - task: validate:commands   # Pattern enforcement│   │
+│  │    - task: validate:constants  # Pattern enforcement│   │
+│  │    - task: check:deps                                │   │
 │  │    - task: test                                      │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
@@ -102,12 +103,13 @@ We adopt a **Task-based Single Source of Truth (SSOT)** pattern where:
 check:
   desc: Run all quality checks
   cmds:
-    - task: format:check    # Formatting validation
-    - task: lint            # go vet + golangci-lint
-    - task: check-defaults  # ADR-002 enforcement
-    - task: validate-commands # ADR-001 enforcement
-    - task: deps:check      # Verification + vulnerabilities
-    - task: test            # Tests with coverage
+    - task: check:format          # Formatting validation
+    - task: lint                  # go vet + golangci-lint
+    - task: validate:defaults     # ADR-002 enforcement
+    - task: validate:commands     # ADR-001 enforcement
+    - task: validate:constants    # ADR-005 enforcement
+    - task: check:deps            # Verification + vulnerabilities
+    - task: test                  # Tests with coverage
 ```
 
 **GitHub Actions CI - Uses SSOT:**
@@ -128,9 +130,13 @@ pre-commit:
   parallel: true
   commands:
     format:
-      run: ./scripts/format-go.sh fix {staged_files}
+      run: task format:staged -- {staged_files}
     lint:
       run: task lint
+    validate-constants:
+      run: task validate:constants
+    verify-deps:
+      run: task check:deps:verify
     test:
       run: task test
 ```
@@ -156,8 +162,8 @@ $ task check
 - **Pattern Enforcement**: Architectural patterns validated in CI automatically
 - **Onboarding**: New developers learn one tool (`task`) not multiple
 - **Confidence**: Developers trust that local checks match CI
-- **Composability**: Tasks can be composed (check → deps:check → vuln)
-- **Granular Control**: Run specific checks (task vuln) or all (task check)
+- **Composability**: Tasks can be composed (check → check:deps → check:vuln)
+- **Granular Control**: Run specific checks (task check:vuln) or all (task check)
 
 ### Negative
 
@@ -182,8 +188,9 @@ This ADR enables **automated enforcement** of other architectural patterns:
 ```yaml
 check:
   cmds:
-    - task: check-defaults      # Enforces ADR-002 (No scattered SetDefaults)
-    - task: validate-commands   # Enforces ADR-001 (Ultra-thin commands)
+    - task: validate:defaults     # Enforces ADR-002 (No scattered SetDefaults)
+    - task: validate:commands     # Enforces ADR-001 (Ultra-thin commands)
+    - task: validate:constants    # Enforces ADR-005 (Auto-generated constants)
 ```
 
 Unlike most projects that document patterns but rely on manual code review, **this project validates architectural patterns in CI automatically**.
@@ -194,21 +201,22 @@ Tasks are composed in layers for flexibility:
 
 ```
 task check (everything)
-  ├─ task format:check
+  ├─ task check:format
   ├─ task lint
-  ├─ task check-defaults (custom validation)
-  ├─ task validate-commands (custom validation)
-  ├─ task deps:check (composed task)
-  │   ├─ task deps:verify
-  │   ├─ task deps:outdated
-  │   └─ task vuln
+  ├─ task validate:defaults (custom validation)
+  ├─ task validate:commands (custom validation)
+  ├─ task validate:constants (custom validation)
+  ├─ task check:deps (composed task)
+  │   ├─ task check:deps:verify
+  │   ├─ task check:deps:outdated
+  │   └─ task check:vuln
   └─ task test
 ```
 
 Developers can:
 - Run everything: `task check`
-- Run a category: `task deps:check`
-- Run individual check: `task vuln`
+- Run a category: `task check:deps`
+- Run individual check: `task check:vuln`
 
 CI always runs: `task check` (complete validation)
 
@@ -247,10 +255,90 @@ task check  # Run ALL checks - this is non-negotiable
 ```
 ```
 
+## Task Naming Convention
+
+### Pattern: action:target
+
+All tasks follow a simple, consistent pattern:
+
+```
+action:target[:subvariant]
+```
+
+Where:
+- **action** is what you're doing (check, validate, test, generate, build, clean, format, bench)
+- **target** is what you're doing it to (a resource, variant, or modifier)
+
+**Examples:**
+
+```yaml
+# Action applied to different targets
+check:format                  # Check format
+check:vuln                    # Check vulnerabilities
+check:deps                    # Check dependencies (orchestrator)
+check:deps:verify             # Check deps, verify subvariant
+check:deps:outdated           # Check deps, outdated subvariant
+validate:commands             # Validate commands
+validate:constants            # Validate constants
+generate:config:key-constants # Generate config key constants
+generate:config:template      # Generate config YAML template
+generate:docs                 # Generate docs (orchestrator)
+generate:docs:config          # Generate configuration documentation
+test:race                     # Test with race detection
+test:integration              # Integration test
+test:coverage:patch           # Test coverage, patch subvariant
+bench:cmd                     # Benchmark cmd package
+build:release                 # Build release artifacts
+clean:local                   # Clean local artifacts
+clean:release                 # Clean release artifacts
+format:staged                 # Format staged files
+
+# Standalone actions (no target needed)
+format                  # Format everything
+test                    # Test everything
+build                   # Build
+clean                   # Clean everything (orchestrator)
+check                   # Check everything (orchestrator)
+lint                    # Lint
+run                     # Run
+install                 # Install
+setup                   # Setup
+tidy                    # Tidy
+```
+
+**Benefits:**
+
+- **Simple**: One pattern to learn - `action:target`
+- **Discoverable**: `task check:<TAB>` shows all checks, `task test:<TAB>` shows all test variants
+- **Consistent**: Always read as "action on target"
+- **Scalable**: Easy to add new tasks following the same pattern
+
+### Why This Pattern Matters
+
+**Scripts are implementation details. Task is the interface.**
+
+```yaml
+# .lefthook.yml - uses Task commands, not scripts
+format:
+  run: task format:staged -- {staged_files}
+validate-constants:
+  run: task validate:constants
+verify-deps:
+  run: task check:deps:verify
+```
+
+**Benefits:**
+
+- Rename or refactor scripts → only update Taskfile.yml
+- Lefthook, CI, and local commands remain unchanged
+- Consistent "always use Task" rule with zero exceptions
+- Task is the SSOT interface for ALL environments (local, Lefthook, CI)
+
 ## Related ADRs
 
-- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands enforced via `task validate-commands`
-- [ADR-002](002-centralized-configuration-registry.md) - Config registry enforced via `task check-defaults`
+- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands enforced via `task validate:commands`
+- [ADR-002](002-centralized-configuration-registry.md) - Config registry enforced via `task validate:defaults`
+- [ADR-005](005-auto-generated-config-constants.md) - Config constants enforced via `task validate:constants`
 - [ADR-008](008-release-automation-with-goreleaser.md) - Release process uses `task check` as quality gate
 
 ## References

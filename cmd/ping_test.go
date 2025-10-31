@@ -9,24 +9,12 @@ import (
 
 	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-// mockUIRunner is a mock implementation of ui.UIRunner for testing
-type mockUIRunner struct {
-	CalledWithMessage string
-	CalledWithColor   string
-	ReturnError       error
-}
-
-func (m *mockUIRunner) RunUI(message, col string) error {
-	m.CalledWithMessage = message
-	m.CalledWithColor = col
-	return m.ReturnError
-}
 
 // TestPingCommand tests the ping command integration with configuration
 func TestPingCommand(t *testing.T) {
@@ -45,7 +33,7 @@ func TestPingCommand(t *testing.T) {
 		wantErr         bool
 		wantOutput      string
 		writer          *bytes.Buffer
-		mockRunner      *mockUIRunner
+		mockRunner      *ui.MockUIRunner
 	}{
 		{
 			name:            "Default Configuration",
@@ -54,7 +42,7 @@ func TestPingCommand(t *testing.T) {
 			wantErr:         false,
 			wantOutput:      "",
 			writer:          &bytes.Buffer{},
-			mockRunner:      &mockUIRunner{},
+			mockRunner:      &ui.MockUIRunner{},
 		},
 		{
 			name:            "JSON Configuration",
@@ -63,7 +51,7 @@ func TestPingCommand(t *testing.T) {
 			wantErr:         false,
 			wantOutput:      "JSON Config Message\n",
 			writer:          &bytes.Buffer{},
-			mockRunner:      &mockUIRunner{},
+			mockRunner:      &ui.MockUIRunner{},
 		},
 		{
 			name:            "CLI Args Override Configuration",
@@ -72,7 +60,7 @@ func TestPingCommand(t *testing.T) {
 			wantErr:         false,
 			wantOutput:      "",
 			writer:          &bytes.Buffer{},
-			mockRunner:      &mockUIRunner{},
+			mockRunner:      &ui.MockUIRunner{},
 		},
 		{
 			name:            "Partial Configuration",
@@ -81,7 +69,7 @@ func TestPingCommand(t *testing.T) {
 			wantErr:         false,
 			wantOutput:      "Partial Config Message\n",
 			writer:          &bytes.Buffer{},
-			mockRunner:      &mockUIRunner{},
+			mockRunner:      &ui.MockUIRunner{},
 		},
 	}
 
@@ -148,7 +136,7 @@ func TestPingCommandFlags(t *testing.T) {
 	viper.Set("app.ping.ui", false)
 
 	// Create mock UI runner
-	mockRunner := &mockUIRunner{}
+	mockRunner := &ui.MockUIRunner{}
 
 	// Create command
 	cmd := &cobra.Command{
@@ -210,7 +198,7 @@ func TestPingConfigDefaults(t *testing.T) {
 	config.SetDefaults()
 
 	// Create mock UI runner
-	mockRunner := &mockUIRunner{}
+	mockRunner := &ui.MockUIRunner{}
 
 	// Create command
 	cmd := &cobra.Command{

@@ -28,6 +28,7 @@ What becomes easier or more difficult to do because of this change?
 
 ## Index
 
+- [ADR-000](000-task-based-single-source-of-truth.md) - Task-Based Single Source of Truth (Foundational)
 - [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-Thin Command Pattern
 - [ADR-002](002-centralized-configuration-registry.md) - Centralized Configuration Registry
 - [ADR-003](003-dependency-injection-over-mocking.md) - Dependency Injection Over Mocking

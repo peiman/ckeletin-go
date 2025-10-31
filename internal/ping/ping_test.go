@@ -8,22 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
-
-// mockUIRunner is a mock implementation of ui.UIRunner for testing
-type mockUIRunner struct {
-	CalledWithMessage string
-	CalledWithColor   string
-	ReturnError       error
-}
-
-func (m *mockUIRunner) RunUI(message, col string) error {
-	m.CalledWithMessage = message
-	m.CalledWithColor = col
-	return m.ReturnError
-}
 
 // errorWriter always returns an error on Write
 type errorWriter struct{}
@@ -141,7 +129,7 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 			t.Parallel()
 			// SETUP PHASE: Create output buffer and executor
 			outBuf := &bytes.Buffer{}
-			mockRunner := &mockUIRunner{}
+			mockRunner := &ui.MockUIRunner{}
 			executor := NewExecutor(tt.cfg, mockRunner, outBuf)
 
 			// EXECUTION PHASE: Execute the command
@@ -209,7 +197,7 @@ func TestExecutor_Execute_UIMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// SETUP PHASE: Create mock UI runner and executor
-			mockRunner := &mockUIRunner{ReturnError: tt.uiRunnerError}
+			mockRunner := &ui.MockUIRunner{ReturnError: tt.uiRunnerError}
 			outBuf := &bytes.Buffer{}
 			executor := NewExecutor(tt.cfg, mockRunner, outBuf)
 
@@ -246,7 +234,7 @@ func TestExecutor_Execute_WriteError(t *testing.T) {
 		Color:   "white",
 		UI:      false,
 	}
-	mockRunner := &mockUIRunner{}
+	mockRunner := &ui.MockUIRunner{}
 	executor := NewExecutor(cfg, mockRunner, writer)
 
 	// EXECUTION PHASE: Execute the command
@@ -276,7 +264,7 @@ func TestExecutor_Execute_InvalidColor(t *testing.T) {
 		Color:   "invalid_color",
 		UI:      false,
 	}
-	mockRunner := &mockUIRunner{}
+	mockRunner := &ui.MockUIRunner{}
 	executor := NewExecutor(cfg, mockRunner, outBuf)
 
 	// EXECUTION PHASE: Execute the command
