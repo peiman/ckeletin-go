@@ -207,19 +207,38 @@ func TestBindFlags_AllFlagsHaveViperBinding(t *testing.T) {
 
 // TestBindFlags_ErrorCollection tests that bindFlags properly collects multiple errors
 func TestBindFlags_ErrorCollection(t *testing.T) {
-	// This test is tricky because viper.BindPFlag rarely fails in practice
-	// We're testing that IF it fails, errors are collected properly
+	// Test that bindFlags collects and returns errors when flag bindings fail
+	// This happens when flags don't exist (Lookup returns nil)
 
-	// In the current implementation, bindFlags should:
-	// 1. Attempt to bind all flags
-	// 2. Collect any errors that occur
-	// 3. Return a combined error if any bindings failed
-
-	// For now, we test the happy path - all bindings succeed
+	// SETUP
 	viper.Reset()
-	err := bindFlags(RootCmd)
-	if err != nil {
-		t.Errorf("bindFlags() should succeed with valid flags, got error: %v", err)
+
+	// Create a bare command with NO persistent flags defined
+	// This will cause all Lookup() calls to return nil, triggering bind errors
+	bareCmd := &cobra.Command{
+		Use:   "bare",
+		Short: "Command with no flags",
+	}
+
+	// EXECUTION
+	// bindFlags will try to look up flags that don't exist
+	err := bindFlags(bareCmd)
+
+	// ASSERTION
+	// Should return an error indicating multiple bindings failed
+	if err == nil {
+		t.Fatal("bindFlags() should return error when flags don't exist")
+	}
+
+	// Verify error message contains information about failed bindings
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "failed to bind") {
+		t.Errorf("Error message should mention 'failed to bind', got: %v", errMsg)
+	}
+
+	// Verify it mentions the number of failures (14 flags total)
+	if !strings.Contains(errMsg, "14 flag(s)") {
+		t.Errorf("Error message should mention '14 flag(s)', got: %v", errMsg)
 	}
 }
 
