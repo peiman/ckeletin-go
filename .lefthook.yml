@@ -10,6 +10,8 @@ pre-commit:
       run: task lint
     deps-verify:
       run: task deps:verify
+    check-constants:
+      run: task check-constants
     test:
       run: task test
 

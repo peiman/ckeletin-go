@@ -95,6 +95,12 @@ tasks:
       - ./scripts/validate-command-patterns.sh
     silent: false
 
+  check-constants:
+    desc: Check if config constants are up-to-date with registry
+    cmds:
+      - ./scripts/check-constants.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |

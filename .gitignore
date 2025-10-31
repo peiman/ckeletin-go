@@ -72,3 +72,6 @@ bench-new.txt
 
 # Environment variables
 .env
+
+# Research and planning files
+research/
