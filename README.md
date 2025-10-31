@@ -314,7 +314,7 @@ func Registry() []ConfigOption {
 }
 ```
 
-**Important**: Never use `viper.SetDefault()` directly in command files. Our `check-defaults` task will catch any violations of this rule.
+**Important**: Never use `viper.SetDefault()` directly in command files. Our `validate:defaults` task will catch any violations of this rule.
 
 ### Automatic Documentation Generation
 

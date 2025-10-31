@@ -304,7 +304,7 @@ func TestExecutor_Execute(t *testing.T) {
 
 ```bash
 # Validate ultra-thin pattern
-task validate-commands
+task validate:commands
 
 # Run tests
 task test
@@ -456,10 +456,10 @@ task test
 task test:race
 
 # View detailed coverage
-task test:coverage-text
+task test:coverage:text
 
 # Generate HTML coverage report
-task test:coverage-html
+task test:coverage:html
 
 # Run integration tests
 task test:integration
