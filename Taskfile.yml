@@ -3,7 +3,8 @@ version: '3'
 
 vars:
   BINARY_NAME: ckeletin-go
-  MODULE_PATH: github.com/peiman/ckeletin-go
+  MODULE_PATH:
+    sh: go list -m
   VERSION:
     sh: git describe --tags --always --dirty
   COMMIT:
