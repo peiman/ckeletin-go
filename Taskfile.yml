@@ -37,6 +37,47 @@ tasks:
     - lefthook install
     silent: true
 
+  doctor:
+    desc: Check development environment and tool installation
+    cmds:
+      - |
+        echo "🔍 Checking development environment..."
+        echo ""
+
+        # Go version
+        echo "Go:"
+        go version || echo "  ❌ Go not found"
+        echo ""
+
+        # Task version
+        echo "Task:"
+        task --version || echo "  ❌ Task not found"
+        echo ""
+
+        # Development tools
+        echo "Development Tools:"
+
+        echo "  goimports:"
+        which goimports > /dev/null && goimports --help > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  golangci-lint:"
+        which golangci-lint > /dev/null && golangci-lint version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  gotestsum:"
+        which gotestsum > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  govulncheck:"
+        which govulncheck > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  lefthook:"
+        which lefthook > /dev/null && lefthook version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  go-mod-outdated:"
+        which go-mod-outdated > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo ""
+        echo "💡 If any tools are missing, run: task setup"
+
   tidy:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
