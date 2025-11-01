@@ -498,3 +498,4 @@ git push -u origin <branch-name>
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage
 - **.cursor/rules/** - Detailed development rules and conventions
+- never use --no-verify before asking my permission with a good deviation description
