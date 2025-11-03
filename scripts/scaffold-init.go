@@ -21,6 +21,7 @@ package main
 
 import (
 	"fmt"
+	"go/format"
 	"os"
 	"path/filepath"
 	"strings"
@@ -102,7 +103,12 @@ func main() {
 	}
 
 	fmt.Println("  ✓ Running go mod tidy")
+
 	fmt.Println("  ✓ Formatting code")
+	if err := formatGoFiles(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting Go files: %v\n", err)
+		os.Exit(1)
+	}
 }
 
 // checkAlreadyInitialized checks if go.mod contains the old module path
@@ -294,4 +300,51 @@ func updateTemplateFiles(oldModule, newModule string) (int, error) {
 	})
 
 	return count, err
+}
+
+// formatGoFiles formats all Go files using go/format
+func formatGoFiles() error {
+	return filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories we don't want to process
+		if info.IsDir() {
+			name := info.Name()
+			if name == ".git" || name == "vendor" || name == "dist" || name == ".task" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Only process .go files (excluding test files in scripts/)
+		if !strings.HasSuffix(path, ".go") || strings.HasPrefix(path, "scripts/") {
+			return nil
+		}
+
+		// Read file
+		// #nosec G304 - path is controlled by filepath.Walk, not user input
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Format the Go code
+		formatted, err := format.Source(content)
+		if err != nil {
+			// If formatting fails, just skip this file
+			// (it might have syntax errors after replacement)
+			return nil
+		}
+
+		// Only write if content changed
+		if string(formatted) != string(content) {
+			if err := os.WriteFile(path, formatted, info.Mode()); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
