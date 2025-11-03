@@ -105,7 +105,12 @@ tasks:
       - echo "🚀 Initializing scaffold..."
       - go run scripts/scaffold-init.go "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
       - go mod tidy
-      - task: format
+      - |
+        {{if eq OS "windows"}}
+        echo "  ⚠️  Skipping format on Windows (requires Unix shell)"
+        {{else}}
+        task format
+        {{end}}
       - echo ""
       - echo "✅ Scaffold initialized successfully!"
       - echo "   Binary{{":"}} {{.NAME}}"
