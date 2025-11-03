@@ -78,6 +78,45 @@ tasks:
         echo ""
         echo "💡 If any tools are missing, run: task setup"
 
+  init:
+    desc: Initialize scaffold with custom name and module
+    summary: |
+      Automates scaffold customization by updating module path and binary name
+      throughout the codebase. This is the first command you run after cloning.
+
+      Usage:
+        task init name=<name> module=<module>
+
+      Example:
+        task init name=myapp module=github.com/myuser/myapp
+    vars:
+      NAME: "{{.name}}"
+      MODULE: "{{.module}}"
+      OLD_MODULE: "github.com/peiman/ckeletin-go"
+      OLD_NAME: "ckeletin-go"
+    preconditions:
+      - sh: '[ -n "{{.NAME}}" ]'
+        msg: "Binary name is required. Usage: task init name=<name> module=<module>"
+      - sh: '[ -n "{{.MODULE}}" ]'
+        msg: "Module path is required. Usage: task init name=<name> module=<module>"
+      - sh: '[ "{{.MODULE}}" != "{{.OLD_MODULE}}" ]'
+        msg: "Module path must be different from {{.OLD_MODULE}}"
+    cmds:
+      - echo "🚀 Initializing scaffold..."
+      - go run scripts/scaffold-init.go "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
+      - go mod tidy
+      - task: format
+      - echo ""
+      - echo "✅ Scaffold initialized successfully!"
+      - echo "   Binary{{":"}} {{.NAME}}"
+      - echo "   Module{{":"}} {{.MODULE}}"
+      - echo ""
+      - echo "Next steps{{":"}}"
+      - echo "  1. Review changes{{":"}} git diff"
+      - echo "  2. Run quality checks{{":"}} task check"
+      - echo "  3. Build binary{{":"}} task build"
+      - echo "  4. Test binary{{":"}} ./{{.NAME}} --version"
+
   tidy:
     desc: Ensure go.mod and go.sum are up to date
     cmds:

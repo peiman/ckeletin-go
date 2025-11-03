@@ -6,7 +6,6 @@
 // Usage: go run scripts/generate-config-constants.go
 
 //go:build ignore
-// +build ignore
 
 package main
 
