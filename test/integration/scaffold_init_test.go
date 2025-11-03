@@ -42,6 +42,19 @@ func TestScaffoldInit(t *testing.T) {
 		t.Fatalf("Failed to init git repo: %v\nOutput: %s", err, string(output))
 	}
 
+	// Configure git user (required for commits in CI)
+	configEmailCmd := exec.Command("git", "config", "user.email", "test@ckeletin-go.example")
+	configEmailCmd.Dir = tmpDir
+	if output, err := configEmailCmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to set git user.email: %v\nOutput: %s", err, string(output))
+	}
+
+	configNameCmd := exec.Command("git", "config", "user.name", "Test User")
+	configNameCmd.Dir = tmpDir
+	if output, err := configNameCmd.CombinedOutput(); err != nil {
+		t.Fatalf("Failed to set git user.name: %v\nOutput: %s", err, string(output))
+	}
+
 	// Add and commit files (needed for git describe)
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = tmpDir
