@@ -309,13 +309,23 @@ tasks:
   build:
     desc: Build the binary
     cmds:
-      - go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go
+      - |
+        {{if eq OS "windows"}}
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go
+        {{else}}
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go
+        {{end}}
 
   run:
     desc: Run the application
     deps: [build]
     cmds:
-      - ./{{.BINARY_NAME}}
+      - |
+        {{if eq OS "windows"}}
+        ./{{.BINARY_NAME}}.exe
+        {{else}}
+        ./{{.BINARY_NAME}}
+        {{end}}
 
   install:
     desc: Install the application
@@ -326,7 +336,12 @@ tasks:
     desc: Clean local build artifacts
     cmds:
       - go clean
-      - rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
+      - |
+        {{if eq OS "windows"}}
+        rm -f {{.BINARY_NAME}}.exe coverage.txt test-output.json coverage.html
+        {{else}}
+        rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
+        {{end}}
 
   clean:release:
     desc: Clean GoReleaser artifacts
