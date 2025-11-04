@@ -175,10 +175,14 @@ func TestScaffoldInit(t *testing.T) {
 			t.Fatalf("task build failed: %v\nOutput: %s", err, string(output))
 		}
 
-		// Verify binary exists
-		binaryPath := filepath.Join(tmpDir, testName)
+		// Verify binary exists (with .exe on Windows)
+		binaryName := testName
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+		binaryPath := filepath.Join(tmpDir, binaryName)
 		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-			t.Errorf("Binary %s does not exist after build", testName)
+			t.Errorf("Binary %s does not exist after build", binaryName)
 		}
 	})
 
