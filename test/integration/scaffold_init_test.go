@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -183,7 +184,12 @@ func TestScaffoldInit(t *testing.T) {
 
 	// Run: ./testapp --version (binary works)
 	t.Run("binary executes", func(t *testing.T) {
-		binaryPath := filepath.Join(tmpDir, testName)
+		binaryName := testName
+		// On Windows, executables have .exe extension
+		if runtime.GOOS == "windows" {
+			binaryName += ".exe"
+		}
+		binaryPath := filepath.Join(tmpDir, binaryName)
 		t.Logf("Running: %s --version", binaryPath)
 
 		cmd := exec.Command(binaryPath, "--version")
