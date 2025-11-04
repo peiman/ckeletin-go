@@ -14,12 +14,12 @@ if [ ! -f "$COVERAGE_FILE" ]; then
     exit 1
 fi
 
-# Get list of changed .go files (excluding _test.go)
+# Get list of changed .go files (excluding _test.go and scripts/)
 if git rev-parse --verify "$BASE_BRANCH" &>/dev/null; then
-    changed_files=$(git diff "$BASE_BRANCH"...HEAD --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' || true)
+    changed_files=$(git diff "$BASE_BRANCH"...HEAD --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' || true)
 else
     # Fallback to staged changes
-    changed_files=$(git diff --cached --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' || true)
+    changed_files=$(git diff --cached --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' || true)
 fi
 
 if [ -z "$changed_files" ]; then

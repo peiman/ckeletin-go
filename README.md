@@ -186,14 +186,26 @@ task build
 
 ### Using the Scaffold
 
-1. Update `module` path in `go.mod`.
-2. Change `BINARY_NAME` in `Taskfile.yml` to rename your CLI (e.g., `myapp`).
-3. Build and run to confirm setup:
-
+1. **Initialize with your project details:**
    ```bash
-   task build
-   ./myapp ping
+   task init name=myapp module=github.com/myuser/myapp
    ```
+
+   This single command automatically:
+   - Updates the module path in `go.mod`
+   - Replaces all import statements (40+ files)
+   - Updates binary name in `Taskfile.yml` and `.goreleaser.yml`
+   - Formats all code
+   - Runs `go mod tidy`
+
+2. **Build and test your customized CLI:**
+   ```bash
+   task check    # Run quality checks
+   task build    # Build your binary
+   ./myapp --version
+   ```
+
+That's it! Your scaffold is ready to customize.
 
 ### Important: Single Source of Truth for Names
 
@@ -213,29 +225,33 @@ This design ensures you don't need to search and replace names across multiple f
 
 ### Customizing the Module Path
 
-When you clone this repository, it's important to update the `MODULE_PATH` in the `go.mod` file to reflect your own repository path. This ensures that your module is uniquely identifiable and avoids conflicts with other projects.
+**Quick Method:** Use `task init` (see "Using the Scaffold" above).
 
-#### Steps to Update the Module Path
+**What It Does:** The `task init` command automatically updates:
+- Module declaration in `go.mod`
+- All import statements across 40+ Go files
+- Binary name in `Taskfile.yml` and `.goreleaser.yml`
+- Template files with the new module path
 
-1. **Open `go.mod`**: Locate the `go.mod` file in the root of the project.
+**Manual Method (Advanced):** If you need to understand what's happening or customize the process:
 
-2. **Edit the Module Path**: Change the module path to reflect your own repository. For example, if you're using GitHub, it might look like this:
-
+1. **Update `go.mod`**: Change the module path to your repository:
    ```go
    module github.com/yourusername/your-repo-name
    ```
 
-   If you're using another version control system, adjust the path accordingly. For example:
+2. **Update imports**: Search and replace `github.com/peiman/ckeletin-go` with your module path in all `.go` files
 
-   ```go
-   module gitlab.com/yourusername/your-repo-name
+3. **Update configurations**: Change `BINARY_NAME` in `Taskfile.yml` and `project_name` in `.goreleaser.yml`
+
+4. **Clean up**:
+   ```bash
+   go mod tidy
+   task format
+   task check
    ```
 
-3. **Run `go mod tidy`**: After making changes, run `go mod tidy` to clean up any unnecessary dependencies and ensure the `go.mod` and `go.sum` files are up to date.
-
-   **Note:** `Taskfile.yml` automatically detects your module path using `go list -m` - no manual Taskfile updates needed.
-
-By following these steps, you can ensure that your version of the project is correctly configured and ready for further development or deployment.
+**Note:** `Taskfile.yml` automatically detects your module path using `go list -m` - it adapts to whatever is in `go.mod`.
 
 ---
 

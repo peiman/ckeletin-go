@@ -59,6 +59,30 @@ jobs:
       - name: Download Dependencies
         run: go mod download
 
+      - name: Install Task (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          curl -sL https://taskfile.dev/install.sh | sh -s -- -b "$INSTALL_DIR" v${{ env.TASK_VERSION }}
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+        shell: bash
+
+      - name: Install Task (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $INSTALL_DIR = "$env:USERPROFILE\.local\bin"
+          New-Item -ItemType Directory -Force -Path $INSTALL_DIR
+          $TASK_URL = "https://github.com/go-task/task/releases/download/v${{ env.TASK_VERSION }}/task_windows_amd64.zip"
+          Invoke-WebRequest -Uri $TASK_URL -OutFile task.zip
+          Expand-Archive -Path task.zip -DestinationPath $INSTALL_DIR -Force
+          Remove-Item task.zip
+          echo "$INSTALL_DIR" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Verify Task Installation
+        run: task --version
+
       - name: Build
         run: go build -v ./...
 

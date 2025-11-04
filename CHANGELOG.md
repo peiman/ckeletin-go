@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Automated scaffold initialization** (`task init`):
+  - Single command to customize module path and binary name: `task init name=myapp module=github.com/myuser/myapp`
+  - Automatically updates 40+ files including all Go imports, configs, and templates
+  - Cross-platform pure Go implementation (Windows/Linux/macOS)
+  - Includes formatting and validation
+  - Comprehensive integration test ensures reliability
+  - Eliminates 15-20 minutes of manual find/replace work
+  - Example: `task init name=mycompany-cli module=github.com/mycompany/mycompany-cli`
+
 ### Changed
 
 - Updated Go version from 1.24 to 1.25 in go.mod and CI workflow
