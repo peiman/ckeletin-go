@@ -199,6 +199,12 @@ tasks:
       - ./scripts/validate-layering.sh
     silent: false
 
+  validate:package-organization:
+    desc: Validate package organization follows CLI-first strategy (enforces ADR-010)
+    cmds:
+      - ./scripts/validate-package-organization.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -317,6 +323,7 @@ tasks:
       - task: validate:constants
       - task: validate:architecture
       - task: validate:layering
+      - task: validate:package-organization
       - task: check:deps
       - task: test
 
