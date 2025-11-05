@@ -187,6 +187,12 @@ tasks:
       - ./scripts/check-constants.sh
     silent: false
 
+  validate:architecture:
+    desc: Validate architecture documentation follows SSOT pattern
+    cmds:
+      - ./scripts/validate-architecture.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -303,6 +309,7 @@ tasks:
       - task: validate:defaults
       - task: validate:commands
       - task: validate:constants
+      - task: validate:architecture
       - task: check:deps
       - task: test
 

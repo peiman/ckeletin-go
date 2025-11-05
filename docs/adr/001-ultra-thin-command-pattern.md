@@ -5,6 +5,28 @@ Accepted
 
 ## Context
 
+### Framework Selection: Why Cobra?
+
+ckeletin-go uses [Cobra](https://github.com/spf13/cobra) as the CLI framework.
+
+**Why Cobra?**
+- Industry standard for Go CLIs (used by kubectl, hugo, gh, docker cli, and many others)
+- Excellent subcommand support with clean, hierarchical command structure
+- Automatic help generation and flag parsing with sensible defaults
+- Strong community support and battle-tested stability (10k+ GitHub stars, widely adopted)
+- Native integration with Viper for configuration binding
+- POSIX-compliant flags with support for shorthand, required flags, and persistent flags
+
+**Alternatives Considered:**
+- **urfave/cli**: Simpler but less feature-rich, weaker subcommand nesting, smaller ecosystem
+- **kingpin**: Less active maintenance, smaller community, less documentation
+- **kong**: Tag-based reflection approach offers less explicit control over command structure
+- **Direct flag package**: Low-level, would require significant boilerplate for subcommands and help
+
+Cobra's maturity, explicit command structure, and wide adoption align with our goal of building a maintainable, production-ready CLI application. Its integration with Viper enables the configuration patterns described in ADR-002.
+
+### The Problem: Command Bloat
+
 When building CLI applications with Cobra, there's a tendency for command files to become bloated with:
 - Business logic mixed with CLI framework code
 - Direct viper.SetDefault() calls scattered throughout

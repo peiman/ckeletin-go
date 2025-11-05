@@ -493,8 +493,9 @@ git push -u origin <branch-name>
 5. Ask the user for clarification when uncertain
 
 ### Key Resources
+- **docs/adr/ARCHITECTURE.md** - System structure (WHAT the system is: components, flows, interactions)
+- **docs/adr/*.md** - Architectural decisions (WHY it's this way: rationale, alternatives, consequences)
 - **Taskfile.yml** - All available commands and their implementations
-- **docs/adr/** - Architectural decisions and rationale
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage
 - **.cursor/rules/** - Detailed development rules and conventions
