@@ -5,6 +5,29 @@ Accepted
 
 ## Context
 
+### Configuration Library: Why Viper?
+
+The centralized configuration registry is built on [Viper](https://github.com/spf13/viper), the de facto standard configuration library for Go applications.
+
+**Why Viper?**
+- **Multi-source configuration precedence** with sensible defaults (CLI flags > environment variables > config file > default values)
+- **Automatic environment variable mapping** (e.g., `app.log_level` → `CKELETIN_APP_LOG_LEVEL`)
+- **Multiple file format support** (YAML, JSON, TOML, HCL, etc.) without code changes
+- **Type-safe getters** with fallback support (GetString, GetInt, GetDuration, GetBool, etc.)
+- **Native integration with Cobra** for seamless flag binding and command configuration
+- **Well-maintained and widely adopted** (used by Hugo, Docker CLI, Kubernetes tools, and 25k+ GitHub stars)
+- **Live configuration reloading** capability (watchConfig for hot-reload scenarios)
+
+**Alternatives Considered:**
+- **envconfig**: Environment variables only, no file or flag support, loses CLI arg precedence
+- **koanf**: More features (e.g., dot-notation access, merge strategies) but added complexity for minimal benefit, smaller ecosystem
+- **viper alternatives (cleanenv, etc.)**: Less mature, smaller communities, fewer integrations
+- **Manual configuration**: High maintenance burden, would reinvent precedence rules and type conversion
+
+Viper's multi-source precedence model and Cobra integration make it the natural choice for a CLI application. The 12-factor app principle of configuration via environment variables is built-in, while still supporting config files for complex setups.
+
+### The Problem: Scattered Configuration
+
 In typical Cobra/Viper applications, configuration defaults are scattered:
 - `viper.SetDefault()` calls in init() functions
 - Different command files setting overlapping defaults
