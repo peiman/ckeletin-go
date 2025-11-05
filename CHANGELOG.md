@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configuration: `.go-arch-lint.yml` defines components and allowed dependencies
   - Prevents architectural drift through CI validation
   - Note: Adding new business logic packages requires updating `.go-arch-lint.yml`
+- **ADR-010: Package Organization Strategy**:
+  - Documents CLI-first package organization (no `pkg/`, all implementation in `internal/`)
+  - Explains why ckeletin-go is a CLI application, not a library
+  - Automated enforcement via validation script
+  - New task: `task validate:package-organization` checks directory structure
+  - Integrated into `task check` quality pipeline
+  - Validates: No Go code in `pkg/`, only `main.go` at root, all packages in expected locations
+  - Prevents accidental public API surface expansion
+  - Complements ADR-009 layering rules
 
 ### Changed
 

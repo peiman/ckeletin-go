@@ -624,6 +624,7 @@ Each ADR has **validation automation** tied to task commands:
 | ADR-005 | Config constants | `task validate:constants` | Registry ↔ constants sync |
 | ADR-006 | Structured logging | `task check` | Linter rules (no fmt.Println) |
 | ADR-009 | Layered architecture | `task validate:layering` | go-arch-lint checks dependencies |
+| ADR-010 | Package organization | `task validate:package-organization` | Validates CLI-first structure (no pkg/) |
 
 ### Development Cycle
 
@@ -697,7 +698,8 @@ This table shows how the ADRs interact to create the overall architecture:
 | **[ADR-006](006-structured-logging-with-zerolog.md)** | Logging | ADR-001, 009 | Commands and business logic use structured logging, logger is infrastructure layer (009) |
 | **[ADR-007](007-bubble-tea-for-interactive-ui.md)** | UI framework | ADR-001, 006, 009 | Interactive commands use Bubble Tea, log with structured logging, UI is infrastructure layer (009) |
 | **[ADR-008](008-release-automation-with-goreleaser.md)** | Distribution | ADR-000 | Release process uses task commands |
-| **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007) |
+| **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007, 010 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007), package structure (010) |
+| **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure (no pkg/, all in internal/), complements layering rules (009) |
 
 ### Dependency Graph
 
@@ -768,7 +770,7 @@ internal/           # Private implementation (not importable by other projects)
 pkg/                # (Not used - nothing to expose as library)
 ```
 
-<!-- TODO: ADR - Package Organization Strategy (why internal/ vs pkg/, why CLI app not library) -->
+See [ADR-010](010-package-organization-strategy.md) for the rationale behind this organization strategy.
 
 **Design Decision:** ckeletin-go is a **CLI application**, not a library:
 
