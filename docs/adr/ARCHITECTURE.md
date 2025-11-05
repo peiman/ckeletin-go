@@ -155,6 +155,45 @@ Configuration: `.go-arch-lint.yml` defines components and allowed dependencies.
 
 **Maintenance Note:** When adding new commands (e.g., `internal/init/`), update `.go-arch-lint.yml` to include the new business logic package. See [ADR-009](009-layered-architecture-pattern.md) for details.
 
+### Validation in Action
+
+When you run `task validate:layering`, go-arch-lint checks all dependency rules and reports violations with clear error messages:
+
+**Example 1: Business logic importing command layer**
+
+```bash
+$ task validate:layering
+🔍 Validating layered architecture (ADR-009)...
+✅ go-arch-lint installed successfully
+Component business shouldn't depend on github.com/peiman/ckeletin-go/cmd in internal/ping/ping.go:9
+❌ Layered architecture validation failed
+```
+
+This violation occurs when business logic tries to import from `cmd/`:
+```go
+// ❌ internal/ping/ping.go:9
+import "github.com/peiman/ckeletin-go/cmd"
+```
+
+**Example 2: Business logic importing other business logic**
+
+```bash
+Component business shouldn't depend on github.com/peiman/ckeletin-go/internal/docs in internal/ping/ping.go:10
+```
+
+This violation occurs when business logic packages try to import each other:
+```go
+// ❌ internal/ping/ping.go:10
+import "github.com/peiman/ckeletin-go/internal/docs"
+```
+
+**Fix:** Remove the forbidden import and refactor:
+- Extract shared functionality to infrastructure layer (`internal/config`, `internal/logger`, etc.)
+- Pass data as parameters between business logic packages
+- Use dependency injection for shared services
+
+For complete package organization details, see [Package Organization](#package-organization).
+
 ---
 
 ## Component Structure
@@ -710,6 +749,8 @@ This table shows how the ADRs interact to create the overall architecture:
 ---
 
 ## Package Organization
+
+This section explains the directory structure for the layers described in [Architectural Layers](#architectural-layers).
 
 ### Why internal/ vs pkg/ vs cmd/?
 
