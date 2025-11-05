@@ -124,6 +124,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Features
 
 - **Modular Command Structure**: Add, remove, or update commands without breaking the rest of the application.
+- **Layered Architecture**: Enforced 4-layer architecture (Entry → Command → Business Logic → Infrastructure) with automated validation to prevent architectural drift.
 - **Structured Logging**: Use Zerolog to create efficient, leveled logs. Perfect for debugging, auditing, and production use.
 - **Bubble Tea UI**: Optional, interactive UI for advanced terminal applications.
 - **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
@@ -135,6 +136,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Architecture
 
 **ckeletin-go follows a principled architecture emphasizing:**
+- **Layered architecture** - 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with automated enforcement ([ADR-009](docs/adr/009-layered-architecture-pattern.md))
 - **Separation of concerns** - CLI wiring separate from business logic
 - **Single source of truth** - One canonical place for all configuration, tasks, and patterns
 - **Type safety** - Auto-generated constants, strong typing throughout
@@ -142,6 +144,12 @@ Each command manages its own configuration and defaults, promoting modularity an
 - **Automation** - Task-based workflow, auto-generated docs, enforced patterns
 
 All architectural decisions are documented in **[Architecture Decision Records (ADRs)](docs/adr/)** with detailed rationale and implementation guidance.
+
+**Key architectural patterns:**
+- Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](docs/adr/001-ultra-thin-command-pattern.md))
+- Centralized configuration registry with type-safe constants ([ADR-002](docs/adr/002-centralized-configuration-registry.md))
+- Dependency injection over mocking for testability ([ADR-003](docs/adr/003-dependency-injection-over-mocking.md))
+- Automated validation prevents architectural drift (`task validate:layering`)
 
 ---
 

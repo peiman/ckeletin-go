@@ -193,6 +193,12 @@ tasks:
       - ./scripts/validate-architecture.sh
     silent: false
 
+  validate:layering:
+    desc: Validate 4-layer architecture dependency rules (enforces ADR-009)
+    cmds:
+      - ./scripts/validate-layering.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -310,6 +316,7 @@ tasks:
       - task: validate:commands
       - task: validate:constants
       - task: validate:architecture
+      - task: validate:layering
       - task: check:deps
       - task: test
 
