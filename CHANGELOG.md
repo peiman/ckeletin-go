@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Comprehensive integration test ensures reliability
   - Eliminates 15-20 minutes of manual find/replace work
   - Example: `task init name=mycompany-cli module=github.com/mycompany/mycompany-cli`
+- **ADR-009: Layered Architecture Pattern**:
+  - Documents 4-layer architecture (Entry → Command → Business Logic → Infrastructure)
+  - Explains dependency rules and framework independence
+  - Automated enforcement via go-arch-lint
+  - New task: `task validate:layering` checks layer dependencies
+  - Integrated into `task check` quality pipeline
+  - Configuration: `.go-arch-lint.yml` defines components and allowed dependencies
+  - Prevents architectural drift through CI validation
+  - Note: Adding new business logic packages requires updating `.go-arch-lint.yml`
 
 ### Changed
 

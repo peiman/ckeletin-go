@@ -1,0 +1,108 @@
+version: 3
+workdir: .
+
+# Architectural components (ADR-009: Layered Architecture Pattern)
+#
+# This configuration enforces the 4-layer architecture:
+#   Entry → Command → Business Logic → Infrastructure → External Systems
+#
+# Key Rules:
+# - Outer layers depend on inner layers, never reverse
+# - Only cmd/ can import Cobra
+# - internal/ packages cannot import cmd/
+# - Business logic packages are isolated from each other
+#
+# Maintenance Note:
+# - When adding new business logic packages (e.g., internal/init/), add them to
+#   the 'business' component list below
+# - Infrastructure packages (config, logger, ui) rarely change
+
+# Global allow settings
+allow:
+  depOnAnyVendor: true  # Allow vendor imports (external libraries)
+  deepScan: false       # Disable deep AST scanning for performance
+  ignoreNotFoundComponents: false  # Fail if unmatched files found
+
+# Exclude test files, scripts, and generated files from validation
+excludeFiles:
+  - .*_test\.go$
+  - /scripts/.*
+  - /test/.*
+  - /main\.go$
+  - /main_test\.go$
+
+components:
+  # Layer 2: Command Layer (cmd/)
+  # - Ultra-thin command wrappers (ADR-001)
+  # - Only layer that can import Cobra
+  commands:
+    in: cmd
+
+  # Layer 4: Infrastructure Layer (shared services)
+  # - Configuration management (ADR-002, ADR-005) - includes subpackages
+  # - Logging infrastructure (ADR-006)
+  # - UI components (ADR-007)
+  # - Cross-cutting concerns available to all layers
+  infrastructure:
+    in:
+      - internal/config/**
+      - internal/logger/**
+      - internal/ui/**
+
+  # Layer 3: Business Logic Layer
+  # - Feature-specific implementations
+  # - No CLI framework dependencies
+  # - Packages isolated from each other
+  #
+  # TODO: When adding new commands, add their internal/ packages here
+  # Example: Adding 'task init' → add 'internal/init/**' below
+  business:
+    in:
+      - internal/ping/**
+      - internal/docs/**
+
+# External dependencies (vendors from go.mod)
+vendors:
+  # Cobra CLI framework
+  cobra:
+    in: github.com/spf13/cobra
+
+  # Viper configuration library
+  viper:
+    in: github.com/spf13/viper
+
+# Common components available to all layers
+commonComponents:
+  - infrastructure
+
+# Dependency Rules (ADR-009)
+#
+# Enforces layered architecture dependency flow using allowlist approach
+# - Components can ONLY depend on what's listed in mayDependOn
+# - Unlisted dependencies will cause validation failures
+deps:
+  # Command layer delegates to business logic and uses infrastructure
+  # Can also use Cobra and Viper (CLI framework)
+  commands:
+    mayDependOn:
+      - business
+      - infrastructure
+    canUse:
+      - cobra
+      - viper
+
+  # Business logic uses infrastructure only
+  # Cannot import commands or other business logic
+  # Cannot use Cobra (framework independence)
+  business:
+    mayDependOn:
+      - infrastructure
+    # canUse is intentionally omitted - uses only standard library + infrastructure
+
+  # Infrastructure is the foundation
+  # Cannot depend on upper layers (commands, business)
+  # Can use Viper for configuration
+  infrastructure:
+    mayDependOn: []  # Empty - depends on nothing
+    canUse:
+      - viper

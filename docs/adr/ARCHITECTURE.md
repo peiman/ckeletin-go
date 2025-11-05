@@ -35,13 +35,13 @@
 - **Automated validation** of architectural patterns
 - **Cross-platform support** (Linux, macOS, Windows)
 
-The architecture follows a **layered design** with clear separation of concerns and enforcement through automated validation scripts.
+The architecture follows a **4-layer pattern** (Entry → Command → Business Logic → Infrastructure) with automated enforcement of dependency rules. See [ADR-009](009-layered-architecture-pattern.md) for complete details.
 
 ---
 
 ## Architectural Layers
 
-<!-- TODO: ADR - Layered Architecture Pattern (why layering, how layers interact, dependency rules) -->
+See [ADR-009](009-layered-architecture-pattern.md) for the rationale, alternatives considered, and enforcement mechanisms for the layered architecture pattern.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -81,10 +81,79 @@ The architecture follows a **layered design** with clear separation of concerns 
 
 **Layer Responsibilities:**
 
-1. **CLI Entry:** Bootstrap application, execute root command
-2. **Command Layer:** Parse input, validate flags, delegate to business logic (see [ADR-001](001-ultra-thin-command-pattern.md))
-3. **Business Logic:** Domain-specific functionality
-4. **Infrastructure:** Cross-cutting concerns (config, logging, UI)
+1. **CLI Entry (main.go)**
+   - Bootstrap application
+   - Execute root command
+   - **Imports**: `cmd/` only
+   - **Imported by**: Nothing (entry point)
+
+2. **Command Layer (cmd/)**
+   - Parse CLI input and bind flags
+   - Validate arguments
+   - Delegate to business logic (see [ADR-001](001-ultra-thin-command-pattern.md))
+   - **Imports**: `internal/*`, Cobra framework
+   - **Imported by**: Entry layer only
+   - **Key Rule**: Only this layer can import Cobra
+
+3. **Business Logic (internal/ping, internal/docs, etc.)**
+   - Domain-specific functionality
+   - Framework-independent implementations
+   - **Imports**: Infrastructure layer, standard library
+   - **Imported by**: Command layer
+   - **Key Rules**:
+     - ❌ No Cobra imports (framework independence)
+     - ❌ No `cmd/` imports (prevents cycles)
+     - ❌ Business packages isolated from each other
+
+4. **Infrastructure (internal/config, internal/logger, internal/ui)**
+   - Cross-cutting concerns
+   - Shared services available to all layers
+   - **Imports**: External libraries, standard library
+   - **Imported by**: Command layer, Business logic layer
+   - **Key Rules**:
+     - ❌ Cannot import business logic
+     - ❌ Cannot import `cmd/`
+
+### Dependency Rules (Enforced by ADR-009)
+
+See [ADR-009](009-layered-architecture-pattern.md) for complete rationale and alternatives considered.
+
+**Allowed Dependencies:**
+- ✅ Entry → Command
+- ✅ Command → Business Logic
+- ✅ Command → Infrastructure
+- ✅ Business Logic → Infrastructure
+
+**Forbidden Dependencies:**
+- ❌ Business Logic → Command (would couple to CLI)
+- ❌ Business Logic → Business Logic (packages must be isolated)
+- ❌ Infrastructure → Business Logic (wrong direction)
+- ❌ Infrastructure → Command (wrong direction)
+- ❌ `internal/*` → Cobra (only `cmd/` uses framework)
+
+**Example Violations Caught by Validation:**
+
+```go
+// ❌ VIOLATION: Business logic importing command layer
+// internal/ping/executor.go
+import "github.com/peiman/ckeletin-go/cmd"
+// Error: Component business shouldn't depend on cmd
+
+// ❌ VIOLATION: Business logic importing other business logic
+// internal/ping/executor.go
+import "github.com/peiman/ckeletin-go/internal/docs"
+// Error: Component business shouldn't depend on internal/docs
+```
+
+**Enforcement:**
+
+```bash
+task validate:layering  # Runs go-arch-lint to check all rules
+```
+
+Configuration: `.go-arch-lint.yml` defines components and allowed dependencies.
+
+**Maintenance Note:** When adding new commands (e.g., `internal/init/`), update `.go-arch-lint.yml` to include the new business logic package. See [ADR-009](009-layered-architecture-pattern.md) for details.
 
 ---
 
@@ -515,6 +584,7 @@ Each ADR has **validation automation** tied to task commands:
 | ADR-002 | Config registry | `task validate:defaults` | No viper.SetDefault() calls |
 | ADR-005 | Config constants | `task validate:constants` | Registry ↔ constants sync |
 | ADR-006 | Structured logging | `task check` | Linter rules (no fmt.Println) |
+| ADR-009 | Layered architecture | `task validate:layering` | go-arch-lint checks dependencies |
 
 ### Development Cycle
 
@@ -575,41 +645,50 @@ Each ADR has **validation automation** tied to task commands:
 
 ## How ADRs Work Together
 
-This table shows how the 9 ADRs interact to create the overall architecture:
+This table shows how the ADRs interact to create the overall architecture:
 
 | ADR | Scope | Interacts With | How They Connect |
 |-----|-------|----------------|------------------|
 | **[ADR-000](000-task-based-single-source-of-truth.md)** | Development workflow | All ADRs | Provides task-based enforcement for all patterns |
-| **[ADR-001](001-ultra-thin-command-pattern.md)** | Command structure | ADR-002, 003, 006 | Commands use config (002), DI (003), logging (006) |
-| **[ADR-002](002-centralized-configuration-registry.md)** | Configuration SSOT | ADR-001, 004, 005 | Registry used by commands (001), validated (004), generates constants (005) |
+| **[ADR-001](001-ultra-thin-command-pattern.md)** | Command structure | ADR-002, 003, 006, 009 | Commands use config (002), DI (003), logging (006), follow layering (009) |
+| **[ADR-002](002-centralized-configuration-registry.md)** | Configuration SSOT | ADR-001, 004, 005, 009 | Registry used by commands (001), validated (004), generates constants (005), infrastructure layer (009) |
 | **[ADR-003](003-dependency-injection-over-mocking.md)** | Testing strategy | ADR-001 | Business logic (called by commands) uses DI for testability |
 | **[ADR-004](004-security-validation-in-config.md)** | Security | ADR-002 | Adds validation layer to config registry |
 | **[ADR-005](005-auto-generated-config-constants.md)** | Type safety | ADR-001, 002 | Generates constants from registry (002) for use in commands (001) |
-| **[ADR-006](006-structured-logging-with-zerolog.md)** | Logging | ADR-001 | Commands and business logic use structured logging |
-| **[ADR-007](007-bubble-tea-for-interactive-ui.md)** | UI framework | ADR-001, 006 | Interactive commands use Bubble Tea, log with structured logging |
+| **[ADR-006](006-structured-logging-with-zerolog.md)** | Logging | ADR-001, 009 | Commands and business logic use structured logging, logger is infrastructure layer (009) |
+| **[ADR-007](007-bubble-tea-for-interactive-ui.md)** | UI framework | ADR-001, 006, 009 | Interactive commands use Bubble Tea, log with structured logging, UI is infrastructure layer (009) |
 | **[ADR-008](008-release-automation-with-goreleaser.md)** | Distribution | ADR-000 | Release process uses task commands |
+| **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007) |
 
 ### Dependency Graph
 
 ```
                     ADR-000 (Task-based workflow)
                             │
-                    ┌───────┴────────┬───────────────┐
-                    │                │               │
-                    ▼                ▼               ▼
-                ADR-001          ADR-002         ADR-008
-              (Commands)        (Config)        (Release)
-                    │                │
-            ┌───────┼────────┐       │
-            │       │        │       │
-            ▼       ▼        ▼       ▼
-        ADR-003  ADR-006  ADR-007  ADR-004  ADR-005
-         (DI)    (Log)     (UI)    (Sec)   (Constants)
-                                             │
-                                             ▼
-                                        Validation
-                                          Scripts
+        ┌───────────────────┼───────────────────┐
+        │                   │                   │
+        ▼                   ▼                   ▼
+    ADR-009             ADR-001             ADR-002         ADR-008
+   (Layering)          (Commands)           (Config)       (Release)
+        │                   │                   │
+   [enforces]        ┌──────┼────────┐          │
+        │            │      │        │          │
+        └────────────┼──────┼────────┼──────────┘
+                     │      │        │
+                     ▼      ▼        ▼
+                 ADR-003  ADR-006  ADR-007  ADR-004  ADR-005
+                  (DI)    (Log)     (UI)    (Sec)   (Constants)
+                                                     │
+                                                     ▼
+                                                Validation
+                                                  Scripts
 ```
+
+**Key Relationships:**
+- **ADR-009** (Layering) enforces the structure that ADR-001 (Commands) and ADR-002 (Config) operate within
+- **ADR-001** (Commands) uses ADR-003 (DI), ADR-006 (Logging), ADR-007 (UI) within the layering constraints
+- **ADR-002** (Config) uses ADR-004 (Security validation) and generates ADR-005 (Constants)
+- **ADR-000** (Tasks) provides enforcement for all patterns via validation scripts
 
 ### Cross-Cutting Concerns
 
@@ -672,7 +751,7 @@ Example invalid imports in internal/ping/executor.go:
   ❌ "ckeletin-go/cmd"  (would create cycle)
 ```
 
-**Enforcement:** Go compiler prevents cycles, but layering is convention-based.
+**Enforcement:** Go compiler prevents cycles. Layering rules are automated via go-arch-lint (see [ADR-009](009-layered-architecture-pattern.md)). Run `task validate:layering` to check compliance.
 
 ---
 
@@ -753,11 +832,12 @@ func MustNewPingCommand() *cobra.Command {
 
 ## Summary
 
-**ckeletin-go's architecture** is built on three pillars:
+**ckeletin-go's architecture** is built on four foundational pillars:
 
-1. **Task-based workflow** ([ADR-000](000-task-based-single-source-of-truth.md)) - SSOT for development
-2. **Ultra-thin commands** ([ADR-001](001-ultra-thin-command-pattern.md)) - Clear separation of concerns
-3. **Centralized configuration** ([ADR-002](002-centralized-configuration-registry.md)) - Type-safe, validated config
+1. **Layered architecture** ([ADR-009](009-layered-architecture-pattern.md)) - Enforced 4-layer pattern with automated validation
+2. **Task-based workflow** ([ADR-000](000-task-based-single-source-of-truth.md)) - SSOT for development
+3. **Ultra-thin commands** ([ADR-001](001-ultra-thin-command-pattern.md)) - Clear separation of concerns
+4. **Centralized configuration** ([ADR-002](002-centralized-configuration-registry.md)) - Type-safe, validated config
 
 These are supported by:
 
