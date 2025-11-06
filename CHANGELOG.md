@@ -35,6 +35,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Validates: No Go code in `pkg/`, only `main.go` at root, all packages in expected locations
   - Prevents accidental public API surface expansion
   - Complements ADR-009 layering rules
+- **ADR-001 & ADR-002 Extensions - Implementation Patterns**:
+  - Extended ADR-001 with two implementation patterns:
+    - **Command Metadata Pattern**: Declarative command definitions in `internal/config/commands/`, factory functions for construction
+    - **Executor Pattern**: Business logic in `internal/*/executor.go` with `Execute()` method for framework independence
+  - Extended ADR-002 with Type-Safe Config Consumption pattern:
+    - Commands use `getConfigValueWithFlags[T]()` helper with generated constants
+    - Config passed as typed structs to executors (e.g., `ping.Config`)
+    - New task: `task validate:config-consumption` enforces pattern
+    - Prevents direct `viper.Get*()` calls in command files (except whitelisted: helpers.go, root.go, flags.go)
+  - Removed 3 TODO markers from ARCHITECTURE.md, replaced with ADR pattern references
+  - Added validation to Pattern Enforcement table
 
 ### Changed
 

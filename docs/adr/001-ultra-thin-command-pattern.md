@@ -105,14 +105,102 @@ This checks that command files:
 - Don't contain direct viper.SetDefault() calls
 - Don't exceed reasonable line counts
 
+## Implementation Patterns
+
+This section documents the specific implementation patterns that realize the ultra-thin command principle in practice.
+
+### Command Metadata Pattern
+
+**Problem**: Creating Cobra commands involves repetitive boilerplate (Use, Short, Long, flags) scattered across command files, leading to inconsistency and duplication.
+
+**Solution**: Declare command metadata separately in `internal/config/commands/<command>_config.go` and use factory functions to construct commands from metadata.
+
+**Structure**:
+```go
+// internal/config/commands/ping_config.go
+var PingMetadata = config.CommandMetadata{
+    Use:   "ping",
+    Short: "Responds with a pong",
+    Long:  `Description...`,
+    ConfigPrefix: "app.ping",
+    FlagOverrides: map[string]string{
+        "app.ping.output_message": "message",
+    },
+}
+
+// cmd/ping.go
+var pingCmd = MustNewCommand(commands.PingMetadata, runPing)
+```
+
+**Benefits**:
+- **Separation**: Command metadata separate from implementation
+- **Consistency**: `MustNewCommand()` applies consistent patterns
+- **Discoverability**: All metadata in `internal/config/commands/`
+- **Testability**: Metadata can be validated independently
+- **Auto-registration**: Flags registered automatically from ConfigPrefix
+
+**Factory Functions** (`cmd/helpers.go`):
+- `MustNewCommand(metadata, runE)` - Creates command, panics on error (for init())
+- `NewCommand(metadata, runE)` - Returns `(*cobra.Command, error)` (for runtime)
+- `MustAddToRoot(cmd)` - Adds to root and sets up config inheritance
+
+### Executor Pattern
+
+**Problem**: Business logic mixed with CLI framework code makes testing difficult and couples domain logic to Cobra.
+
+**Solution**: Implement business logic in separate executor structs with `Execute() error` method, keeping CLI layer as thin delegation.
+
+**Structure**:
+```go
+// internal/ping/ping.go
+type Executor struct {
+    cfg      Config
+    uiRunner ui.UIRunner
+    writer   io.Writer
+}
+
+func NewExecutor(cfg Config, uiRunner ui.UIRunner, writer io.Writer) *Executor {
+    return &Executor{cfg: cfg, uiRunner: uiRunner, writer: writer}
+}
+
+func (e *Executor) Execute() error {
+    // All business logic here
+    // Framework-agnostic
+    return nil
+}
+
+// cmd/ping.go
+func runPing(cmd *cobra.Command, args []string) error {
+    cfg := ping.Config{/* retrieve config */}
+    return ping.NewExecutor(cfg, uiRunner, os.Stdout).Execute()
+}
+```
+
+**Benefits**:
+- **Framework Independence**: Business logic has zero Cobra dependencies
+- **Testability**: Test `Execute()` without any CLI framework
+- **Dependency Injection**: Dependencies explicit in constructor (see [ADR-003](003-dependency-injection-over-mocking.md))
+- **Reusability**: Executor can be used in non-CLI contexts
+- **Clear Separation**: CLI concerns vs business logic boundaries explicit
+
+**Pattern Enforced By**:
+- **ADR-009** (Layered Architecture): Business logic cannot import cmd/
+- **ADR-001** (This ADR): Commands must be thin (~20-30 lines)
+- Natural consequence: Logic must live elsewhere → Executor pattern emerges
+
+**Validation**: `task validate:commands` checks command files stay thin, which implicitly requires delegation pattern.
+
 ## Related ADRs
 
-- [ADR-002](002-centralized-configuration-registry.md) - Centralized configuration eliminates scattered SetDefault calls
-- [ADR-003](003-dependency-injection-over-mocking.md) - Dependency injection enables testing without mocks
+- [ADR-002](002-centralized-configuration-registry.md) - Centralized configuration eliminates scattered SetDefault calls; command metadata uses ConfigPrefix
+- [ADR-003](003-dependency-injection-over-mocking.md) - Dependency injection enables testing without mocks; executors use DI
+- [ADR-009](009-layered-architecture-pattern.md) - Enforces business logic isolation from cmd/, making Executor pattern necessary
 
 ## References
 
 - `cmd/README.md` - Detailed command pattern documentation
-- `cmd/ping.go` - Reference implementation (~31 lines)
+- `cmd/ping.go` - Reference implementation (~31 lines) showing metadata and executor patterns
+- `cmd/helpers.go` - Factory functions (MustNewCommand, MustAddToRoot)
+- `internal/ping/ping.go` - Executor pattern reference implementation
+- `internal/config/commands/ping_config.go` - Command metadata example
 - `cmd/docs.go` - Subcommand example
-- `cmd/helpers.go` - Pattern enforcement helpers

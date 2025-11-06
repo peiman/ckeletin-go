@@ -183,15 +183,89 @@ errs := config.ValidateAllConfigValues(viper.AllSettings())
 unknownKeys := findUnknownKeys(settings, knownKeys)
 ```
 
+## Implementation Patterns
+
+This section documents how commands consume configuration from the centralized registry in a type-safe manner.
+
+### Type-Safe Config Consumption Pattern
+
+**Problem**: Direct `viper.Get*()` calls scattered throughout command files create fragility - typos in string keys fail at runtime, no type safety, and difficult refactoring.
+
+**Solution**: Commands use helper functions with generated constants and pass configuration as typed structs to business logic.
+
+**Structure**:
+```go
+// cmd/ping.go - Retrieve config with helper
+func runPing(cmd *cobra.Command, args []string) error {
+    cfg := ping.Config{
+        Message: getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutputMessage),
+        Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
+        UI:      getConfigValueWithFlags[bool](cmd, "ui", config.KeyAppPingUi),
+    }
+    return ping.NewExecutor(cfg, uiRunner, os.Stdout).Execute()
+}
+
+// internal/ping/ping.go - Config struct in business logic
+type Config struct {
+    Message string
+    Color   string
+    UI      bool
+}
+```
+
+**Benefits**:
+- **Type Safety**: Generic helper `getConfigValueWithFlags[T]()` provides compile-time type checking
+- **Generated Constants**: Uses `config.Key*` constants (auto-generated from registry via [ADR-005](005-auto-generated-config-constants.md))
+- **Flag Integration**: Automatically checks command flags before falling back to Viper
+- **Centralized Retrieval**: Config assembled in one place (command file) before passing to business logic
+- **Refactor-Friendly**: Renaming config keys only requires updating registry and regenerating constants
+- **Framework Independence**: Business logic receives plain structs, no Viper/Cobra dependencies
+
+**Helper Function** (`cmd/helpers.go`):
+```go
+func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName, configKey string) T {
+    // 1. Check if flag was explicitly set
+    if cmd.Flags().Changed(flagName) {
+        val, _ := cmd.Flags().GetString(flagName) // or GetBool, etc.
+        return convertToType[T](val)
+    }
+    // 2. Fall back to Viper (env vars, config file, defaults)
+    return viper.Get(configKey).(T)
+}
+```
+
+**Config Struct Pattern**:
+- Config structs live in business logic packages (`internal/ping/ping.go`)
+- Commands create config structs from registry keys
+- Executors receive config as constructor parameters
+- No `viper` or `cobra` imports in business logic
+
+**Enforcement**:
+
+```bash
+task validate:config-consumption  # Checks type-safe config pattern
+```
+
+Validation script checks:
+- ✅ No direct `viper.Get*()` calls in command files (except whitelisted: helpers.go, root.go, flags.go)
+- ✅ Commands use `getConfigValueWithFlags[T]()` helper for type-safe retrieval
+- ✅ Config passed as typed structs to executors
+
+Additionally, ADR-001's `task validate:commands` indirectly enforces this pattern by requiring commands to be thin - scattering config retrieval throughout business logic would violate line count limits.
+
 ## Related ADRs
 
-- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands rely on centralized config
-- [ADR-005](005-auto-generated-config-constants.md) - Type-safe constants from registry
+- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands rely on centralized config; executor pattern receives config structs
+- [ADR-005](005-auto-generated-config-constants.md) - Type-safe constants from registry enable type-safe consumption
+- [ADR-009](009-layered-architecture-pattern.md) - Business logic isolation means no direct Viper access, config passed as structs
 
 ## References
 
 - `internal/config/registry.go` - Registry implementation
 - `internal/config/commands/` - Self-registering config providers
+- `cmd/helpers.go` - `getConfigValueWithFlags[T]()` helper function
+- `cmd/ping.go` - Reference implementation showing config consumption pattern
+- `internal/ping/ping.go` - Config struct example in business logic
 - `scripts/check-defaults.sh` - Validation script
 - `scripts/generate-config-constants.go` - Key generation
 - `docs/configuration.md` - Auto-generated documentation
