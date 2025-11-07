@@ -128,6 +128,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 - **Structured Logging**: Use Zerolog to create efficient, leveled logs. Perfect for debugging, auditing, and production use.
 - **Bubble Tea UI**: Optional, interactive UI for advanced terminal applications.
 - **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
+- **License Compliance**: Automated dependency license checking (go-licenses + lichen) prevents GPL/AGPL contamination. Conservative permissive-only policy by default.
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
 - **High Test Coverage & Quality Checks**: Ensure a robust codebase that meets production standards.
 
@@ -149,6 +150,7 @@ All architectural decisions are documented in **[Architecture Decision Records (
 - Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](docs/adr/001-ultra-thin-command-pattern.md))
 - Centralized configuration registry with type-safe constants ([ADR-002](docs/adr/002-centralized-configuration-registry.md))
 - Dependency injection over mocking for testability ([ADR-003](docs/adr/003-dependency-injection-over-mocking.md))
+- Dual-tool license compliance checking (source + binary) ([ADR-011](docs/adr/011-license-compliance.md))
 - Automated validation prevents architectural drift (`task validate:layering`)
 
 ---

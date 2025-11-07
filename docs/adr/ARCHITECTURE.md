@@ -626,6 +626,7 @@ Each ADR has **validation automation** tied to task commands:
 | ADR-006 | Structured logging | `task check` | Linter rules (no fmt.Println) |
 | ADR-009 | Layered architecture | `task validate:layering` | go-arch-lint checks dependencies |
 | ADR-010 | Package organization | `task validate:package-organization` | Validates CLI-first structure (no pkg/) |
+| ADR-011 | License compliance | `task check:license` | Dual tool verification (source + binary) |
 
 ### Development Cycle
 
@@ -661,6 +662,9 @@ Each ADR has **validation automation** tied to task commands:
 │    - Linting (golangci-lint)                                 │
 │    - Pattern validation (all ADRs)                           │
 │    - Dependency checks                                       │
+│    - License compliance (ADR-011)                            │
+│      ├─ Source-based (go-licenses, fast)                     │
+│      └─ Binary-based (lichen, accurate)                      │
 │    - Tests with coverage                                     │
 │    - Vulnerability scan                                      │
 └──────────────┬───────────────────────────────────────────────┘
@@ -701,6 +705,7 @@ This table shows how the ADRs interact to create the overall architecture:
 | **[ADR-008](008-release-automation-with-goreleaser.md)** | Distribution | ADR-000 | Release process uses task commands |
 | **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007, 010 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007), package structure (010) |
 | **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure (no pkg/, all in internal/), complements layering rules (009) |
+| **[ADR-011](011-license-compliance.md)** | License compliance | ADR-000, 008 | Dual-tool checking (go-licenses + lichen) enforced via task orchestrator (000), integrated with release process (008) |
 
 ### Dependency Graph
 

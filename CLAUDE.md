@@ -365,6 +365,195 @@ func TestFeature(t *testing.T) {
 - Integration tests: `test/integration/`
 - Benchmarks: `*_bench_test.go`
 
+## License Compliance
+
+**ckeletin-go uses automated license compliance checking to prevent legal issues.**
+
+See [ADR-011](docs/adr/011-license-compliance.md) for full strategy and [docs/licenses.md](docs/licenses.md) for user guide.
+
+### When to Check Licenses
+
+**ALWAYS check licenses when adding dependencies:**
+
+```bash
+# After adding a dependency
+go get github.com/example/package
+
+# Fast check (source-based, ~2-5 seconds)
+task check:license:source
+```
+
+**Before committing:**
+```bash
+# Runs all checks including license compliance
+task check
+```
+
+**Before releases:**
+```bash
+# Accurate check (binary-based, ~10-15 seconds)
+task check:license:binary
+```
+
+### Default Policy (Conservative)
+
+**✅ Allowed Licenses:**
+- MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense
+
+**❌ Denied Licenses:**
+- GPL, AGPL, SSPL (strong copyleft - forces entire codebase to be open-source)
+- LGPL, MPL (weak copyleft - requires source for modified libraries)
+
+**⚠️ Unknown Licenses:**
+- Requires manual review and possible override in `.lichen.yaml`
+
+### Two-Tier Checking System
+
+**Source-Based (go-licenses) - Development:**
+- Fast (~2-5 seconds)
+- Scans `go.mod` and source code
+- May include test-only dependencies
+- Use: `task check:license:source`
+
+**Binary-Based (lichen) - Release:**
+- Accurate (~10-15 seconds)
+- Scans compiled binary only
+- Only runtime dependencies
+- Use: `task check:license:binary`
+
+**Both (orchestrator) - CI:**
+- Runs both checks
+- Defense in depth
+- Use: `task check:license`
+
+### Handling Violations
+
+When you see a license violation:
+
+```bash
+❌ License compliance check failed
+
+Found disallowed licenses:
+  github.com/example/gpl-lib@v1.0.0: GPL-3.0 (forbidden)
+```
+
+**Actions:**
+
+1. **Remove the dependency:**
+   ```bash
+   go get github.com/example/gpl-lib@none
+   go mod tidy
+   task check:license:source
+   ```
+
+2. **Find an alternative:**
+   - Search [pkg.go.dev](https://pkg.go.dev) for MIT/Apache-2.0 alternatives
+   - Check "Similar packages" section
+   - Verify license before adding
+
+3. **Request exception (justified cases only):**
+   - Edit `.lichen.yaml` exceptions section
+   - Document justification
+   - Get approval before committing
+
+4. **Override policy (if allowed for your project):**
+   ```bash
+   # Temporarily allow MPL-2.0
+   LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0" task check:license:source
+
+   # Or edit scripts/check-licenses-source.sh for permanent change
+   ```
+
+### Customizing Policy
+
+**Via Environment Variables:**
+```bash
+# Allow additional licenses
+export LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0"
+task check:license:source
+
+# Change disallowed types
+export LICENSE_DISALLOWED="forbidden"
+task check:license:source
+```
+
+**Via .lichen.yaml (for binary checks):**
+```yaml
+# .lichen.yaml
+allow:
+  - "MIT"
+  - "Apache-2.0"
+  - "MPL-2.0"  # Add weak copyleft if acceptable
+
+override:
+  - path: "github.com/example/package"
+    licenses: ["MIT"]  # Override mis-detected license
+```
+
+### Generating Artifacts
+
+**License Report (CSV):**
+```bash
+task generate:license:report
+# Output: reports/licenses.csv
+```
+
+**License Files (for distribution):**
+```bash
+task generate:license:files
+# Output: third_party/licenses/
+```
+
+**NOTICE File (attribution):**
+```bash
+task generate:attribution
+# Output: NOTICE
+```
+
+**All Artifacts:**
+```bash
+task generate:license
+```
+
+### Integration with Development Workflow
+
+License checking is integrated into `task check`:
+
+```
+task check runs:
+  ├─ check:format
+  ├─ lint
+  ├─ validate:* (all ADR validations)
+  ├─ check:deps
+  ├─ check:license  ← Includes license compliance
+  │   ├─ check:license:source (fast, go-licenses)
+  │   └─ check:license:binary (accurate, lichen)
+  └─ test
+```
+
+**Pre-commit hooks do NOT include license checks** (too slow for every commit).
+
+**CI DOES include license checks** (blocks merge on violations).
+
+### Why This Matters
+
+- **Legal Protection:** Prevent GPL/AGPL from forcing your code open-source
+- **Commercial Use:** Scaffold users can build proprietary products
+- **Professional Standard:** Enterprise-grade compliance from day one
+- **Early Detection:** Catch issues during development, not during audits
+- **Education:** Learn license implications through tooling
+
+### Quick Reference
+
+| Task | When | Speed | Purpose |
+|------|------|-------|---------|
+| `task check:license:source` | After `go get` | ~2-5s | Fast dev feedback |
+| `task check:license:binary` | Before release | ~10-15s | Accurate verification |
+| `task check:license` | CI, comprehensive | ~15-20s | Both checks |
+| `task generate:license` | Before release | ~5s | All artifacts |
+
+**For complete details, see [docs/licenses.md](docs/licenses.md)**
+
 ### Documentation Requirements
 
 **Keep documentation up to date:**
@@ -403,6 +592,7 @@ func TestFeature(t *testing.T) {
 | Skip tests for "simple" code | Write tests anyway | Coverage requirements are mandatory |
 | Mock everything | Use dependency injection | Simpler, more maintainable (ADR-003) |
 | Forget CHANGELOG.md | Update it with every change | Users need to know what changed |
+| Add deps without license check | `go get pkg && task check:license:source` | Prevent GPL/AGPL contamination |
 
 ### Anti-Patterns Specific to ckeletin-go
 
@@ -421,6 +611,11 @@ func TestFeature(t *testing.T) {
 4. **Skipping Integration Tests** - Only running unit tests
    - Run `task test:integration` for full coverage
    - Integration tests catch real-world issues
+
+5. **Ignoring License Compliance** - Adding dependencies without checking licenses
+   - Always run `task check:license:source` after `go get`
+   - Check `task check:license:binary` before releases
+   - Review `.lichen.yaml` for policy customization
 
 ## Quick Reference
 
@@ -479,6 +674,10 @@ git push -u origin <branch-name>
 | `task generate:config:key-constants` | After config registry changes | Regenerates config constants |
 | `task check:deps` | Weekly/monthly | Checks for dependency updates |
 | `task check:vuln` | Before releases | Scans for vulnerabilities |
+| `task check:license` | After `go get`, in CI | Checks dependency licenses (both source + binary) |
+| `task check:license:source` | After adding dependencies | Fast license check (~2-5s) |
+| `task check:license:binary` | Before releases | Accurate binary license check (~10-15s) |
+| `task generate:license` | Before releases | Generate all license artifacts |
 | `task check:release` | Before creating releases | Checks if GoReleaser is installed |
 | `task test:release` | Before tagging | Tests release build locally |
 | `task clean:release` | After testing releases | Cleans GoReleaser artifacts |

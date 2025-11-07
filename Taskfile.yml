@@ -34,6 +34,8 @@ tasks:
     - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
     - go install github.com/evilmartians/lefthook@latest
     - go install github.com/psampaz/go-mod-outdated@latest
+    - go install github.com/google/go-licenses/v2@latest
+    - go install github.com/uw-labs/lichen@latest
     - lefthook install
     silent: true
 
@@ -74,6 +76,12 @@ tasks:
 
         echo "  go-mod-outdated:"
         which go-mod-outdated > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  go-licenses:"
+        which go-licenses > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+
+        echo "  lichen:"
+        which lichen > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
 
         echo ""
         echo "💡 If any tools are missing, run: task setup"
@@ -319,6 +327,58 @@ tasks:
       - task: generate:config:template
     silent: true
 
+  # --- License Compliance Tasks (ADR-011) ---
+
+  check:license:
+    desc: Check all license compliance (orchestrator)
+    cmds:
+      - task: check:license:source
+      - task: check:license:binary
+
+  check:license:source:
+    desc: Check dependency licenses from source (fast, for development)
+    cmds:
+      - ./scripts/check-licenses-source.sh
+    silent: false
+
+  check:license:binary:
+    desc: Check licenses in compiled binary (accurate, for releases)
+    cmds:
+      - ./scripts/check-licenses-binary.sh
+    deps: [build]
+    silent: false
+
+  generate:license:
+    desc: Generate all license artifacts (orchestrator)
+    cmds:
+      - task: generate:license:report
+      - task: generate:license:files
+      - task: generate:attribution
+
+  generate:license:report:
+    desc: Generate license report (CSV format)
+    cmds:
+      - mkdir -p reports
+      - ./scripts/generate-license-report.sh
+    silent: false
+
+  generate:license:files:
+    desc: Save license files to third_party/ for distribution
+    cmds:
+      - mkdir -p third_party/licenses
+      - go-licenses save ./... --save_path=third_party/licenses
+      - echo "License files saved to third_party/licenses/"
+    silent: false
+
+  generate:attribution:
+    desc: Generate NOTICE file with attribution
+    cmds:
+      - ./scripts/generate-attribution.sh
+    deps: [generate:license:report]
+    silent: false
+
+  # --- Quality Checks ---
+
   check:
     desc: Run all quality checks
     cmds:
@@ -332,6 +392,7 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: check:deps
+      - task: check:license
       - task: test
 
   build:

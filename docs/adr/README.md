@@ -36,8 +36,9 @@ An Architecture Decision Record (ADR) captures an important architectural decisi
 **Writing tests?**
 - [ADR-003](003-dependency-injection-over-mocking.md) - DI over mocking
 
-**Security or validation?**
+**Security or compliance?**
 - [ADR-004](004-security-validation-in-config.md) - Security validation
+- [ADR-011](011-license-compliance.md) - License compliance
 
 **Infrastructure?**
 - [ADR-006](006-structured-logging-with-zerolog.md) - Structured logging
@@ -114,6 +115,9 @@ What becomes easier or more difficult to do because of this change?
 - [ADR-006](006-structured-logging-with-zerolog.md) - Structured Logging with Zerolog
 - [ADR-007](007-bubble-tea-for-interactive-ui.md) - Bubble Tea for Interactive UI
 - [ADR-008](008-release-automation-with-goreleaser.md) - Release Automation with GoReleaser
+- [ADR-009](009-layered-architecture-pattern.md) - Layered Architecture Pattern
+- [ADR-010](010-package-organization-strategy.md) - Package Organization Strategy
+- [ADR-011](011-license-compliance.md) - License Compliance Strategy (Dual-Tool Approach)
 
 ## Creating a New ADR
 

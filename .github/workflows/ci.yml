@@ -11,6 +11,9 @@ on:
     branches:
       - main
 
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC (catch upstream license changes)
+
 # Concurrency controls to prevent wasting CI minutes
 # Cancel in-progress runs for PRs, but let main branch builds complete
 concurrency:
@@ -161,6 +164,20 @@ jobs:
           verbose: true
           flags: unittests
           name: codecov-ckeletin-go
+
+      - name: Generate License Report
+        if: always()
+        run: task generate:license:report
+
+      - name: Upload License Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: |
+            reports/licenses.csv
+            reports/license-errors.log
+          retention-days: 90
 
   release:
     runs-on: ubuntu-latest

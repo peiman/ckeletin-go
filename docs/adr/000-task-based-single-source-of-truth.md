@@ -334,12 +334,63 @@ verify-deps:
 - Consistent "always use Task" rule with zero exceptions
 - Task is the SSOT interface for ALL environments (local, Lefthook, CI)
 
+### Complex Multi-Action Example: License Compliance
+
+When a domain requires multiple verification methods AND multiple output artifacts, the pattern scales elegantly with orchestrators:
+
+```yaml
+# CHECK - Multiple verification methods
+check:license              # Orchestrator: runs all verification methods
+check:license:source       # Source-based check (go-licenses, fast)
+check:license:binary       # Binary-based check (lichen, accurate)
+
+# GENERATE - Multiple artifact types
+generate:license           # Orchestrator: creates all artifacts
+generate:license:report    # Generate CSV report
+generate:license:files     # Save license files to third_party/
+generate:attribution       # Generate NOTICE file
+```
+
+**Why this works:**
+
+1. **Orchestrators provide simple interface**: `task check:license` runs everything
+2. **Subvariants allow granular control**: `task check:license:source` for fast dev feedback
+3. **Clear action:target:variant pattern**: Each task name states exactly what it does
+4. **Consistent with existing patterns**: Same structure as `check:deps`, `generate:docs`
+5. **Scales to complexity**: Can add more variants without breaking pattern
+
+**Usage patterns:**
+
+```bash
+# Development: fast feedback
+task check:license:source        # ~2-5 seconds
+
+# Release: accurate verification
+task check:license:binary        # ~10-15 seconds
+
+# CI: comprehensive check
+task check:license               # Runs both via orchestrator
+
+# Artifacts: generate all
+task generate:license            # All reports + NOTICE
+```
+
+**Pattern clarity:**
+
+- ✅ `check:license` = orchestrator (runs subvariants)
+- ✅ `check:license:source` = specific check method
+- ✅ `generate:license:report` = generate one artifact type
+- ❌ `check:license:report` = WRONG (mixing check + generate actions)
+
+See [ADR-011](011-license-compliance.md) for full implementation details.
+
 ## Related ADRs
 
 - [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands enforced via `task validate:commands`
 - [ADR-002](002-centralized-configuration-registry.md) - Config registry enforced via `task validate:defaults`
 - [ADR-005](005-auto-generated-config-constants.md) - Config constants enforced via `task validate:constants`
 - [ADR-008](008-release-automation-with-goreleaser.md) - Release process uses `task check` as quality gate
+- [ADR-011](011-license-compliance.md) - License compliance enforced via `task check:license` (dual-tool orchestrator)
 
 ## References
 
