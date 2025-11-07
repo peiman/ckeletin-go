@@ -338,11 +338,7 @@ export LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0,LGPL-3.0"
 task check:license:source
 ```
 
-**Change disallowed types:**
-```bash
-export LICENSE_DISALLOWED="forbidden"  # Only block GPL, not LGPL
-task check:license:source
-```
+**Note:** The `go-licenses` tool only supports `--allowed_licenses` (not `--disallowed_types` simultaneously). Use the `LICENSE_ALLOWED` environment variable to customize the list of permitted licenses.
 
 **Make permanent:**
 Edit `scripts/check-licenses-source.sh`:

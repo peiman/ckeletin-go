@@ -472,9 +472,8 @@ Found disallowed licenses:
 export LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0"
 task check:license:source
 
-# Change disallowed types
-export LICENSE_DISALLOWED="forbidden"
-task check:license:source
+# Note: go-licenses only supports --allowed_licenses
+# (not --disallowed_types simultaneously)
 ```
 
 **Via .lichen.yaml (for binary checks):**

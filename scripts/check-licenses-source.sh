@@ -5,9 +5,10 @@
 
 set -e
 
-# Default policy: Allow permissive licenses only, deny copyleft
+# Default policy: Allow permissive licenses only
+# Note: go-licenses doesn't support both --allowed_licenses and --disallowed_types
+# We use --allowed_licenses for explicit permissive-only policy
 ALLOWED_LICENSES="${LICENSE_ALLOWED:-MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,0BSD,Unlicense}"
-DISALLOWED_TYPES="${LICENSE_DISALLOWED:-forbidden,restricted}"
 
 # Get module path to ignore self
 MODULE_PATH=$(go list -m 2>/dev/null || echo "github.com/peiman/ckeletin-go")
@@ -15,7 +16,6 @@ MODULE_PATH=$(go list -m 2>/dev/null || echo "github.com/peiman/ckeletin-go")
 echo "🔍 Checking dependency licenses (source-based, fast)..."
 echo "   Tool: go-licenses"
 echo "   Allowed: $ALLOWED_LICENSES"
-echo "   Disallowed types: $DISALLOWED_TYPES"
 echo ""
 
 # Check if go-licenses is installed
@@ -34,7 +34,6 @@ fi
 echo "Scanning dependencies..."
 if go-licenses check \
     --allowed_licenses="$ALLOWED_LICENSES" \
-    --disallowed_types="$DISALLOWED_TYPES" \
     --ignore="$MODULE_PATH" \
     ./... 2>&1; then
     echo ""

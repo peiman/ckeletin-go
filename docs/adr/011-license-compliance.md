@@ -410,9 +410,10 @@ generate:attribution:
 
 **scripts/check-licenses-source.sh**
 - Uses go-licenses with CLI flags
-- Environment variable overrides (LICENSE_ALLOWED, LICENSE_DISALLOWED)
-- Default conservative policy
+- Environment variable override (LICENSE_ALLOWED)
+- Default conservative policy (permissive-only)
 - Clear error messages with next steps
+- Note: go-licenses only supports --allowed_licenses (not --disallowed_types simultaneously)
 
 **scripts/check-licenses-binary.sh**
 - Uses lichen with .lichen.yaml config
