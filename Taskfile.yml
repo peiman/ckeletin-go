@@ -205,6 +205,12 @@ tasks:
       - ./scripts/validate-package-organization.sh
     silent: false
 
+  validate:config-consumption:
+    desc: Validate type-safe config consumption pattern (enforces ADR-002)
+    cmds:
+      - ./scripts/validate-config-consumption.sh
+    silent: false
+
   test:
     desc: Run tests with coverage
     cmd: |
@@ -324,6 +330,7 @@ tasks:
       - task: validate:architecture
       - task: validate:layering
       - task: validate:package-organization
+      - task: validate:config-consumption
       - task: check:deps
       - task: test
 

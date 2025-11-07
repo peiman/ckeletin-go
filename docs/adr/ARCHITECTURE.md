@@ -621,6 +621,7 @@ Each ADR has **validation automation** tied to task commands:
 | ADR-000 | Task-based workflow | `task check` | All checks use task |
 | ADR-001 | Ultra-thin commands | `task validate:commands` | Script checks line count, patterns |
 | ADR-002 | Config registry | `task validate:defaults` | No viper.SetDefault() calls |
+| ADR-002 | Config consumption | `task validate:config-consumption` | Type-safe config retrieval pattern |
 | ADR-005 | Config constants | `task validate:constants` | Registry ↔ constants sync |
 | ADR-006 | Structured logging | `task check` | Linter rules (no fmt.Println) |
 | ADR-009 | Layered architecture | `task validate:layering` | go-arch-lint checks dependencies |
@@ -822,32 +823,31 @@ func (e *Executor) Execute() (Result, error) {
 }
 ```
 
-<!-- TODO: ADR - Executor Pattern (likely extends ADR-001, separates business logic from CLI) -->
+See [ADR-001 Implementation Patterns](001-ultra-thin-command-pattern.md#executor-pattern) for complete details on this pattern.
 
 **Why:** Separates business logic from CLI, enables testing (ADR-003)
 
-### 2. Options Pattern
+### 2. Type-Safe Config Consumption Pattern
 
-**Used in:** Command configuration (internal/config/commands/)
+**Used in:** Command configuration retrieval (cmd/*.go)
 
 ```go
-type CommandOptions struct {
-    Timeout  time.Duration
-    Retries  int
-    Verbose  bool
+// cmd/ping.go - Type-safe config retrieval
+cfg := ping.Config{
+    Message: getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutputMessage),
+    Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
 }
 
-func NewOptionsFromViper() CommandOptions {
-    return CommandOptions{
-        Timeout: viper.GetDuration(config.KeyAppTimeout),
-        // ...
-    }
+// internal/ping/ping.go - Config struct
+type Config struct {
+    Message string
+    Color   string
 }
 ```
 
-<!-- TODO: ADR - Options Pattern (likely extends ADR-002, type-safe config consumption) -->
+See [ADR-002 Implementation Patterns](002-centralized-configuration-registry.md#type-safe-config-consumption-pattern) for complete details on this pattern.
 
-**Why:** Centralizes command configuration, type-safe access
+**Why:** Type-safe access to config, framework independence in business logic
 
 ### 3. Registry Pattern
 
@@ -855,21 +855,25 @@ func NewOptionsFromViper() CommandOptions {
 
 See [ADR-002](002-centralized-configuration-registry.md) for details.
 
-### 4. Factory Pattern
+### 4. Command Metadata Pattern
 
-**Used in:** Command creation (cmd/*.go)
+**Used in:** Command creation (cmd/*.go, internal/config/commands/)
 
 ```go
-func MustNewPingCommand() *cobra.Command {
-    cmd := &cobra.Command{...}
-    // Setup flags, etc.
-    return cmd
+// internal/config/commands/ping_config.go
+var PingMetadata = config.CommandMetadata{
+    Use:   "ping",
+    Short: "Responds with a pong",
+    ConfigPrefix: "app.ping",
 }
+
+// cmd/ping.go
+var pingCmd = MustNewCommand(commands.PingMetadata, runPing)
 ```
 
-<!-- TODO: ADR - Factory Pattern (likely extends ADR-001, consistent command creation) -->
+See [ADR-001 Implementation Patterns](001-ultra-thin-command-pattern.md#command-metadata-pattern) for complete details on this pattern.
 
-**Why:** Consistent command creation, validation at startup
+**Why:** Consistent command creation, declarative metadata, automatic flag registration
 
 ---
 
