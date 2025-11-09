@@ -163,6 +163,7 @@ tasks:
       Used by: task check (developer workflow)
 
       For strict version verification (CI), use: task check:tools:version
+    silent: true
     cmds:
       - |
         echo "🔍 Checking development tools installation..."
@@ -338,64 +339,68 @@ tasks:
 
   check:format:
     desc: Check if Go code is formatted (CI mode)
+    silent: true
     cmds:
       - ./scripts/format-go.sh check
 
   check:vuln:
     desc: Check for vulnerabilities
+    silent: true
     cmds:
       - govulncheck ./...
 
   lint:
     desc: Run all linters
+    silent: true
     cmds:
       - go vet ./...
       - golangci-lint run
 
   validate:defaults:
     desc: Validate no unauthorized viper.SetDefault() calls (enforces ADR-002)
+    silent: true
     cmds:
       - ./scripts/check-defaults.sh
-    silent: false
 
   validate:commands:
     desc: Validate command files follow ultra-thin patterns (enforces ADR-001)
+    silent: true
     cmds:
       - ./scripts/validate-command-patterns.sh
-    silent: false
 
   validate:constants:
     desc: Validate config constants are in sync with registry (enforces ADR-005)
+    silent: true
     cmds:
       - ./scripts/check-constants.sh
-    silent: false
 
   validate:architecture:
     desc: Validate architecture documentation follows SSOT pattern
+    silent: true
     cmds:
       - ./scripts/validate-architecture.sh
-    silent: false
 
   validate:layering:
     desc: Validate 4-layer architecture dependency rules (enforces ADR-009)
+    silent: true
     cmds:
       - ./scripts/validate-layering.sh
-    silent: false
 
   validate:package-organization:
     desc: Validate package organization follows CLI-first strategy (enforces ADR-010)
+    silent: true
     cmds:
       - ./scripts/validate-package-organization.sh
-    silent: false
 
   validate:config-consumption:
     desc: Validate type-safe config consumption pattern (enforces ADR-002)
+    silent: true
     cmds:
       - ./scripts/validate-config-consumption.sh
-    silent: false
 
   test:
     desc: Run tests with coverage
+    silent: true
     cmd: |
       gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -v -coverprofile=coverage.txt -covermode=atomic ./...
 
@@ -512,16 +517,16 @@ tasks:
 
   check:license:source:
     desc: Check dependency licenses from source (fast, for development)
+    silent: true
     cmds:
       - ./scripts/check-licenses-source.sh
-    silent: false
 
   check:license:binary:
     desc: Check licenses in compiled binary (accurate, for releases)
+    silent: true
     cmds:
       - ./scripts/check-licenses-binary.sh
     deps: [build]
-    silent: false
 
   generate:license:
     desc: Generate all license artifacts (orchestrator)
