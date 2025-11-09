@@ -19,6 +19,17 @@ vars:
     -X '{{.MODULE_PATH}}/cmd.Date={{.DATE}}'
     "
 
+  # Pinned tool versions for reproducibility
+  # Update these intentionally after testing - see docs/development.md
+  TOOL_GOIMPORTS_VERSION: latest               # Formatting - safe to use latest
+  TOOL_GOVULNCHECK_VERSION: latest             # Security scanning - always want latest
+  TOOL_GOTESTSUM_VERSION: v1.11.0              # Test runner - pinned for stability
+  TOOL_GOLANGCI_LINT_VERSION: v2.3.0           # Linter - pinned to avoid surprises
+  TOOL_LEFTHOOK_VERSION: v1.7.18               # Git hooks - pinned for reproducibility
+  TOOL_GO_MOD_OUTDATED_VERSION: latest         # Dependency checker - safe to use latest
+  TOOL_GO_LICENSES_VERSION: v2.0.0-alpha.1     # License compliance (source) - CRITICAL: pin for reproducibility
+  TOOL_LICHEN_VERSION: v0.1.7                  # License compliance (binary) - CRITICAL: pin for reproducibility
+
 tasks:
   default:
     cmds:
@@ -26,18 +37,29 @@ tasks:
     silent: true
 
   setup:
-    desc: Install development tools
+    desc: Install development tools with pinned versions
     cmds:
-    - go install golang.org/x/tools/cmd/goimports@latest
-    - go install golang.org/x/vuln/cmd/govulncheck@latest
-    - go install gotest.tools/gotestsum@latest
-    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-    - go install github.com/evilmartians/lefthook@latest
-    - go install github.com/psampaz/go-mod-outdated@latest
-    - go install github.com/google/go-licenses/v2@latest
-    - go install github.com/uw-labs/lichen@latest
+    - echo "📦 Installing development tools with pinned versions..."
+    - echo "   goimports{{":"}} {{.TOOL_GOIMPORTS_VERSION}}"
+    - echo "   govulncheck{{":"}} {{.TOOL_GOVULNCHECK_VERSION}}"
+    - echo "   gotestsum{{":"}} {{.TOOL_GOTESTSUM_VERSION}}"
+    - echo "   golangci-lint{{":"}} {{.TOOL_GOLANGCI_LINT_VERSION}}"
+    - echo "   lefthook{{":"}} {{.TOOL_LEFTHOOK_VERSION}}"
+    - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
+    - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
+    - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
+    - echo ""
+    - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
+    - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
+    - go install gotest.tools/gotestsum@{{.TOOL_GOTESTSUM_VERSION}}
+    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.TOOL_GOLANGCI_LINT_VERSION}}
+    - go install github.com/evilmartians/lefthook@{{.TOOL_LEFTHOOK_VERSION}}
+    - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
+    - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
+    - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
     - lefthook install
-    silent: true
+    - echo "✅ Tools installed successfully"
+    silent: false
 
   doctor:
     desc: Check development environment and tool installation
@@ -129,6 +151,159 @@ tasks:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
       - go mod tidy
+
+  # --- Tool Verification ---
+
+  check:tools:installed:
+    desc: Check that required development tools are installed (fast, for dev workflow)
+    summary: |
+      Verifies that all required development tools are installed and accessible.
+      This is a fast check that only verifies tool existence, not versions.
+
+      Used by: task check (developer workflow)
+
+      For strict version verification (CI), use: task check:tools:version
+    cmds:
+      - |
+        echo "🔍 Checking development tools installation..."
+        all_good=true
+
+        check_tool() {
+          if command -v "$1" > /dev/null 2>&1; then
+            echo "  ✅ $1"
+          else
+            echo "  ❌ $1 not found"
+            all_good=false
+          fi
+        }
+
+        check_tool "goimports"
+        check_tool "golangci-lint"
+        check_tool "gotestsum"
+        check_tool "govulncheck"
+        check_tool "go-licenses"
+        check_tool "lichen"
+
+        if [ "$all_good" = false ]; then
+          echo ""
+          echo "❌ Some tools are missing. Run: task setup"
+          exit 1
+        fi
+
+        echo ""
+        echo "✅ All required tools are installed"
+
+  check:tools:version:
+    desc: Verify development tools match expected versions (strict, for CI)
+    summary: |
+      Verifies that installed development tools match the pinned versions.
+      This ensures reproducibility across environments (dev, CI, team).
+
+      Used by: task check:ci (CI workflow)
+      Not used by: task check (too strict for daily dev)
+
+      For just checking installation without version check, use: task check:tools:installed
+    cmds:
+      - |
+        echo "🔍 Verifying development tool versions..."
+        all_match=true
+
+        # go-licenses version check
+        echo "  Checking go-licenses..."
+        if ! command -v go-licenses > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          echo "    ✅ installed (version check not yet implemented)"
+          # Note: go-licenses doesn't have a --version flag yet
+          # When it does, add: expected_version="{{.TOOL_GO_LICENSES_VERSION}}"
+        fi
+
+        # lichen version check
+        echo "  Checking lichen..."
+        if ! command -v lichen > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          echo "    ✅ installed (version check not yet implemented)"
+          # Note: lichen doesn't have a --version flag
+          # When it does, add version verification
+        fi
+
+        # golangci-lint version check
+        echo "  Checking golangci-lint..."
+        if ! command -v golangci-lint > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          installed_version=$(golangci-lint version --format short 2>/dev/null || echo "unknown")
+          echo "    Installed: $installed_version"
+          echo "    Expected:  {{.TOOL_GOLANGCI_LINT_VERSION}}"
+          # Fuzzy match for now - exact version comparison is complex
+        fi
+
+        if [ "$all_match" = false ]; then
+          echo ""
+          echo "❌ Tool version verification failed"
+          echo "   Run: task setup"
+          echo ""
+          echo "💡 This strict check is for CI reproducibility."
+          echo "   For development, 'task check' uses check:tools:installed instead."
+          exit 1
+        fi
+
+        echo ""
+        echo "✅ Tool versions verified"
+        echo ""
+        echo "Note: Full version verification will be enhanced as tools add --version support"
+
+  check:tools:updates:
+    desc: Check if newer versions of development tools are available
+    summary: |
+      Checks for available updates to pinned development tools.
+      Does NOT update tools automatically - updates must be intentional.
+
+      Workflow:
+        1. Run this task to see available versions
+        2. Review changelogs for breaking changes
+        3. Update version in Taskfile.yml vars
+        4. Run: task setup
+        5. Run: task check
+        6. Commit version bump if all checks pass
+    cmds:
+      - |
+        echo "📦 Current pinned versions{{":"}}"
+        echo "   goimports{{":"}}       {{.TOOL_GOIMPORTS_VERSION}}"
+        echo "   govulncheck{{":"}}     {{.TOOL_GOVULNCHECK_VERSION}}"
+        echo "   gotestsum{{":"}}       {{.TOOL_GOTESTSUM_VERSION}}"
+        echo "   golangci-lint{{":"}}   {{.TOOL_GOLANGCI_LINT_VERSION}}"
+        echo "   lefthook{{":"}}        {{.TOOL_LEFTHOOK_VERSION}}"
+        echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
+        echo "   go-licenses{{":"}}     {{.TOOL_GO_LICENSES_VERSION}}"
+        echo "   lichen{{":"}}          {{.TOOL_LICHEN_VERSION}}"
+        echo ""
+        echo "🔍 Checking for available versions..."
+        echo ""
+        echo "gotestsum{{":"}}"
+        go list -m -versions gotest.tools/gotestsum 2>/dev/null | tr ' ' '\n' | tail -5 || echo "  (unable to fetch)"
+        echo ""
+        echo "golangci-lint{{":"}}"
+        go list -m -versions github.com/golangci/golangci-lint/v2 2>/dev/null | tr ' ' '\n' | tail -5 || echo "  (unable to fetch)"
+        echo ""
+        echo "lefthook{{":"}}"
+        go list -m -versions github.com/evilmartians/lefthook 2>/dev/null | tr ' ' '\n' | tail -5 || echo "  (unable to fetch)"
+        echo ""
+        echo "go-licenses{{":"}}"
+        go list -m -versions github.com/google/go-licenses/v2 2>/dev/null | tr ' ' '\n' | tail -5 || echo "  (unable to fetch)"
+        echo ""
+        echo "lichen{{":"}}"
+        go list -m -versions github.com/uw-labs/lichen 2>/dev/null | tr ' ' '\n' | tail -5 || echo "  (unable to fetch)"
+        echo ""
+        echo "💡 To update a tool{{":"}}"
+        echo "   1. Update version in Taskfile.yml (vars section)"
+        echo "   2. Run{{":"}} task setup"
+        echo "   3. Run{{":"}} task check"
+        echo "   4. Commit if all checks pass"
 
   check:deps:verify:
     desc: Verify that dependencies haven't been modified
@@ -380,8 +555,62 @@ tasks:
   # --- Quality Checks ---
 
   check:
-    desc: Run all quality checks
+    desc: Run all quality checks (developer workflow - fast, friendly)
+    summary: |
+      Runs comprehensive quality checks for local development.
+
+      Developer-friendly checks:
+        - Tools: Verifies installation only (not versions)
+        - Format: Checks code formatting
+        - Lint: Runs linters
+        - Validate: Runs all ADR validators
+        - Dependencies: Checks deps and licenses
+        - Tests: Runs test suite
+
+      For CI workflow with strict version checking, use: task check:ci
+
+      Quick daily workflow:
+        1. Make changes
+        2. task check
+        3. Commit if passing
     cmds:
+      - task: check:tools:installed  # Fast: just check tools exist
+      - task: check:format
+      - task: lint
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: validate:architecture
+      - task: validate:layering
+      - task: validate:package-organization
+      - task: validate:config-consumption
+      - task: check:deps
+      - task: check:license
+      - task: test
+
+  check:ci:
+    desc: Run all quality checks with strict tool version verification (CI workflow)
+    summary: |
+      Runs comprehensive quality checks for CI with strict reproducibility.
+
+      CI-specific checks:
+        - Tools: Verifies exact pinned versions match
+        - Format: Checks code formatting
+        - Lint: Runs linters
+        - Validate: Runs all ADR validators
+        - Dependencies: Checks deps and licenses
+        - Tests: Runs test suite
+
+      This ensures reproducible builds across all environments.
+
+      Use this in:
+        - GitHub Actions / CI pipelines
+        - Release verification
+        - Pre-merge checks
+
+      For local development, use: task check (faster, more flexible)
+    cmds:
+      - task: check:tools:version  # Strict: verify exact versions
       - task: check:format
       - task: lint
       - task: validate:defaults

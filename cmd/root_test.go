@@ -60,7 +60,7 @@ func TestInitConfig(t *testing.T) {
 		},
 		{
 			name:            "With valid config file",
-			setupConfigFile: "../testdata/config.yaml",
+			setupConfigFile: "../testdata/config/valid.yaml",
 			expectedError:   false,
 		},
 	}
