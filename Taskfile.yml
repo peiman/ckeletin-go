@@ -27,7 +27,7 @@ vars:
   TOOL_GOLANGCI_LINT_VERSION: v2.3.0           # Linter - pinned to avoid surprises
   TOOL_LEFTHOOK_VERSION: v1.7.18               # Git hooks - pinned for reproducibility
   TOOL_GO_MOD_OUTDATED_VERSION: latest         # Dependency checker - safe to use latest
-  TOOL_GO_LICENSES_VERSION: latest             # License compliance (source) - use latest for Go 1.25.x compatibility
+  TOOL_GO_LICENSES_VERSION: v2.0.1             # License compliance (source) - CRITICAL: pin for reproducibility
   TOOL_LICHEN_VERSION: v0.1.7                  # License compliance (binary) - CRITICAL: pin for reproducibility
 
 tasks:
