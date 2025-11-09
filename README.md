@@ -15,9 +15,30 @@
 
 ---
 
+## TLDR;
+
+**Skip weeks of CLI boilerplate.** Get a production-ready CLI in 2 minutes with enterprise-grade features out of the box:
+
+- **91.9% test coverage** - Ship with confidence, not hope
+- **License compliance** - Blocks GPL/AGPL automatically. Build proprietary products worry-free
+- **Reproducible builds** - Pinned tool versions. Same results every time
+- **One command customization** - `task init name=myapp module=github.com/you/myapp` - Done
+
+**2-minute quickstart:**
+```bash
+git clone https://github.com/peiman/ckeletin-go.git && cd ckeletin-go
+task setup && task init name=myapp module=github.com/you/myapp
+task build && ./myapp ping
+```
+
+You just built a professional CLI. Now make it yours.
+
+---
+
 ## Table of Contents
 
 - [ckeletin-go](#ckeletin-go)
+  - [TLDR;](#tldr)
   - [Table of Contents](#table-of-contents)
   - [Introduction](#introduction)
   - [Key Highlights](#key-highlights)
@@ -49,9 +70,11 @@
       - [Flags](#flags)
       - [Examples](#examples)
   - [Development Workflow](#development-workflow)
-    - [Taskfile Tasks](#taskfile-tasks)
+    - [Essential Task Commands](#essential-task-commands)
+    - [Development Tools \& Reproducibility](#development-tools--reproducibility)
     - [Pre-Commit Hooks with Lefthook](#pre-commit-hooks-with-lefthook)
     - [Continuous Integration](#continuous-integration)
+    - [Creating Releases](#creating-releases)
   - [Customization](#customization)
     - [Changing the Program Name](#changing-the-program-name)
     - [Adding New Commands](#adding-new-commands)
@@ -87,9 +110,12 @@ Each command manages its own configuration and defaults, promoting modularity an
 
 ## Key Highlights
 
-- **Single-Source Binary Name**: Update `BINARY_NAME` in `Taskfile.yml`, and `ldflags` handles the rest. No more hunting down references.
-- **Detailed Coverage Reports**: Use `task test:coverage:text` to see exactly what code paths need testing.
-- **Seamless Customization**: Easily add new commands, reconfigure settings, or integrate Bubble Tea UIs.
+- **91.9% Test Coverage Out of the Box**: Production-ready from day one with comprehensive test suite
+- **Enterprise License Compliance**: Automated GPL/AGPL blocking prevents legal contamination. Build proprietary products worry-free
+- **Reproducible Builds**: Pinned tool versions (goimports v0.28.0, golangci-lint v2.3.0, etc.) ensure identical results across environments
+- **Single-Source Binary Name**: Update `BINARY_NAME` in `Taskfile.yml`, and `ldflags` handles the rest. No more hunting down references
+- **Detailed Coverage Reports**: Use `task test:coverage:text` to see exactly what code paths need testing
+- **Seamless Customization**: `task init` updates 40+ files in one command. Add new features without breaking existing patterns
 
 ---
 
@@ -128,9 +154,16 @@ Each command manages its own configuration and defaults, promoting modularity an
 - **Structured Logging**: Use Zerolog to create efficient, leveled logs. Perfect for debugging, auditing, and production use.
 - **Bubble Tea UI**: Optional, interactive UI for advanced terminal applications.
 - **Single-Source Configuration**: Set defaults in config files, override with env vars, and fine-tune with flags.
-- **License Compliance**: Automated dependency license checking (go-licenses + lichen) prevents GPL/AGPL contamination. Conservative permissive-only policy by default.
+- **Enterprise License Compliance**:
+  - **Dual-tool checking**: go-licenses (source analysis, ~2-5s) + lichen (binary analysis, ~10-15s) for defense in depth
+  - **Automatic blocking**: Prevents GPL/AGPL contamination that could force your code open-source
+  - **Commercial-friendly**: Default permissive-only policy (MIT, Apache-2.0, BSD) allows proprietary products
+  - **CI integration**: Automated checks on every PR. Violations block merge
+  - **Reproducible compliance**: Pinned tool versions ensure consistent license detection across environments
+  - **Customizable policy**: Override allowed licenses via environment or `.lichen.yaml`
+  - See [ADR-011](docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
-- **High Test Coverage & Quality Checks**: Ensure a robust codebase that meets production standards.
+- **High Test Coverage & Quality Checks**: 91.9% coverage out of the box. Ensure a robust codebase that meets production standards.
 
 ---
 
@@ -466,6 +499,55 @@ task build     # Build the binary
 **For the complete task list:** Run `task --list` or see [Taskfile.yml](Taskfile.yml).
 **For task naming pattern:** See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md).
 
+### Development Tools & Reproducibility
+
+This project pins all tool versions for reproducible builds across environments:
+
+**Tool Version Management:**
+```bash
+task doctor                    # Check environment and tool versions
+task check:tools:installed     # Fast existence check (dev workflow)
+task check:tools:version       # Strict version verification (CI workflow)
+task check:tools:updates       # Discover available tool updates
+```
+
+**Pinned Tools** (defined in `Taskfile.yml`):
+- **goimports** v0.28.0 - Code formatting
+- **golangci-lint** v2.3.0 - Comprehensive linting
+- **gotestsum** latest - Test runner (Go 1.25.x compatible)
+- **govulncheck** latest - Security vulnerability scanning (Go 1.25.x compatible)
+- **lefthook** v1.7.18 - Git hooks management
+- **go-licenses** v2.0.1 - Source-based license compliance (CRITICAL: pinned for reproducibility)
+- **lichen** v0.1.7 - Binary-based license compliance (CRITICAL: pinned for reproducibility)
+
+**License Compliance Tasks:**
+```bash
+# Fast check during development (~2-5s)
+task check:license:source
+
+# Accurate check before releases (~10-15s)
+task check:license:binary
+
+# Both checks (CI workflow, ~15-20s)
+task check:license
+
+# Generate license artifacts
+task generate:license:report   # CSV report
+task generate:license:files    # Third-party license files
+task generate:attribution       # NOTICE file
+task generate:license           # All artifacts
+```
+
+**Why Pinned Versions Matter:**
+- **Consistency**: Same lint results on dev machines and CI
+- **Reproducibility**: License compliance checks produce identical results
+- **Stability**: Avoid breaking changes from tool updates
+- **Debugging**: Pinned versions make issues reproducible
+
+**Dev vs CI Separation:**
+- **Local**: `task check` runs fast existence checks for rapid feedback
+- **CI**: `task check:ci` enforces strict version verification for release quality
+
 ### Pre-Commit Hooks with Lefthook
 
 `task setup` installs hooks that run `format`, `lint`, `test` on commit, ensuring code quality before changes land in the repository.
@@ -790,8 +872,9 @@ MIT License. See [LICENSE](LICENSE).
 - Use quotes for special chars in arguments.
 - Run `go mod tidy` to keep dependencies clean.
 - Run `task check:deps` regularly to ensure dependencies are up-to-date and secure.
+- Run `task check:license:source` after adding dependencies to catch license violations early.
 - Regularly run tests, lint, and format tasks to maintain code quality and style.
-- See [Test Fixtures Documentation](docs/test-fixtures.md) for information about available test fixtures.
+- See [Test Fixtures Documentation](testdata/README.md) for information about available test fixtures and the organized subdirectory structure.
 
 ---
 
