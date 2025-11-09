@@ -592,6 +592,7 @@ tasks:
       - task: check:deps
       - task: check:license
       - task: test
+      - ./scripts/check-summary.sh  # Display summary (only runs if all checks pass)
 
   check:ci:
     desc: Run all quality checks with strict tool version verification (CI workflow)
