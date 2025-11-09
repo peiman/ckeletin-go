@@ -75,3 +75,14 @@ bench-new.txt
 
 # Research and planning files
 research/
+
+# License compliance outputs (generated artifacts)
+reports/licenses.csv
+reports/license-errors.log
+reports/licenses-binary.json
+reports/sbom*.json
+third_party/licenses/
+NOTICE
+
+# Lichen cache (if applicable)
+.lichen-cache/

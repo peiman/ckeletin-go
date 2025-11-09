@@ -7,6 +7,19 @@
 //   (e.g., internal/config/<command>_options.go).
 // - Those files self-register providers here via RegisterOptionsProvider in init().
 // - Never use viper.SetDefault() directly in command files or elsewhere.
+//
+// Thread-Safety Notes:
+//
+// This registry follows a safe initialization-time-only pattern:
+//  1. RegisterOptionsProvider() is called only during package init() (single-threaded)
+//  2. Registry() is called during startup in PersistentPreRunE (single-threaded)
+//  3. SetDefaults() writes to Viper during startup only (single-threaded)
+//  4. After initialization, the registry is read-only (no mutations)
+//  5. Commands execute sequentially (Cobra's execution model)
+//
+// This pattern ensures thread-safety without requiring locks or synchronization.
+// The optionsProviders slice is only appended to during init(), never during runtime.
+// Viper itself is not thread-safe for writes, but our usage pattern avoids concurrent access.
 
 package config
 

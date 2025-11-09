@@ -1,0 +1,142 @@
+# .lichen.yaml - License compliance configuration for lichen
+# Analyzes compiled binaries to verify only shipped dependencies
+# See: ADR-011 License Compliance Strategy
+# Documentation: https://github.com/uw-labs/lichen
+
+# Minimum confidence threshold for license detection (0.0 - 1.0)
+# Lower values may accept false positives, higher may miss valid licenses
+# Recommended: 0.80 (80% confidence)
+threshold: .80
+
+# Allowed licenses (conservative permissive-only policy)
+# If this list is omitted, ALL licenses are allowed (not recommended)
+allow:
+  # --- Permissive Licenses (Low Risk) ---
+  # These impose minimal restrictions and allow commercial use
+
+  - "MIT"
+    # Simple, permissive license used by many projects
+    # Requires: Copyright notice, license text
+    # Allows: Commercial use, modification, distribution, sublicensing
+
+  - "Apache-2.0"
+    # Permissive with patent grant and explicit trademark rules
+    # Requires: Copyright notice, license text, NOTICE file (if exists)
+    # Allows: Commercial use, modification, distribution, patent use
+
+  - "BSD-2-Clause"
+    # Simplified BSD license
+    # Requires: Copyright notice, license text
+    # Allows: Commercial use, modification, distribution
+
+  - "BSD-3-Clause"
+    # BSD with non-endorsement clause
+    # Requires: Copyright notice, license text, no use of names
+    # Allows: Commercial use, modification, distribution
+
+  - "ISC"
+    # Functionally equivalent to MIT/BSD-2-Clause, simpler wording
+    # Requires: Copyright notice, license text
+    # Allows: Commercial use, modification, distribution
+
+  - "0BSD"
+    # Zero-Clause BSD (public domain equivalent)
+    # Requires: Nothing (public domain)
+    # Allows: Everything
+
+  - "Unlicense"
+    # Explicit public domain dedication
+    # Requires: Nothing (public domain)
+    # Allows: Everything
+
+  # --- Weak Copyleft (Uncomment if needed) ---
+  # These require source availability for modified library code
+  # but NOT for the application using the library
+
+  # - "MPL-2.0"
+  #   # Mozilla Public License 2.0
+  #   # Requires: Modified files must be MPL, source provided for modified files
+  #   # Allows: Commercial use, proprietary application code
+  #   # Note: File-level copyleft, not full-program
+
+  # - "LGPL-2.1"
+  # - "LGPL-3.0"
+  #   # Lesser GNU Public License
+  #   # Requires: Modified library source, dynamic linking preferred
+  #   # Allows: Commercial use, proprietary application code
+  #   # Note: Complex licensing, consult legal counsel
+
+  # --- Strong Copyleft (DENIED by default) ---
+  # These are NOT in the allow list (violations will be caught)
+  # Uncomment ONLY if your project is also GPL/AGPL
+
+  # - "GPL-2.0"
+  # - "GPL-3.0"
+  #   # GNU General Public License
+  #   # Requires: Entire application must be GPL, all source provided
+  #   # Use case: Only if your project is also GPL
+
+  # - "AGPL-3.0"
+  #   # Affero GPL (network copyleft)
+  #   # Requires: Source provided even for SaaS/network use
+  #   # Use case: Only if your project is also AGPL
+
+# Override license detection for specific packages
+# Use when automated detection fails or is incorrect
+override:
+  # Example: Manually specify license for a package
+  # - path: "github.com/example/package"
+  #   version: "v1.2.3"  # Optional: apply to specific version only
+  #   licenses: ["MIT"]
+
+  # Example: Package with dual license, choosing MIT variant
+  # - path: "github.com/dual/licensed"
+  #   licenses: ["MIT"]
+  #   # Note: Original is "MIT OR Apache-2.0", we choose MIT
+
+# Exceptions for justified license policy violations
+# Use sparingly and document reasoning
+exceptions:
+
+  # Allow specific packages with otherwise-denied licenses
+  licenseNotPermitted:
+    # Example: Legacy dependency with LGPL that we can't replace
+    # - path: "github.com/legacy/library"
+    #   licenses: ["LGPL-3.0"]
+    #   # Justification: Core functionality, no alternative exists
+    #   # Verified: Dynamic linking maintained (ADR-XXX)
+
+  # Ignore packages with unresolvable licenses
+  unresolvableLicense:
+    # Example: Internal tool without LICENSE file
+    # - path: "github.com/internal/tool"
+    #   # Justification: Internal company code, approved by legal
+
+# --- Customization Guide ---
+#
+# To allow weak copyleft (MPL, LGPL):
+#   1. Uncomment desired licenses in the "allow" section above
+#   2. Understand legal implications (see docs/licenses.md)
+#   3. Document decision in ADR or CHANGELOG
+#
+# To add an exception:
+#   1. Identify the package and license from error output
+#   2. Add to appropriate exceptions section
+#   3. Document justification (why this exception is acceptable)
+#   4. Get legal review if commercial product
+#
+# To override mis-detected license:
+#   1. Verify actual license (check repository, go.pkg.dev)
+#   2. Add to "override" section with correct license
+#   3. Document source of truth in comments
+#
+# For more information:
+#   - See: docs/licenses.md (comprehensive user guide)
+#   - See: ADR-011 (license compliance strategy)
+#   - Lichen docs: https://github.com/uw-labs/lichen
+
+# --- Policy Summary ---
+# Default policy: Conservative permissive-only
+# ✅ Allowed: MIT, Apache-2.0, BSD-*, ISC, 0BSD, Unlicense
+# ❌ Denied: GPL, AGPL, LGPL, MPL, SSPL (all copyleft)
+# ⚠️  Unknown: Requires manual review and override

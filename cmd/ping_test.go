@@ -37,7 +37,7 @@ func TestPingCommand(t *testing.T) {
 	}{
 		{
 			name:            "Default Configuration",
-			testFixturePath: "../testdata/config.yaml",
+			testFixturePath: "../testdata/config/valid.yaml",
 			args:            []string{},
 			wantErr:         false,
 			wantOutput:      "",
@@ -46,7 +46,7 @@ func TestPingCommand(t *testing.T) {
 		},
 		{
 			name:            "JSON Configuration",
-			testFixturePath: "../testdata/config.json",
+			testFixturePath: "../testdata/config/valid.json",
 			args:            []string{},
 			wantErr:         false,
 			wantOutput:      "JSON Config Message\n",
@@ -55,7 +55,7 @@ func TestPingCommand(t *testing.T) {
 		},
 		{
 			name:            "CLI Args Override Configuration",
-			testFixturePath: "../testdata/config.yaml",
+			testFixturePath: "../testdata/config/valid.yaml",
 			args:            []string{"--message", "CLI Message", "--color", "cyan"},
 			wantErr:         false,
 			wantOutput:      "",
@@ -64,7 +64,7 @@ func TestPingCommand(t *testing.T) {
 		},
 		{
 			name:            "Partial Configuration",
-			testFixturePath: "../testdata/partial_config.yaml",
+			testFixturePath: "../testdata/config/partial.yaml",
 			args:            []string{"--color", "white"},
 			wantErr:         false,
 			wantOutput:      "Partial Config Message\n",
