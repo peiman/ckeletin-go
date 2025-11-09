@@ -22,7 +22,7 @@ vars:
   # Pinned tool versions for reproducibility
   # Update these intentionally after testing - see docs/development.md
   TOOL_GOIMPORTS_VERSION: v0.28.0              # Formatting - pinned for Go 1.25.x compatibility
-  TOOL_GOVULNCHECK_VERSION: latest             # Security scanning - always want latest
+  TOOL_GOVULNCHECK_VERSION: v1.1.3             # Security scanning - pinned for Go 1.25.x compatibility
   TOOL_GOTESTSUM_VERSION: v1.11.0              # Test runner - pinned for stability
   TOOL_GOLANGCI_LINT_VERSION: v2.3.0           # Linter - pinned to avoid surprises
   TOOL_LEFTHOOK_VERSION: v1.7.18               # Git hooks - pinned for reproducibility
