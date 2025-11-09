@@ -121,8 +121,6 @@ jobs:
             ~/.cache/go-build
             /go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Cache Task Binary
         id: cache-task
@@ -217,8 +215,6 @@ jobs:
             ~/.cache/go-build
             /go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
 
       - name: Install Syft for SBOM generation
         uses: anchore/sbom-action/download-syft@v0.20.9
