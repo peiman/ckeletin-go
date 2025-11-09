@@ -168,12 +168,11 @@ tasks:
       - |
         echo "🔍 Checking development tools installation..."
         all_good=true
+        missing_tools=""
 
         check_tool() {
-          if command -v "$1" > /dev/null 2>&1; then
-            echo "  ✅ $1"
-          else
-            echo "  ❌ $1 not found"
+          if ! command -v "$1" > /dev/null 2>&1; then
+            missing_tools="$missing_tools\n  ❌ $1 not found"
             all_good=false
           fi
         }
@@ -186,12 +185,12 @@ tasks:
         check_tool "lichen"
 
         if [ "$all_good" = false ]; then
+          echo -e "$missing_tools"
           echo ""
           echo "❌ Some tools are missing. Run: task setup"
           exit 1
         fi
 
-        echo ""
         echo "✅ All required tools are installed"
 
   check:tools:version:
@@ -321,11 +320,9 @@ tasks:
 
   check:deps:
     desc: Run all dependency checks
-    cmds:
-      - task: check:deps:verify
-      - task: check:deps:outdated
-      - task: check:vuln
     silent: true
+    cmds:
+      - ./scripts/check-deps.sh
 
   format:
     desc: Format all Go code
@@ -353,8 +350,7 @@ tasks:
     desc: Run all linters
     silent: true
     cmds:
-      - go vet ./...
-      - golangci-lint run
+      - ./scripts/lint.sh
 
   validate:defaults:
     desc: Validate no unauthorized viper.SetDefault() calls (enforces ADR-002)
@@ -559,6 +555,12 @@ tasks:
 
   # --- Quality Checks ---
 
+  check:summary:
+    desc: Display check summary (internal task)
+    silent: true
+    cmds:
+      - ./scripts/check-summary.sh
+
   check:
     desc: Run all quality checks (developer workflow - fast, friendly)
     summary: |
@@ -592,7 +594,7 @@ tasks:
       - task: check:deps
       - task: check:license
       - task: test
-      - ./scripts/check-summary.sh  # Display summary (only runs if all checks pass)
+      - task: check:summary
 
   check:ci:
     desc: Run all quality checks with strict tool version verification (CI workflow)
@@ -632,12 +634,13 @@ tasks:
 
   build:
     desc: Build the binary
+    silent: true
     cmds:
       - |
         {{if eq OS "windows"}}
-        go build {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go > /dev/null 2>&1
         {{else}}
-        go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go > /dev/null 2>&1
         {{end}}
 
   run:
