@@ -11,6 +11,30 @@ NC='\033[0m' # No Color
 # Standard separator line
 SEPARATOR="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Category separator line width
+CATEGORY_WIDTH=48
+
+# category_header: Display category header with separator
+# Usage: category_header "Code Quality"
+category_header() {
+    local title="$1"
+    local title_length=${#title}
+    local separator_length=$((CATEGORY_WIDTH - title_length - 2))
+
+    if [ $separator_length -lt 3 ]; then
+        separator_length=3
+    fi
+
+    # Build separator string character by character (more portable)
+    local separator=""
+    for ((i=0; i<separator_length; i++)); do
+        separator="${separator}─"
+    done
+
+    echo ""
+    echo "─── ${title} ${separator}"
+}
+
 # check_header: Display check header
 # Usage: check_header "Checking code formatting"
 check_header() {

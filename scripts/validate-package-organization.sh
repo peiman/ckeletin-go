@@ -76,15 +76,11 @@ fi
 
 # Summary
 if [ $ERRORS -eq 0 ]; then
-    echo "$SEPARATOR"
-    echo "✅ Package organization validation passed"
-    echo ""
-    echo "Structure follows ADR-010 (CLI-first organization):"
+    check_success "Package organization validation passed"
     echo "  • No public API surface (no pkg/)"
     echo "  • All implementation in internal/"
     echo "  • CLI interface via cmd/"
     echo "  • Clean project root"
-    echo "$SEPARATOR"
     exit 0
 else
     REMEDIATION="Fix issues to maintain CLI-first architecture"$'\n'

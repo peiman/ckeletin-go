@@ -42,15 +42,11 @@ fi
 
 # Run the linter (hide output on success, capture on failure)
 if run_check "go-arch-lint check 2>&1"; then
-    echo "$SEPARATOR"
-    echo "✅ Layered architecture validation passed"
-    echo ""
-    echo "All layer dependency rules satisfied:"
+    check_success "Layered architecture validation passed"
     echo "  • Entry → Command → Business Logic/Infrastructure"
     echo "  • No reverse dependencies detected"
     echo "  • Cobra isolated to cmd/ layer"
     echo "  • Business logic packages properly isolated"
-    echo "$SEPARATOR"
     exit 0
 else
     REMEDIATION="Review layer dependencies and fix violations"$'\n'

@@ -581,9 +581,21 @@ tasks:
         2. task check
         3. Commit if passing
     cmds:
-      - task: check:tools:installed  # Fast: just check tools exist
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
+      - task: check:tools:installed
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Code Quality"
+        silent: true
       - task: check:format
       - task: lint
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Architecture Validation"
+        silent: true
       - task: validate:defaults
       - task: validate:commands
       - task: validate:constants
@@ -591,8 +603,16 @@ tasks:
       - task: validate:layering
       - task: validate:package-organization
       - task: validate:config-consumption
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Dependencies"
+        silent: true
       - task: check:deps
       - task: check:license
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Tests"
+        silent: true
       - task: test
       - task: check:summary
 

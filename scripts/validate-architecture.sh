@@ -153,14 +153,10 @@ fi
 
 # Summary
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "$SEPARATOR"
-    echo "✅ Architecture documentation validation passed"
-    echo ""
-    echo "SSOT maintained:"
+    check_success "Architecture documentation validation passed"
     echo "  • ARCHITECTURE.md contains structure (WHAT)"
     echo "  • ADRs contain decisions (WHY)"
     echo "  • No duplication detected"
-    echo "$SEPARATOR"
     exit 0
 else
     REMEDIATION="Fix issues to maintain SSOT"$'\n'
