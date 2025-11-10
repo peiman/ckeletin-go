@@ -203,6 +203,7 @@ tasks:
       Not used by: task check (too strict for daily dev)
 
       For just checking installation without version check, use: task check:tools:installed
+    silent: true
     cmds:
       - |
         echo "🔍 Verifying development tool versions..."
@@ -561,31 +562,14 @@ tasks:
     cmds:
       - ./scripts/check-summary.sh
 
-  check:
-    desc: Run all quality checks (developer workflow - fast, friendly)
+  check:common:
+    desc: Common quality checks (internal task - SSOT for check list)
     summary: |
-      Runs comprehensive quality checks for local development.
+      Contains the shared check list used by both 'check' and 'check:ci'.
+      This is the SSOT (Single Source of Truth) for all quality checks.
 
-      Developer-friendly checks:
-        - Tools: Verifies installation only (not versions)
-        - Format: Checks code formatting
-        - Lint: Runs linters
-        - Validate: Runs all ADR validators
-        - Dependencies: Checks deps and licenses
-        - Tests: Runs test suite
-
-      For CI workflow with strict version checking, use: task check:ci
-
-      Quick daily workflow:
-        1. Make changes
-        2. task check
-        3. Commit if passing
+      Do not call this directly - use 'task check' or 'task check:ci' instead.
     cmds:
-      - cmd: |
-          source scripts/lib/check-output.sh
-          category_header "Development Environment"
-        silent: true
-      - task: check:tools:installed
       - cmd: |
           source scripts/lib/check-output.sh
           category_header "Code Quality"
@@ -616,6 +600,33 @@ tasks:
       - task: test
       - task: check:summary
 
+  check:
+    desc: Run all quality checks (developer workflow - fast, friendly)
+    summary: |
+      Runs comprehensive quality checks for local development.
+
+      Developer-friendly checks:
+        - Tools: Verifies installation only (not versions)
+        - Format: Checks code formatting
+        - Lint: Runs linters
+        - Validate: Runs all ADR validators
+        - Dependencies: Checks deps and licenses
+        - Tests: Runs test suite
+
+      For CI workflow with strict version checking, use: task check:ci
+
+      Quick daily workflow:
+        1. Make changes
+        2. task check
+        3. Commit if passing
+    cmds:
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
+      - task: check:tools:installed
+      - task: check:common
+
   check:ci:
     desc: Run all quality checks with strict tool version verification (CI workflow)
     summary: |
@@ -638,19 +649,12 @@ tasks:
 
       For local development, use: task check (faster, more flexible)
     cmds:
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
       - task: check:tools:version  # Strict: verify exact versions
-      - task: check:format
-      - task: lint
-      - task: validate:defaults
-      - task: validate:commands
-      - task: validate:constants
-      - task: validate:architecture
-      - task: validate:layering
-      - task: validate:package-organization
-      - task: validate:config-consumption
-      - task: check:deps
-      - task: check:license
-      - task: test
+      - task: check:common
 
   build:
     desc: Build the binary
