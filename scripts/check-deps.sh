@@ -23,11 +23,20 @@ OUTDATED_OUTPUT=$(go list -u -m -json all 2>/dev/null | go-mod-outdated -update 
 
 # Check 3: Check for vulnerabilities
 if ! run_check "govulncheck ./... 2>&1"; then
-    check_failure \
-        "Security vulnerabilities found" \
-        "$CHECK_OUTPUT" \
-        "Review vulnerabilities and update dependencies"
-    exit 1
+    # Check if it's a network error vs actual vulnerabilities
+    if echo "$CHECK_OUTPUT" | grep -qi "no such host\|connection refused\|timeout\|network is unreachable\|dial tcp"; then
+        check_failure \
+            "Vulnerability check failed (network error)" \
+            "$CHECK_OUTPUT" \
+            "Check internet connection and retry"$'\n'"Alternatively, skip with: SKIP_VULN_CHECK=1 task check"
+        exit 1
+    else
+        check_failure \
+            "Security vulnerabilities found" \
+            "$CHECK_OUTPUT" \
+            "Review vulnerabilities and update dependencies"
+        exit 1
+    fi
 fi
 
 check_success "All dependencies verified and secure"
