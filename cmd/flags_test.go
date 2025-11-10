@@ -595,8 +595,3 @@ func TestStringSliceDefault(t *testing.T) {
 		})
 	}
 }
-
-func TestRegisterFlagsForPrefixWithOverrides(t *testing.T) {
-	t.Skip("Skipping RegisterFlagsForPrefixWithOverrides test - requires complex setup with cobra and viper. " +
-		"Function is indirectly tested via NewCommand tests and integration tests.")
-}
