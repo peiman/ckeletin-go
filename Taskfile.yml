@@ -163,16 +163,16 @@ tasks:
       Used by: task check (developer workflow)
 
       For strict version verification (CI), use: task check:tools:version
+    silent: true
     cmds:
       - |
         echo "🔍 Checking development tools installation..."
         all_good=true
+        missing_tools=""
 
         check_tool() {
-          if command -v "$1" > /dev/null 2>&1; then
-            echo "  ✅ $1"
-          else
-            echo "  ❌ $1 not found"
+          if ! command -v "$1" > /dev/null 2>&1; then
+            missing_tools="$missing_tools\n  ❌ $1 not found"
             all_good=false
           fi
         }
@@ -185,12 +185,12 @@ tasks:
         check_tool "lichen"
 
         if [ "$all_good" = false ]; then
+          echo -e "$missing_tools"
           echo ""
           echo "❌ Some tools are missing. Run: task setup"
           exit 1
         fi
 
-        echo ""
         echo "✅ All required tools are installed"
 
   check:tools:version:
@@ -203,6 +203,7 @@ tasks:
       Not used by: task check (too strict for daily dev)
 
       For just checking installation without version check, use: task check:tools:installed
+    silent: true
     cmds:
       - |
         echo "🔍 Verifying development tool versions..."
@@ -320,11 +321,9 @@ tasks:
 
   check:deps:
     desc: Run all dependency checks
-    cmds:
-      - task: check:deps:verify
-      - task: check:deps:outdated
-      - task: check:vuln
     silent: true
+    cmds:
+      - ./scripts/check-deps.sh
 
   format:
     desc: Format all Go code
@@ -338,64 +337,67 @@ tasks:
 
   check:format:
     desc: Check if Go code is formatted (CI mode)
+    silent: true
     cmds:
       - ./scripts/format-go.sh check
 
   check:vuln:
     desc: Check for vulnerabilities
+    silent: true
     cmds:
       - govulncheck ./...
 
   lint:
     desc: Run all linters
+    silent: true
     cmds:
-      - go vet ./...
-      - golangci-lint run
+      - ./scripts/lint.sh
 
   validate:defaults:
     desc: Validate no unauthorized viper.SetDefault() calls (enforces ADR-002)
+    silent: true
     cmds:
       - ./scripts/check-defaults.sh
-    silent: false
 
   validate:commands:
     desc: Validate command files follow ultra-thin patterns (enforces ADR-001)
+    silent: true
     cmds:
       - ./scripts/validate-command-patterns.sh
-    silent: false
 
   validate:constants:
     desc: Validate config constants are in sync with registry (enforces ADR-005)
+    silent: true
     cmds:
       - ./scripts/check-constants.sh
-    silent: false
 
   validate:architecture:
     desc: Validate architecture documentation follows SSOT pattern
+    silent: true
     cmds:
       - ./scripts/validate-architecture.sh
-    silent: false
 
   validate:layering:
     desc: Validate 4-layer architecture dependency rules (enforces ADR-009)
+    silent: true
     cmds:
       - ./scripts/validate-layering.sh
-    silent: false
 
   validate:package-organization:
     desc: Validate package organization follows CLI-first strategy (enforces ADR-010)
+    silent: true
     cmds:
       - ./scripts/validate-package-organization.sh
-    silent: false
 
   validate:config-consumption:
     desc: Validate type-safe config consumption pattern (enforces ADR-002)
+    silent: true
     cmds:
       - ./scripts/validate-config-consumption.sh
-    silent: false
 
   test:
     desc: Run tests with coverage
+    silent: true
     cmd: |
       gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -v -coverprofile=coverage.txt -covermode=atomic ./...
 
@@ -512,16 +514,16 @@ tasks:
 
   check:license:source:
     desc: Check dependency licenses from source (fast, for development)
+    silent: true
     cmds:
       - ./scripts/check-licenses-source.sh
-    silent: false
 
   check:license:binary:
     desc: Check licenses in compiled binary (accurate, for releases)
+    silent: true
     cmds:
       - ./scripts/check-licenses-binary.sh
     deps: [build]
-    silent: false
 
   generate:license:
     desc: Generate all license artifacts (orchestrator)
@@ -554,6 +556,50 @@ tasks:
 
   # --- Quality Checks ---
 
+  check:summary:
+    desc: Display check summary (internal task)
+    silent: true
+    cmds:
+      - ./scripts/check-summary.sh
+
+  check:common:
+    desc: Common quality checks (internal task - SSOT for check list)
+    summary: |
+      Contains the shared check list used by both 'check' and 'check:ci'.
+      This is the SSOT (Single Source of Truth) for all quality checks.
+
+      Do not call this directly - use 'task check' or 'task check:ci' instead.
+    cmds:
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Code Quality"
+        silent: true
+      - task: check:format
+      - task: lint
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Architecture Validation"
+        silent: true
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: validate:architecture
+      - task: validate:layering
+      - task: validate:package-organization
+      - task: validate:config-consumption
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Dependencies"
+        silent: true
+      - task: check:deps
+      - task: check:license
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Tests"
+        silent: true
+      - task: test
+      - task: check:summary
+
   check:
     desc: Run all quality checks (developer workflow - fast, friendly)
     summary: |
@@ -574,19 +620,12 @@ tasks:
         2. task check
         3. Commit if passing
     cmds:
-      - task: check:tools:installed  # Fast: just check tools exist
-      - task: check:format
-      - task: lint
-      - task: validate:defaults
-      - task: validate:commands
-      - task: validate:constants
-      - task: validate:architecture
-      - task: validate:layering
-      - task: validate:package-organization
-      - task: validate:config-consumption
-      - task: check:deps
-      - task: check:license
-      - task: test
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
+      - task: check:tools:installed
+      - task: check:common
 
   check:ci:
     desc: Run all quality checks with strict tool version verification (CI workflow)
@@ -610,28 +649,22 @@ tasks:
 
       For local development, use: task check (faster, more flexible)
     cmds:
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
       - task: check:tools:version  # Strict: verify exact versions
-      - task: check:format
-      - task: lint
-      - task: validate:defaults
-      - task: validate:commands
-      - task: validate:constants
-      - task: validate:architecture
-      - task: validate:layering
-      - task: validate:package-organization
-      - task: validate:config-consumption
-      - task: check:deps
-      - task: check:license
-      - task: test
+      - task: check:common
 
   build:
     desc: Build the binary
+    silent: true
     cmds:
       - |
         {{if eq OS "windows"}}
-        go build {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go > /dev/null 2>&1
         {{else}}
-        go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go
+        go build {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go > /dev/null 2>&1
         {{end}}
 
   run:

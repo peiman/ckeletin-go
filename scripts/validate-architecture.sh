@@ -11,12 +11,17 @@
 
 set -e
 
+# Source standard output functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/check-output.sh
+source "${SCRIPT_DIR}/lib/check-output.sh"
+
+check_header "Validating architecture documentation SSOT"
+
 ARCHITECTURE_FILE="docs/adr/ARCHITECTURE.md"
 ADR_DIR="docs/adr"
 EXIT_CODE=0
-
-echo "🔍 Validating architecture documentation SSOT..."
-echo ""
+ERROR_DETAILS=""
 
 # Check 1: ARCHITECTURE.md exists
 if [ ! -f "$ARCHITECTURE_FILE" ]; then
@@ -26,7 +31,6 @@ fi
 
 # Check 2: ARCHITECTURE.md doesn't contain decision language
 # UNLESS it's marked with <!-- TODO: ADR --> comment
-echo "Checking for decision language in ARCHITECTURE.md..."
 DECISION_KEYWORDS=(
     "we chose"
     "we decided"
@@ -63,24 +67,18 @@ for keyword in "${DECISION_KEYWORDS[@]}"; do
             # If no TODO marker, report as violation
             if [ $has_todo -eq 0 ]; then
                 if [ $FOUND_DECISION_LANGUAGE -eq 0 ]; then
-                    echo "❌ Found decision language without TODO marker (belongs in ADRs):"
+                    ERROR_DETAILS+="Found decision language without TODO marker (belongs in ADRs):"$'\n'
                     FOUND_DECISION_LANGUAGE=1
                     EXIT_CODE=1
                 fi
-                echo "   Line $line_num: '$keyword'"
-                echo "      $(echo "$match" | cut -d: -f2-)"
+                ERROR_DETAILS+="   Line $line_num: '$keyword'"$'\n'
+                ERROR_DETAILS+="      $(echo "$match" | cut -d: -f2-)"$'\n'
             fi
         done <<< "$matches"
     fi
 done
 
-if [ $FOUND_DECISION_LANGUAGE -eq 0 ]; then
-    echo "✅ No unmarked decision language (TODO markers found for known gaps)"
-fi
-echo ""
-
 # Check 3: All ADRs are referenced in ARCHITECTURE.md
-echo "Checking that all ADRs are referenced in ARCHITECTURE.md..."
 MISSING_ADRS=()
 
 # Find all ADR files (000-*.md pattern)
@@ -99,18 +97,14 @@ for adr_file in "$ADR_DIR"/[0-9][0-9][0-9]-*.md; do
 done
 
 if [ ${#MISSING_ADRS[@]} -gt 0 ]; then
-    echo "❌ The following ADRs are not referenced in ARCHITECTURE.md:"
+    ERROR_DETAILS+="The following ADRs are not referenced in ARCHITECTURE.md:"$'\n'
     for missing in "${MISSING_ADRS[@]}"; do
-        echo "   - $missing"
+        ERROR_DETAILS+="   - $missing"$'\n'
     done
     EXIT_CODE=1
-else
-    echo "✅ All ADRs are referenced in ARCHITECTURE.md"
 fi
-echo ""
 
 # Check 4: ARCHITECTURE.md has required sections
-echo "Checking for required sections in ARCHITECTURE.md..."
 REQUIRED_SECTIONS=(
     "## Overview"
     "## Architectural Layers"
@@ -126,18 +120,14 @@ for section in "${REQUIRED_SECTIONS[@]}"; do
 done
 
 if [ ${#MISSING_SECTIONS[@]} -gt 0 ]; then
-    echo "❌ Missing required sections in ARCHITECTURE.md:"
+    ERROR_DETAILS+="Missing required sections in ARCHITECTURE.md:"$'\n'
     for missing in "${MISSING_SECTIONS[@]}"; do
-        echo "   - $missing"
+        ERROR_DETAILS+="   - $missing"$'\n'
     done
     EXIT_CODE=1
-else
-    echo "✅ All required sections present"
 fi
-echo ""
 
 # Check 5: ARCHITECTURE.md links to ADR files correctly
-echo "Checking ADR link format..."
 # Links should be like [ADR-001](001-ultra-thin-command-pattern.md)
 # Extract all ADR links and verify the files exist
 BROKEN_LINKS=()
@@ -154,35 +144,29 @@ while IFS= read -r link; do
 done < <(grep -o '\[ADR-[0-9][0-9][0-9]\]([^)]*.md)' "$ARCHITECTURE_FILE" || true)
 
 if [ ${#BROKEN_LINKS[@]} -gt 0 ]; then
-    echo "❌ Broken ADR links in ARCHITECTURE.md:"
+    ERROR_DETAILS+="Broken ADR links in ARCHITECTURE.md:"$'\n'
     for broken in "${BROKEN_LINKS[@]}"; do
-        echo "   - $broken"
+        ERROR_DETAILS+="   - $broken"$'\n'
     done
     EXIT_CODE=1
-else
-    echo "✅ All ADR links are valid"
 fi
-echo ""
 
 # Summary
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "✅ Architecture documentation validation passed"
-    echo ""
-    echo "SSOT maintained:"
+    check_success "Architecture documentation validation passed"
     echo "  • ARCHITECTURE.md contains structure (WHAT)"
     echo "  • ADRs contain decisions (WHY)"
     echo "  • No duplication detected"
+    exit 0
 else
-    echo "❌ Architecture documentation validation failed"
-    echo ""
-    echo "Fix the issues above to maintain SSOT."
-    echo ""
-    echo "Guidelines:"
-    echo "  • ARCHITECTURE.md should describe WHAT exists (structure, flow)"
-    echo "  • ADRs should describe WHY (decisions, rationale, alternatives)"
-    echo "  • Link to ADRs instead of duplicating decision text"
-fi
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    REMEDIATION="Fix issues to maintain SSOT"$'\n'
+    REMEDIATION+="ARCHITECTURE.md should describe WHAT exists (structure, flow)"$'\n'
+    REMEDIATION+="ADRs should describe WHY (decisions, rationale, alternatives)"$'\n'
+    REMEDIATION+="Link to ADRs instead of duplicating decision text"
 
-exit $EXIT_CODE
+    check_failure \
+        "Architecture documentation validation failed" \
+        "$ERROR_DETAILS" \
+        "$REMEDIATION"
+    exit 1
+fi

@@ -8,7 +8,12 @@
 # Set strict mode
 set -eo pipefail
 
-echo "Checking for unauthorized viper.SetDefault() calls..."
+# Source standard output functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/check-output.sh
+source "${SCRIPT_DIR}/lib/check-output.sh"
+
+check_header "Validating ADR-002: Config defaults in registry"
 
 # Find all Go files that call viper.SetDefault(), excluding:
 # 1. registry.go (authorized location)
@@ -17,13 +22,11 @@ echo "Checking for unauthorized viper.SetDefault() calls..."
 UNAUTHORIZED_DEFAULTS=$(grep -rn --include="*.go" --exclude="*_test.go" "viper\.SetDefault" . | grep -v "internal/config/registry.go" | grep -v "//.*viper\.SetDefault" || true)
 
 if [ -n "$UNAUTHORIZED_DEFAULTS" ]; then
-    echo "ERROR: Found unauthorized viper.SetDefault() calls in the following locations:"
-    echo ""
-    echo "$UNAUTHORIZED_DEFAULTS"
-    echo ""
-    echo "IMPORTANT: All defaults must be defined ONLY in internal/config/registry.go"
-    echo "Please move these defaults to the registry and remove the direct calls."
+    check_failure \
+        "Found unauthorized viper.SetDefault() calls" \
+        "$UNAUTHORIZED_DEFAULTS" \
+        "All defaults must be defined in internal/config/registry.go"$'\n'"Move these defaults to the registry"
     exit 1
 else
-    echo "✅ No unauthorized viper.SetDefault() calls found."
+    check_success "No unauthorized viper.SetDefault() calls"
 fi 

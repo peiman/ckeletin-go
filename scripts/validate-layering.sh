@@ -13,8 +13,12 @@
 
 set -eo pipefail
 
-echo "🔍 Validating layered architecture (ADR-009)..."
-echo ""
+# Source standard output functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/check-output.sh
+source "${SCRIPT_DIR}/lib/check-output.sh"
+
+check_header "Validating layered architecture (ADR-009)"
 
 # Check if .go-arch-lint.yml exists
 if [ ! -f ".go-arch-lint.yml" ]; then
@@ -36,37 +40,26 @@ if ! command -v go-arch-lint &> /dev/null; then
     echo ""
 fi
 
-# Run the linter
-echo "Running architecture validation..."
-echo ""
-
-if go-arch-lint check; then
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "✅ Layered architecture validation passed"
-    echo ""
-    echo "All layer dependency rules satisfied:"
+# Run the linter (hide output on success, capture on failure)
+if run_check "go-arch-lint check 2>&1"; then
+    check_success "Layered architecture validation passed"
     echo "  • Entry → Command → Business Logic/Infrastructure"
     echo "  • No reverse dependencies detected"
     echo "  • Cobra isolated to cmd/ layer"
     echo "  • Business logic packages properly isolated"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     exit 0
 else
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "❌ Layered architecture validation failed"
-    echo ""
-    echo "Violations detected in layer dependencies."
-    echo ""
-    echo "Common issues:"
-    echo "  • internal/ package importing from cmd/"
-    echo "  • Business logic importing Cobra"
-    echo "  • Business logic packages importing each other"
-    echo "  • Infrastructure importing business logic"
-    echo ""
-    echo "See ADR-009 for architecture rules:"
-    echo "  docs/adr/009-layered-architecture-pattern.md"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    REMEDIATION="Review layer dependencies and fix violations"$'\n'
+    REMEDIATION+="Common issues:"$'\n'
+    REMEDIATION+="  • internal/ package importing from cmd/"$'\n'
+    REMEDIATION+="  • Business logic importing Cobra"$'\n'
+    REMEDIATION+="  • Business logic packages importing each other"$'\n'
+    REMEDIATION+="  • Infrastructure importing business logic"$'\n'
+    REMEDIATION+="See ADR-009: docs/adr/009-layered-architecture-pattern.md"
+
+    check_failure \
+        "Layered architecture validation failed" \
+        "$CHECK_OUTPUT" \
+        "$REMEDIATION"
     exit 1
 fi

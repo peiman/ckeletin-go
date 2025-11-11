@@ -8,6 +8,9 @@
 
 set -e
 
+# Source standard output functions (only for check mode)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 MODE="${1:-fix}"
 shift || true
 FILES="${@:-.}"
@@ -18,31 +21,34 @@ format_files() {
 }
 
 check_files() {
-    local needs_format=0
+    # shellcheck source=lib/check-output.sh
+    source "${SCRIPT_DIR}/lib/check-output.sh"
+
+    check_header "Checking code formatting"
+
+    local unformatted_output=""
 
     # Check goimports
-    unformatted=$(goimports -l $FILES 2>/dev/null || true)
-    if [ -n "$unformatted" ]; then
-        echo "❌ Files need goimports formatting:"
-        echo "$unformatted"
-        needs_format=1
+    local goimports_output=$(goimports -l $FILES 2>/dev/null || true)
+    if [ -n "$goimports_output" ]; then
+        unformatted_output+="Files need goimports:"$'\n'"$goimports_output"$'\n\n'
     fi
 
     # Check gofmt
-    unformatted=$(gofmt -l $FILES 2>/dev/null || true)
-    if [ -n "$unformatted" ]; then
-        echo "❌ Files need gofmt formatting:"
-        echo "$unformatted"
-        needs_format=1
+    local gofmt_output=$(gofmt -l $FILES 2>/dev/null || true)
+    if [ -n "$gofmt_output" ]; then
+        unformatted_output+="Files need gofmt:"$'\n'"$gofmt_output"
     fi
 
-    if [ $needs_format -eq 1 ]; then
-        echo ""
-        echo "💡 Run 'task format' to fix formatting issues"
+    if [ -n "$unformatted_output" ]; then
+        check_failure \
+            "Formatting check failed" \
+            "$unformatted_output" \
+            "Run: task format"
         exit 1
     fi
 
-    echo "✅ All Go files properly formatted"
+    check_success "All Go files properly formatted"
 }
 
 case "$MODE" in

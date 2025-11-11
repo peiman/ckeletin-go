@@ -95,23 +95,6 @@ func TestMustNewCommand_Success(t *testing.T) {
 	}
 }
 
-func TestMustNewCommand_PanicsOnError(t *testing.T) {
-	// Note: Testing actual panic scenarios is difficult because RegisterFlagsForPrefixWithOverrides
-	// rarely returns errors in practice (only when viper.BindPFlag fails, which requires
-	// complex setup like duplicate flag names).
-	//
-	// The important changes are:
-	// 1. NewCommand now returns (*cobra.Command, error) instead of panicking
-	// 2. MustNewCommand wraps NewCommand and panics on error for init() usage
-	//
-	// This test verifies that the panic mechanism exists and works correctly.
-	// We test the success path here; the panic path is implicitly tested by the
-	// fact that the code compiles and uses panic() correctly.
-
-	t.Skip("Skipping panic test - difficult to trigger real error without complex setup. " +
-		"The conversion from panic-based to error-based API is verified by compilation and success tests.")
-}
-
 func TestNewCommand_PreservesMetadata(t *testing.T) {
 	// SETUP: Create metadata with all fields
 	meta := config.CommandMetadata{

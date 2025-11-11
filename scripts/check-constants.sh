@@ -4,7 +4,12 @@
 
 set -e
 
-echo "🔍 Checking if config constants are up-to-date..."
+# Source standard output functions
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/check-output.sh
+source "${SCRIPT_DIR}/lib/check-output.sh"
+
+check_header "Validating ADR-005: Config constants in sync"
 
 # Generate to temp file
 TEMP_FILE=$(mktemp)
@@ -23,15 +28,11 @@ git checkout internal/config/keys_generated.go 2>/dev/null || true
 
 # Compare
 if ! diff -q "$TEMP_FILE" internal/config/keys_generated.go > /dev/null 2>&1; then
-    echo "❌ ERROR: Config constants are out of date!"
-    echo ""
-    echo "The generated constants in internal/config/keys_generated.go do not match the current registry."
-    echo ""
-    echo "Please run:"
-    echo "  task generate:config:key-constants"
-    echo ""
-    echo "Then commit the updated file."
+    check_failure \
+        "Config constants are out of date" \
+        "Generated constants in keys_generated.go don't match the registry" \
+        "Run: task generate:config:key-constants"$'\n'"Then commit the updated file"
     exit 1
 fi
 
-echo "✅ Config constants are up-to-date"
+check_success "Config constants are up-to-date"
