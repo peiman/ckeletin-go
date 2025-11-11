@@ -13,6 +13,7 @@ package integration
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,6 +23,18 @@ import (
 )
 
 var binaryPath string
+
+// getExitCode extracts the exit code from a command execution error.
+// Returns 0 if err is nil, the exit code if err is an ExitError, or -1 otherwise.
+func getExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	return -1
+}
 
 // TestMain builds the binary before running tests
 func TestMain(m *testing.M) {
@@ -33,7 +46,8 @@ func TestMain(m *testing.M) {
 
 	cmd := exec.Command("go", "build", "-o", binaryName, "../../main.go")
 	if err := cmd.Run(); err != nil {
-		panic("Failed to build binary: " + err.Error())
+		fmt.Fprintf(os.Stderr, "Failed to build test binary: %v\n", err)
+		os.Exit(1)
 	}
 	binaryPath = "./" + binaryName
 
@@ -83,12 +97,7 @@ func TestPingCommand(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
 			if exitCode != tt.wantExitCode {
 				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
@@ -166,12 +175,7 @@ func TestConfigValidateCommand(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
 			if exitCode != tt.wantExitCode {
 				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
@@ -377,12 +381,7 @@ func TestConfigLoading(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
 			if exitCode != tt.wantExitCode {
 				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
@@ -456,12 +455,7 @@ func TestEnvironmentVariables(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
 			if exitCode != tt.wantExitCode {
 				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",

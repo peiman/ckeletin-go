@@ -63,27 +63,10 @@ func TestInit(t *testing.T) {
 			},
 			expectedError: false,
 		},
-		// Skip this test for now as it's more complex to reliably capture stderr
-		/* {
-			name:          "Nil output uses stderr",
-			logLevel:      "info",
-			output:        nil,
-			testMessages:  map[string]bool{
-				"Test message to stderr": true,
-			},
-			captureStderr: true,
-			expectedError: false,
-		}, */
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Skip the stderr capture test for now
-			if tt.name == "Nil output uses stderr" {
-				t.Skip("Skipping stderr capture test due to platform differences")
-				return
-			}
-
 			// SETUP PHASE
 			viper.Set("app.log_level", tt.logLevel)
 
