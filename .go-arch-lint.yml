@@ -42,12 +42,14 @@ components:
   # - Configuration management (ADR-002, ADR-005) - includes subpackages
   # - Logging infrastructure (ADR-006)
   # - UI components (ADR-007)
+  # - Test utilities (testutil package)
   # - Cross-cutting concerns available to all layers
   infrastructure:
     in:
       - internal/config/**
       - internal/logger/**
       - internal/ui/**
+      - internal/testutil/**
 
   # Layer 3: Business Logic Layer
   # - Feature-specific implementations

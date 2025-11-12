@@ -5,8 +5,9 @@ package validator
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
+
+	"github.com/peiman/ckeletin-go/internal/testutil"
 )
 
 func TestValidate(t *testing.T) {
@@ -77,8 +78,8 @@ func TestValidate(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			if tt.skipOnWindows && runtime.GOOS == "windows" {
-				t.Skip("Skipping permission test on Windows")
+			if tt.skipOnWindows {
+				testutil.SkipOnWindowsWithReason(t, "permission test requires Unix file permissions")
 			}
 
 			// Create temp file

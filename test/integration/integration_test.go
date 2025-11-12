@@ -13,15 +13,31 @@ package integration
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var binaryPath string
+
+// getExitCode extracts the exit code from a command execution error.
+// Returns 0 if err is nil, the exit code if err is an ExitError, or -1 otherwise.
+func getExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return exitErr.ExitCode()
+	}
+	return -1
+}
 
 // TestMain builds the binary before running tests
 func TestMain(m *testing.M) {
@@ -33,7 +49,8 @@ func TestMain(m *testing.M) {
 
 	cmd := exec.Command("go", "build", "-o", binaryName, "../../main.go")
 	if err := cmd.Run(); err != nil {
-		panic("Failed to build binary: " + err.Error())
+		fmt.Fprintf(os.Stderr, "Failed to build test binary: %v\n", err)
+		os.Exit(1)
 	}
 	binaryPath = "./" + binaryName
 
@@ -83,24 +100,17 @@ func TestPingCommand(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			// Check output if specified
 			if tt.wantOutputContains != "" {
 				output := stdout.String()
-				if !strings.Contains(output, tt.wantOutputContains) {
-					t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContains, output)
-				}
+				assert.Contains(t, output, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -152,9 +162,8 @@ func TestConfigValidateCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test config file
 			configFile := filepath.Join(tmpDir, tt.name+".yaml")
-			if err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms); err != nil {
-				t.Fatalf("Failed to create config file: %v", err)
-			}
+			err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms)
+			require.NoError(t, err, "setup: failed to create config file")
 
 			// Build command
 			args := append([]string{"config", "validate", "--file", configFile}, tt.args...)
@@ -163,25 +172,20 @@ func TestConfigValidateCommand(t *testing.T) {
 			cmd.Stdout = &stdout
 			cmd.Stderr = &stderr
 
-			err := cmd.Run()
+			err = cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			// Check output
-			combinedOutput := stdout.String() + stderr.String()
-			if tt.wantOutputContains != "" && !strings.Contains(combinedOutput, tt.wantOutputContains) {
-				t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContains, combinedOutput)
+			if tt.wantOutputContains != "" {
+				combinedOutput := stdout.String() + stderr.String()
+				assert.Contains(t, combinedOutput, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -217,23 +221,15 @@ func TestDocsCommand(t *testing.T) {
 
 			err := cmd.Run()
 
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstderr: %s",
-					exitCode, tt.wantExitCode, stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstderr: %s", stderr.String())
 
 			if tt.wantOutputContains != "" {
 				output := stdout.String()
-				if !strings.Contains(output, tt.wantOutputContains) {
-					t.Errorf("Output doesn't contain %q", tt.wantOutputContains)
-				}
+				assert.Contains(t, output, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -274,22 +270,14 @@ func TestHelpCommand(t *testing.T) {
 
 			err := cmd.Run()
 
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d", exitCode, tt.wantExitCode)
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode, "exit code mismatch")
 
 			if tt.wantOutputContains != "" {
 				output := stdout.String()
-				if !strings.Contains(output, tt.wantOutputContains) {
-					t.Errorf("Output doesn't contain %q", tt.wantOutputContains)
-				}
+				assert.Contains(t, output, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -301,15 +289,13 @@ func TestVersionFlag(t *testing.T) {
 	cmd.Stdout = &stdout
 
 	err := cmd.Run()
-	if err != nil {
-		t.Fatalf("Version command failed: %v", err)
-	}
+	require.NoError(t, err, "version command should succeed")
 
 	output := stdout.String()
 	// Version output should contain version info
-	if !strings.Contains(output, "version") && !strings.Contains(output, "dev") {
-		t.Errorf("Version output unexpected: %s", output)
-	}
+	hasVersion := strings.Contains(output, "version") || strings.Contains(output, "dev")
+	assert.True(t, hasVersion,
+		"version output should contain 'version' or 'dev', got: %s", output)
 }
 
 // TestConfigLoading tests configuration loading from files
@@ -363,9 +349,8 @@ func TestConfigLoading(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create config file
 			configFile := filepath.Join(tmpDir, "config.yaml")
-			if err := os.WriteFile(configFile, []byte(tt.configContent), 0600); err != nil {
-				t.Fatalf("Failed to create config file: %v", err)
-			}
+			err := os.WriteFile(configFile, []byte(tt.configContent), 0600)
+			require.NoError(t, err, "setup: failed to create config file")
 
 			// Run command with config file
 			args := append([]string{"--config", configFile}, tt.args...)
@@ -374,25 +359,20 @@ func TestConfigLoading(t *testing.T) {
 			cmd.Stdout = &stdout
 			cmd.Stderr = &stderr
 
-			err := cmd.Run()
+			err = cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			// Check output
-			output := stdout.String()
-			if tt.wantOutputContains != "" && !strings.Contains(output, tt.wantOutputContains) {
-				t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContains, output)
+			if tt.wantOutputContains != "" {
+				output := stdout.String()
+				assert.Contains(t, output, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 
 			// Cleanup for next test
@@ -456,24 +436,17 @@ func TestEnvironmentVariables(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			// Check output
 			if tt.wantOutputContains != "" {
 				output := stdout.String()
-				if !strings.Contains(output, tt.wantOutputContains) {
-					t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContains, output)
-				}
+				assert.Contains(t, output, tt.wantOutputContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -491,9 +464,8 @@ func TestConfigPrecedence(t *testing.T) {
     output_color: "blue"
 `
 	configFile := filepath.Join(tmpDir, "config.yaml")
-	if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
-		t.Fatalf("Failed to create config file: %v", err)
-	}
+	err := os.WriteFile(configFile, []byte(configContent), 0600)
+	require.NoError(t, err, "setup: failed to create config file")
 
 	tests := []struct {
 		name               string
@@ -537,14 +509,12 @@ func TestConfigPrecedence(t *testing.T) {
 				cmd.Env = append(cmd.Env, k+"="+v)
 			}
 
-			if err := cmd.Run(); err != nil {
-				t.Fatalf("Command failed: %v", err)
-			}
+			err := cmd.Run()
+			require.NoError(t, err, "command should succeed")
 
 			output := stdout.String()
-			if !strings.Contains(output, tt.wantOutputContains) {
-				t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContains, output)
-			}
+			assert.Contains(t, output, tt.wantOutputContains,
+				"output should contain expected text")
 		})
 	}
 }
@@ -562,35 +532,30 @@ func TestMultiCommandWorkflow(t *testing.T) {
     output_color: "green"
 `
 		configFile := filepath.Join(tmpDir, "workflow-config.yaml")
-		if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
-			t.Fatalf("Failed to create config file: %v", err)
-		}
+		err := os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err, "setup: failed to create config file")
 
 		// Step 2: Validate the config
 		validateCmd := exec.Command(binaryPath, "config", "validate", "--file", configFile)
 		var validateStdout bytes.Buffer
 		validateCmd.Stdout = &validateStdout
 
-		if err := validateCmd.Run(); err != nil {
-			t.Fatalf("Config validation failed: %v\nOutput: %s", err, validateStdout.String())
-		}
+		err = validateCmd.Run()
+		require.NoError(t, err, "config validation should succeed: %s", validateStdout.String())
 
-		if !strings.Contains(validateStdout.String(), "valid") {
-			t.Errorf("Validation output doesn't confirm config is valid: %s", validateStdout.String())
-		}
+		assert.Contains(t, validateStdout.String(), "valid",
+			"validation output should confirm config is valid")
 
 		// Step 3: Use the validated config
 		pingCmd := exec.Command(binaryPath, "--config", configFile, "ping")
 		var pingStdout bytes.Buffer
 		pingCmd.Stdout = &pingStdout
 
-		if err := pingCmd.Run(); err != nil {
-			t.Fatalf("Ping command failed: %v", err)
-		}
+		err = pingCmd.Run()
+		require.NoError(t, err, "ping command should succeed")
 
-		if !strings.Contains(pingStdout.String(), "Workflow Test") {
-			t.Errorf("Ping output doesn't contain expected message: %s", pingStdout.String())
-		}
+		assert.Contains(t, pingStdout.String(), "Workflow Test",
+			"ping output should contain expected message")
 	})
 
 	t.Run("Generate docs then validate config", func(t *testing.T) {
@@ -599,30 +564,26 @@ func TestMultiCommandWorkflow(t *testing.T) {
 		var docsStdout bytes.Buffer
 		docsCmd.Stdout = &docsStdout
 
-		if err := docsCmd.Run(); err != nil {
-			t.Fatalf("Docs generation failed: %v", err)
-		}
+		err := docsCmd.Run()
+		require.NoError(t, err, "docs generation should succeed")
 
-		if !strings.Contains(docsStdout.String(), "Configuration") {
-			t.Errorf("Docs don't contain configuration info: %s", docsStdout.String())
-		}
+		assert.Contains(t, docsStdout.String(), "Configuration",
+			"docs should contain configuration info")
 
 		// Step 2: Create a config based on docs
 		configContent := `app:
   log_level: info
 `
 		configFile := filepath.Join(tmpDir, "docs-based-config.yaml")
-		if err := os.WriteFile(configFile, []byte(configContent), 0600); err != nil {
-			t.Fatalf("Failed to create config file: %v", err)
-		}
+		err = os.WriteFile(configFile, []byte(configContent), 0600)
+		require.NoError(t, err, "setup: failed to create config file")
 
 		// Step 3: Validate the config
 		validateCmd := exec.Command(binaryPath, "config", "validate", "--file", configFile)
 		var validateStdout bytes.Buffer
 		validateCmd.Stdout = &validateStdout
 
-		if err := validateCmd.Run(); err != nil {
-			t.Fatalf("Config validation failed: %v\nOutput: %s", err, validateStdout.String())
-		}
+		err = validateCmd.Run()
+		require.NoError(t, err, "config validation should succeed: %s", validateStdout.String())
 	})
 }

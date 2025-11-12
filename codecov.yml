@@ -27,3 +27,4 @@ ignore:
   - "scripts/**/*"
   - "docs/**/*"
   - "test/**/*"
+  - "internal/testutil/**"  # Test utilities with platform-specific code

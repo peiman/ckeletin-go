@@ -5,17 +5,15 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/peiman/ckeletin-go/internal/testutil"
 )
 
 func TestValidateConfigFilePermissions(t *testing.T) {
 	t.Parallel()
-	// Skip permission tests on Windows
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping permission tests on Windows")
-	}
+	testutil.SkipOnWindowsWithReason(t, "permission tests require Unix file permissions")
 
 	tests := []struct {
 		name        string
@@ -92,9 +90,7 @@ func TestValidateConfigFilePermissions(t *testing.T) {
 
 func TestValidateConfigFilePermissions_NonexistentFile(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping permission tests on Windows")
-	}
+	testutil.SkipOnWindowsWithReason(t, "permission tests require Unix file permissions")
 
 	err := ValidateConfigFilePermissions("/nonexistent/path/config.yaml")
 	if err == nil {
@@ -106,9 +102,7 @@ func TestValidateConfigFilePermissions_NonexistentFile(t *testing.T) {
 }
 
 func TestValidateConfigFilePermissions_Windows(t *testing.T) {
-	if runtime.GOOS != "windows" {
-		t.Skip("Skipping Windows-specific test on non-Windows platform")
-	}
+	testutil.SkipOnNonWindows(t)
 
 	// On Windows, should always return nil
 	tmpDir := t.TempDir()
@@ -238,10 +232,7 @@ func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
 }
 
 func TestValidateConfigFileSecurity(t *testing.T) {
-	// Skip permission tests on Windows
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipping security validation tests on Windows")
-	}
+	testutil.SkipOnWindowsWithReason(t, "security validation requires Unix file permissions")
 
 	tests := []struct {
 		name        string

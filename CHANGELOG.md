@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Test Quality Improvements**:
+  - Added `testify/assert` and `testify/require` for cleaner test assertions
+  - Created `internal/testutil` package with standardized platform skip helpers:
+    - `SkipOnWindows(t)` - Skip tests on Windows
+    - `SkipOnWindowsWithReason(t, reason)` - Skip with custom message
+    - `SkipOnNonWindows(t)` - Skip on non-Windows platforms
+    - `SkipOnPlatform(t, platform)` - Skip on specific platform
+  - Added `getExitCode()` helper in integration tests to eliminate duplicate error handling code
+  - Created comprehensive `docs/testing-guide.md`:
+    - Test patterns (table-driven, SETUP-EXECUTION-ASSERTION)
+    - Platform-specific testing guidelines
+    - Anti-patterns to avoid
+    - Integration testing patterns
+    - ADR-003 compliance examples
+
 - **Automated scaffold initialization** (`task init`):
   - Single command to customize module path and binary name: `task init name=myapp module=github.com/myuser/myapp`
   - Automatically updates 40+ files including all Go imports, configs, and templates
@@ -49,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Test code improvements**:
+  - Replaced `panic()` with proper error handling in `TestMain` (integration tests)
+  - Removed commented-out test code in `internal/logger/logger_test.go`
+  - Standardized platform-specific skip patterns across test files
+  - Updated `internal/config/security_test.go` and `internal/config/validator/validator_test.go` to use `testutil` helpers
 - Updated Go version from 1.24 to 1.25 in go.mod and CI workflow
 - Updated CI test matrix to test against Go 1.24.x and 1.25.x
 - **Task naming pattern refactoring** (ADR-000 compliance):
