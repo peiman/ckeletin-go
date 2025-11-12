@@ -646,6 +646,197 @@ func TestGetConfigValue_Types(t *testing.T) {
 	}
 }
 
+// TestGetConfigValue_FlagErrors tests error handling when flags are not properly configured
+func TestGetConfigValue_FlagErrors(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupFlags   func(*cobra.Command)
+		setFlag      bool
+		flagName     string
+		viperKey     string
+		viperValue   interface{}
+		expectedType string
+	}{
+		{
+			name: "String flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent",
+			viperKey:     "test.string",
+			viperValue:   "viper-value",
+			expectedType: "string",
+		},
+		{
+			name: "Bool flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-bool",
+			viperKey:     "test.bool",
+			viperValue:   true,
+			expectedType: "bool",
+		},
+		{
+			name: "Int flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-int",
+			viperKey:     "test.int",
+			viperValue:   42,
+			expectedType: "int",
+		},
+		{
+			name: "Float64 flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-float",
+			viperKey:     "test.float",
+			viperValue:   3.14,
+			expectedType: "float64",
+		},
+		{
+			name: "String slice flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-slice",
+			viperKey:     "test.slice",
+			viperValue:   []string{"a", "b"},
+			expectedType: "[]string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			viper.Reset()
+			viper.Set(tt.viperKey, tt.viperValue)
+
+			cmd := &cobra.Command{Use: "test"}
+			tt.setupFlags(cmd)
+
+			// Try to set the flag if requested (this will fail for nonexistent flags)
+			if tt.setFlag {
+				_ = cmd.Flags().Set(tt.flagName, "value")
+			}
+
+			// EXECUTION & ASSERTION PHASE
+			// These should fall back to viper values when flags don't exist
+			switch tt.expectedType {
+			case "string":
+				result := getConfigValueWithFlags[string](cmd, tt.flagName, tt.viperKey)
+				if result != tt.viperValue.(string) {
+					t.Errorf("Expected '%s', got '%s'", tt.viperValue, result)
+				}
+			case "bool":
+				result := getConfigValueWithFlags[bool](cmd, tt.flagName, tt.viperKey)
+				if result != tt.viperValue.(bool) {
+					t.Errorf("Expected %v, got %v", tt.viperValue, result)
+				}
+			case "int":
+				result := getConfigValueWithFlags[int](cmd, tt.flagName, tt.viperKey)
+				if result != tt.viperValue.(int) {
+					t.Errorf("Expected %d, got %d", tt.viperValue, result)
+				}
+			case "float64":
+				result := getConfigValueWithFlags[float64](cmd, tt.flagName, tt.viperKey)
+				if result != tt.viperValue.(float64) {
+					t.Errorf("Expected %f, got %f", tt.viperValue, result)
+				}
+			case "[]string":
+				result := getConfigValueWithFlags[[]string](cmd, tt.flagName, tt.viperKey)
+				expected := tt.viperValue.([]string)
+				if len(result) != len(expected) {
+					t.Errorf("Expected length %d, got %d", len(expected), len(result))
+				}
+			}
+		})
+	}
+}
+
+// TestGetConfigValue_ViperTypeMismatch tests behavior when viper has wrong type
+func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
+	tests := []struct {
+		name           string
+		viperValue     interface{}
+		requestedType  string
+		expectedResult interface{}
+	}{
+		{
+			name:           "Viper has int, requesting string",
+			viperValue:     42,
+			requestedType:  "string",
+			expectedResult: "", // zero value
+		},
+		{
+			name:           "Viper has string, requesting bool",
+			viperValue:     "not-a-bool",
+			requestedType:  "bool",
+			expectedResult: false, // zero value
+		},
+		{
+			name:           "Viper has string, requesting int",
+			viperValue:     "not-an-int",
+			requestedType:  "int",
+			expectedResult: 0, // zero value
+		},
+		{
+			name:           "Viper has bool, requesting float64",
+			viperValue:     true,
+			requestedType:  "float64",
+			expectedResult: 0.0, // zero value
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			viper.Reset()
+			viper.Set("test.key", tt.viperValue)
+
+			// Create command without flags set
+			cmd := &cobra.Command{Use: "test"}
+			cmd.Flags().String("str", "", "")
+			cmd.Flags().Bool("bool", false, "")
+			cmd.Flags().Int("int", 0, "")
+			cmd.Flags().Float64("float", 0.0, "")
+
+			// EXECUTION & ASSERTION PHASE
+			// When viper has wrong type and flag not set, should return zero value
+			switch tt.requestedType {
+			case "string":
+				result := getConfigValueWithFlags[string](cmd, "str", "test.key")
+				if result != tt.expectedResult.(string) {
+					t.Errorf("Expected '%s', got '%s'", tt.expectedResult, result)
+				}
+			case "bool":
+				result := getConfigValueWithFlags[bool](cmd, "bool", "test.key")
+				if result != tt.expectedResult.(bool) {
+					t.Errorf("Expected %v, got %v", tt.expectedResult, result)
+				}
+			case "int":
+				result := getConfigValueWithFlags[int](cmd, "int", "test.key")
+				if result != tt.expectedResult.(int) {
+					t.Errorf("Expected %d, got %d", tt.expectedResult, result)
+				}
+			case "float64":
+				result := getConfigValueWithFlags[float64](cmd, "float", "test.key")
+				if result != tt.expectedResult.(float64) {
+					t.Errorf("Expected %f, got %f", tt.expectedResult, result)
+				}
+			}
+		})
+	}
+}
+
 // TestGetConfigValue_StringSlice specifically tests the string slice handling in getConfigValueWithFlags
 func TestGetConfigValue_StringSlice(t *testing.T) {
 	// SETUP PHASE

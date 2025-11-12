@@ -22,9 +22,11 @@ import (
 
 // TestScaffoldInit tests the complete scaffold initialization workflow
 func TestScaffoldInit(t *testing.T) {
-	// Skip if task is not installed
-	if _, err := exec.LookPath("task"); err != nil {
-		t.Skip("task command not found, skipping scaffold init test")
+	// Check if task is available, use fallback if not
+	_, taskErr := exec.LookPath("task")
+	useTaskFallback := taskErr != nil
+	if useTaskFallback {
+		t.Log("task command not found, using direct script execution as fallback")
 	}
 
 	// Create temp directory for test
@@ -72,15 +74,39 @@ func TestScaffoldInit(t *testing.T) {
 	// Run: task init name=testapp module=github.com/test/testapp
 	testName := "testapp"
 	testModule := "github.com/test/testapp"
-	t.Logf("Running: task init name=%s module=%s", testName, testModule)
+	oldModule := "github.com/peiman/ckeletin-go"
+	oldName := "ckeletin-go"
 
-	cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
-	cmd.Dir = tmpDir
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("task init failed: %v\nOutput: %s", err, string(output))
+	if useTaskFallback {
+		// Fallback: run scaffold-init.go directly
+		t.Logf("Running: go run scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
+		cmd := exec.Command("go", "run", "scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("scaffold-init.go failed: %v\nOutput: %s", err, string(output))
+		}
+		t.Logf("scaffold-init.go output:\n%s", string(output))
+
+		// Run go mod tidy
+		t.Logf("Running: go mod tidy")
+		tidyCmd := exec.Command("go", "mod", "tidy")
+		tidyCmd.Dir = tmpDir
+		tidyOutput, err := tidyCmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("go mod tidy failed: %v\nOutput: %s", err, string(tidyOutput))
+		}
+	} else {
+		// Use task command
+		t.Logf("Running: task init name=%s module=%s", testName, testModule)
+		cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("task init failed: %v\nOutput: %s", err, string(output))
+		}
+		t.Logf("task init output:\n%s", string(output))
 	}
-	t.Logf("task init output:\n%s", string(output))
 
 	// Verify: go.mod contains new module path
 	t.Run("go.mod updated", func(t *testing.T) {
@@ -165,14 +191,29 @@ func TestScaffoldInit(t *testing.T) {
 	// Integration test focuses on verifying the scaffold init process works correctly
 	// Quality checks require tools (golangci-lint, goimports, bash scripts) not available in test env
 
-	// Run: task build (produces binary)
-	t.Run("task build succeeds", func(t *testing.T) {
-		t.Logf("Running: task build")
-		cmd := exec.Command("task", "build")
-		cmd.Dir = tmpDir
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("task build failed: %v\nOutput: %s", err, string(output))
+	// Run: task build (produces binary) or go build directly
+	t.Run("build succeeds", func(t *testing.T) {
+		if useTaskFallback {
+			// Fallback: run go build directly
+			binaryName := testName
+			if runtime.GOOS == "windows" {
+				binaryName += ".exe"
+			}
+			t.Logf("Running: go build -o %s", binaryName)
+			cmd := exec.Command("go", "build", "-o", binaryName)
+			cmd.Dir = tmpDir
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("go build failed: %v\nOutput: %s", err, string(output))
+			}
+		} else {
+			t.Logf("Running: task build")
+			cmd := exec.Command("task", "build")
+			cmd.Dir = tmpDir
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("task build failed: %v\nOutput: %s", err, string(output))
+			}
 		}
 
 		// Verify binary exists (with .exe on Windows)
