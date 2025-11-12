@@ -322,9 +322,16 @@ See ADR-006 for details.
 
 ### Testing Standards
 
+**⚠️ IMPORTANT: All new tests MUST use testify/assert or testify/require**
+
 **Structure your tests like this:**
 
 ```go
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+)
+
 func TestFeature(t *testing.T) {
     tests := []struct {
         name     string
@@ -343,17 +350,18 @@ func TestFeature(t *testing.T) {
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            // Setup
+            // SETUP PHASE
+            // (setup code here)
 
-            // Execute
+            // EXECUTION PHASE
             got, err := ProcessFeature(tt.input)
 
-            // Assert
+            // ASSERTION PHASE
             if tt.wantErr {
-                assert.Error(t, err)
+                assert.Error(t, err, "ProcessFeature should return error")
             } else {
-                assert.NoError(t, err)
-                assert.Equal(t, tt.expected, got)
+                assert.NoError(t, err, "ProcessFeature should not return error")
+                assert.Equal(t, tt.expected, got, "ProcessFeature should return expected value")
             }
         })
     }

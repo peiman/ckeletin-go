@@ -4,6 +4,8 @@ package cmd
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStringDefault(t *testing.T) {
@@ -47,9 +49,7 @@ func TestStringDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := stringDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("stringDefault() = %q, want %q", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "stringDefault should convert value correctly")
 		})
 	}
 }
@@ -160,9 +160,7 @@ func TestBoolDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := boolDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("boolDefault() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "boolDefault should convert value correctly")
 		})
 	}
 }
@@ -243,9 +241,7 @@ func TestIntDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := intDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("intDefault() = %d, want %d", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "intDefault should convert value correctly")
 		})
 	}
 }
@@ -281,9 +277,7 @@ func TestIntDefault_AllUintTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := intDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("intDefault() = %d, want %d", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "intDefault should handle uint types correctly")
 		})
 	}
 }
@@ -316,9 +310,7 @@ func TestIntDefault_Uint64Overflow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := intDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("intDefault(%d) = %d, want %d (should clamp, not wrap to negative)", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "intDefault should clamp uint64 overflow, not wrap to negative")
 		})
 	}
 }
@@ -346,9 +338,7 @@ func TestIntDefault_Uint32Overflow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := intDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("intDefault(%d) = %d, want %d", tt.input, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "intDefault should handle uint overflow correctly")
 		})
 	}
 
@@ -370,9 +360,7 @@ func TestIntDefault_Uint32Overflow(t *testing.T) {
 			want = maxInt
 		}
 
-		if got != want {
-			t.Errorf("intDefault(%d) = %d, want %d", input, got, want)
-		}
+		assert.Equal(t, want, got, "intDefault should handle uint32 max value correctly")
 	})
 }
 
@@ -402,9 +390,7 @@ func TestIntDefault_Int64Overflow(t *testing.T) {
 			// Just verify it doesn't panic and returns a value
 			// On 64-bit systems, these values fit in int
 			// On 32-bit systems, they would be clamped
-			if got == 0 {
-				t.Errorf("intDefault() should handle large int64, got 0")
-			}
+			assert.NotEqual(t, 0, got, "intDefault should handle large int64, should not return 0")
 		})
 	}
 }
@@ -470,9 +456,7 @@ func TestFloatDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := floatDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("floatDefault() = %f, want %f", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "floatDefault should convert value correctly")
 		})
 	}
 }
@@ -528,9 +512,7 @@ func TestFloatDefault_AllIntTypes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := floatDefault(tt.input)
-			if got != tt.want {
-				t.Errorf("floatDefault() = %f, want %f", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "floatDefault should handle all int types correctly")
 		})
 	}
 }
@@ -544,7 +526,7 @@ func TestStringSliceDefault(t *testing.T) {
 		{
 			name:  "Nil value",
 			input: nil,
-			want:  []string{},
+			want:  nil, // Function returns nil for nil input
 		},
 		{
 			name:  "String slice",
@@ -574,24 +556,14 @@ func TestStringSliceDefault(t *testing.T) {
 		{
 			name:  "Invalid type",
 			input: 123,
-			want:  []string{},
+			want:  nil, // Function returns nil for invalid types
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := stringSliceDefault(tt.input)
-
-			if len(got) != len(tt.want) {
-				t.Errorf("stringSliceDefault() length = %d, want %d", len(got), len(tt.want))
-				return
-			}
-
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Errorf("stringSliceDefault()[%d] = %q, want %q", i, got[i], tt.want[i])
-				}
-			}
+			assert.Equal(t, tt.want, got, "stringSliceDefault should convert value correctly")
 		})
 	}
 }
