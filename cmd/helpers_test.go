@@ -7,6 +7,8 @@ import (
 
 	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCommand_Success(t *testing.T) {
@@ -27,18 +29,10 @@ func TestNewCommand_Success(t *testing.T) {
 	cmd, err := NewCommand(meta, runE)
 
 	// ASSERTION: Should succeed
-	if err != nil {
-		t.Errorf("NewCommand() unexpected error = %v", err)
-	}
-	if cmd == nil {
-		t.Fatal("NewCommand() returned nil command")
-	}
-	if cmd.Use != "test" {
-		t.Errorf("Command.Use = %v, want %v", cmd.Use, "test")
-	}
-	if cmd.Short != "Test command" {
-		t.Errorf("Command.Short = %v, want %v", cmd.Short, "Test command")
-	}
+	assert.NoError(t, err, "NewCommand() should not return error")
+	require.NotNil(t, cmd, "NewCommand() should return non-nil command")
+	assert.Equal(t, "test", cmd.Use, "Command.Use should match metadata")
+	assert.Equal(t, "Test command", cmd.Short, "Command.Short should match metadata")
 }
 
 func TestNewCommand_ReturnsErrorOnInvalidFlags(t *testing.T) {
@@ -61,12 +55,8 @@ func TestNewCommand_ReturnsErrorOnInvalidFlags(t *testing.T) {
 
 	// ASSERTION: Should return nil command and nil error (no flags to register)
 	// Note: Empty prefix is not an error, it just means no flags to register
-	if err != nil {
-		t.Errorf("NewCommand() unexpected error = %v", err)
-	}
-	if cmd == nil {
-		t.Fatal("NewCommand() returned nil command even with valid metadata")
-	}
+	assert.NoError(t, err, "NewCommand() should not return error even with non-existent prefix")
+	require.NotNil(t, cmd, "NewCommand() should return command even with non-existent prefix")
 }
 
 func TestMustNewCommand_Success(t *testing.T) {
@@ -87,12 +77,8 @@ func TestMustNewCommand_Success(t *testing.T) {
 	cmd := MustNewCommand(meta, runE)
 
 	// ASSERTION: Should succeed
-	if cmd == nil {
-		t.Fatal("MustNewCommand() returned nil command")
-	}
-	if cmd.Use != "test-must" {
-		t.Errorf("Command.Use = %v, want %v", cmd.Use, "test-must")
-	}
+	require.NotNil(t, cmd, "MustNewCommand() should return non-nil command")
+	assert.Equal(t, "test-must", cmd.Use, "Command.Use should match metadata")
 }
 
 func TestNewCommand_PreservesMetadata(t *testing.T) {
@@ -114,22 +100,10 @@ func TestNewCommand_PreservesMetadata(t *testing.T) {
 	cmd, err := NewCommand(meta, runE)
 
 	// ASSERTION: All metadata should be preserved
-	if err != nil {
-		t.Fatalf("NewCommand() error = %v", err)
-	}
-	if cmd.Use != meta.Use {
-		t.Errorf("Command.Use = %v, want %v", cmd.Use, meta.Use)
-	}
-	if cmd.Short != meta.Short {
-		t.Errorf("Command.Short = %v, want %v", cmd.Short, meta.Short)
-	}
-	if cmd.Long != meta.Long {
-		t.Errorf("Command.Long = %v, want %v", cmd.Long, meta.Long)
-	}
-	if cmd.Hidden != meta.Hidden {
-		t.Errorf("Command.Hidden = %v, want %v", cmd.Hidden, meta.Hidden)
-	}
-	if cmd.RunE == nil {
-		t.Error("Command.RunE should not be nil")
-	}
+	require.NoError(t, err, "NewCommand() should not return error")
+	assert.Equal(t, meta.Use, cmd.Use, "Command.Use should match metadata")
+	assert.Equal(t, meta.Short, cmd.Short, "Command.Short should match metadata")
+	assert.Equal(t, meta.Long, cmd.Long, "Command.Long should match metadata")
+	assert.Equal(t, meta.Hidden, cmd.Hidden, "Command.Hidden should match metadata")
+	assert.NotNil(t, cmd.RunE, "Command.RunE should not be nil")
 }

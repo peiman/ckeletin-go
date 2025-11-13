@@ -18,6 +18,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestScaffoldInit tests the complete scaffold initialization workflow
@@ -34,42 +37,36 @@ func TestScaffoldInit(t *testing.T) {
 
 	// Copy entire project to temp directory
 	t.Logf("Copying project to temp directory: %s", tmpDir)
-	if err := copyProjectFiles(tmpDir); err != nil {
-		t.Fatalf("Failed to copy project files: %v", err)
-	}
+	err := copyProjectFiles(tmpDir)
+	require.NoError(t, err, "failed to copy project files")
 
 	// Initialize git repo (needed for Taskfile VERSION variable)
 	initCmd := exec.Command("git", "init")
 	initCmd.Dir = tmpDir
-	if output, err := initCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to init git repo: %v\nOutput: %s", err, string(output))
-	}
+	output, err := initCmd.CombinedOutput()
+	require.NoError(t, err, "failed to init git repo\nOutput: %s", string(output))
 
 	// Configure git user (required for commits in CI)
 	configEmailCmd := exec.Command("git", "config", "user.email", "test@ckeletin-go.example")
 	configEmailCmd.Dir = tmpDir
-	if output, err := configEmailCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to set git user.email: %v\nOutput: %s", err, string(output))
-	}
+	output, err = configEmailCmd.CombinedOutput()
+	require.NoError(t, err, "failed to set git user.email\nOutput: %s", string(output))
 
 	configNameCmd := exec.Command("git", "config", "user.name", "Test User")
 	configNameCmd.Dir = tmpDir
-	if output, err := configNameCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to set git user.name: %v\nOutput: %s", err, string(output))
-	}
+	output, err = configNameCmd.CombinedOutput()
+	require.NoError(t, err, "failed to set git user.name\nOutput: %s", string(output))
 
 	// Add and commit files (needed for git describe)
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = tmpDir
-	if output, err := addCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to add files: %v\nOutput: %s", err, string(output))
-	}
+	output, err = addCmd.CombinedOutput()
+	require.NoError(t, err, "failed to add files\nOutput: %s", string(output))
 
 	commitCmd := exec.Command("git", "commit", "-m", "Initial commit")
 	commitCmd.Dir = tmpDir
-	if output, err := commitCmd.CombinedOutput(); err != nil {
-		t.Fatalf("Failed to commit: %v\nOutput: %s", err, string(output))
-	}
+	output, err = commitCmd.CombinedOutput()
+	require.NoError(t, err, "failed to commit\nOutput: %s", string(output))
 
 	// Run: task init name=testapp module=github.com/test/testapp
 	testName := "testapp"
@@ -83,9 +80,7 @@ func TestScaffoldInit(t *testing.T) {
 		cmd := exec.Command("go", "run", "scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("scaffold-init.go failed: %v\nOutput: %s", err, string(output))
-		}
+		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))
 		t.Logf("scaffold-init.go output:\n%s", string(output))
 
 		// Run go mod tidy
@@ -93,18 +88,14 @@ func TestScaffoldInit(t *testing.T) {
 		tidyCmd := exec.Command("go", "mod", "tidy")
 		tidyCmd.Dir = tmpDir
 		tidyOutput, err := tidyCmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("go mod tidy failed: %v\nOutput: %s", err, string(tidyOutput))
-		}
+		require.NoError(t, err, "go mod tidy failed\nOutput: %s", string(tidyOutput))
 	} else {
 		// Use task command
 		t.Logf("Running: task init name=%s module=%s", testName, testModule)
 		cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("task init failed: %v\nOutput: %s", err, string(output))
-		}
+		require.NoError(t, err, "task init failed\nOutput: %s", string(output))
 		t.Logf("task init output:\n%s", string(output))
 	}
 
@@ -112,39 +103,30 @@ func TestScaffoldInit(t *testing.T) {
 	t.Run("go.mod updated", func(t *testing.T) {
 		goModPath := filepath.Join(tmpDir, "go.mod")
 		content, err := os.ReadFile(goModPath)
-		if err != nil {
-			t.Fatalf("Failed to read go.mod: %v", err)
-		}
+		require.NoError(t, err, "failed to read go.mod")
 
-		if !strings.Contains(string(content), "module "+testModule) {
-			t.Errorf("go.mod does not contain new module path\nContent:\n%s", string(content))
-		}
+		assert.Contains(t, string(content), "module "+testModule,
+			"go.mod should contain new module path")
 	})
 
 	// Verify: Taskfile.yml contains new binary name
 	t.Run("Taskfile.yml updated", func(t *testing.T) {
 		taskfilePath := filepath.Join(tmpDir, "Taskfile.yml")
 		content, err := os.ReadFile(taskfilePath)
-		if err != nil {
-			t.Fatalf("Failed to read Taskfile.yml: %v", err)
-		}
+		require.NoError(t, err, "failed to read Taskfile.yml")
 
-		if !strings.Contains(string(content), "BINARY_NAME: "+testName) {
-			t.Errorf("Taskfile.yml does not contain new binary name\nContent:\n%s", string(content))
-		}
+		assert.Contains(t, string(content), "BINARY_NAME: "+testName,
+			"Taskfile.yml should contain new binary name")
 	})
 
 	// Verify: .goreleaser.yml contains new project name
 	t.Run(".goreleaser.yml updated", func(t *testing.T) {
 		goreleaserPath := filepath.Join(tmpDir, ".goreleaser.yml")
 		content, err := os.ReadFile(goreleaserPath)
-		if err != nil {
-			t.Fatalf("Failed to read .goreleaser.yml: %v", err)
-		}
+		require.NoError(t, err, "failed to read .goreleaser.yml")
 
-		if !strings.Contains(string(content), "project_name: "+testName) {
-			t.Errorf(".goreleaser.yml does not contain new project name\nContent:\n%s", string(content))
-		}
+		assert.Contains(t, string(content), "project_name: "+testName,
+			".goreleaser.yml should contain new project name")
 	})
 
 	// Verify: No old module references remain in Go files
@@ -177,14 +159,11 @@ func TestScaffoldInit(t *testing.T) {
 			return nil
 		})
 
-		if err != nil {
-			t.Fatalf("Failed to walk directory: %v", err)
-		}
+		require.NoError(t, err, "failed to walk directory")
 
-		if len(filesWithOldRefs) > 0 {
-			t.Errorf("Found old module references in %d files:\n%s",
-				len(filesWithOldRefs), strings.Join(filesWithOldRefs, "\n"))
-		}
+		assert.Empty(t, filesWithOldRefs,
+			"found old module references in files:\n%s",
+			strings.Join(filesWithOldRefs, "\n"))
 	})
 
 	// Skip quality checks in integration test - they're validated in the main CI build job
@@ -203,17 +182,13 @@ func TestScaffoldInit(t *testing.T) {
 			cmd := exec.Command("go", "build", "-o", binaryName)
 			cmd.Dir = tmpDir
 			output, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("go build failed: %v\nOutput: %s", err, string(output))
-			}
+			require.NoError(t, err, "go build failed\nOutput: %s", string(output))
 		} else {
 			t.Logf("Running: task build")
 			cmd := exec.Command("task", "build")
 			cmd.Dir = tmpDir
 			output, err := cmd.CombinedOutput()
-			if err != nil {
-				t.Fatalf("task build failed: %v\nOutput: %s", err, string(output))
-			}
+			require.NoError(t, err, "task build failed\nOutput: %s", string(output))
 		}
 
 		// Verify binary exists (with .exe on Windows)
@@ -222,9 +197,8 @@ func TestScaffoldInit(t *testing.T) {
 			binaryName += ".exe"
 		}
 		binaryPath := filepath.Join(tmpDir, binaryName)
-		if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-			t.Errorf("Binary %s does not exist after build", binaryName)
-		}
+		_, err := os.Stat(binaryPath)
+		assert.False(t, os.IsNotExist(err), "binary %s should exist after build", binaryName)
 	})
 
 	// Run: ./testapp --version (binary works)
@@ -240,15 +214,11 @@ func TestScaffoldInit(t *testing.T) {
 		cmd := exec.Command(binaryPath, "--version")
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("Binary execution failed: %v\nOutput: %s", err, string(output))
-		}
+		require.NoError(t, err, "binary execution failed\nOutput: %s", string(output))
 
 		// Verify output contains binary name
-		if !strings.Contains(string(output), testName) {
-			t.Errorf("Binary output does not contain expected name %q\nOutput: %s",
-				testName, string(output))
-		}
+		assert.Contains(t, string(output), testName,
+			"binary output should contain expected name")
 	})
 }
 

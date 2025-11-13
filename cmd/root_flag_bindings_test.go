@@ -10,6 +10,8 @@ import (
 	"github.com/peiman/ckeletin-go/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // viperKeyToFlagName converts a viper key to its corresponding flag name.
@@ -47,9 +49,7 @@ func TestViperKeyToFlagName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.viperKey, func(t *testing.T) {
 			got := viperKeyToFlagName(tt.viperKey)
-			if got != tt.expected {
-				t.Errorf("viperKeyToFlagName(%q) = %q, want %q", tt.viperKey, got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got, "viperKeyToFlagName(%q) should return expected flag name", tt.viperKey)
 		})
 	}
 }
@@ -61,10 +61,8 @@ func TestBindFlags_FunctionExists(t *testing.T) {
 
 	// Test that bindFlags() function exists and returns an error type
 	err := bindFlags(RootCmd)
-	if err != nil {
-		// We expect no error when binding valid flags
-		t.Errorf("bindFlags() returned unexpected error: %v", err)
-	}
+	// We expect no error when binding valid flags
+	assert.NoError(t, err, "bindFlags() should not return error for valid flags")
 }
 
 // TestFlagBindings_RegistryDriven validates all flags from the config registry
@@ -74,9 +72,7 @@ func TestFlagBindings_RegistryDriven(t *testing.T) {
 
 	// Get all core options from registry
 	options := config.CoreOptions()
-	if len(options) == 0 {
-		t.Fatal("No options in registry - cannot test")
-	}
+	require.NotEmpty(t, options, "Registry should have options to test")
 
 	// Initialize root command (calls init() which defines flags)
 	// Note: RootCmd is package-level variable defined in root.go
@@ -94,18 +90,13 @@ func TestFlagBindings_RegistryDriven(t *testing.T) {
 
 			// 1. Verify flag exists in RootCmd
 			flag := RootCmd.PersistentFlags().Lookup(flagName)
-			if flag == nil {
-				t.Fatalf("Flag %q not found in RootCmd.PersistentFlags() for viper key %q",
-					flagName, opt.Key)
-			}
+			require.NotNil(t, flag, "Flag %q should exist in RootCmd.PersistentFlags() for viper key %q",
+				flagName, opt.Key)
 
 			// 2. Test that binding works (this calls bindFlags internally)
 			err := viper.BindPFlag(opt.Key, flag)
-			if err != nil {
-				t.Errorf("Failed to bind flag %q to viper key %q: %v",
-					flagName, opt.Key, err)
-				return
-			}
+			assert.NoError(t, err, "Failed to bind flag %q to viper key %q",
+				flagName, opt.Key)
 
 			// 3. Verify the binding exists
 			// After binding, setting the flag should update viper
@@ -123,46 +114,32 @@ func verifyDefaultValue(t *testing.T, opt config.ConfigOption, flagName string) 
 
 	// Get the flag to check its default value
 	flag := RootCmd.PersistentFlags().Lookup(flagName)
-	if flag == nil {
-		t.Fatal("Flag not found")
-	}
+	require.NotNil(t, flag, "Flag should exist")
 
 	// Check default value based on type
 	switch opt.Type {
 	case "string":
 		expected, ok := opt.DefaultValue.(string)
-		if !ok {
-			t.Fatalf("Registry default value for %s is not a string: %T", opt.Key, opt.DefaultValue)
-		}
+		require.True(t, ok, "Registry default value for %s should be a string, got %T", opt.Key, opt.DefaultValue)
 		got := flag.DefValue
-		if got != expected {
-			t.Errorf("Default value mismatch for %s (flag %s): expected %q, got %q",
-				opt.Key, flagName, expected, got)
-		}
+		assert.Equal(t, expected, got, "Default value mismatch for %s (flag %s)",
+			opt.Key, flagName)
 
 	case "bool":
 		expected, ok := opt.DefaultValue.(bool)
-		if !ok {
-			t.Fatalf("Registry default value for %s is not a bool: %T", opt.Key, opt.DefaultValue)
-		}
+		require.True(t, ok, "Registry default value for %s should be a bool, got %T", opt.Key, opt.DefaultValue)
 		got := flag.DefValue
 		expectedStr := fmt.Sprintf("%t", expected)
-		if got != expectedStr {
-			t.Errorf("Default value mismatch for %s (flag %s): expected %q, got %q",
-				opt.Key, flagName, expectedStr, got)
-		}
+		assert.Equal(t, expectedStr, got, "Default value mismatch for %s (flag %s)",
+			opt.Key, flagName)
 
 	case "int":
 		expected, ok := opt.DefaultValue.(int)
-		if !ok {
-			t.Fatalf("Registry default value for %s is not an int: %T", opt.Key, opt.DefaultValue)
-		}
+		require.True(t, ok, "Registry default value for %s should be an int, got %T", opt.Key, opt.DefaultValue)
 		got := flag.DefValue
 		expectedStr := fmt.Sprintf("%d", expected)
-		if got != expectedStr {
-			t.Errorf("Default value mismatch for %s (flag %s): expected %q, got %q",
-				opt.Key, flagName, expectedStr, got)
-		}
+		assert.Equal(t, expectedStr, got, "Default value mismatch for %s (flag %s)",
+			opt.Key, flagName)
 
 	default:
 		t.Errorf("Unknown type %q for option %s", opt.Type, opt.Key)
@@ -176,9 +153,7 @@ func TestBindFlags_AllFlagsHaveViperBinding(t *testing.T) {
 
 	// Call bindFlags to set up bindings
 	err := bindFlags(RootCmd)
-	if err != nil {
-		t.Fatalf("bindFlags() failed: %v", err)
-	}
+	require.NoError(t, err, "bindFlags() should succeed")
 
 	// Get expected flags from registry
 	options := config.CoreOptions()
@@ -226,20 +201,14 @@ func TestBindFlags_ErrorCollection(t *testing.T) {
 
 	// ASSERTION
 	// Should return an error indicating multiple bindings failed
-	if err == nil {
-		t.Fatal("bindFlags() should return error when flags don't exist")
-	}
+	require.Error(t, err, "bindFlags() should return error when flags don't exist")
 
 	// Verify error message contains information about failed bindings
 	errMsg := err.Error()
-	if !strings.Contains(errMsg, "failed to bind") {
-		t.Errorf("Error message should mention 'failed to bind', got: %v", errMsg)
-	}
+	assert.Contains(t, errMsg, "failed to bind", "Error message should mention 'failed to bind'")
 
 	// Verify it mentions the number of failures (14 flags total)
-	if !strings.Contains(errMsg, "14 flag(s)") {
-		t.Errorf("Error message should mention '14 flag(s)', got: %v", errMsg)
-	}
+	assert.Contains(t, errMsg, "14 flag(s)", "Error message should mention '14 flag(s)'")
 }
 
 // TestBindFlags_Integration tests the full flag binding flow
@@ -251,9 +220,7 @@ func TestBindFlags_Integration(t *testing.T) {
 	// 1. Flags are defined in init()
 	// 2. bindFlags() binds them to viper
 	err := bindFlags(RootCmd)
-	if err != nil {
-		t.Fatalf("bindFlags() failed: %v", err)
-	}
+	require.NoError(t, err, "bindFlags() should succeed")
 
 	// ASSERTION
 	// Verify a sample of flags are properly bound
@@ -271,9 +238,7 @@ func TestBindFlags_Integration(t *testing.T) {
 		t.Run(tc.viperKey, func(t *testing.T) {
 			// Check flag exists
 			flag := RootCmd.PersistentFlags().Lookup(tc.flagName)
-			if flag == nil {
-				t.Fatalf("Flag %q not found", tc.flagName)
-			}
+			require.NotNil(t, flag, "Flag %q should exist", tc.flagName)
 
 			// Verify binding by checking if viper key is accessible
 			// (the key should exist even if not explicitly set)
@@ -315,12 +280,10 @@ func TestBindFlags_FromSubcommand(t *testing.T) {
 	err := bindFlags(mockSubCmd)
 
 	// ASSERTION
-	if err != nil {
-		t.Fatalf("bindFlags(subcommand) failed: %v\n"+
+	require.NoError(t, err,
+		"bindFlags(subcommand) should succeed.\n"+
 			"This indicates bindFlags() is looking up flags on the subcommand instead of root.\n"+
-			"Ensure bindFlags() uses cmd.Root().PersistentFlags().Lookup() not cmd.PersistentFlags().Lookup()",
-			err)
-	}
+			"Ensure bindFlags() uses cmd.Root().PersistentFlags().Lookup() not cmd.PersistentFlags().Lookup()")
 
 	// Verify a sample of flags were actually bound
 	testCases := []struct {
@@ -336,22 +299,16 @@ func TestBindFlags_FromSubcommand(t *testing.T) {
 		t.Run(tc.flagName, func(t *testing.T) {
 			// Verify the flag exists on RootCmd (persistent flags)
 			flag := RootCmd.PersistentFlags().Lookup(tc.flagName)
-			if flag == nil {
-				t.Fatalf("Flag %q not found on RootCmd", tc.flagName)
-			}
+			require.NotNil(t, flag, "Flag %q should exist on RootCmd", tc.flagName)
 
 			// Verify it can be accessed via the subcommand's inherited flags
 			inheritedFlag := mockSubCmd.Flag(tc.flagName)
-			if inheritedFlag == nil {
-				t.Fatalf("Flag %q not inherited by subcommand", tc.flagName)
-			}
+			require.NotNil(t, inheritedFlag, "Flag %q should be inherited by subcommand", tc.flagName)
 
 			// Verify binding exists by manually binding and checking no error
 			// (In real execution, viper.BindPFlag is called inside bindFlags)
 			err := viper.BindPFlag(tc.viperKey, flag)
-			if err != nil {
-				t.Errorf("Failed to bind %q to %q: %v", tc.flagName, tc.viperKey, err)
-			}
+			assert.NoError(t, err, "Failed to bind %q to %q", tc.flagName, tc.viperKey)
 		})
 	}
 
