@@ -395,6 +395,12 @@ tasks:
     cmds:
       - ./scripts/validate-config-consumption.sh
 
+  validate:task-naming:
+    desc: Validate task names follow action:target pattern (enforces ADR-000)
+    silent: true
+    cmds:
+      - ./scripts/validate-task-naming.sh
+
   test:
     desc: Run tests with coverage
     silent: true
@@ -466,6 +472,38 @@ tasks:
     desc: Run benchmarks for logger package
     cmd: |
       go test -bench=. -benchmem ./internal/logger -run=^$
+
+  test:fuzz:
+    desc: Run all fuzz tests (default 10s per function)
+    summary: |
+      Runs fuzz tests to discover edge cases in config parsing and validation.
+
+      Fuzz tests are non-deterministic and can run indefinitely. This task runs
+      each fuzz test for 10 seconds by default. For longer fuzzing sessions:
+        task test:fuzz FUZZTIME=1m
+        task test:fuzz FUZZTIME=10m
+        task test:fuzz FUZZTIME=1h
+
+      Not included in 'task check' (manual/exploratory testing only).
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      echo "Running fuzz tests for $FUZZTIME each..."
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./internal/config
+      go test -fuzz=FuzzValidate -fuzztime=$FUZZTIME ./internal/config/validator
+      go test -fuzz=FuzzFindUnknownKeys -fuzztime=$FUZZTIME ./internal/config/validator
+      echo "✅ Fuzz testing completed"
+
+  test:fuzz:config:
+    desc: Run fuzz tests for config package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./internal/config
+
+  test:fuzz:validator:
+    desc: Run fuzz tests for validator package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=. -fuzztime=$FUZZTIME ./internal/config/validator
 
   bench:compare:
     desc: Compare benchmark results (requires benchstat)
@@ -583,6 +621,7 @@ tasks:
       - task: validate:defaults
       - task: validate:commands
       - task: validate:constants
+      - task: validate:task-naming
       - task: validate:architecture
       - task: validate:layering
       - task: validate:package-organization
@@ -598,6 +637,7 @@ tasks:
           category_header "Tests"
         silent: true
       - task: test
+      - task: test:race
       - task: check:summary
 
   check:

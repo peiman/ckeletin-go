@@ -215,3 +215,42 @@ func TestPingConfigDefaults(t *testing.T) {
 	// Default message is "Pong" as defined in ping_options.go
 	assert.Contains(t, got, "Pong", "Expected output to contain default message 'Pong'")
 }
+
+// TestRunPingWrapper tests the public runPing wrapper function to ensure 100% coverage.
+// This test verifies that the wrapper correctly instantiates the default UIRunner
+// and delegates to runPingWithUIRunner.
+func TestRunPingWrapper(t *testing.T) {
+	// SETUP PHASE: Reset viper and set defaults
+	viper.Reset()
+	config.SetDefaults()
+
+	// Create a command instance
+	cmd := &cobra.Command{
+		Use:  "ping",
+		RunE: runPing, // Use the actual wrapper, not the DI version
+	}
+
+	// Register flags
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+		"app.ping.output_message": "message",
+		"app.ping.output_color":   "color",
+		"app.ping.ui":             "ui",
+	})
+	require.NoError(t, err, "Failed to register flags")
+
+	// Set output buffer
+	outBuf := &bytes.Buffer{}
+	cmd.SetOut(outBuf)
+
+	// Set UI to false to avoid terminal UI in tests
+	err = cmd.Flags().Set("ui", "false")
+	require.NoError(t, err, "Failed to set ui flag")
+
+	// EXECUTION PHASE: Call runPing directly (not the DI version)
+	// This tests that the wrapper creates ui.NewDefaultUIRunner() correctly
+	err = runPing(cmd, []string{})
+
+	// ASSERTION PHASE: Should complete without error
+	assert.NoError(t, err, "runPing() wrapper should not return error")
+	assert.Contains(t, outBuf.String(), "Pong", "Output should contain default message")
+}

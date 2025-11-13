@@ -269,6 +269,37 @@ Where:
 - **action** is what you're doing (check, validate, test, generate, build, clean, format, bench)
 - **target** is what you're doing it to (a resource, variant, or modifier)
 
+### Automated Enforcement
+
+Task naming is **validated automatically** via `task validate:task-naming`:
+
+```bash
+$ task validate:task-naming
+🔍 Validating ADR-000: Task naming convention...
+✅ All tasks follow ADR-000 naming convention
+```
+
+If you create an invalid task name:
+
+```bash
+❌ Task 'fuzz': Standalone task not in allowed list
+   💡 Found similar tasks:
+      • test:fuzz
+      • test:fuzz:config
+   💡 Suggested fix: Use pattern 'test:fuzz'
+```
+
+**Where it runs:**
+- ✅ Local: `task check` (before every commit)
+- ✅ Pre-commit: Via lefthook hooks
+- ✅ CI: Part of quality gate pipeline
+
+**How it works:**
+- Parses all task names from Taskfile.yml
+- Validates action is from approved list
+- Provides smart suggestions using pattern matching
+- Detects typos (e.g., `tset:race` → suggests `test:race`)
+
 **Examples:**
 
 ```yaml
