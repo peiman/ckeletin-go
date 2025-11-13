@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestCompletionCommandRegistered tests that the completion command is properly registered
@@ -26,9 +28,7 @@ func TestCompletionCommandRegistered(t *testing.T) {
 	}
 
 	// ASSERTION PHASE
-	if !foundCompletion {
-		t.Error("completion command not found in RootCmd.Commands()")
-	}
+	assert.True(t, foundCompletion, "completion command should be registered in RootCmd")
 }
 
 // TestCompletionCommandMetadata tests the completion command's metadata
@@ -43,9 +43,7 @@ func TestCompletionCommandMetadata(t *testing.T) {
 		}
 	}
 
-	if completionCmd == nil {
-		t.Fatal("completion command not found")
-	}
+	require.NotNil(t, completionCmd, "completion command should be found")
 
 	// ASSERTION PHASE
 	tests := []struct {
@@ -87,16 +85,13 @@ func TestCompletionCommandMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !strings.Contains(strings.ToLower(tt.got), strings.ToLower(tt.contains)) {
-				t.Errorf("%s doesn't contain %q\nGot: %s", tt.name, tt.contains, tt.got)
-			}
+			assert.Contains(t, strings.ToLower(tt.got), strings.ToLower(tt.contains),
+				"%s should contain %q", tt.name, tt.contains)
 		})
 	}
 
 	// Test DisableFlagsInUseLine is true
-	if !completionCmd.DisableFlagsInUseLine {
-		t.Error("DisableFlagsInUseLine should be true")
-	}
+	assert.True(t, completionCmd.DisableFlagsInUseLine, "DisableFlagsInUseLine should be true")
 }
 
 // TestCompletionCommandExecution tests that the completion command generates output via RunE
@@ -129,13 +124,8 @@ func TestCompletionCommandExecution(t *testing.T) {
 				}
 			}
 
-			if completionCmd == nil {
-				t.Fatal("completion command not found")
-			}
-
-			if completionCmd.RunE == nil {
-				t.Fatal("completionCmd.RunE is nil")
-			}
+			require.NotNil(t, completionCmd, "completion command should be found")
+			require.NotNil(t, completionCmd.RunE, "completionCmd.RunE should be set")
 
 			// Capture output
 			var stdout bytes.Buffer
@@ -146,19 +136,20 @@ func TestCompletionCommandExecution(t *testing.T) {
 			err := completionCmd.RunE(completionCmd, tt.args)
 
 			// ASSERTION PHASE
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Expected error=%v, got error=%v", tt.wantErr, err)
+			if tt.wantErr {
+				assert.Error(t, err, "Should return error")
+			} else {
+				assert.NoError(t, err, "Should not return error")
 			}
 
 			output := stdout.String()
-			if tt.outputNotEmpty && output == "" {
-				t.Error("Expected non-empty output, got empty string")
+			if tt.outputNotEmpty {
+				assert.NotEmpty(t, output, "Output should not be empty")
 			}
 
 			for _, contains := range tt.outputContains {
-				if !strings.Contains(strings.ToLower(output), strings.ToLower(contains)) {
-					t.Errorf("Output doesn't contain %q\nOutput preview: %s...", contains, output[:min(100, len(output))])
-				}
+				assert.Contains(t, strings.ToLower(output), strings.ToLower(contains),
+					"Output should contain %q", contains)
 			}
 		})
 	}
@@ -184,14 +175,8 @@ func TestCompletionCommandRunE(t *testing.T) {
 		}
 	}
 
-	if completionCmd == nil {
-		t.Fatal("completion command not found")
-	}
-
-	// Verify RunE is set
-	if completionCmd.RunE == nil {
-		t.Fatal("completionCmd.RunE is nil")
-	}
+	require.NotNil(t, completionCmd, "completion command should be found")
+	require.NotNil(t, completionCmd.RunE, "completionCmd.RunE should be set")
 
 	// EXECUTION PHASE
 	var output bytes.Buffer
@@ -200,17 +185,12 @@ func TestCompletionCommandRunE(t *testing.T) {
 	err := completionCmd.RunE(completionCmd, []string{})
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Errorf("RunE should not return error, got: %v", err)
-	}
-
-	if output.Len() == 0 {
-		t.Error("RunE should generate completion output, got empty")
-	}
+	assert.NoError(t, err, "RunE should not return error")
+	assert.NotEmpty(t, output.String(), "RunE should generate completion output")
 
 	// Verify it's bash completion (default)
 	outputStr := output.String()
-	if !strings.Contains(outputStr, "bash") && !strings.Contains(outputStr, "completion") {
-		t.Errorf("Output doesn't look like bash completion script:\n%s", outputStr)
-	}
+	hasBash := strings.Contains(outputStr, "bash")
+	hasCompletion := strings.Contains(outputStr, "completion")
+	assert.True(t, hasBash || hasCompletion, "Output should look like bash completion script")
 }

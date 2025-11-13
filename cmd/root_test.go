@@ -17,6 +17,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInitConfig tests all cases related to the initConfig function in a table-driven format
@@ -141,24 +143,22 @@ func TestInitConfig(t *testing.T) {
 
 			// ASSERTION PHASE
 			// Check error expectations
-			if tt.expectedError && err == nil {
-				t.Errorf("Expected error, got nil")
-			} else if !tt.expectedError && err != nil {
-				t.Errorf("Expected no error, got: %v", err)
+			if tt.expectedError {
+				assert.Error(t, err, "initConfig should return error")
+			} else {
+				assert.NoError(t, err, "initConfig should not return error")
 			}
 
 			// Check error content if applicable
 			if tt.expectedErrContain != "" && err != nil {
-				if !strings.Contains(err.Error(), tt.expectedErrContain) {
-					t.Errorf("Expected error to contain '%s', got: %v", tt.expectedErrContain, err)
-				}
+				assert.Contains(t, err.Error(), tt.expectedErrContain,
+					"Error should contain expected string")
 			}
 
 			// Check config status if applicable
 			if tt.expectedStatus != "" && !tt.expectedError {
-				if !strings.Contains(configFileStatus, tt.expectedStatus) {
-					t.Errorf("Expected status to contain '%s', got: '%s'", tt.expectedStatus, configFileStatus)
-				}
+				assert.Contains(t, configFileStatus, tt.expectedStatus,
+					"Status should contain expected string")
 			}
 
 			// Run custom assertions if provided
@@ -189,9 +189,8 @@ func TestRootCmd_PersistentPreRunE_Errors(t *testing.T) {
 	err := RootCmd.PersistentPreRunE(cmd, args)
 
 	// Verify error is returned
-	if err == nil || err.Error() != "initConfig error" {
-		t.Errorf("Expected 'initConfig error', got %v", err)
-	}
+	require.Error(t, err, "Should return error")
+	assert.Equal(t, "initConfig error", err.Error(), "Error message should match")
 }
 
 // Test the specific status logging in PersistentPreRunE
@@ -733,30 +732,20 @@ func TestGetConfigValue_FlagErrors(t *testing.T) {
 			switch tt.expectedType {
 			case "string":
 				result := getConfigValueWithFlags[string](cmd, tt.flagName, tt.viperKey)
-				if result != tt.viperValue.(string) {
-					t.Errorf("Expected '%s', got '%s'", tt.viperValue, result)
-				}
+				assert.Equal(t, tt.viperValue.(string), result, "String value should match")
 			case "bool":
 				result := getConfigValueWithFlags[bool](cmd, tt.flagName, tt.viperKey)
-				if result != tt.viperValue.(bool) {
-					t.Errorf("Expected %v, got %v", tt.viperValue, result)
-				}
+				assert.Equal(t, tt.viperValue.(bool), result, "Bool value should match")
 			case "int":
 				result := getConfigValueWithFlags[int](cmd, tt.flagName, tt.viperKey)
-				if result != tt.viperValue.(int) {
-					t.Errorf("Expected %d, got %d", tt.viperValue, result)
-				}
+				assert.Equal(t, tt.viperValue.(int), result, "Int value should match")
 			case "float64":
 				result := getConfigValueWithFlags[float64](cmd, tt.flagName, tt.viperKey)
-				if result != tt.viperValue.(float64) {
-					t.Errorf("Expected %f, got %f", tt.viperValue, result)
-				}
+				assert.Equal(t, tt.viperValue.(float64), result, "Float64 value should match")
 			case "[]string":
 				result := getConfigValueWithFlags[[]string](cmd, tt.flagName, tt.viperKey)
 				expected := tt.viperValue.([]string)
-				if len(result) != len(expected) {
-					t.Errorf("Expected length %d, got %d", len(expected), len(result))
-				}
+				assert.Equal(t, len(expected), len(result), "Slice length should match")
 			}
 		})
 	}
@@ -814,24 +803,16 @@ func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
 			switch tt.requestedType {
 			case "string":
 				result := getConfigValueWithFlags[string](cmd, "str", "test.key")
-				if result != tt.expectedResult.(string) {
-					t.Errorf("Expected '%s', got '%s'", tt.expectedResult, result)
-				}
+				assert.Equal(t, tt.expectedResult.(string), result, "Should return zero value for type mismatch")
 			case "bool":
 				result := getConfigValueWithFlags[bool](cmd, "bool", "test.key")
-				if result != tt.expectedResult.(bool) {
-					t.Errorf("Expected %v, got %v", tt.expectedResult, result)
-				}
+				assert.Equal(t, tt.expectedResult.(bool), result, "Should return zero value for type mismatch")
 			case "int":
 				result := getConfigValueWithFlags[int](cmd, "int", "test.key")
-				if result != tt.expectedResult.(int) {
-					t.Errorf("Expected %d, got %d", tt.expectedResult, result)
-				}
+				assert.Equal(t, tt.expectedResult.(int), result, "Should return zero value for type mismatch")
 			case "float64":
 				result := getConfigValueWithFlags[float64](cmd, "float", "test.key")
-				if result != tt.expectedResult.(float64) {
-					t.Errorf("Expected %f, got %f", tt.expectedResult, result)
-				}
+				assert.Equal(t, tt.expectedResult.(float64), result, "Should return zero value for type mismatch")
 			}
 		})
 	}

@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunConfigValidate(t *testing.T) {
@@ -80,9 +82,8 @@ func TestRunConfigValidate(t *testing.T) {
 			// Create temp config file
 			tmpDir := t.TempDir()
 			configFile := filepath.Join(tmpDir, "config.yaml")
-			if err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms); err != nil {
-				t.Fatalf("Failed to create test config: %v", err)
-			}
+			err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms)
+			require.NoError(t, err, "Failed to create test config")
 
 			// Set up command
 			cmd := &cobra.Command{}
@@ -102,16 +103,18 @@ func TestRunConfigValidate(t *testing.T) {
 			}
 
 			// Execute
-			err := runConfigValidate(cmd, []string{})
+			err = runConfigValidate(cmd, []string{})
 
 			// Verify
-			if (err != nil) != tt.wantErr {
-				t.Errorf("runConfigValidate() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err, "runConfigValidate should return error")
+			} else {
+				assert.NoError(t, err, "runConfigValidate should not return error")
 			}
 
-			output_str := output.String()
-			if tt.wantOutputContain != "" && !strings.Contains(output_str, tt.wantOutputContain) {
-				t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContain, output_str)
+			if tt.wantOutputContain != "" {
+				assert.Contains(t, output.String(), tt.wantOutputContain,
+					"Output should contain expected string")
 			}
 		})
 	}
@@ -128,13 +131,9 @@ func TestRunConfigValidate_NonexistentFile(t *testing.T) {
 
 	err := runConfigValidate(cmd, []string{})
 
-	if err == nil {
-		t.Error("Expected error for nonexistent file")
-	}
-
-	if !strings.Contains(err.Error(), "validation failed") {
-		t.Errorf("Expected 'validation failed' error, got: %v", err)
-	}
+	require.Error(t, err, "Should return error for nonexistent file")
+	assert.Contains(t, err.Error(), "validation failed",
+		"Error should mention validation failed")
 }
 
 // TestConfigCommandRegistered tests that the config command is properly registered
@@ -150,9 +149,7 @@ func TestConfigCommandRegistered(t *testing.T) {
 	}
 
 	// ASSERTION PHASE
-	if !foundConfig {
-		t.Error("config command not found in RootCmd.Commands()")
-	}
+	assert.True(t, foundConfig, "config command should be registered in RootCmd")
 }
 
 // TestConfigCommandMetadata tests the config command's metadata and structure
@@ -166,9 +163,7 @@ func TestConfigCommandMetadata(t *testing.T) {
 		}
 	}
 
-	if configCmd == nil {
-		t.Fatal("config command not found")
-	}
+	require.NotNil(t, configCmd, "config command should be found")
 
 	// ASSERTION PHASE - test parent command metadata
 	tests := []struct {
@@ -195,9 +190,8 @@ func TestConfigCommandMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !strings.Contains(strings.ToLower(tt.got), strings.ToLower(tt.contains)) {
-				t.Errorf("%s doesn't contain %q\nGot: %s", tt.name, tt.contains, tt.got)
-			}
+			assert.Contains(t, strings.ToLower(tt.got), strings.ToLower(tt.contains),
+				"%s should contain %q", tt.name, tt.contains)
 		})
 	}
 }
@@ -213,9 +207,7 @@ func TestConfigValidateCommandRegistered(t *testing.T) {
 		}
 	}
 
-	if configCmd == nil {
-		t.Fatal("config command not found")
-	}
+	require.NotNil(t, configCmd, "config command should be found")
 
 	// EXECUTION & ASSERTION PHASE
 	var foundValidate bool
@@ -226,9 +218,7 @@ func TestConfigValidateCommandRegistered(t *testing.T) {
 		}
 	}
 
-	if !foundValidate {
-		t.Error("validate subcommand not found under config command")
-	}
+	assert.True(t, foundValidate, "validate subcommand should be registered under config command")
 }
 
 // TestConfigValidateCommandMetadata tests the validate subcommand's metadata
@@ -242,9 +232,7 @@ func TestConfigValidateCommandMetadata(t *testing.T) {
 		}
 	}
 
-	if configCmd == nil {
-		t.Fatal("config command not found")
-	}
+	require.NotNil(t, configCmd, "config command should be found")
 
 	var validateCmd *cobra.Command
 	for _, c := range configCmd.Commands() {
@@ -254,9 +242,7 @@ func TestConfigValidateCommandMetadata(t *testing.T) {
 		}
 	}
 
-	if validateCmd == nil {
-		t.Fatal("validate subcommand not found")
-	}
+	require.NotNil(t, validateCmd, "validate subcommand should be found")
 
 	// ASSERTION PHASE
 	tests := []struct {
@@ -293,16 +279,13 @@ func TestConfigValidateCommandMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !strings.Contains(strings.ToLower(tt.got), strings.ToLower(tt.contains)) {
-				t.Errorf("%s doesn't contain %q\nGot: %s", tt.name, tt.contains, tt.got)
-			}
+			assert.Contains(t, strings.ToLower(tt.got), strings.ToLower(tt.contains),
+				"%s should contain %q", tt.name, tt.contains)
 		})
 	}
 
 	// Verify RunE is set
-	if validateCmd.RunE == nil {
-		t.Error("validateCmd.RunE should not be nil")
-	}
+	assert.NotNil(t, validateCmd.RunE, "validateCmd.RunE should be set")
 }
 
 // TestConfigValidateCommandFlags tests that the validate command has correct flags
@@ -316,9 +299,7 @@ func TestConfigValidateCommandFlags(t *testing.T) {
 		}
 	}
 
-	if configCmd == nil {
-		t.Fatal("config command not found")
-	}
+	require.NotNil(t, configCmd, "config command should be found")
 
 	var validateCmd *cobra.Command
 	for _, c := range configCmd.Commands() {
@@ -328,29 +309,21 @@ func TestConfigValidateCommandFlags(t *testing.T) {
 		}
 	}
 
-	if validateCmd == nil {
-		t.Fatal("validate subcommand not found")
-	}
+	require.NotNil(t, validateCmd, "validate subcommand should be found")
 
 	// EXECUTION & ASSERTION PHASE
 	// Check that --file flag exists
 	fileFlag := validateCmd.Flags().Lookup("file")
-	if fileFlag == nil {
-		t.Fatal("--file flag not found")
-	}
+	require.NotNil(t, fileFlag, "--file flag should exist")
 
 	// Check flag shorthand
-	if fileFlag.Shorthand != "f" {
-		t.Errorf("Expected shorthand 'f', got '%s'", fileFlag.Shorthand)
-	}
+	assert.Equal(t, "f", fileFlag.Shorthand, "Flag shorthand should be 'f'")
 
 	// Check flag usage text
-	if !strings.Contains(fileFlag.Usage, "Config file") && !strings.Contains(fileFlag.Usage, "config file") {
-		t.Errorf("Flag usage doesn't mention config file: %s", fileFlag.Usage)
-	}
+	hasConfigFile := strings.Contains(fileFlag.Usage, "Config file") ||
+		strings.Contains(fileFlag.Usage, "config file")
+	assert.True(t, hasConfigFile, "Flag usage should mention config file")
 
 	// Check default value is empty
-	if fileFlag.DefValue != "" {
-		t.Errorf("Expected default value to be empty, got '%s'", fileFlag.DefValue)
-	}
+	assert.Empty(t, fileFlag.DefValue, "Default value should be empty")
 }
