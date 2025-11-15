@@ -86,6 +86,9 @@ jobs:
       - name: Verify Task Installation
         run: task --version
 
+      - name: Install Project Dependencies
+        run: task setup
+
       - name: Build
         run: task build
 

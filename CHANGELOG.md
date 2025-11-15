@@ -111,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed `go build -v ./...` → `task build`
   - Changed `go test -v -race ./...` → `task test:race` (Unix/macOS)
   - Changed `go test -v ./...` → `task test` (Windows)
+  - Added `task setup` step to install dev dependencies (gotestsum, etc.) before running tests
   - Ensures CI and local development use identical commands (Single Source of Truth)
 
 - **ADR-006 logging compliance**:
