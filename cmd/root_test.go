@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/logger"
@@ -17,6 +16,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInitConfig tests all cases related to the initConfig function in a table-driven format
@@ -141,24 +142,22 @@ func TestInitConfig(t *testing.T) {
 
 			// ASSERTION PHASE
 			// Check error expectations
-			if tt.expectedError && err == nil {
-				t.Errorf("Expected error, got nil")
-			} else if !tt.expectedError && err != nil {
-				t.Errorf("Expected no error, got: %v", err)
+			if tt.expectedError {
+				assert.Error(t, err, "initConfig should return error")
+			} else {
+				assert.NoError(t, err, "initConfig should not return error")
 			}
 
 			// Check error content if applicable
 			if tt.expectedErrContain != "" && err != nil {
-				if !strings.Contains(err.Error(), tt.expectedErrContain) {
-					t.Errorf("Expected error to contain '%s', got: %v", tt.expectedErrContain, err)
-				}
+				assert.Contains(t, err.Error(), tt.expectedErrContain,
+					"Error should contain expected string")
 			}
 
 			// Check config status if applicable
 			if tt.expectedStatus != "" && !tt.expectedError {
-				if !strings.Contains(configFileStatus, tt.expectedStatus) {
-					t.Errorf("Expected status to contain '%s', got: '%s'", tt.expectedStatus, configFileStatus)
-				}
+				assert.Contains(t, configFileStatus, tt.expectedStatus,
+					"Status should contain expected string")
 			}
 
 			// Run custom assertions if provided
@@ -189,9 +188,8 @@ func TestRootCmd_PersistentPreRunE_Errors(t *testing.T) {
 	err := RootCmd.PersistentPreRunE(cmd, args)
 
 	// Verify error is returned
-	if err == nil || err.Error() != "initConfig error" {
-		t.Errorf("Expected 'initConfig error', got %v", err)
-	}
+	require.Error(t, err, "Should return error")
+	assert.Equal(t, "initConfig error", err.Error(), "Error message should match")
 }
 
 // Test the specific status logging in PersistentPreRunE
@@ -234,12 +232,8 @@ func TestRootCmd_ConfigStatusLogging(t *testing.T) {
 					// This is the core of what we're testing:
 					if configFileStatus != "" {
 						// If we have config status, it should be logged appropriately
-						if tt.configStatus != configFileStatus {
-							t.Errorf("Expected status %q, got %q", tt.configStatus, configFileStatus)
-						}
-						if tt.configUsed != configFileUsed {
-							t.Errorf("Expected configUsed %q, got %q", tt.configUsed, configFileUsed)
-						}
+						assert.Equal(t, tt.configStatus, configFileStatus, "Status should match")
+						assert.Equal(t, tt.configUsed, configFileUsed, "ConfigUsed should match")
 					}
 					return nil
 				},
@@ -249,9 +243,7 @@ func TestRootCmd_ConfigStatusLogging(t *testing.T) {
 			err := mockCmd.PersistentPreRunE(mockCmd, []string{})
 
 			// ASSERTION PHASE
-			if err != nil {
-				t.Errorf("Mock command failed: %v", err)
-			}
+			assert.NoError(t, err, "Mock command should not fail")
 		})
 	}
 }
@@ -275,9 +267,8 @@ func TestExecute_ErrorPropagation(t *testing.T) {
 	err := Execute()
 
 	// ASSERTION PHASE
-	if err == nil || !strings.Contains(err.Error(), "some error") {
-		t.Errorf("Expected 'some error', got %v", err)
-	}
+	require.Error(t, err, "Execute should return error")
+	assert.Contains(t, err.Error(), "some error", "Error should contain 'some error'")
 }
 
 // TestConfigPaths tests the ConfigPaths function that returns the configuration paths
@@ -326,18 +317,9 @@ func TestConfigPaths(t *testing.T) {
 			paths := ConfigPaths()
 
 			// ASSERTION PHASE
-			if paths.DefaultName != tt.wantDefaultName {
-				t.Errorf("ConfigPaths().DefaultName = %v, want %v", paths.DefaultName, tt.wantDefaultName)
-			}
-
-			if paths.DefaultFullName != tt.wantDefaultFullName {
-				t.Errorf("ConfigPaths().DefaultFullName = %v, want %v", paths.DefaultFullName, tt.wantDefaultFullName)
-			}
-
-			// Check if the default path contains the expected file name
-			if !strings.Contains(paths.DefaultPath, tt.wantDefaultPathContains) {
-				t.Errorf("ConfigPaths().DefaultPath = %v, should contain %v", paths.DefaultPath, tt.wantDefaultPathContains)
-			}
+			assert.Equal(t, tt.wantDefaultName, paths.DefaultName, "ConfigPaths().DefaultName should match")
+			assert.Equal(t, tt.wantDefaultFullName, paths.DefaultFullName, "ConfigPaths().DefaultFullName should match")
+			assert.Contains(t, paths.DefaultPath, tt.wantDefaultPathContains, "ConfigPaths().DefaultPath should contain expected file name")
 		})
 	}
 }
@@ -401,9 +383,7 @@ func TestEnvPrefix(t *testing.T) {
 			prefix := EnvPrefix()
 
 			// ASSERTION PHASE
-			if prefix != tt.expectedPrefix {
-				t.Errorf("EnvPrefix() = %v, want %v", prefix, tt.expectedPrefix)
-			}
+			assert.Equal(t, tt.expectedPrefix, prefix, "EnvPrefix() should match expected prefix")
 		})
 	}
 }
@@ -469,15 +449,10 @@ func TestEnvironmentVariables(t *testing.T) {
 			err := initConfig()
 
 			// ASSERTION PHASE
-			if err != nil {
-				t.Fatalf("initConfig() failed: %v", err)
-			}
+			require.NoError(t, err, "initConfig() should not fail")
 
 			actualValue := viper.GetString(tt.viperKey)
-			if actualValue != tt.expectedValue {
-				t.Errorf("viper.GetString(%q) = %q, want %q",
-					tt.viperKey, actualValue, tt.expectedValue)
-			}
+			assert.Equal(t, tt.expectedValue, actualValue, "viper.GetString(%q) should match", tt.viperKey)
 		})
 	}
 }
@@ -506,14 +481,10 @@ func TestSetupCommandConfig(t *testing.T) {
 
 	// ASSERTION PHASE
 	// Verify original PreRunE was called
-	if !isOriginalCalled {
-		t.Error("Original PreRunE was not called")
-	}
+	assert.True(t, isOriginalCalled, "Original PreRunE should be called")
 
 	// No error should be returned
-	if err != nil {
-		t.Errorf("PreRunE returned unexpected error: %v", err)
-	}
+	assert.NoError(t, err, "PreRunE should not return error")
 
 	// Test with a command that has no PreRunE
 	cmdWithoutPreRun := &cobra.Command{Use: "test2"}
@@ -521,9 +492,7 @@ func TestSetupCommandConfig(t *testing.T) {
 
 	// Ensure it still works
 	err = cmdWithoutPreRun.PreRunE(cmdWithoutPreRun, []string{})
-	if err != nil {
-		t.Errorf("PreRunE returned unexpected error for command without original PreRunE: %v", err)
-	}
+	assert.NoError(t, err, "PreRunE should not return error for command without original PreRunE")
 
 	// Test with a command that returns an error in PreRunE
 	expectedErr := fmt.Errorf("test error")
@@ -537,9 +506,7 @@ func TestSetupCommandConfig(t *testing.T) {
 
 	// Run PreRunE and verify the error is propagated
 	err = cmdWithErrPreRun.PreRunE(cmdWithErrPreRun, []string{})
-	if err != expectedErr {
-		t.Errorf("Expected error %v, got %v", expectedErr, err)
-	}
+	assert.Equal(t, expectedErr, err, "PreRunE should propagate error")
 }
 
 // TestGetConfigValue_Types tests the getConfigValueWithFlags function with different types
@@ -566,83 +533,220 @@ func TestGetConfigValue_Types(t *testing.T) {
 	// EXECUTION & ASSERTION PHASE
 	// Test string type
 	strVal := getConfigValueWithFlags[string](cmd, "string", "test.string")
-	if strVal != "string-value" {
-		t.Errorf("Expected string value to be 'string-value', got '%s'", strVal)
-	}
+	assert.Equal(t, "string-value", strVal, "String value should match")
 
 	// Test bool type
 	boolVal := getConfigValueWithFlags[bool](cmd, "bool", "test.bool")
-	if boolVal != true {
-		t.Errorf("Expected bool value to be true, got %v", boolVal)
-	}
+	assert.True(t, boolVal, "Bool value should be true")
 
 	// Test int type
 	intVal := getConfigValueWithFlags[int](cmd, "int", "test.int")
-	if intVal != 42 {
-		t.Errorf("Expected int value to be 42, got %d", intVal)
-	}
+	assert.Equal(t, 42, intVal, "Int value should be 42")
 
 	// Test float type
 	floatVal := getConfigValueWithFlags[float64](cmd, "float", "test.float")
-	if floatVal != 3.14 {
-		t.Errorf("Expected float value to be 3.14, got %f", floatVal)
-	}
+	assert.Equal(t, 3.14, floatVal, "Float value should be 3.14")
 
 	// Test string slice type
 	sliceVal := getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
-	if len(sliceVal) != 3 || sliceVal[0] != "value1" || sliceVal[1] != "value2" || sliceVal[2] != "value3" {
-		t.Errorf("Expected string slice value to be [value1 value2 value3], got %v", sliceVal)
-	}
+	assert.Equal(t, []string{"value1", "value2", "value3"}, sliceVal, "String slice should match")
 
 	// Test overriding values with flags
-	if err := cmd.Flags().Set("string", "flag-value"); err != nil {
-		t.Fatalf("Failed to set string flag: %v", err)
-	}
-	if err := cmd.Flags().Set("bool", "false"); err != nil {
-		t.Fatalf("Failed to set bool flag: %v", err)
-	}
-	if err := cmd.Flags().Set("int", "99"); err != nil {
-		t.Fatalf("Failed to set int flag: %v", err)
-	}
-	if err := cmd.Flags().Set("float", "6.28"); err != nil {
-		t.Fatalf("Failed to set float flag: %v", err)
-	}
-	if err := cmd.Flags().Set("stringslice", "flag1,flag2,flag3,flag4"); err != nil {
-		t.Fatalf("Failed to set string slice flag: %v", err)
-	}
+	require.NoError(t, cmd.Flags().Set("string", "flag-value"), "Failed to set string flag")
+	require.NoError(t, cmd.Flags().Set("bool", "false"), "Failed to set bool flag")
+	require.NoError(t, cmd.Flags().Set("int", "99"), "Failed to set int flag")
+	require.NoError(t, cmd.Flags().Set("float", "6.28"), "Failed to set float flag")
+	require.NoError(t, cmd.Flags().Set("stringslice", "flag1,flag2,flag3,flag4"), "Failed to set string slice flag")
 
 	// Verify flag values override viper values
 	strVal = getConfigValueWithFlags[string](cmd, "string", "test.string")
-	if strVal != "flag-value" {
-		t.Errorf("Expected string flag value to be 'flag-value', got '%s'", strVal)
-	}
+	assert.Equal(t, "flag-value", strVal, "String flag value should override viper value")
 
 	boolVal = getConfigValueWithFlags[bool](cmd, "bool", "test.bool")
-	if boolVal != false {
-		t.Errorf("Expected bool flag value to be false, got %v", boolVal)
-	}
+	assert.False(t, boolVal, "Bool flag value should be false")
 
 	intVal = getConfigValueWithFlags[int](cmd, "int", "test.int")
-	if intVal != 99 {
-		t.Errorf("Expected int flag value to be 99, got %d", intVal)
-	}
+	assert.Equal(t, 99, intVal, "Int flag value should be 99")
 
 	floatVal = getConfigValueWithFlags[float64](cmd, "float", "test.float")
-	if floatVal != 6.28 {
-		t.Errorf("Expected float flag value to be 6.28, got %f", floatVal)
-	}
+	assert.Equal(t, 6.28, floatVal, "Float flag value should be 6.28")
 
 	// Verify string slice flag value overrides viper value
 	sliceVal = getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
 	expectedSlice := []string{"flag1", "flag2", "flag3", "flag4"}
-	if len(sliceVal) != len(expectedSlice) {
-		t.Errorf("Expected string slice flag length to be %d, got %d", len(expectedSlice), len(sliceVal))
-	} else {
-		for i, v := range expectedSlice {
-			if sliceVal[i] != v {
-				t.Errorf("Expected string slice flag value at index %d to be '%s', got '%s'", i, v, sliceVal[i])
+	assert.Equal(t, expectedSlice, sliceVal, "String slice flag should override viper value")
+}
+
+// TestGetConfigValue_FlagErrors tests error handling when flags are not properly configured
+func TestGetConfigValue_FlagErrors(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupFlags   func(*cobra.Command)
+		setFlag      bool
+		flagName     string
+		viperKey     string
+		viperValue   interface{}
+		expectedType string
+	}{
+		{
+			name: "String flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent",
+			viperKey:     "test.string",
+			viperValue:   "viper-value",
+			expectedType: "string",
+		},
+		{
+			name: "Bool flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-bool",
+			viperKey:     "test.bool",
+			viperValue:   true,
+			expectedType: "bool",
+		},
+		{
+			name: "Int flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-int",
+			viperKey:     "test.int",
+			viperValue:   42,
+			expectedType: "int",
+		},
+		{
+			name: "Float64 flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-float",
+			viperKey:     "test.float",
+			viperValue:   3.14,
+			expectedType: "float64",
+		},
+		{
+			name: "String slice flag not registered",
+			setupFlags: func(cmd *cobra.Command) {
+				// Don't register the flag
+			},
+			setFlag:      false,
+			flagName:     "nonexistent-slice",
+			viperKey:     "test.slice",
+			viperValue:   []string{"a", "b"},
+			expectedType: "[]string",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			viper.Reset()
+			viper.Set(tt.viperKey, tt.viperValue)
+
+			cmd := &cobra.Command{Use: "test"}
+			tt.setupFlags(cmd)
+
+			// Try to set the flag if requested (this will fail for nonexistent flags)
+			if tt.setFlag {
+				_ = cmd.Flags().Set(tt.flagName, "value")
 			}
-		}
+
+			// EXECUTION & ASSERTION PHASE
+			// These should fall back to viper values when flags don't exist
+			switch tt.expectedType {
+			case "string":
+				result := getConfigValueWithFlags[string](cmd, tt.flagName, tt.viperKey)
+				assert.Equal(t, tt.viperValue.(string), result, "String value should match")
+			case "bool":
+				result := getConfigValueWithFlags[bool](cmd, tt.flagName, tt.viperKey)
+				assert.Equal(t, tt.viperValue.(bool), result, "Bool value should match")
+			case "int":
+				result := getConfigValueWithFlags[int](cmd, tt.flagName, tt.viperKey)
+				assert.Equal(t, tt.viperValue.(int), result, "Int value should match")
+			case "float64":
+				result := getConfigValueWithFlags[float64](cmd, tt.flagName, tt.viperKey)
+				assert.Equal(t, tt.viperValue.(float64), result, "Float64 value should match")
+			case "[]string":
+				result := getConfigValueWithFlags[[]string](cmd, tt.flagName, tt.viperKey)
+				expected := tt.viperValue.([]string)
+				assert.Equal(t, len(expected), len(result), "Slice length should match")
+			}
+		})
+	}
+}
+
+// TestGetConfigValue_ViperTypeMismatch tests behavior when viper has wrong type
+func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
+	tests := []struct {
+		name           string
+		viperValue     interface{}
+		requestedType  string
+		expectedResult interface{}
+	}{
+		{
+			name:           "Viper has int, requesting string",
+			viperValue:     42,
+			requestedType:  "string",
+			expectedResult: "", // zero value
+		},
+		{
+			name:           "Viper has string, requesting bool",
+			viperValue:     "not-a-bool",
+			requestedType:  "bool",
+			expectedResult: false, // zero value
+		},
+		{
+			name:           "Viper has string, requesting int",
+			viperValue:     "not-an-int",
+			requestedType:  "int",
+			expectedResult: 0, // zero value
+		},
+		{
+			name:           "Viper has bool, requesting float64",
+			viperValue:     true,
+			requestedType:  "float64",
+			expectedResult: 0.0, // zero value
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			viper.Reset()
+			viper.Set("test.key", tt.viperValue)
+
+			// Create command without flags set
+			cmd := &cobra.Command{Use: "test"}
+			cmd.Flags().String("str", "", "")
+			cmd.Flags().Bool("bool", false, "")
+			cmd.Flags().Int("int", 0, "")
+			cmd.Flags().Float64("float", 0.0, "")
+
+			// EXECUTION & ASSERTION PHASE
+			// When viper has wrong type and flag not set, should return zero value
+			switch tt.requestedType {
+			case "string":
+				result := getConfigValueWithFlags[string](cmd, "str", "test.key")
+				assert.Equal(t, tt.expectedResult.(string), result, "Should return zero value for type mismatch")
+			case "bool":
+				result := getConfigValueWithFlags[bool](cmd, "bool", "test.key")
+				assert.Equal(t, tt.expectedResult.(bool), result, "Should return zero value for type mismatch")
+			case "int":
+				result := getConfigValueWithFlags[int](cmd, "int", "test.key")
+				assert.Equal(t, tt.expectedResult.(int), result, "Should return zero value for type mismatch")
+			case "float64":
+				result := getConfigValueWithFlags[float64](cmd, "float", "test.key")
+				assert.Equal(t, tt.expectedResult.(float64), result, "Should return zero value for type mismatch")
+			}
+		})
 	}
 }
 
@@ -700,27 +804,14 @@ func TestGetConfigValue_StringSlice(t *testing.T) {
 
 			// Set the flag if needed
 			if tt.setFlag {
-				if err := cmd.Flags().Set("stringslice", tt.flagValue); err != nil {
-					t.Fatalf("Failed to set string slice flag: %v", err)
-				}
+				require.NoError(t, cmd.Flags().Set("stringslice", tt.flagValue), "Failed to set string slice flag")
 			}
 
 			// EXECUTION PHASE
 			result := getConfigValueWithFlags[[]string](cmd, "stringslice", "test.stringslice")
 
 			// ASSERTION PHASE
-			if len(result) != len(tt.expectedResult) {
-				t.Errorf("Expected string slice length to be %d, got %d",
-					len(tt.expectedResult), len(result))
-				t.Errorf("Expected: %v, Got: %v", tt.expectedResult, result)
-				return
-			}
-
-			for i, v := range tt.expectedResult {
-				if result[i] != v {
-					t.Errorf("Expected value at index %d to be '%s', got '%s'", i, v, result[i])
-				}
-			}
+			assert.Equal(t, tt.expectedResult, result, "String slice should match expected result")
 		})
 	}
 }
@@ -751,9 +842,7 @@ func TestLoggingFlagBindings(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Verify flag exists in persistent flags
 			flag := RootCmd.PersistentFlags().Lookup(tt.flagName)
-			if flag == nil {
-				t.Errorf("Flag %s not found in RootCmd persistent flags", tt.flagName)
-			}
+			assert.NotNil(t, flag, "Flag %s should be found in RootCmd persistent flags", tt.flagName)
 		})
 	}
 }
@@ -808,9 +897,7 @@ func TestLoggingFlagsIntegration(t *testing.T) {
 
 			// EXECUTE
 			err := logger.Init(consoleBuf)
-			if err != nil {
-				t.Fatalf("Failed to initialize logger: %v", err)
-			}
+			require.NoError(t, err, "Failed to initialize logger")
 
 			// Log some messages
 			log.Debug().Msg("Debug message")
@@ -821,20 +908,16 @@ func TestLoggingFlagsIntegration(t *testing.T) {
 
 			// ASSERT
 			if tt.expectFileExists {
-				if _, err := os.Stat(tt.filePath); os.IsNotExist(err) {
-					t.Errorf("Expected log file to exist at %s", tt.filePath)
-				}
+				_, err := os.Stat(tt.filePath)
+				assert.False(t, os.IsNotExist(err), "Expected log file to exist at %s", tt.filePath)
 			} else {
-				if _, err := os.Stat(tt.filePath); !os.IsNotExist(err) {
-					t.Errorf("Expected log file NOT to exist at %s", tt.filePath)
-				}
+				_, err := os.Stat(tt.filePath)
+				assert.True(t, os.IsNotExist(err), "Expected log file NOT to exist at %s", tt.filePath)
 			}
 
 			// Verify console contains info message
 			consoleOutput := consoleBuf.String()
-			if !strings.Contains(consoleOutput, "Info message") {
-				t.Errorf("Console output should contain 'Info message'")
-			}
+			assert.Contains(t, consoleOutput, "Info message", "Console output should contain 'Info message'")
 		})
 	}
 }
@@ -878,13 +961,11 @@ func TestInitConfigWithoutHomeDir(t *testing.T) {
 
 	// ASSERTION PHASE
 	// Should NOT return error - app should work without HOME
-	if err != nil {
-		t.Errorf("initConfig should work without HOME environment variable, got error: %v", err)
-	}
+	assert.NoError(t, err, "initConfig should work without HOME environment variable")
 
 	// Should use defaults (no config file found is OK)
-	if err == nil && configFileStatus == "" {
-		t.Error("configFileStatus should be set even when no config file is found")
+	if err == nil {
+		assert.NotEmpty(t, configFileStatus, "configFileStatus should be set even when no config file is found")
 	}
 }
 
@@ -905,9 +986,7 @@ func TestConfigFromCurrentDirectory(t *testing.T) {
 	configContent := []byte("app:\n  log_level: debug\n")
 	configPath := filepath.Join(tempDir, ".ckeletin-go.yaml")
 	err := os.WriteFile(configPath, configContent, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write test config: %v", err)
-	}
+	require.NoError(t, err, "Failed to write test config")
 
 	// Save originals
 	origCfgFile := cfgFile
@@ -938,19 +1017,13 @@ func TestConfigFromCurrentDirectory(t *testing.T) {
 	err = initConfig()
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("initConfig should succeed with current directory config: %v", err)
-	}
+	require.NoError(t, err, "initConfig should succeed with current directory config")
 
 	// Should find config from current directory
-	if viper.GetString("app.log_level") != "debug" {
-		t.Errorf("Expected log_level='debug' from current dir config, got: %s", viper.GetString("app.log_level"))
-	}
+	assert.Equal(t, "debug", viper.GetString("app.log_level"), "Expected log_level='debug' from current dir config")
 
 	// Config file should be discovered
-	if !strings.Contains(configFileStatus, "Using config file") {
-		t.Errorf("Expected 'Using config file' status, got: %s", configFileStatus)
-	}
+	assert.Contains(t, configFileStatus, "Using config file", "Expected 'Using config file' status")
 }
 
 // TestConfigPriorityCurrentDirFirst tests that current directory config has priority over home directory
@@ -971,16 +1044,12 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 	homeConfigContent := []byte("app:\n  log_level: info\n")
 	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
 	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write home config: %v", err)
-	}
+	require.NoError(t, err, "Failed to write home config")
 
 	currentConfigContent := []byte("app:\n  log_level: debug\n")
 	currentConfig := filepath.Join(currentDir, ".ckeletin-go.yaml")
 	err = os.WriteFile(currentConfig, currentConfigContent, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write current dir config: %v", err)
-	}
+	require.NoError(t, err, "Failed to write current dir config")
 
 	// Save originals
 	origCfgFile := cfgFile
@@ -1012,19 +1081,15 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 	err = initConfig()
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("initConfig should succeed with both configs present: %v", err)
-	}
+	require.NoError(t, err, "initConfig should succeed with both configs present")
 
 	// Current directory config should win (debug, not info)
 	logLevel := viper.GetString("app.log_level")
-	if logLevel != "debug" {
-		t.Errorf("Expected log_level='debug' from current dir (priority), got: %s", logLevel)
-	}
+	assert.Equal(t, "debug", logLevel, "Expected log_level='debug' from current dir (priority)")
 
 	// Config file path should be from current directory
-	if configFileUsed != "" && !strings.Contains(configFileUsed, currentDir) {
-		t.Errorf("Expected config from current dir (%s), got: %s", currentDir, configFileUsed)
+	if configFileUsed != "" {
+		assert.Contains(t, configFileUsed, currentDir, "Expected config from current dir")
 	}
 }
 
@@ -1050,9 +1115,7 @@ func TestConfigFromHomeDirectoryOnly(t *testing.T) {
 	homeConfigContent := []byte("app:\n  log_level: warn\n")
 	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
 	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
-	if err != nil {
-		t.Fatalf("Failed to write home config: %v", err)
-	}
+	require.NoError(t, err, "Failed to write home config")
 
 	// Save originals
 	origCfgFile := cfgFile
@@ -1084,18 +1147,14 @@ func TestConfigFromHomeDirectoryOnly(t *testing.T) {
 	err = initConfig()
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("initConfig should succeed with home directory config: %v", err)
-	}
+	require.NoError(t, err, "initConfig should succeed with home directory config")
 
 	// Home directory config should be loaded
 	logLevel := viper.GetString("app.log_level")
-	if logLevel != "warn" {
-		t.Errorf("Expected log_level='warn' from home dir, got: %s", logLevel)
-	}
+	assert.Equal(t, "warn", logLevel, "Expected log_level='warn' from home dir")
 
 	// Config file path should be from home directory
-	if configFileUsed != "" && !strings.Contains(configFileUsed, homeDir) {
-		t.Errorf("Expected config from home dir (%s), got: %s", homeDir, configFileUsed)
+	if configFileUsed != "" {
+		assert.Contains(t, configFileUsed, homeDir, "Expected config from home dir")
 	}
 }

@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/docs"
@@ -13,6 +12,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRunDocsConfig tests the runDocsConfig function
@@ -72,21 +73,13 @@ func TestRunDocsConfig(t *testing.T) {
 
 			// ASSERTION PHASE
 			if tt.runErr {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if !strings.Contains(err.Error(), tt.expectedErr) {
-					t.Errorf("Expected error containing %q, got %q", tt.expectedErr, err.Error())
-				}
-			} else if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-			}
+				require.Error(t, err, "Expected error but got none")
+				assert.Contains(t, err.Error(), tt.expectedErr, "Error should contain expected message")
+			} else {
+				require.NoError(t, err, "Unexpected error")
 
-			// Verify that the output contains expected content for valid formats
-			if !tt.runErr {
-				// For non-error cases, check that we generated some output
-				if output.Len() == 0 {
-					t.Errorf("No output was generated")
-				}
+				// Verify that the output contains expected content for valid formats
+				assert.NotZero(t, output.Len(), "Output should not be empty for valid formats")
 			}
 		})
 	}
@@ -135,12 +128,11 @@ func TestDocsCommands(t *testing.T) {
 	configCmd.Flags().StringP("output", "o", "", "Output file (defaults to stdout)")
 
 	// Bind flags to Viper
-	if err := viper.BindPFlag("app.docs.output_format", configCmd.Flags().Lookup("format")); err != nil {
-		t.Fatalf("Failed to bind format flag: %v", err)
-	}
-	if err := viper.BindPFlag("app.docs.output_file", configCmd.Flags().Lookup("output")); err != nil {
-		t.Fatalf("Failed to bind output flag: %v", err)
-	}
+	err := viper.BindPFlag("app.docs.output_format", configCmd.Flags().Lookup("format"))
+	require.NoError(t, err, "Failed to bind format flag")
+
+	err = viper.BindPFlag("app.docs.output_file", configCmd.Flags().Lookup("output"))
+	require.NoError(t, err, "Failed to bind output flag")
 
 	// Set up command configuration inheritance
 	setupCommandConfig(configCmd)
@@ -148,52 +140,28 @@ func TestDocsCommands(t *testing.T) {
 	// EXECUTION PHASE
 	// Find the docs command
 	foundDocsCmd, _, err := RootCmd.Find([]string{"docs"})
-	if err != nil {
-		t.Fatalf("Expected to find docs command: %v", err)
-	}
+	require.NoError(t, err, "Expected to find docs command")
 
 	// Find the config subcommand
 	foundConfigCmd, _, err := RootCmd.Find([]string{"docs", "config"})
-	if err != nil {
-		t.Fatalf("Expected to find docs config command: %v", err)
-	}
+	require.NoError(t, err, "Expected to find docs config command")
 
 	// ASSERTION PHASE
 	// Check docs command properties
-	if foundDocsCmd.Use != "docs" {
-		t.Errorf("Expected docs command Use to be 'docs', got %s", foundDocsCmd.Use)
-	}
-	if foundDocsCmd.Short == "" {
-		t.Errorf("Docs command should have a Short description")
-	}
+	assert.Equal(t, "docs", foundDocsCmd.Use, "Docs command Use should be 'docs'")
+	assert.NotEmpty(t, foundDocsCmd.Short, "Docs command should have a Short description")
 
 	// Check config command properties
-	if foundConfigCmd.Use != "config" {
-		t.Errorf("Expected config command Use to be 'config', got %s", foundConfigCmd.Use)
-	}
-	if foundConfigCmd.Short == "" {
-		t.Errorf("Config command should have a Short description")
-	}
-	if foundConfigCmd.RunE == nil {
-		t.Errorf("Config command should have a RunE function")
-	}
+	assert.Equal(t, "config", foundConfigCmd.Use, "Config command Use should be 'config'")
+	assert.NotEmpty(t, foundConfigCmd.Short, "Config command should have a Short description")
+	assert.NotNil(t, foundConfigCmd.RunE, "Config command should have a RunE function")
 
 	// Check that format and output flags are registered
 	formatFlag := foundConfigCmd.Flags().Lookup("format")
-	if formatFlag == nil {
-		t.Errorf("format flag not found in config command")
-	} else {
-		if formatFlag.DefValue != docs.FormatMarkdown {
-			t.Errorf("format flag default value should be %s, got %s", docs.FormatMarkdown, formatFlag.DefValue)
-		}
-	}
+	require.NotNil(t, formatFlag, "format flag should be registered in config command")
+	assert.Equal(t, docs.FormatMarkdown, formatFlag.DefValue, "format flag default value should be markdown")
 
 	outputFlag := foundConfigCmd.Flags().Lookup("output")
-	if outputFlag == nil {
-		t.Errorf("output flag not found in config command")
-	} else {
-		if outputFlag.DefValue != "" {
-			t.Errorf("output flag default value should be empty, got %s", outputFlag.DefValue)
-		}
-	}
+	require.NotNil(t, outputFlag, "output flag should be registered in config command")
+	assert.Equal(t, "", outputFlag.DefValue, "output flag default value should be empty")
 }

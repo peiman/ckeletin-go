@@ -66,11 +66,22 @@ ckeletin-go/
 
 ## Writing Tests
 
+### ⚠️ IMPORTANT: All New Tests Must Use Testify
+
+**All new tests written after 2025-11-12 MUST use testify/assert or testify/require for assertions.**
+
+See "Using Testify for Assertions" section below for details.
+
 ### Table-Driven Tests (Recommended Pattern)
 
 Use table-driven tests for functions with multiple input/output scenarios:
 
 ```go
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+)
+
 func TestStringDefault(t *testing.T) {
     tests := []struct {
         name  string
@@ -97,9 +108,7 @@ func TestStringDefault(t *testing.T) {
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
             got := stringDefault(tt.input)
-            if got != tt.want {
-                t.Errorf("stringDefault() = %q, want %q", got, tt.want)
-            }
+            assert.Equal(t, tt.want, got, "stringDefault should convert value correctly")
         })
     }
 }
@@ -110,12 +119,19 @@ func TestStringDefault(t *testing.T) {
 - Easy to add new scenarios
 - Excellent debuggability (can run individual cases)
 - Self-documenting test intent
+- Clean assertions with testify
 
 ### SETUP-EXECUTION-ASSERTION Pattern
 
 Structure tests in three clear phases:
 
 ```go
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+)
+
 func TestFeature(t *testing.T) {
     // SETUP PHASE
     viper.Reset()
@@ -126,12 +142,8 @@ func TestFeature(t *testing.T) {
     result, err := FeatureUnderTest()
 
     // ASSERTION PHASE
-    if err != nil {
-        t.Errorf("FeatureUnderTest() unexpected error: %v", err)
-    }
-    if result != expected {
-        t.Errorf("FeatureUnderTest() = %v, want %v", result, expected)
-    }
+    assert.NoError(t, err, "FeatureUnderTest should not return error")
+    assert.Equal(t, expected, result, "FeatureUnderTest should return expected value")
 }
 ```
 
@@ -139,6 +151,7 @@ func TestFeature(t *testing.T) {
 - Clear separation of concerns
 - Easy to understand test flow
 - Easier to debug failures
+- Cleaner assertions with descriptive messages
 
 ### Using Testify for Assertions
 

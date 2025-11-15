@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/config"
@@ -14,6 +13,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestPingCommand tests the ping command integration with configuration
@@ -78,9 +79,8 @@ func TestPingCommand(t *testing.T) {
 			// SETUP PHASE: Reset viper, load fixture, and setup command
 			viper.Reset()
 			viper.SetConfigFile(tt.testFixturePath)
-			if err := viper.ReadInConfig(); err != nil {
-				t.Fatalf("Failed to load test fixture %s: %v", tt.testFixturePath, err)
-			}
+			err := viper.ReadInConfig()
+			require.NoError(t, err, "Failed to load test fixture %s", tt.testFixturePath)
 
 			// Create a new command instance for each test to avoid state pollution
 			cmd := &cobra.Command{
@@ -92,36 +92,33 @@ func TestPingCommand(t *testing.T) {
 			}
 
 			// Register flags
-			if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+			err = RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 				"app.ping.output_message": "message",
 				"app.ping.output_color":   "color",
 				"app.ping.ui":             "ui",
-			}); err != nil {
-				t.Fatalf("Failed to register flags: %v", err)
-			}
+			})
+			require.NoError(t, err, "Failed to register flags")
 
 			cmd.SetOut(tt.writer)
 			cmd.SetArgs(tt.args)
-			if err := cmd.ParseFlags(tt.args); err != nil {
-				t.Fatalf("Failed to parse flags: %v", err)
-			}
+			err = cmd.ParseFlags(tt.args)
+			require.NoError(t, err, "Failed to parse flags")
 
 			tt.writer.Reset()
 
 			// EXECUTION PHASE: Run the ping command
-			err := runPingWithUIRunner(cmd, []string{}, tt.mockRunner)
+			err = runPingWithUIRunner(cmd, []string{}, tt.mockRunner)
 
 			// ASSERTION PHASE: Check error and output
-			if (err != nil) != tt.wantErr {
-				t.Errorf("runPing() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				assert.Error(t, err, "runPing() should return error")
+			} else {
+				assert.NoError(t, err, "runPing() should not return error")
 			}
 
 			if !tt.wantErr && !viper.GetBool("app.ping.ui") {
 				got := tt.writer.String()
-				if got != tt.wantOutput {
-					t.Errorf("runPing() output = %q, want %q", got, tt.wantOutput)
-				}
+				assert.Equal(t, tt.wantOutput, got, "runPing() output mismatch")
 			}
 		})
 	}
@@ -147,48 +144,37 @@ func TestPingCommandFlags(t *testing.T) {
 	}
 
 	// Register flags
-	if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 		"app.ping.output_message": "message",
 		"app.ping.output_color":   "color",
 		"app.ping.ui":             "ui",
-	}); err != nil {
-		t.Fatalf("Failed to register flags: %v", err)
-	}
+	})
+	require.NoError(t, err, "Failed to register flags")
 
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 
 	// EXECUTION PHASE: No flags set, should use viper values
-	err := runPingWithUIRunner(cmd, []string{}, mockRunner)
-	if err != nil {
-		t.Fatalf("runPing() failed: %v", err)
-	}
+	err = runPingWithUIRunner(cmd, []string{}, mockRunner)
+	require.NoError(t, err, "runPing() failed")
 
 	// ASSERTION PHASE: Check that viper values were used
 	got := outBuf.String()
-	if !strings.Contains(got, "ConfigMessage") {
-		t.Errorf("Expected output to contain 'ConfigMessage', got %q", got)
-	}
+	assert.Contains(t, got, "ConfigMessage", "Expected output to contain 'ConfigMessage'")
 
 	// EXECUTION PHASE: Set flags, should override viper
-	if err := cmd.Flags().Set("message", "FlagMessage"); err != nil {
-		t.Fatalf("Failed to set message flag: %v", err)
-	}
-	if err := cmd.Flags().Set("color", "red"); err != nil {
-		t.Fatalf("Failed to set color flag: %v", err)
-	}
+	err = cmd.Flags().Set("message", "FlagMessage")
+	require.NoError(t, err, "Failed to set message flag")
+	err = cmd.Flags().Set("color", "red")
+	require.NoError(t, err, "Failed to set color flag")
 
 	outBuf.Reset()
 	err = runPingWithUIRunner(cmd, []string{}, mockRunner)
-	if err != nil {
-		t.Fatalf("runPing() with flags failed: %v", err)
-	}
+	require.NoError(t, err, "runPing() with flags failed")
 
 	// ASSERTION PHASE: Check that flag values were used
 	got = outBuf.String()
-	if !strings.Contains(got, "FlagMessage") {
-		t.Errorf("Expected output to contain 'FlagMessage', got %q", got)
-	}
+	assert.Contains(t, got, "FlagMessage", "Expected output to contain 'FlagMessage'")
 }
 
 // TestPingConfigDefaults ensures the default values from config registry are used
@@ -209,28 +195,62 @@ func TestPingConfigDefaults(t *testing.T) {
 	}
 
 	// Register flags
-	if err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
 		"app.ping.output_message": "message",
 		"app.ping.output_color":   "color",
 		"app.ping.ui":             "ui",
-	}); err != nil {
-		t.Fatalf("Failed to register flags: %v", err)
-	}
+	})
+	require.NoError(t, err, "Failed to register flags")
 
 	outBuf := &bytes.Buffer{}
 	cmd.SetOut(outBuf)
 
 	// EXECUTION PHASE: Run with defaults
-	err := runPingWithUIRunner(cmd, []string{}, mockRunner)
+	err = runPingWithUIRunner(cmd, []string{}, mockRunner)
 
 	// ASSERTION PHASE: Check that defaults were used
-	if err != nil {
-		t.Fatalf("runPing() failed: %v", err)
-	}
+	require.NoError(t, err, "runPing() failed")
 
 	got := outBuf.String()
 	// Default message is "Pong" as defined in ping_options.go
-	if !strings.Contains(got, "Pong") {
-		t.Errorf("Expected output to contain default message 'Pong', got %q", got)
+	assert.Contains(t, got, "Pong", "Expected output to contain default message 'Pong'")
+}
+
+// TestRunPingWrapper tests the public runPing wrapper function to ensure 100% coverage.
+// This test verifies that the wrapper correctly instantiates the default UIRunner
+// and delegates to runPingWithUIRunner.
+func TestRunPingWrapper(t *testing.T) {
+	// SETUP PHASE: Reset viper and set defaults
+	viper.Reset()
+	config.SetDefaults()
+
+	// Create a command instance
+	cmd := &cobra.Command{
+		Use:  "ping",
+		RunE: runPing, // Use the actual wrapper, not the DI version
 	}
+
+	// Register flags
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", map[string]string{
+		"app.ping.output_message": "message",
+		"app.ping.output_color":   "color",
+		"app.ping.ui":             "ui",
+	})
+	require.NoError(t, err, "Failed to register flags")
+
+	// Set output buffer
+	outBuf := &bytes.Buffer{}
+	cmd.SetOut(outBuf)
+
+	// Set UI to false to avoid terminal UI in tests
+	err = cmd.Flags().Set("ui", "false")
+	require.NoError(t, err, "Failed to set ui flag")
+
+	// EXECUTION PHASE: Call runPing directly (not the DI version)
+	// This tests that the wrapper creates ui.NewDefaultUIRunner() correctly
+	err = runPing(cmd, []string{})
+
+	// ASSERTION PHASE: Should complete without error
+	assert.NoError(t, err, "runPing() wrapper should not return error")
+	assert.Contains(t, outBuf.String(), "Pong", "Output should contain default message")
 }

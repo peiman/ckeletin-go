@@ -86,16 +86,19 @@ jobs:
       - name: Verify Task Installation
         run: task --version
 
+      - name: Install Project Dependencies
+        run: task setup
+
       - name: Build
-        run: go build -v ./...
+        run: task build
 
-      - name: Run Tests (Unix)
+      - name: Run Tests with Race Detection (Unix)
         if: runner.os != 'Windows'
-        run: go test -v -race ./...
+        run: task test:race
 
-      - name: Run Tests (Windows)
+      - name: Run Tests (Windows - no race detector)
         if: runner.os == 'Windows'
-        run: go test -v ./...
+        run: task test
 
   # Main build job with full quality checks (Linux only)
   build:

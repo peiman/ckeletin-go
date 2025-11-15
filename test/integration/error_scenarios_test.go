@@ -19,6 +19,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestConfigFileErrors tests error handling for config file issues
@@ -144,22 +147,17 @@ func TestConfigFileErrors(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			// Check error message
-			stderrOutput := stderr.String()
-			if tt.wantStderrContains != "" && !strings.Contains(stderrOutput, tt.wantStderrContains) {
-				t.Errorf("Stderr doesn't contain %q\nGot: %s", tt.wantStderrContains, stderrOutput)
+			if tt.wantStderrContains != "" {
+				stderrOutput := stderr.String()
+				assert.Contains(t, stderrOutput, tt.wantStderrContains,
+					"stderr should contain expected text")
 			}
 		})
 	}
@@ -209,24 +207,16 @@ func TestInvalidFlagValues(t *testing.T) {
 			err := cmd.Run()
 
 			// Check exit code
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstderr: %s",
-					exitCode, tt.wantExitCode, stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstderr: %s", stderr.String())
 
 			// Check error message if specified
 			if tt.wantStderrContains != "" {
 				stderrOutput := stderr.String()
-				if !strings.Contains(stderrOutput, tt.wantStderrContains) {
-					t.Errorf("Stderr doesn't contain %q\nGot: %s", tt.wantStderrContains, stderrOutput)
-				}
+				assert.Contains(t, stderrOutput, tt.wantStderrContains,
+					"stderr should contain expected text")
 			}
 		})
 	}
@@ -275,23 +265,16 @@ func TestInvalidCommands(t *testing.T) {
 
 			err := cmd.Run()
 
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 
 			if tt.wantStderrContains != "" {
 				combinedOutput := stdout.String() + stderr.String()
-				if !strings.Contains(combinedOutput, tt.wantStderrContains) {
-					t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantStderrContains, combinedOutput)
-				}
+				assert.Contains(t, combinedOutput, tt.wantStderrContains,
+					"output should contain expected text")
 			}
 		})
 	}
@@ -329,23 +312,15 @@ func TestDocumentationOutputErrors(t *testing.T) {
 
 			err := cmd.Run()
 
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstderr: %s",
-					exitCode, tt.wantExitCode, stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstderr: %s", stderr.String())
 
 			if tt.wantStderrContains != "" {
 				stderrOutput := stderr.String()
-				if !strings.Contains(stderrOutput, tt.wantStderrContains) {
-					t.Errorf("Stderr doesn't contain %q\nGot: %s", tt.wantStderrContains, stderrOutput)
-				}
+				assert.Contains(t, stderrOutput, tt.wantStderrContains,
+					"stderr should contain expected text")
 			}
 		})
 	}
@@ -373,18 +348,10 @@ func TestConfigPrecedenceWithErrors(t *testing.T) {
 		err := cmd.Run()
 
 		// Should fail due to invalid config
-		if err == nil {
-			t.Error("Expected command to fail with invalid config")
-		}
+		require.Error(t, err, "command should fail with invalid config")
 
-		exitCode := 0
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		}
-
-		if exitCode != 1 {
-			t.Errorf("Exit code = %d, want 1", exitCode)
-		}
+		exitCode := getExitCode(err)
+		assert.Equal(t, 1, exitCode, "exit code should be 1")
 	})
 
 	t.Run("Flag overrides everything even with config errors", func(t *testing.T) {
@@ -397,9 +364,7 @@ func TestConfigPrecedenceWithErrors(t *testing.T) {
 		err := cmd.Run()
 
 		// Should fail because config file is required when --config is specified
-		if err == nil {
-			t.Error("Expected command to fail with nonexistent config")
-		}
+		require.Error(t, err, "command should fail with nonexistent config")
 	})
 }
 
@@ -441,17 +406,11 @@ func TestEdgeCaseInputs(t *testing.T) {
 
 			err := cmd.Run()
 
-			exitCode := 0
-			if err != nil {
-				if exitErr, ok := err.(*exec.ExitError); ok {
-					exitCode = exitErr.ExitCode()
-				}
-			}
+			exitCode := getExitCode(err)
 
-			if exitCode != tt.wantExitCode {
-				t.Errorf("Exit code = %d, want %d\nstdout: %s\nstderr: %s",
-					exitCode, tt.wantExitCode, stdout.String(), stderr.String())
-			}
+			assert.Equal(t, tt.wantExitCode, exitCode,
+				"exit code mismatch\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
 		})
 	}
 }
@@ -486,8 +445,7 @@ func TestConcurrentCommandExecution(t *testing.T) {
 
 	// Collect results
 	for i := 0; i < numConcurrent; i++ {
-		if err := <-errChan; err != nil {
-			t.Errorf("Concurrent execution %d failed: %v", i, err)
-		}
+		err := <-errChan
+		assert.NoError(t, err, "concurrent execution %d should succeed", i)
 	}
 }

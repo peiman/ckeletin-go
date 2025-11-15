@@ -23,6 +23,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Anti-patterns to avoid
     - Integration testing patterns
     - ADR-003 compliance examples
+  - **Integrated race detection into quality checks**: `task check` now runs `test:race` automatically to catch concurrency bugs
+  - **Achieved 100% coverage on cmd/ package**: Added test for `runPing` wrapper function (cmd/ping_test.go:222-256)
+  - **Added ADR-000 task naming validator**: Automatically enforces `action:target` pattern
+    - New task: `task validate:task-naming` (integrated into `task check`)
+    - Provides smart suggestions for violations (e.g., "fuzz" → "Did you mean 'test:fuzz'?")
+    - Detects typos using pattern matching (e.g., "tset:race" → "Did you mean 'test:race'?")
+    - Prevents naming drift and guides contributors to correct patterns
+  - **Added fuzz testing for config parsing**:
+    - `FuzzValidateConfigValue` in internal/config/limits_test.go - tests string limits, nested structures, type conversions
+    - `FuzzValidate` in internal/config/validator/validator_test.go - end-to-end YAML parsing with malformed input
+    - `FuzzFindUnknownKeys` in internal/config/validator/validator_test.go - recursive key traversal with special characters
+    - New task commands: `task test:fuzz`, `task test:fuzz:config`, `task test:fuzz:validator`
+    - Configurable duration: `task test:fuzz FUZZTIME=1h` (default: 10s per function)
+    - Not included in `task check` (manual/exploratory testing only)
+  - **Enhanced `task doctor` with Go version compatibility checking**:
+    - Detects when dev tools (go-licenses, golangci-lint, gotestsum, govulncheck) were built with older Go version
+    - Shows warning with specific tools and their build versions: `⚠️ built with go1.25.3 (current: go1.25.4)`
+    - Suggests rebuild command: `task setup`
+    - Prevents compatibility issues (e.g., go-licenses failing with "package does not have module info" errors)
+    - Added documentation in CLAUDE.md about rebuilding tools after Go upgrades
 
 - **Automated scaffold initialization** (`task init`):
   - Single command to customize module path and binary name: `task init name=myapp module=github.com/myuser/myapp`
@@ -91,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added explicit permissions to lint-workflows.yml following principle of least privilege (CodeQL security recommendation)
 
 ### Fixed
+
+- **ADR-000 compliance in CI**:
+  - Updated test-matrix job in `.github/workflows/ci.yml` to use `task` commands instead of direct `go` commands
+  - Changed `go build -v ./...` → `task build`
+  - Changed `go test -v -race ./...` → `task test:race` (Unix/macOS)
+  - Changed `go test -v ./...` → `task test` (Windows)
+  - Added `task setup` step to install dev dependencies (gotestsum, etc.) before running tests
+  - Ensures CI and local development use identical commands (Single Source of Truth)
 
 - **ADR-006 logging compliance**:
   - Added missing `component` field to 5 log statements in `internal/ui/ui.go` (lines 51, 66, 79, 87, 103)

@@ -11,6 +11,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunConfigValidate(t *testing.T) {
@@ -80,9 +82,8 @@ func TestRunConfigValidate(t *testing.T) {
 			// Create temp config file
 			tmpDir := t.TempDir()
 			configFile := filepath.Join(tmpDir, "config.yaml")
-			if err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms); err != nil {
-				t.Fatalf("Failed to create test config: %v", err)
-			}
+			err := os.WriteFile(configFile, []byte(tt.configContent), tt.configPerms)
+			require.NoError(t, err, "Failed to create test config")
 
 			// Set up command
 			cmd := &cobra.Command{}
@@ -102,16 +103,18 @@ func TestRunConfigValidate(t *testing.T) {
 			}
 
 			// Execute
-			err := runConfigValidate(cmd, []string{})
+			err = runConfigValidate(cmd, []string{})
 
 			// Verify
-			if (err != nil) != tt.wantErr {
-				t.Errorf("runConfigValidate() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err, "runConfigValidate should return error")
+			} else {
+				assert.NoError(t, err, "runConfigValidate should not return error")
 			}
 
-			output_str := output.String()
-			if tt.wantOutputContain != "" && !strings.Contains(output_str, tt.wantOutputContain) {
-				t.Errorf("Output doesn't contain %q\nGot: %s", tt.wantOutputContain, output_str)
+			if tt.wantOutputContain != "" {
+				assert.Contains(t, output.String(), tt.wantOutputContain,
+					"Output should contain expected string")
 			}
 		})
 	}
@@ -128,11 +131,199 @@ func TestRunConfigValidate_NonexistentFile(t *testing.T) {
 
 	err := runConfigValidate(cmd, []string{})
 
-	if err == nil {
-		t.Error("Expected error for nonexistent file")
+	require.Error(t, err, "Should return error for nonexistent file")
+	assert.Contains(t, err.Error(), "validation failed",
+		"Error should mention validation failed")
+}
+
+// TestConfigCommandRegistered tests that the config command is properly registered
+func TestConfigCommandRegistered(t *testing.T) {
+	// SETUP & EXECUTION PHASE
+	// RootCmd should have config command as a child
+	var foundConfig bool
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "config" {
+			foundConfig = true
+			break
+		}
 	}
 
-	if !strings.Contains(err.Error(), "validation failed") {
-		t.Errorf("Expected 'validation failed' error, got: %v", err)
+	// ASSERTION PHASE
+	assert.True(t, foundConfig, "config command should be registered in RootCmd")
+}
+
+// TestConfigCommandMetadata tests the config command's metadata and structure
+func TestConfigCommandMetadata(t *testing.T) {
+	// SETUP PHASE
+	var configCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "config" {
+			configCmd = c
+			break
+		}
 	}
+
+	require.NotNil(t, configCmd, "config command should be found")
+
+	// ASSERTION PHASE - test parent command metadata
+	tests := []struct {
+		name     string
+		got      string
+		contains string
+	}{
+		{
+			name:     "Use field",
+			got:      configCmd.Use,
+			contains: "config",
+		},
+		{
+			name:     "Short description",
+			got:      configCmd.Short,
+			contains: "Configuration",
+		},
+		{
+			name:     "Long description",
+			got:      configCmd.Long,
+			contains: "configuration",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Contains(t, strings.ToLower(tt.got), strings.ToLower(tt.contains),
+				"%s should contain %q", tt.name, tt.contains)
+		})
+	}
+}
+
+// TestConfigValidateCommandRegistered tests that validate subcommand is registered
+func TestConfigValidateCommandRegistered(t *testing.T) {
+	// SETUP PHASE
+	var configCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "config" {
+			configCmd = c
+			break
+		}
+	}
+
+	require.NotNil(t, configCmd, "config command should be found")
+
+	// EXECUTION & ASSERTION PHASE
+	var foundValidate bool
+	for _, c := range configCmd.Commands() {
+		if c.Name() == "validate" {
+			foundValidate = true
+			break
+		}
+	}
+
+	assert.True(t, foundValidate, "validate subcommand should be registered under config command")
+}
+
+// TestConfigValidateCommandMetadata tests the validate subcommand's metadata
+func TestConfigValidateCommandMetadata(t *testing.T) {
+	// SETUP PHASE
+	var configCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "config" {
+			configCmd = c
+			break
+		}
+	}
+
+	require.NotNil(t, configCmd, "config command should be found")
+
+	var validateCmd *cobra.Command
+	for _, c := range configCmd.Commands() {
+		if c.Name() == "validate" {
+			validateCmd = c
+			break
+		}
+	}
+
+	require.NotNil(t, validateCmd, "validate subcommand should be found")
+
+	// ASSERTION PHASE
+	tests := []struct {
+		name     string
+		got      string
+		contains string
+	}{
+		{
+			name:     "Use field",
+			got:      validateCmd.Use,
+			contains: "validate",
+		},
+		{
+			name:     "Short description",
+			got:      validateCmd.Short,
+			contains: "Validate",
+		},
+		{
+			name:     "Long description mentions validation",
+			got:      validateCmd.Long,
+			contains: "validate",
+		},
+		{
+			name:     "Long description mentions security",
+			got:      validateCmd.Long,
+			contains: "security",
+		},
+		{
+			name:     "Example provided",
+			got:      validateCmd.Example,
+			contains: "config validate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Contains(t, strings.ToLower(tt.got), strings.ToLower(tt.contains),
+				"%s should contain %q", tt.name, tt.contains)
+		})
+	}
+
+	// Verify RunE is set
+	assert.NotNil(t, validateCmd.RunE, "validateCmd.RunE should be set")
+}
+
+// TestConfigValidateCommandFlags tests that the validate command has correct flags
+func TestConfigValidateCommandFlags(t *testing.T) {
+	// SETUP PHASE
+	var configCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "config" {
+			configCmd = c
+			break
+		}
+	}
+
+	require.NotNil(t, configCmd, "config command should be found")
+
+	var validateCmd *cobra.Command
+	for _, c := range configCmd.Commands() {
+		if c.Name() == "validate" {
+			validateCmd = c
+			break
+		}
+	}
+
+	require.NotNil(t, validateCmd, "validate subcommand should be found")
+
+	// EXECUTION & ASSERTION PHASE
+	// Check that --file flag exists
+	fileFlag := validateCmd.Flags().Lookup("file")
+	require.NotNil(t, fileFlag, "--file flag should exist")
+
+	// Check flag shorthand
+	assert.Equal(t, "f", fileFlag.Shorthand, "Flag shorthand should be 'f'")
+
+	// Check flag usage text
+	hasConfigFile := strings.Contains(fileFlag.Usage, "Config file") ||
+		strings.Contains(fileFlag.Usage, "config file")
+	assert.True(t, hasConfigFile, "Flag usage should mention config file")
+
+	// Check default value is empty
+	assert.Empty(t, fileFlag.DefValue, "Default value should be empty")
 }

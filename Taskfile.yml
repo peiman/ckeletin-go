@@ -63,10 +63,14 @@ tasks:
 
   doctor:
     desc: Check development environment and tool installation
+    silent: true
     cmds:
       - |
         echo "🔍 Checking development environment..."
         echo ""
+
+        # Get current Go version
+        CURRENT_GO_VERSION=$(go version | awk '{print $3}')
 
         # Go version
         echo "Go:"
@@ -81,32 +85,53 @@ tasks:
         # Development tools
         echo "Development Tools:"
 
-        echo "  goimports:"
-        which goimports > /dev/null && goimports --help > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        # Track if any tools need rebuilding
+        STALE_TOOLS=""
 
-        echo "  golangci-lint:"
-        which golangci-lint > /dev/null && golangci-lint version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        # Helper function to check tool and its Go build version
+        check_tool() {
+          local tool_name="$1"
+          local tool_path=$(which "$tool_name" 2>/dev/null)
 
-        echo "  gotestsum:"
-        which gotestsum > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          if [ -z "$tool_path" ]; then
+            echo "  $tool_name:"
+            echo "    ❌ not found (run: task setup)"
+            return
+          fi
 
-        echo "  govulncheck:"
-        which govulncheck > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          echo "  $tool_name:"
+          echo "    ✅ installed"
 
-        echo "  lefthook:"
-        which lefthook > /dev/null && lefthook version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          # Check Go build version for critical tools
+          if [[ "$tool_name" =~ ^(go-licenses|golangci-lint|gotestsum|govulncheck)$ ]]; then
+            local build_go_version=$(go version -m "$tool_path" 2>/dev/null | head -1 | awk '{print $2}')
 
-        echo "  go-mod-outdated:"
-        which go-mod-outdated > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+            if [ -n "$build_go_version" ] && [ "$build_go_version" != "$CURRENT_GO_VERSION" ]; then
+              echo "    ⚠️  built with $build_go_version (current: $CURRENT_GO_VERSION)"
+              STALE_TOOLS="$STALE_TOOLS\n      • $tool_name (built with $build_go_version)"
+            fi
+          fi
+        }
 
-        echo "  go-licenses:"
-        which go-licenses > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
-
-        echo "  lichen:"
-        which lichen > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        check_tool "goimports"
+        check_tool "golangci-lint"
+        check_tool "gotestsum"
+        check_tool "govulncheck"
+        check_tool "lefthook"
+        check_tool "go-mod-outdated"
+        check_tool "go-licenses"
+        check_tool "lichen"
 
         echo ""
-        echo "💡 If any tools are missing, run: task setup"
+
+        if [ -n "$STALE_TOOLS" ]; then
+          echo "⚠️  Warning: Some tools were built with older Go version"
+          echo -e "$STALE_TOOLS"
+          echo ""
+          echo "💡 Rebuild tools: task setup"
+        else
+          echo "💡 If any tools are missing, run: task setup"
+        fi
 
   init:
     desc: Initialize scaffold with custom name and module
@@ -395,6 +420,12 @@ tasks:
     cmds:
       - ./scripts/validate-config-consumption.sh
 
+  validate:task-naming:
+    desc: Validate task names follow action:target pattern (enforces ADR-000)
+    silent: true
+    cmds:
+      - ./scripts/validate-task-naming.sh
+
   test:
     desc: Run tests with coverage
     silent: true
@@ -466,6 +497,38 @@ tasks:
     desc: Run benchmarks for logger package
     cmd: |
       go test -bench=. -benchmem ./internal/logger -run=^$
+
+  test:fuzz:
+    desc: Run all fuzz tests (default 10s per function)
+    summary: |
+      Runs fuzz tests to discover edge cases in config parsing and validation.
+
+      Fuzz tests are non-deterministic and can run indefinitely. This task runs
+      each fuzz test for 10 seconds by default. For longer fuzzing sessions:
+        task test:fuzz FUZZTIME=1m
+        task test:fuzz FUZZTIME=10m
+        task test:fuzz FUZZTIME=1h
+
+      Not included in 'task check' (manual/exploratory testing only).
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      echo "Running fuzz tests for $FUZZTIME each..."
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./internal/config
+      go test -fuzz=FuzzValidate -fuzztime=$FUZZTIME ./internal/config/validator
+      go test -fuzz=FuzzFindUnknownKeys -fuzztime=$FUZZTIME ./internal/config/validator
+      echo "✅ Fuzz testing completed"
+
+  test:fuzz:config:
+    desc: Run fuzz tests for config package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./internal/config
+
+  test:fuzz:validator:
+    desc: Run fuzz tests for validator package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=. -fuzztime=$FUZZTIME ./internal/config/validator
 
   bench:compare:
     desc: Compare benchmark results (requires benchstat)
@@ -583,6 +646,7 @@ tasks:
       - task: validate:defaults
       - task: validate:commands
       - task: validate:constants
+      - task: validate:task-naming
       - task: validate:architecture
       - task: validate:layering
       - task: validate:package-organization
@@ -598,6 +662,7 @@ tasks:
           category_header "Tests"
         silent: true
       - task: test
+      - task: test:race
       - task: check:summary
 
   check:

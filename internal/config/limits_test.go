@@ -346,3 +346,62 @@ func TestValidateAllConfigValues(t *testing.T) {
 		})
 	}
 }
+
+// FuzzValidateConfigValue performs fuzz testing on ValidateConfigValue to discover
+// edge cases with arbitrary input values, deeply nested structures, and extreme sizes.
+// This helps ensure the validation logic is robust against unexpected input patterns.
+func FuzzValidateConfigValue(f *testing.F) {
+	// Seed corpus with interesting test cases
+	f.Add("test.key", "normal string")
+	f.Add("key", strings.Repeat("x", MaxStringValueLength))
+	f.Add("key", "")
+	f.Add("test.nested.key", "value")
+	f.Add("a.b.c.d.e.f", "deep nesting")
+
+	f.Fuzz(func(t *testing.T, key string, value string) {
+		// Skip empty keys as they're not realistic config keys
+		if key == "" {
+			t.Skip()
+		}
+
+		// Test with string value
+		err := ValidateConfigValue(key, value)
+
+		// We expect an error only if the string exceeds MaxStringValueLength
+		if len(value) > MaxStringValueLength {
+			if err == nil {
+				t.Errorf("Expected error for string length %d (max %d), got nil", len(value), MaxStringValueLength)
+			}
+		} else {
+			// Valid length strings should not error
+			if err != nil {
+				t.Errorf("Unexpected error for valid string length %d: %v", len(value), err)
+			}
+		}
+
+		// Test with nested map structure
+		nestedMap := map[string]interface{}{
+			"nested": value,
+			"count":  42,
+		}
+		err = ValidateConfigValue(key, nestedMap)
+
+		// Same validation: nested string value should follow same rules
+		if len(value) > MaxStringValueLength {
+			if err == nil {
+				t.Errorf("Expected error for nested string length %d (max %d), got nil", len(value), MaxStringValueLength)
+			}
+		}
+
+		// Test with slice containing the value
+		slice := []interface{}{value, "other"}
+		err = ValidateConfigValue(key, slice)
+
+		// Validate slice based on string length rules
+		if len(value) > MaxStringValueLength {
+			if err == nil {
+				t.Errorf("Expected error for string in slice with length %d (max %d), got nil", len(value), MaxStringValueLength)
+			}
+		}
+	})
+}
