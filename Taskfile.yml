@@ -63,10 +63,14 @@ tasks:
 
   doctor:
     desc: Check development environment and tool installation
+    silent: true
     cmds:
       - |
         echo "🔍 Checking development environment..."
         echo ""
+
+        # Get current Go version
+        CURRENT_GO_VERSION=$(go version | awk '{print $3}')
 
         # Go version
         echo "Go:"
@@ -81,32 +85,53 @@ tasks:
         # Development tools
         echo "Development Tools:"
 
-        echo "  goimports:"
-        which goimports > /dev/null && goimports --help > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        # Track if any tools need rebuilding
+        STALE_TOOLS=""
 
-        echo "  golangci-lint:"
-        which golangci-lint > /dev/null && golangci-lint version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        # Helper function to check tool and its Go build version
+        check_tool() {
+          local tool_name="$1"
+          local tool_path=$(which "$tool_name" 2>/dev/null)
 
-        echo "  gotestsum:"
-        which gotestsum > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          if [ -z "$tool_path" ]; then
+            echo "  $tool_name:"
+            echo "    ❌ not found (run: task setup)"
+            return
+          fi
 
-        echo "  govulncheck:"
-        which govulncheck > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          echo "  $tool_name:"
+          echo "    ✅ installed"
 
-        echo "  lefthook:"
-        which lefthook > /dev/null && lefthook version > /dev/null 2>&1 && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+          # Check Go build version for critical tools
+          if [[ "$tool_name" =~ ^(go-licenses|golangci-lint|gotestsum|govulncheck)$ ]]; then
+            local build_go_version=$(go version -m "$tool_path" 2>/dev/null | head -1 | awk '{print $2}')
 
-        echo "  go-mod-outdated:"
-        which go-mod-outdated > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+            if [ -n "$build_go_version" ] && [ "$build_go_version" != "$CURRENT_GO_VERSION" ]; then
+              echo "    ⚠️  built with $build_go_version (current: $CURRENT_GO_VERSION)"
+              STALE_TOOLS="$STALE_TOOLS\n      • $tool_name (built with $build_go_version)"
+            fi
+          fi
+        }
 
-        echo "  go-licenses:"
-        which go-licenses > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
-
-        echo "  lichen:"
-        which lichen > /dev/null && echo "    ✅ installed" || echo "    ❌ not found (run: task setup)"
+        check_tool "goimports"
+        check_tool "golangci-lint"
+        check_tool "gotestsum"
+        check_tool "govulncheck"
+        check_tool "lefthook"
+        check_tool "go-mod-outdated"
+        check_tool "go-licenses"
+        check_tool "lichen"
 
         echo ""
-        echo "💡 If any tools are missing, run: task setup"
+
+        if [ -n "$STALE_TOOLS" ]; then
+          echo "⚠️  Warning: Some tools were built with older Go version"
+          echo -e "$STALE_TOOLS"
+          echo ""
+          echo "💡 Rebuild tools: task setup"
+        else
+          echo "💡 If any tools are missing, run: task setup"
+        fi
 
   init:
     desc: Initialize scaffold with custom name and module

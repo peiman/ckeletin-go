@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - New task commands: `task test:fuzz`, `task test:fuzz:config`, `task test:fuzz:validator`
     - Configurable duration: `task test:fuzz FUZZTIME=1h` (default: 10s per function)
     - Not included in `task check` (manual/exploratory testing only)
+  - **Enhanced `task doctor` with Go version compatibility checking**:
+    - Detects when dev tools (go-licenses, golangci-lint, gotestsum, govulncheck) were built with older Go version
+    - Shows warning with specific tools and their build versions: `⚠️ built with go1.25.3 (current: go1.25.4)`
+    - Suggests rebuild command: `task setup`
+    - Prevents compatibility issues (e.g., go-licenses failing with "package does not have module info" errors)
+    - Added documentation in CLAUDE.md about rebuilding tools after Go upgrades
 
 - **Automated scaffold initialization** (`task init`):
   - Single command to customize module path and binary name: `task init name=myapp module=github.com/myuser/myapp`

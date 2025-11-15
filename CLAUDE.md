@@ -24,6 +24,25 @@ When you start a new session, development tools are automatically installed:
 
 **Important:** Tools install automatically via SessionStart hook. You'll see a success message when ready.
 
+### After Upgrading Go
+
+When upgrading Go versions (e.g., 1.25.3 → 1.25.4), rebuild dev tools to avoid compatibility issues:
+
+```bash
+task setup  # Rebuilds all dev tools with new Go version
+```
+
+**Why this matters:**
+- Dev tools (go-licenses, golangci-lint, etc.) are compiled Go binaries
+- They may be incompatible when compiled with an older Go version
+- Common symptom: `go-licenses` failing with "package does not have module info" errors
+- Solution: Rebuild tools with current Go version via `task setup`
+
+**Detecting stale tools:**
+```bash
+task doctor  # Checks if tools were built with older Go version
+```
+
 ### First Steps
 1. Read `Taskfile.yml` to understand available commands
 2. Review `README.md` for project overview
