@@ -447,6 +447,22 @@ tasks:
     cmd: |
       gotestsum --format pkgname -- -v -count=1 ./test/integration/...
 
+  test:golden:
+    desc: Test CLI output against golden files
+    dir: .
+    cmd: |
+      go test ./test/integration -v -run Golden
+
+  test:golden:update:
+    desc: Update golden files (MUST manually review changes!)
+    dir: .
+    cmds:
+      - GOLDEN_UPDATE=1 go test ./test/integration -run Golden
+      - echo ""
+      - echo "Review golden file changes before committing!"
+      - echo "Run git diff test/integration/testdata/"
+      - echo ""
+
   test:coverage:text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:
