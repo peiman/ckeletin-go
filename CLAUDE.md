@@ -392,6 +392,38 @@ func TestFeature(t *testing.T) {
 - Integration tests: `test/integration/`
 - Benchmarks: `*_bench_test.go`
 
+### Golden File Testing
+
+**Golden files** are "reference snapshots" of CLI output used to ensure consistency.
+
+**When to use golden files:**
+- Testing CLI output formatting that should stay consistent
+- Verifying user-facing messages and layouts
+- Ensuring the "neat and nice" restructured output stays that way
+
+**Commands:**
+```bash
+# Run golden file tests
+task test:golden
+
+# Update golden files after intentionally changing output
+task test:golden:update
+
+# IMPORTANT: Always review changes before committing!
+git diff test/integration/testdata/
+```
+
+**Workflow for updating output format:**
+1. Make changes to output script (e.g., `scripts/check-summary.sh`)
+2. Run `task test:golden:update` to regenerate golden files
+3. **CRITICAL:** Review changes with `git diff test/integration/testdata/`
+4. Verify changes match your intent
+5. Commit golden files WITH your code changes
+
+**⚠️ WARNING:** Never blindly update golden files without reviewing changes! Golden files are the "answer key" - if you update them without checking, you might be making wrong answers the new correct ones.
+
+**See [docs/testing.md](docs/testing.md) for comprehensive golden file testing documentation.**
+
 ## License Compliance
 
 **ckeletin-go uses automated license compliance checking to prevent legal issues.**
