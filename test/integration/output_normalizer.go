@@ -33,6 +33,21 @@ func NormalizeDurations(output string) string {
 	return durationPattern.ReplaceAllString(output, "X.XXs")
 }
 
+// NormalizeTempPaths replaces temporary directory paths with placeholders.
+// This prevents golden file tests from failing due to random temp directory names.
+// Example: /var/folders/.../TestScaffoldInit1234567890/001 -> /tmp/TEMP_DIR/001
+func NormalizeTempPaths(output string) string {
+	// Normalize macOS temp directories
+	tempPattern := regexp.MustCompile(`/var/folders/[^/]+/[^/]+/T/Test[^/]+\d+/(\d+)`)
+	normalized := tempPattern.ReplaceAllString(output, "/tmp/TEMP_DIR/$1")
+
+	// Normalize Linux temp directories
+	tempPattern2 := regexp.MustCompile(`/tmp/Test[^/]+\d+/(\d+)`)
+	normalized = tempPattern2.ReplaceAllString(normalized, "/tmp/TEMP_DIR/$1")
+
+	return normalized
+}
+
 // NormalizeCheckOutput applies all normalization functions to the output.
 // This is the main function used by golden file tests to ensure consistent,
 // environment-independent output for comparison.
@@ -42,5 +57,6 @@ func NormalizeCheckOutput(output string) string {
 	normalized = NormalizePaths(normalized)
 	normalized = NormalizeTimings(normalized)
 	normalized = NormalizeDurations(normalized)
+	normalized = NormalizeTempPaths(normalized)
 	return normalized
 }
