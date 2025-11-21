@@ -19,6 +19,10 @@ vars:
     -X '{{.MODULE_PATH}}/cmd.Date={{.DATE}}'
     "
 
+  # Test output file variables
+  TEST_OUTPUT_JSON: "test-output.json"
+  COVERAGE_TXT: "coverage.txt"
+
   # Pinned tool versions for reproducibility
   # Update these intentionally after testing - see docs/development.md
   TOOL_GOIMPORTS_VERSION: v0.28.0              # Formatting - pinned for Go 1.25.x compatibility
@@ -430,12 +434,24 @@ tasks:
     desc: Run tests with coverage
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -v -coverprofile=coverage.txt -covermode=atomic ./...
+      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:unit:
+    desc: Run unit tests only (skips integration tests)
+    silent: true
+    cmd: |
+      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
 
   test:race:
     desc: Run tests with race detection
     cmd: |
-      gotestsum --format standard-verbose --jsonfile test-output.json -- -v -race ./...
+      gotestsum --format standard-verbose --jsonfile {{.TEST_OUTPUT_JSON}} -- -v -race ./...
+
+  test:full:
+    desc: Run all tests with both race detection and coverage (optimized for CI/Check)
+    silent: true
+    cmd: |
+      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
 
   test:watch:
     desc: Run tests in watch mode
@@ -466,16 +482,16 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:
-      - gotestsum --format pkgname --jsonfile test-output.json --hide-summary=skipped -- -cover -coverprofile=coverage.txt -covermode=atomic ./...
+      - gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
       - echo "Detailed coverage report:"
-      - go tool cover -func=coverage.txt
+      - go tool cover -func={{.COVERAGE_TXT}}
     silent: false
 
   test:coverage:html:
     desc: Generate HTML coverage report and open in browser
     cmds:
       - task: test
-      - go tool cover -html=coverage.txt -o coverage.html
+      - go tool cover -html={{.COVERAGE_TXT}} -o coverage.html
       - echo "Coverage report saved to coverage.html"
       - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
     silent: true
@@ -639,7 +655,7 @@ tasks:
     desc: Display check summary (internal task)
     silent: true
     cmds:
-      - ./scripts/check-summary.sh
+      - CHECK_MODE={{.CHECK_MODE}} ./scripts/check-summary.sh
 
   check:common:
     desc: Common quality checks (internal task - SSOT for check list)
@@ -677,8 +693,7 @@ tasks:
           source scripts/lib/check-output.sh
           category_header "Tests"
         silent: true
-      - task: test
-      - task: test:race
+      - task: test:full
       - task: check:summary
 
   check:
@@ -707,6 +722,40 @@ tasks:
         silent: true
       - task: check:tools:installed
       - task: check:common
+
+  check:fast:
+    desc: Run fast quality checks (skip race detection and integration tests)
+    summary: |
+      Runs a subset of quality checks optimized for speed.
+
+      Skips:
+        - Race detection (slow)
+        - Integration tests (slow)
+        - License checks (slow)
+
+      Use this for rapid iteration. Always run 'task check' before committing.
+    cmds:
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Development Environment (Fast Mode)"
+        silent: true
+      - task: check:format
+      - task: lint
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: validate:task-naming
+      - task: validate:architecture
+      - task: validate:layering
+      - task: validate:package-organization
+      - task: validate:config-consumption
+      - cmd: |
+          source scripts/lib/check-output.sh
+          category_header "Tests (Unit Only)"
+        silent: true
+      - task: test:unit
+      - task: check:summary
+        vars: { CHECK_MODE: "fast" }
 
   check:ci:
     desc: Run all quality checks with strict tool version verification (CI workflow)
@@ -770,9 +819,9 @@ tasks:
       - go clean
       - |
         {{if eq OS "windows"}}
-        rm -f {{.BINARY_NAME}}.exe coverage.txt test-output.json coverage.html
+        rm -f {{.BINARY_NAME}}.exe {{.COVERAGE_TXT}} {{.TEST_OUTPUT_JSON}} coverage.html
         {{else}}
-        rm -f {{.BINARY_NAME}} coverage.txt test-output.json coverage.html
+        rm -f {{.BINARY_NAME}} {{.COVERAGE_TXT}} {{.TEST_OUTPUT_JSON}} coverage.html
         {{end}}
 
   clean:release:

@@ -9,7 +9,11 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 
 echo ""
 echo "$SEPARATOR"
-echo "✅ All checks passed (15/15)"
+if [ "$CHECK_MODE" = "fast" ]; then
+  echo "✅ All fast checks passed"
+else
+  echo "✅ All checks passed (15/15)"
+fi
 echo "$SEPARATOR"
 echo ""
 echo "✅ Development tools installed"
@@ -22,11 +26,17 @@ echo "✅ ADR-005: Config constants in sync"
 echo "✅ ADR-008: Architecture SSOT"
 echo "✅ ADR-009: Layered architecture"
 echo "✅ ADR-010: Package organization"
-echo "✅ Dependency integrity"
-echo "✅ No security vulnerabilities"
-echo "✅ License compliance (source)"
-echo "✅ License compliance (binary)"
-echo "✅ All tests passing"
+
+if [ "$CHECK_MODE" != "fast" ]; then
+  echo "✅ Dependency integrity"
+  echo "✅ No security vulnerabilities"
+  echo "✅ License compliance (source)"
+  echo "✅ License compliance (binary)"
+  echo "✅ All tests passing"
+else
+  echo "✅ Tests passing (unit only)"
+fi
+
 echo ""
 echo "$SEPARATOR"
 echo "🚀 Ready to commit!"
