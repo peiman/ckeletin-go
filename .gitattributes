@@ -1,0 +1,20 @@
+# Ensure consistent line endings across platforms
+
+# All text files should have LF line endings in the repository
+* text=auto
+
+# Golden test files must always use LF (Unix) line endings
+*.golden text eol=lf
+
+# Shell scripts should use LF
+*.sh text eol=lf
+
+# Go files should use LF
+*.go text eol=lf
+
+# Markdown and documentation
+*.md text eol=lf
+
+# YAML files
+*.yml text eol=lf
+*.yaml text eol=lf
