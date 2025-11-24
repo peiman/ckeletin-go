@@ -4,14 +4,22 @@
 
 **A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications.**
 
+<!-- Row 1: Build Quality & Security -->
 [![Build Status](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml/badge.svg)](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/codecov/c/github/peiman/ckeletin-go)](https://codecov.io/gh/peiman/ckeletin-go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/peiman/ckeletin-go)](https://goreportcard.com/report/github.com/peiman/ckeletin-go)
-[![Version](https://img.shields.io/github/v/release/peiman/ckeletin-go)](https://github.com/peiman/ckeletin-go/releases)
-[![Go Reference](https://pkg.go.dev/badge/github.com/peiman/ckeletin-go.svg)](https://pkg.go.dev/github.com/peiman/ckeletin-go)
-[![License](https://img.shields.io/github/license/peiman/ckeletin-go)](LICENSE)
 [![CodeQL](https://github.com/peiman/ckeletin-go/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/peiman/ckeletin-go/security/code-scanning)
-[![Made with Go](https://img.shields.io/badge/made%20with-Go-brightgreen.svg)](https://go.dev)
+
+<!-- Row 2: Project Metadata -->
+[![Version](https://img.shields.io/github/v/release/peiman/ckeletin-go)](https://github.com/peiman/ckeletin-go/releases)
+[![License](https://img.shields.io/github/license/peiman/ckeletin-go)](LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/peiman/ckeletin-go.svg)](https://pkg.go.dev/github.com/peiman/ckeletin-go)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/peiman/ckeletin-go)](https://github.com/peiman/ckeletin-go/blob/main/go.mod)
+
+<!-- Row 3: Community & Activity -->
+[![GitHub stars](https://img.shields.io/github/stars/peiman/ckeletin-go?style=social)](https://github.com/peiman/ckeletin-go/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/peiman/ckeletin-go)](https://github.com/peiman/ckeletin-go/commits/main)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 </div>
 
