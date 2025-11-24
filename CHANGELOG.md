@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Development-only commands with build tags (ADR-012)**:
+  - Added `dev` command tree (only available in dev builds with `-tags dev`)
+  - `dev config` - Configuration inspector:
+    - List all config options from registry
+    - Show effective configuration values
+    - Export config to JSON format
+    - Validate current configuration
+    - Search config by prefix
+  - `dev doctor` - Environment health checker:
+    - Verify required tools installed (task, golangci-lint, etc.)
+    - Check Go version compatibility
+    - Validate project structure
+    - Check git repository status
+    - Verify dependencies in sync
+  - New Task commands:
+    - `task build` - Now defaults to dev builds (BREAKING CHANGE)
+    - `task build:dev` - Explicit dev build
+    - `task build:prod` - Production build (previous `task build` behavior)
+    - `task test` - Now defaults to testing with dev commands
+    - `task test:dev` - Explicit dev testing
+    - `task test:prod` - Production testing (no dev commands)
+  - CI job `test-dev-prod` verifies build tag separation
+  - Production releases automatically exclude dev commands
+  - Colorized output via lipgloss (existing dependency)
+
 - **Golden file testing infrastructure**:
   - Added golden file testing for CLI output validation using [goldie/v2](https://github.com/sebdah/goldie)
   - Created output normalization utilities to ensure deterministic test results:
@@ -32,6 +57,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Recursion prevention for integration tests with `INSIDE_TASK_CHECK` environment variable
   - 100% test coverage for new integration test utilities
   - Golden file tests complement structure validation for defense-in-depth testing
+
+### Changed
+
+- **BREAKING: `task build` now defaults to dev builds**:
+  - `task build` creates dev builds with `-tags dev` (includes dev commands)
+  - Use `task build:prod` for production builds (previous behavior)
+  - Rationale: Developers need dev tools during local work; production builds are intentional
+  - **Migration**: Update scripts using `task build` for production to use `task build:prod`
+- **`task test` now includes dev command tests by default**:
+  - Tests run with `-tags dev` to test dev commands
+  - Use `task test:prod` to test without dev commands
 
 ## [0.8.0] - 2025-11-15
 

@@ -118,6 +118,7 @@ What becomes easier or more difficult to do because of this change?
 - [ADR-009](009-layered-architecture-pattern.md) - Layered Architecture Pattern
 - [ADR-010](010-package-organization-strategy.md) - Package Organization Strategy
 - [ADR-011](011-license-compliance.md) - License Compliance Strategy (Dual-Tool Approach)
+- [ADR-012](012-dev-commands-build-tags.md) - Build Tags for Dev-Only Commands
 
 ## Creating a New ADR
 
