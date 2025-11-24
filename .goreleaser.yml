@@ -25,6 +25,11 @@ project_name: ckeletin-go
 
 # Build configuration
 # Binary name automatically uses 'project_name' defined above
+#
+# IMPORTANT: Production builds only (dev commands excluded)
+# - No build tags specified = dev commands automatically excluded
+# - Dev builds use: go build -tags dev (adds dev config, dev doctor commands)
+# - Release binaries ship without dev tools for clean user experience
 builds:
   - main: ./main.go
 

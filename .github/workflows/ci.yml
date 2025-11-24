@@ -100,6 +100,76 @@ jobs:
         if: runner.os == 'Windows'
         run: task test
 
+  # Test dev vs prod builds to ensure build tags work correctly
+  test-dev-prod:
+    name: Test Dev/Prod Build Separation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go Modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-devprod-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-devprod-
+            ${{ runner.os }}-go-
+
+      - name: Download Dependencies
+        run: go mod download
+
+      - name: Install Task
+        run: |
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          curl -sL https://taskfile.dev/install.sh | sh -s -- -b "$INSTALL_DIR" v${{ env.TASK_VERSION }}
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+
+      - name: Install Project Dependencies
+        run: task setup
+
+      - name: Build Dev Binary
+        run: task build:dev
+
+      - name: Verify Dev Commands Exist
+        run: |
+          echo "Testing dev build..."
+          ./ckeletin-go dev --help > /dev/null
+          ./ckeletin-go dev config --help > /dev/null
+          ./ckeletin-go dev doctor --help > /dev/null
+          echo "✅ Dev commands exist in dev build"
+
+      - name: Run Tests with Dev Tag
+        run: task test:dev
+
+      - name: Build Production Binary
+        run: task build:prod
+
+      - name: Verify Dev Commands Hidden
+        run: |
+          echo "Testing production build..."
+          if ./ckeletin-go dev 2>&1 | grep -q "unknown command"; then
+            echo "✅ Dev commands hidden in production build"
+          else
+            echo "❌ Dev commands should not exist in production build"
+            exit 1
+          fi
+
+      - name: Run Tests without Dev Tag
+        run: task test:prod
+
   # Main build job with full quality checks (Linux only)
   build:
     runs-on: ubuntu-latest
