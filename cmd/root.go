@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -288,7 +289,8 @@ func initConfig() error {
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var configNotFoundErr viper.ConfigFileNotFoundError
+		if errors.As(err, &configNotFoundErr) {
 			configFileStatus = "No config file found, using defaults and environment variables"
 		} else {
 			// This error needs to be reported immediately

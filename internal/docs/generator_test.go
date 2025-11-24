@@ -221,12 +221,13 @@ func TestGenerate_BothGenerationAndCloseErrors(t *testing.T) {
 	}
 
 	// Verify error message contains both errors
+	// With errors.Join, both errors are included in the multi-error
 	errMsg := err.Error()
 	if !strings.Contains(errMsg, "generation failed") {
 		t.Errorf("Expected error to mention 'generation failed', got: %v", errMsg)
 	}
-	if !strings.Contains(errMsg, "close also failed") {
-		t.Errorf("Expected error to mention close failure, got: %v", errMsg)
+	if !strings.Contains(errMsg, "file close failed") {
+		t.Errorf("Expected error to mention file close failure, got: %v", errMsg)
 	}
 }
 

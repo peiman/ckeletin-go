@@ -178,7 +178,7 @@ func intDefault(v interface{}) int {
 		return int(t)
 	case uint:
 		// Check for overflow - uint can be larger than max int
-		maxInt := uint(^uint(0) >> 1)
+		maxInt := ^uint(0) >> 1
 		if t > maxInt {
 			log.Warn().
 				Uint("value", t).
