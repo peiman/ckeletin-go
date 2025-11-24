@@ -706,6 +706,7 @@ This table shows how the ADRs interact to create the overall architecture:
 | **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007, 010 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007), package structure (010) |
 | **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure (no pkg/, all in internal/), complements layering rules (009) |
 | **[ADR-011](011-license-compliance.md)** | License compliance | ADR-000, 008 | Dual-tool checking (go-licenses + lichen) enforced via task orchestrator (000), integrated with release process (008) |
+| **[ADR-012](012-dev-commands-build-tags.md)** | Dev commands | ADR-000, 001, 008 | Dev-only commands (config, doctor) excluded from production via build tags, uses task orchestrator (000), follows command pattern (001), excluded from releases (008) |
 
 ### Dependency Graph
 

@@ -1,5 +1,6 @@
 //go:build dev
 
+// ckeletin:allow-custom-command
 // cmd/dev_doctor.go
 //
 // Environment health checker subcommand (dev-only).

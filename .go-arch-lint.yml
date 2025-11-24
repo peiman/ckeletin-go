@@ -62,6 +62,7 @@ components:
     in:
       - internal/ping/**
       - internal/docs/**
+      - internal/dev/**
 
 # External dependencies (vendors from go.mod)
 vendors:

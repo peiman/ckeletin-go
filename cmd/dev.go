@@ -1,5 +1,6 @@
 //go:build dev
 
+// ckeletin:allow-custom-command
 // cmd/dev.go
 //
 // Development-only root command for dev tools.
