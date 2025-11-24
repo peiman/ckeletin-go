@@ -74,27 +74,6 @@ func TestNormalizeTimings(t *testing.T) {
 			expected: "Completed in X.XXs",
 		},
 		{
-			name:     "no timing to normalize",
-			input:    "Just some regular text",
-			expected: "Just some regular text",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeTimings(tt.input)
-			assert.Equal(t, tt.expected, got, "NormalizeTimings should normalize timings correctly")
-		})
-	}
-}
-
-func TestNormalizeDurations(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
 			name:     "took duration",
 			input:    "took 45.2s",
 			expected: "took X.XXs",
@@ -110,7 +89,7 @@ func TestNormalizeDurations(t *testing.T) {
 			expected: "Test completed, took X.XXs to finish",
 		},
 		{
-			name:     "no duration to normalize",
+			name:     "no timing to normalize",
 			input:    "Just some regular text",
 			expected: "Just some regular text",
 		},
@@ -118,8 +97,59 @@ func TestNormalizeDurations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NormalizeDurations(tt.input)
-			assert.Equal(t, tt.expected, got, "NormalizeDurations should normalize durations correctly")
+			got := NormalizeTimings(tt.input)
+			assert.Equal(t, tt.expected, got, "NormalizeTimings should normalize timings correctly")
+		})
+	}
+}
+
+func TestNormalizeTempPaths(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "macOS temp directory",
+			input:    "/var/folders/ab/cd1234567890/T/TestScaffoldInit1234567890/001",
+			expected: "/tmp/TEMP_DIR/001",
+		},
+		{
+			name:     "Linux temp directory",
+			input:    "/tmp/TestScaffoldInit1234567890/001",
+			expected: "/tmp/TEMP_DIR/001",
+		},
+		{
+			name:     "Windows temp directory with backslashes",
+			input:    `C:\Users\username\AppData\Local\Temp\TestScaffoldInit1234567890\001`,
+			expected: "/tmp/TEMP_DIR/001",
+		},
+		{
+			name:     "Windows temp directory with forward slashes",
+			input:    "C:/Users/username/AppData/Local/Temp/TestScaffoldInit1234567890/001",
+			expected: "/tmp/TEMP_DIR/001",
+		},
+		{
+			name:     "Windows temp directory with different drive letter",
+			input:    `D:\Users\testuser\AppData\Local\Temp\TestScaffoldInit9876543210\042`,
+			expected: "/tmp/TEMP_DIR/042",
+		},
+		{
+			name:     "multiple temp paths in output",
+			input:    "/tmp/TestScaffoldInit111/001 and /var/folders/xy/z9876543/T/TestScaffoldInit222/002",
+			expected: "/tmp/TEMP_DIR/001 and /tmp/TEMP_DIR/002",
+		},
+		{
+			name:     "no temp path to normalize",
+			input:    "Just some regular text",
+			expected: "Just some regular text",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeTempPaths(tt.input)
+			assert.Equal(t, tt.expected, got, "NormalizeTempPaths should normalize temp paths correctly")
 		})
 	}
 }

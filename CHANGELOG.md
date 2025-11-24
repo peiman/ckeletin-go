@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Golden file testing infrastructure**:
+  - Added golden file testing for CLI output validation using [goldie/v2](https://github.com/sebdah/goldie)
+  - Created output normalization utilities to ensure deterministic test results:
+    - `NormalizePaths()` - Converts absolute paths to relative paths
+    - `NormalizeTimings()` - Replaces timing values (1.23s → X.XXs)
+    - `NormalizeTempPaths()` - Normalizes temporary directory paths across platforms
+  - Added structure validation tests to verify task check output organization
+  - New task commands:
+    - `task test:golden` - Run golden file tests (~1 second)
+    - `task test:golden:update` - Update golden files with review reminder
+    - `task test:unit` - Run unit tests only (skips integration tests)
+    - `task test:full` - Run tests with both race detection and coverage (optimized for CI)
+    - `task check:fast` - Fast quality checks for rapid iteration (skips race detection, integration tests, and slow checks)
+  - Comprehensive testing documentation in `docs/testing.md`:
+    - Golden file testing workflow and best practices
+    - Structure validation testing approach
+    - Output normalization strategies
+    - Testing pyramid explanation
+    - Troubleshooting guide and FAQ
+  - Enhanced check summary script with fast mode support
+  - Recursion prevention for integration tests with `INSIDE_TASK_CHECK` environment variable
+  - 100% test coverage for new integration test utilities
+  - Golden file tests complement structure validation for defense-in-depth testing
+
 ## [0.8.0] - 2025-11-15
 
 ### Added

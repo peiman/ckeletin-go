@@ -16,6 +16,7 @@ func NormalizePaths(output string) string {
 
 // NormalizeTimings replaces timing values (e.g., "1.23s") with a placeholder.
 // This prevents golden file tests from failing due to performance variations.
+// Handles all duration patterns including: "Completed in 12.34s", "took 45.2s", etc.
 // Example: "Completed in 12.34s" -> "Completed in X.XXs"
 func NormalizeTimings(output string) string {
 	// Match patterns like: 0.001s, 1.23s, 123.45s
@@ -23,19 +24,14 @@ func NormalizeTimings(output string) string {
 	return timingPattern.ReplaceAllString(output, "X.XXs")
 }
 
-// NormalizeDurations replaces duration-related timing values with placeholders.
-// Similar to NormalizeTimings but catches timing patterns with context words.
-// Example: "took 45.2s" -> "took X.XXs"
-func NormalizeDurations(output string) string {
-	// This is redundant with NormalizeTimings but kept for semantic clarity
-	// Both functions normalize the same pattern
-	durationPattern := regexp.MustCompile(`\d+\.\d+s`)
-	return durationPattern.ReplaceAllString(output, "X.XXs")
-}
-
 // NormalizeTempPaths replaces temporary directory paths with placeholders.
 // This prevents golden file tests from failing due to random temp directory names.
-// Example: /var/folders/.../TestScaffoldInit1234567890/001 -> /tmp/TEMP_DIR/001
+// Supports macOS, Linux, and Windows temp directory patterns.
+//
+// Examples:
+//   - macOS: /var/folders/.../TestScaffoldInit1234567890/001 -> /tmp/TEMP_DIR/001
+//   - Linux: /tmp/TestScaffoldInit1234567890/001 -> /tmp/TEMP_DIR/001
+//   - Windows: C:\Users\...\AppData\Local\Temp\TestScaffoldInit1234567890\001 -> /tmp/TEMP_DIR/001
 func NormalizeTempPaths(output string) string {
 	// Normalize macOS temp directories
 	tempPattern := regexp.MustCompile(`/var/folders/[^/]+/[^/]+/T/Test[^/]+\d+/(\d+)`)
@@ -44,6 +40,12 @@ func NormalizeTempPaths(output string) string {
 	// Normalize Linux temp directories
 	tempPattern2 := regexp.MustCompile(`/tmp/Test[^/]+\d+/(\d+)`)
 	normalized = tempPattern2.ReplaceAllString(normalized, "/tmp/TEMP_DIR/$1")
+
+	// Normalize Windows temp directories
+	// Matches: C:\Users\username\AppData\Local\Temp\TestScaffoldInit1234567890\001
+	// Also handles: C:/Users/username/AppData/Local/Temp/... (forward slashes)
+	tempPattern3 := regexp.MustCompile(`[A-Za-z]:[/\\]Users[/\\][^/\\]+[/\\]AppData[/\\]Local[/\\]Temp[/\\]Test[^/\\]+\d+[/\\](\d+)`)
+	normalized = tempPattern3.ReplaceAllString(normalized, "/tmp/TEMP_DIR/$1")
 
 	return normalized
 }
@@ -56,7 +58,6 @@ func NormalizeCheckOutput(output string) string {
 	normalized := output
 	normalized = NormalizePaths(normalized)
 	normalized = NormalizeTimings(normalized)
-	normalized = NormalizeDurations(normalized)
 	normalized = NormalizeTempPaths(normalized)
 	return normalized
 }
