@@ -3,6 +3,7 @@
 package docs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -74,9 +75,9 @@ func (g *Generator) Generate() error {
 			log.Error().Err(closeErr).Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
 			// Handle both generation and close errors
 			if err != nil {
-				// Both errors occurred - wrap both for full context
+				// Both errors occurred - join them properly using errors.Join
 				log.Warn().Err(closeErr).Str("component", "docs").Msg("File close also failed after generation error")
-				return fmt.Errorf("generation failed: %w (note: file close also failed: %v)", err, closeErr)
+				return errors.Join(fmt.Errorf("generation failed: %w", err), fmt.Errorf("file close failed: %w", closeErr))
 			}
 			// Only close error - generation succeeded
 			return fmt.Errorf("failed to close output file: %w", closeErr)

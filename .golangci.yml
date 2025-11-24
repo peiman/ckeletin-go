@@ -24,10 +24,26 @@ linters:
 
     # Bugs & Correctness
     - bodyclose     # Unclosed HTTP response bodies
+    - nilerr        # Returns nil even when error is not nil
+    - nilnil        # Returns both nil error and nil value
+    - errorlint     # Error wrapping best practices (Go 1.13+)
+
+    # Context & Logging
+    - contextcheck  # Proper context propagation
+    - zerologlint   # Correct zerolog usage (must call .Send() or .Msg())
+
+    # Testing Best Practices
+    - testifylint   # Best practices for testify assertions
+    - thelper       # Test helpers must call t.Helper()
 
     # Code Quality
     - misspell      # Spelling mistakes
     - gocyclo       # Cyclomatic complexity
+    - unconvert     # Remove unnecessary type conversions
+    - usestdlibvars # Use stdlib constants instead of magic values
+    - whitespace    # Clean up unnecessary newlines (auto-fixable)
+    - reassign      # Prevents reassigning package variables
+    - predeclared   # Don't shadow Go predeclared identifiers
 
   # Disabled temporarily - too noisy for initial v2 adoption
   # Re-enable after addressing style issues incrementally
@@ -78,6 +94,9 @@ issues:
         - revive        # Style rules less critical in tests
         - gocritic      # Test patterns may differ from production
         - staticcheck   # Less critical in tests
+        - contextcheck  # Test contexts can be more flexible
+        - nilerr        # Test error patterns may differ
+        - nilnil        # Test return patterns may differ
 
     # Exclude strict linters from test directories
     - path: ^test/
@@ -87,6 +106,9 @@ issues:
         - revive
         - gocritic
         - staticcheck
+        - contextcheck
+        - nilerr
+        - nilnil
 
     # Exclude gosec for command files (often have subprocess calls)
     - path: ^cmd/
