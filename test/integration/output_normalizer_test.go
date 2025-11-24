@@ -103,6 +103,42 @@ func TestNormalizeTimings(t *testing.T) {
 	}
 }
 
+func TestNormalizeLineEndings(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Windows CRLF to Unix LF",
+			input:    "line1\r\nline2\r\nline3\r\n",
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name:     "Mixed line endings",
+			input:    "line1\r\nline2\nline3\r\n",
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name:     "Already Unix LF",
+			input:    "line1\nline2\nline3\n",
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name:     "No newlines",
+			input:    "single line",
+			expected: "single line",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NormalizeLineEndings(tt.input)
+			assert.Equal(t, tt.expected, got, "NormalizeLineEndings should normalize line endings correctly")
+		})
+	}
+}
+
 func TestNormalizeTempPaths(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -169,7 +205,8 @@ Test took 5.67s to finish`,
 			expected: `./internal/config/validator.go:26
 ✅ All checks passed (15/15)
 Completed in X.XXs
-Test took X.XXs to finish`,
+Test took X.XXs to finish
+`,
 		},
 		{
 			name: "multiple paths and timings",
@@ -178,17 +215,18 @@ Test took X.XXs to finish`,
 Tests completed in 45.2s, took 50.1s total`,
 			expected: `Error in ./cmd/root.go:10
 ./internal/logger/logger.go:20
-Tests completed in X.XXs, took X.XXs total`,
+Tests completed in X.XXs, took X.XXs total
+`,
 		},
 		{
 			name:     "empty string",
 			input:    "",
-			expected: "",
+			expected: "\n",
 		},
 		{
 			name:     "text with no normalizations needed",
 			input:    "Just some regular output text",
-			expected: "Just some regular output text",
+			expected: "Just some regular output text\n",
 		},
 	}
 

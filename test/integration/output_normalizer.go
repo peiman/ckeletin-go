@@ -2,6 +2,7 @@ package integration
 
 import (
 	"regexp"
+	"strings"
 )
 
 // NormalizePaths converts absolute paths to relative paths in the output.
@@ -50,14 +51,26 @@ func NormalizeTempPaths(output string) string {
 	return normalized
 }
 
+// NormalizeLineEndings normalizes line endings to Unix-style (LF).
+// This prevents golden file tests from failing due to Windows CRLF line endings.
+// Example: "line1\r\nline2\r\n" -> "line1\nline2\n"
+func NormalizeLineEndings(output string) string {
+	// Replace Windows CRLF with Unix LF
+	return strings.ReplaceAll(output, "\r\n", "\n")
+}
+
 // NormalizeCheckOutput applies all normalization functions to the output.
 // This is the main function used by golden file tests to ensure consistent,
 // environment-independent output for comparison.
 func NormalizeCheckOutput(output string) string {
 	// Apply normalizations in sequence
 	normalized := output
+	normalized = NormalizeLineEndings(normalized) // Normalize line endings first
 	normalized = NormalizePaths(normalized)
 	normalized = NormalizeTimings(normalized)
 	normalized = NormalizeTempPaths(normalized)
+
+	// Trim leading and trailing whitespace, then ensure exactly one trailing newline
+	normalized = strings.TrimSpace(normalized) + "\n"
 	return normalized
 }
