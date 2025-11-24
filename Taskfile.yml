@@ -431,7 +431,19 @@ tasks:
       - ./scripts/validate-task-naming.sh
 
   test:
-    desc: Run tests with coverage
+    desc: Run tests with coverage (dev build with dev commands - use test:prod for production)
+    silent: true
+    cmd: |
+      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:dev:
+    desc: Run tests with dev commands (explicit - same as 'task test')
+    silent: true
+    cmd: |
+      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:prod:
+    desc: Run tests without dev commands (production mode)
     silent: true
     cmd: |
       gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
@@ -787,7 +799,29 @@ tasks:
       - task: check:common
 
   build:
-    desc: Build the binary
+    desc: Build the binary (dev build with dev commands - use build:prod for production)
+    silent: true
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        go build -tags dev {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go > /dev/null 2>&1
+        {{else}}
+        go build -tags dev {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go > /dev/null 2>&1
+        {{end}}
+
+  build:dev:
+    desc: Build the binary with dev commands (explicit - same as 'task build')
+    silent: true
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        go build -tags dev {{.LDFLAGS}} -o {{.BINARY_NAME}}.exe main.go > /dev/null 2>&1
+        {{else}}
+        go build -tags dev {{.LDFLAGS}} -o {{.BINARY_NAME}} main.go > /dev/null 2>&1
+        {{end}}
+
+  build:prod:
+    desc: Build production binary without dev commands
     silent: true
     cmds:
       - |

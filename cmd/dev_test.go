@@ -47,17 +47,13 @@ func TestDevCommandHasSubcommands(t *testing.T) {
 
 func TestDevCommandHelp(t *testing.T) {
 	// SETUP PHASE
-	devCmd := findCommandByName(RootCmd, "dev")
-	assert.NotNil(t, devCmd, "Dev command must exist for this test")
-
-	// Set up output capture
 	buf := new(bytes.Buffer)
-	devCmd.SetOut(buf)
-	devCmd.SetErr(buf)
-	devCmd.SetArgs([]string{"--help"})
+	RootCmd.SetOut(buf)
+	RootCmd.SetErr(buf)
+	RootCmd.SetArgs([]string{"dev", "--help"})
 
 	// EXECUTION PHASE
-	err := devCmd.Execute()
+	err := RootCmd.Execute()
 
 	// ASSERTION PHASE
 	assert.NoError(t, err, "Help command should not return error")
@@ -65,21 +61,20 @@ func TestDevCommandHelp(t *testing.T) {
 	assert.Contains(t, output, "dev", "Help should mention dev command")
 	assert.Contains(t, output, "config", "Help should list config subcommand")
 	assert.Contains(t, output, "doctor", "Help should list doctor subcommand")
+
+	// Reset
+	RootCmd.SetArgs([]string{})
 }
 
 func TestDevCommandWithoutSubcommand(t *testing.T) {
 	// SETUP PHASE
-	devCmd := findCommandByName(RootCmd, "dev")
-	assert.NotNil(t, devCmd, "Dev command must exist for this test")
-
-	// Set up output capture
 	buf := new(bytes.Buffer)
-	devCmd.SetOut(buf)
-	devCmd.SetErr(buf)
-	devCmd.SetArgs([]string{})
+	RootCmd.SetOut(buf)
+	RootCmd.SetErr(buf)
+	RootCmd.SetArgs([]string{"dev"})
 
 	// EXECUTION PHASE
-	err := devCmd.Execute()
+	err := RootCmd.Execute()
 
 	// ASSERTION PHASE
 	// Running dev without subcommand should show help (or error asking for subcommand)
@@ -89,6 +84,9 @@ func TestDevCommandWithoutSubcommand(t *testing.T) {
 	assert.True(t,
 		err != nil || output != "",
 		"Should either error or show help when run without subcommand")
+
+	// Reset
+	RootCmd.SetArgs([]string{})
 }
 
 // Helper function to find a command by name in the command tree
