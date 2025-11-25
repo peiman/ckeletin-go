@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -333,6 +334,26 @@ func TestCheckToolLogic(t *testing.T) {
 		"Status should be either passed or failed")
 }
 
+func TestCheckToolNotFound(t *testing.T) {
+	// Test checkTool with a tool that definitely doesn't exist
+	t.Run("nonexistent tool", func(t *testing.T) {
+		// SETUP PHASE
+		doctor := NewDoctor()
+
+		// EXECUTION PHASE
+		// Use a tool name that definitely doesn't exist
+		doctor.checkTool("this-tool-definitely-does-not-exist-12345", "Nonexistent Tool")
+
+		// ASSERTION PHASE
+		results := doctor.GetResults()
+		assert.Len(t, results, 1, "Should have one check result")
+		assert.Equal(t, CheckFailed, results[0].Status,
+			"Should fail when tool not found")
+		assert.Contains(t, results[0].Message, "not found in PATH",
+			"Should report tool not found in PATH")
+	})
+}
+
 func TestCheckGoVersionLogic(t *testing.T) {
 	// Test the logic of checkGoVersion by calling it directly
 	doctor := NewDoctor()
@@ -399,6 +420,34 @@ func TestCheckDependenciesLogic(t *testing.T) {
 	assert.Equal(t, "Dependencies", results[0].Name,
 		"Should check dependencies")
 	// Status depends on go.mod state
+}
+
+func TestCheckDependenciesInNonGoDirectory(t *testing.T) {
+	// Test checkDependencies when not in a Go module directory
+	t.Run("missing go.mod", func(t *testing.T) {
+		// SETUP PHASE
+		doctor := NewDoctor()
+
+		// Save current dir and change to temp dir without go.mod
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err, "Should get current directory")
+		defer os.Chdir(currentDir) // Restore after test
+
+		tmpDir := t.TempDir()
+		err = os.Chdir(tmpDir)
+		assert.NoError(t, err, "Should change to temp directory")
+
+		// EXECUTION PHASE
+		doctor.checkDependencies()
+
+		// ASSERTION PHASE
+		results := doctor.GetResults()
+		assert.Len(t, results, 1, "Should have one check result")
+		assert.Equal(t, CheckFailed, results[0].Status,
+			"Should fail when go.mod missing")
+		assert.Contains(t, results[0].Message, "go.mod not found",
+			"Should report go.mod not found")
+	})
 }
 
 func TestDoctorIntegration(t *testing.T) {
