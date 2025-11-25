@@ -268,3 +268,37 @@ app:
 --log-sampling-initial 100
 --log-sampling-thereafter 10
 ```
+
+## Enforcement
+
+Structured logging is enforced through linter rules and architectural patterns:
+
+**1. Output Pattern Validation** (ADR-012)
+```bash
+task validate:output  # Checks business logic uses logger, not fmt.Print
+```
+- Detects `fmt.Print*` usage in `internal/*` packages
+- Business logic must use `log.Info()`, `log.Error()`, etc.
+
+**2. Linter Integration**
+- golangci-lint configured with rules discouraging direct printing
+- `forbidigo` linter can flag `fmt.Print*` in production code
+- Run via `task lint`
+
+**3. Centralized Initialization**
+- Logger initialized in `internal/logger/logger.go`
+- Global `log` variable configured with correct outputs
+- Cleanup function ensures resources released
+
+**4. Code Organization**
+- Infrastructure layer pattern makes logger natural choice
+- Direct stdout writes blocked by output validation
+- Structured logging is path of least resistance
+
+**5. Integration**
+- **Local**: `task lint` checks linter rules
+- **CI**: Full linting in quality pipeline
+- **Output validation**: `task validate:output` catches fmt.Print usage
+
+**Why No Dedicated `task validate:logging`:**
+Output pattern validation (ADR-012) already catches direct printing. Adding a separate logging validator would be redundant. The linter + output validation provide sufficient enforcement.

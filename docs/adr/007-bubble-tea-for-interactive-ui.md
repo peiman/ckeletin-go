@@ -99,6 +99,45 @@ func (m *mockUIRunner) RunUI(message, col string) error {
 **Survey** - Simpler but less flexible
 **Rejected because**: Bubble Tea offers more control and better UX
 
+## Enforcement
+
+**Status: N/A - Optional Pattern**
+
+Bubble Tea usage is intentionally optional and not enforced:
+
+**1. Opt-In Design**
+- Commands use `--ui` flag to enable interactive mode
+- Default is non-interactive (standard output)
+- User chooses when interactive UI is appropriate
+
+**2. Interface Abstraction**
+```go
+type UIRunner interface {
+    RunUI(message, color string) error
+}
+```
+- Interface allows alternative implementations
+- Commands depend on interface, not concrete type
+- Easy to swap UI frameworks if needed
+
+**3. Testing Support**
+- `internal/ui/mock.go` provides test implementation
+- No Bubble Tea dependency needed in tests
+- Interface-based testing per ADR-003
+
+**4. Why No Enforcement**
+- Interactive UI is feature enhancement, not requirement
+- Some commands don't need UI (batch processing, scripts)
+- Forcing UI would violate Unix philosophy
+- Pattern is "available" not "mandatory"
+
+**5. Related Validation**
+While Bubble Tea itself isn't enforced, output patterns are:
+```bash
+task validate:output  # Ensures proper output stream usage
+```
+This validates that commands use proper output methods (via ui package or stdout), but doesn't require interactive features.
+
 ## References
 - `internal/ui/ui.go` - UIRunner interface and implementation
 - `internal/ui/mock.go` - Test mock

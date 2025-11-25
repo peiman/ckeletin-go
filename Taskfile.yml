@@ -430,6 +430,12 @@ tasks:
     cmds:
       - ./scripts/validate-output-patterns.sh
 
+  validate:security:
+    desc: Validate security patterns (enforces ADR-004)
+    silent: true
+    cmds:
+      - ./scripts/validate-security-patterns.sh
+
   validate:task-naming:
     desc: Validate task names follow action:target pattern (enforces ADR-000)
     silent: true
@@ -702,6 +708,7 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
+      - task: validate:security
       - cmd: |
           source scripts/lib/check-output.sh
           category_header "Dependencies"

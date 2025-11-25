@@ -57,7 +57,45 @@ if err := config.ValidateConfigFileSecurity(path, config.MaxConfigFileSize); err
 - Clear error messages
 - Documentation of limits
 
+## Enforcement
+
+Security validation operates at two levels:
+
+**1. Runtime Validation (Application Load)**
+- `cmd/root.go` calls `config.ValidateConfigFileSecurity()` during initialization
+- Checks file permissions, size limits before loading
+- Application fails fast with clear error messages
+- Cannot bypass via environment variables or flags
+
+**2. Static Validation** (CI/Pre-commit)
+```bash
+task validate:security  # Validate security patterns in codebase
+task check             # Includes security validation
+```
+
+**What Gets Validated:**
+
+| Check | Description | Location |
+|-------|-------------|----------|
+| Constants defined | Security limit constants exist | `internal/config/limits.go` |
+| Validation called | Security validation invoked during init | `cmd/root.go` |
+| Functions exist | Security validation functions present | `internal/config/security.go` |
+| Test coverage | Error scenarios tested | `test/integration/error_scenarios_test.go` |
+
+**3. Integration Tests**
+- `test/integration/error_scenarios_test.go` verifies:
+  - World-writable file detection
+  - Oversized file rejection
+  - Invalid config value handling
+  - Clear error messages with remediation
+
+**4. Integration**
+- **Runtime**: Validation during config load (always)
+- **Local**: Part of `task check` (before commits)
+- **CI**: Runs in quality gate pipeline
+
 ## References
 - `internal/config/security.go` - Permission checks
 - `internal/config/limits.go` - Value size limits
 - `test/integration/error_scenarios_test.go` - Security tests
+- `scripts/validate-security-patterns.sh` - Static validation script

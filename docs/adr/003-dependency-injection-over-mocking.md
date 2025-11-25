@@ -55,6 +55,36 @@ func TestPing(t *testing.T) {
 - Manual interface implementation for tests
 - More code to write initially
 
+## Enforcement
+
+Dependency injection is enforced through multiple architectural layers rather than a dedicated validation script:
+
+**1. Layered Architecture Validation** (ADR-009)
+```bash
+task validate:layering  # Prevents business logic from importing CLI frameworks
+```
+- Business logic cannot import `cobra` or `cmd/`
+- Forces interface-based dependencies as consequence
+- go-arch-lint enforces separation automatically
+
+**2. Testing Requirements**
+- Minimum 80% coverage requirement
+- Interface-based code is naturally more testable
+- Coverage targets incentivize proper DI patterns
+
+**3. Code Organization**
+- `internal/ui/ui.go` defines `UIRunner` interface (not concrete type)
+- `internal/ui/mock.go` provides test implementation
+- Pattern demonstrated in reference implementations
+
+**4. Compile-Time Enforcement**
+- Go type system enforces interface contracts
+- Constructor functions require interface parameters
+- Misuse causes compile errors, not runtime failures
+
+**Why No Dedicated Script:**
+DI is enforced naturally through Go's type system and the layered architecture. Adding a script would duplicate what the compiler and go-arch-lint already verify. The pattern is "enforced by design" rather than "enforced by validation."
+
 ## References
 - `internal/ui/ui.go` - UIRunner interface
 - `internal/ui/mock.go` - Test implementation

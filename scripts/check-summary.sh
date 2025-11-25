@@ -12,7 +12,7 @@ echo "$SEPARATOR"
 if [ "$CHECK_MODE" = "fast" ]; then
   echo "✅ All fast checks passed"
 else
-  echo "✅ All checks passed (16/16)"
+  echo "✅ All checks passed (17/17)"
 fi
 echo "$SEPARATOR"
 echo ""
@@ -22,6 +22,7 @@ echo "✅ Linting"
 echo "✅ ADR-001: Ultra-thin command pattern"
 echo "✅ ADR-002: Config defaults in registry"
 echo "✅ ADR-002: Type-safe config consumption"
+echo "✅ ADR-004: Security patterns"
 echo "✅ ADR-005: Config constants in sync"
 echo "✅ ADR-008: Architecture SSOT"
 echo "✅ ADR-009: Layered architecture"

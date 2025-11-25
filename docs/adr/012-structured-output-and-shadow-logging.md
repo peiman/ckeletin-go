@@ -60,6 +60,32 @@ ui.RenderSuccess(cmd.OutOrStdout(), "User created", user)
 ### Negative
 - **Boilerplate**: Requires passing a `Renderer` or using `internal/ui` helper functions instead of simple `fmt.Println`.
 
+## Enforcement
+
+Output patterns are validated automatically via static analysis:
+
+**1. Validation Script**
+- `scripts/validate-output-patterns.sh` checks source code patterns
+- Detects direct `fmt.Print*` and `os.Stdout` usage in `internal/*`
+- Allows exceptions: `internal/ui/*` (UI implementation), `*_test.go` (tests)
+
+**2. Task Command**
+```bash
+task validate:output  # Checks output patterns
+task check           # Includes output validation
+```
+
+**3. What Gets Validated**
+- Business logic packages use `internal/ui` for Data Stream
+- Business logic packages use `internal/logger` for Status Stream
+- Fails on direct `fmt.Print*` in `internal/*` (except ui/)
+- Fails on direct `os.Stdout` writes in `internal/*` (except ui/)
+
+**4. Integration**
+- **Local**: Part of `task check` (before every commit)
+- **CI**: Runs in quality gate pipeline
+- **Pre-commit**: Via lefthook hooks
+
 ## Implementation
 
 - `internal/logger` defaults console output to `os.Stderr`.
