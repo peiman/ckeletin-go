@@ -424,6 +424,12 @@ tasks:
     cmds:
       - ./scripts/validate-config-consumption.sh
 
+  validate:output:
+    desc: Validate output patterns (enforces ADR-012)
+    silent: true
+    cmds:
+      - ./scripts/validate-output-patterns.sh
+
   validate:task-naming:
     desc: Validate task names follow action:target pattern (enforces ADR-000)
     silent: true
@@ -695,6 +701,7 @@ tasks:
       - task: validate:layering
       - task: validate:package-organization
       - task: validate:config-consumption
+      - task: validate:output
       - cmd: |
           source scripts/lib/check-output.sh
           category_header "Dependencies"
@@ -761,6 +768,7 @@ tasks:
       - task: validate:layering
       - task: validate:package-organization
       - task: validate:config-consumption
+      - task: validate:output
       - cmd: |
           source scripts/lib/check-output.sh
           category_header "Tests (Unit Only)"

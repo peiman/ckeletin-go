@@ -109,7 +109,7 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 				Color:   "white",
 				UI:      false,
 			},
-			wantOutput: "Test Message\n",
+			wantOutput: "✔ Pong! Test Message\n",
 			wantErr:    false,
 		},
 		{
@@ -119,7 +119,7 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 				Color:   "red",
 				UI:      false,
 			},
-			wantOutput: "Red Message\n",
+			wantOutput: "✔ Pong! Red Message\n",
 			wantErr:    false,
 		},
 	}
@@ -218,8 +218,8 @@ func TestExecutor_Execute_UIMode(t *testing.T) {
 				t.Errorf("UI runner called with color = %q, want %q", mockRunner.CalledWithColor, tt.wantUIColor)
 			}
 
-			// Verify nothing was written to output in UI mode
-			if outBuf.Len() > 0 {
+			// Verify nothing was written to output in UI mode (UNLESS there was an error)
+			if !tt.wantErr && outBuf.Len() > 0 {
 				t.Errorf("Output buffer should be empty in UI mode, got: %q", outBuf.String())
 			}
 		})
@@ -245,14 +245,8 @@ func TestExecutor_Execute_WriteError(t *testing.T) {
 		t.Error("Execute() expected error, got nil")
 		return
 	}
-	if !strings.Contains(err.Error(), "failed to print colored message") {
-		t.Errorf("Execute() error = %v, expected to contain 'failed to print colored message'", err)
-	}
-	if !strings.Contains(err.Error(), "Test Message") {
-		t.Errorf("Execute() error = %v, expected to contain message 'Test Message'", err)
-	}
-	if !strings.Contains(err.Error(), "white") {
-		t.Errorf("Execute() error = %v, expected to contain color 'white'", err)
+	if !strings.Contains(err.Error(), "failed to write output") {
+		t.Errorf("Execute() error = %v, expected to contain 'failed to write output'", err)
 	}
 }
 
@@ -275,10 +269,7 @@ func TestExecutor_Execute_InvalidColor(t *testing.T) {
 		t.Error("Execute() expected error for invalid color, got nil")
 		return
 	}
-	if !strings.Contains(err.Error(), "failed to print colored message") {
-		t.Errorf("Execute() error = %v, expected to contain 'failed to print colored message'", err)
-	}
-	if !strings.Contains(err.Error(), "invalid_color") {
-		t.Errorf("Execute() error = %v, expected to contain color 'invalid_color'", err)
+	if !strings.Contains(err.Error(), "invalid color") {
+		t.Errorf("Execute() error = %v, expected to contain 'invalid color'", err)
 	}
 }

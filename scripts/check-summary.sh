@@ -12,7 +12,7 @@ echo "$SEPARATOR"
 if [ "$CHECK_MODE" = "fast" ]; then
   echo "✅ All fast checks passed"
 else
-  echo "✅ All checks passed (15/15)"
+  echo "✅ All checks passed (16/16)"
 fi
 echo "$SEPARATOR"
 echo ""
@@ -26,6 +26,7 @@ echo "✅ ADR-005: Config constants in sync"
 echo "✅ ADR-008: Architecture SSOT"
 echo "✅ ADR-009: Layered architecture"
 echo "✅ ADR-010: Package organization"
+echo "✅ ADR-012: Output patterns"
 
 if [ "$CHECK_MODE" != "fast" ]; then
   echo "✅ Dependency integrity"

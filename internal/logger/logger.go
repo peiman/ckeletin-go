@@ -48,8 +48,9 @@ var (
 //	}
 //	defer logger.Cleanup()
 func Init(out io.Writer) error {
+	// Default to stderr for logging to avoid polluting stdout (Data Stream)
 	if out == nil {
-		out = os.Stdout
+		out = os.Stderr
 	}
 
 	// Store console writer for rebuilding

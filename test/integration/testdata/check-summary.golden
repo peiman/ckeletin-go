@@ -1,5 +1,5 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ All checks passed (15/15)
+✅ All checks passed (16/16)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ Development tools installed
@@ -12,6 +12,7 @@
 ✅ ADR-008: Architecture SSOT
 ✅ ADR-009: Layered architecture
 ✅ ADR-010: Package organization
+✅ ADR-012: Output patterns
 ✅ Dependency integrity
 ✅ No security vulnerabilities
 ✅ License compliance (source)
