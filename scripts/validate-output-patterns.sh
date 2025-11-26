@@ -26,6 +26,7 @@ VIOLATIONS=$(grep -r "fmt\.Print" internal/ \
   --include="*.go" \
   --exclude="*_test.go" \
   --exclude-dir="ui" \
+  --exclude-dir="progress" \
   --exclude-dir="logger" \
   --exclude-dir="testutil" \
   || true)
@@ -35,6 +36,7 @@ STDOUT_VIOLATIONS=$(grep -r "os\.Stdout" internal/ \
   --include="*.go" \
   --exclude="*_test.go" \
   --exclude-dir="ui" \
+  --exclude-dir="progress" \
   --exclude-dir="logger" \
   --exclude-dir="testutil" \
   || true)
