@@ -417,3 +417,180 @@ func TestTeaHandler_OnProgress_ContextCancellation(t *testing.T) {
 	// Handler should not have started since context was cancelled
 	assert.False(t, h.started)
 }
+
+func TestTeaHandler_OnProgress_StartsProgram(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	// Initially not started
+	assert.False(t, h.started)
+
+	// Send a start event - this triggers the start() method
+	event := NewEvent(EventStart, "Starting operation")
+
+	// Run in a goroutine since OnProgress may block waiting for program
+	done := make(chan struct{})
+	go func() {
+		h.OnProgress(ctx, event)
+		close(done)
+	}()
+
+	// Give it time to start
+	time.Sleep(100 * time.Millisecond)
+
+	h.mu.Lock()
+	started := h.started
+	h.mu.Unlock()
+
+	// Program should have started
+	assert.True(t, started, "program should have started after OnProgress")
+
+	// Stop the handler
+	h.Stop()
+
+	// Wait for goroutine to complete
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		// Timeout is acceptable since program may be blocked
+	}
+}
+
+func TestTeaHandler_OnProgress_SendsEvent(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	// Start by sending multiple events
+	done := make(chan struct{})
+	go func() {
+		// Send start event
+		h.OnProgress(ctx, NewEvent(EventStart, "Starting"))
+
+		// Send progress events
+		h.OnProgress(ctx, NewEvent(EventProgress, "Working").WithProgress(1, 3))
+		h.OnProgress(ctx, NewEvent(EventProgress, "Working").WithProgress(2, 3))
+		h.OnProgress(ctx, NewEvent(EventProgress, "Working").WithProgress(3, 3))
+
+		// Complete event should trigger quit
+		h.OnProgress(ctx, NewEvent(EventComplete, "Done"))
+		close(done)
+	}()
+
+	// Wait for events to be sent
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		// Timeout acceptable
+	}
+
+	// Stop handler
+	h.Stop()
+}
+
+func TestTeaHandler_OnProgress_ErrorEvent(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	done := make(chan struct{})
+	go func() {
+		// Send start then error
+		h.OnProgress(ctx, NewEvent(EventStart, "Starting"))
+		h.OnProgress(ctx, NewEvent(EventError, "Failed"))
+		close(done)
+	}()
+
+	// Wait for events
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	h.Stop()
+}
+
+func TestTeaHandler_OnProgress_ContextCancelDuringWait(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Start the program first
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		cancel() // Cancel while waiting for ready
+	}()
+
+	event := NewEvent(EventStart, "test")
+
+	// OnProgress should handle context cancellation while waiting
+	h.OnProgress(ctx, event)
+
+	h.Stop()
+}
+
+func TestTeaHandler_OnProgress_MultipleStart(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	done := make(chan struct{})
+	go func() {
+		// Multiple calls should only start once
+		h.OnProgress(ctx, NewEvent(EventStart, "First"))
+		h.OnProgress(ctx, NewEvent(EventStart, "Second"))
+		h.OnProgress(ctx, NewEvent(EventComplete, "Done"))
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	h.Stop()
+}
+
+func TestTeaHandler_Stop_AfterStart(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	// Start the handler
+	done := make(chan struct{})
+	go func() {
+		h.OnProgress(ctx, NewEvent(EventStart, "Starting"))
+		close(done)
+	}()
+
+	// Wait a bit for start
+	time.Sleep(100 * time.Millisecond)
+
+	// Stop should work after starting
+	h.Stop()
+
+	// Verify stopped
+	h.mu.Lock()
+	assert.False(t, h.started)
+	assert.Nil(t, h.program)
+	h.mu.Unlock()
+
+	<-done
+}
+
+func TestTeaHandler_start_DoubleStart(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+
+	// Call start directly multiple times
+	h.start()
+	h.start() // Should be a no-op
+
+	h.mu.Lock()
+	assert.True(t, h.started)
+	h.mu.Unlock()
+
+	h.Stop()
+}

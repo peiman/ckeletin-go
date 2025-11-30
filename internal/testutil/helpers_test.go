@@ -59,4 +59,25 @@ func TestSkipOnPlatform(t *testing.T) {
 
 		// If we got here, it correctly didn't skip
 	})
+
+	t.Run("skips when platform matches current", func(t *testing.T) {
+		// Use current platform to test the skip path
+		SkipOnPlatform(t, runtime.GOOS)
+
+		// This line should not be reached
+		t.Error("Should have skipped on current platform")
+	})
+}
+
+// TestSkipOnNonWindows_ActualSkip tests the actual skip on non-Windows.
+func TestSkipOnNonWindows_ActualSkip(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("This test verifies non-Windows skip behavior")
+	}
+
+	// On non-Windows, this should skip
+	SkipOnNonWindows(t)
+
+	// This line should not be reached on non-Windows
+	t.Error("Should have skipped on non-Windows")
 }
