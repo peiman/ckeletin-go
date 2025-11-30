@@ -68,7 +68,28 @@ This project uses several automated security measures:
 - **Dependabot**: Automatic dependency updates for known vulnerabilities
 - **CodeQL**: Automated code scanning for security issues
 - **govulncheck**: Regular vulnerability scanning of Go dependencies
-- **SBOM Generation**: Software Bill of Materials for transparency
+- **SBOM Generation**: Software Bill of Materials for transparency (SPDX & CycloneDX formats)
+
+### Security Task Commands
+
+| Command | Purpose | When to Run |
+|---------|---------|-------------|
+| `task check:vuln` | Scan for known vulnerabilities | Before commits |
+| `task check:deps:verify` | Verify dependency integrity | Pre-commit (automatic) |
+| `task check:deps:checksum` | Verify go.sum checksums | Supply chain verification |
+| `task check:license` | Check dependency licenses | Before adding deps |
+| `task generate:sbom` | Generate SBOM (SPDX + CycloneDX) | Before releases |
+| `task generate:sbom:spdx` | Generate SPDX format only | Compliance audits |
+| `task generate:sbom:cyclonedx` | Generate CycloneDX format only | Security audits |
+
+### Runtime Security (ADR-004)
+
+| Protection | Limit | Purpose |
+|------------|-------|---------|
+| Config file size | 1 MB max | Prevents DoS attacks |
+| String values | 10 KB max | Prevents memory exhaustion |
+| Slice/array length | 1000 elements | Prevents performance DoS |
+| File permissions | Rejects 0666 | Prevents unauthorized modification |
 
 ## Security-Related Configuration
 

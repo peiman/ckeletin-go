@@ -80,9 +80,11 @@ research/
 reports/licenses.csv
 reports/license-errors.log
 reports/licenses-binary.json
-reports/sbom*.json
 third_party/licenses/
 NOTICE
+
+# SBOM generated files (all formats)
+reports/sbom/
 
 # Lichen cache (if applicable)
 .lichen-cache/

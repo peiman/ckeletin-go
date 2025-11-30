@@ -33,6 +33,7 @@ vars:
   TOOL_GO_MOD_OUTDATED_VERSION: latest         # Dependency checker - safe to use latest
   TOOL_GO_LICENSES_VERSION: v2.0.1             # License compliance (source) - CRITICAL: pin for reproducibility
   TOOL_LICHEN_VERSION: v0.1.7                  # License compliance (binary) - CRITICAL: pin for reproducibility
+  TOOL_SYFT_VERSION: v1.18.1                   # SBOM generation - pinned for reproducibility
 
 tasks:
   default:
@@ -52,6 +53,7 @@ tasks:
     - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
     - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
     - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
+    - echo "   syft{{":"}} {{.TOOL_SYFT_VERSION}}"
     - echo ""
     - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
     - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
@@ -61,6 +63,7 @@ tasks:
     - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
     - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
     - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
+    - go install github.com/anchore/syft/cmd/syft@{{.TOOL_SYFT_VERSION}}
     - lefthook install
     - echo "✅ Tools installed successfully"
     silent: false
@@ -341,6 +344,12 @@ tasks:
       - go mod verify
     silent: true
 
+  check:deps:checksum:
+    desc: Verify go.sum checksums against checksum database (supply chain security)
+    cmds:
+      - ./scripts/check-deps-checksum.sh
+    silent: true
+
   check:deps:outdated:
     desc: Check for outdated dependencies
     cmds:
@@ -375,6 +384,12 @@ tasks:
     silent: true
     cmds:
       - govulncheck ./...
+
+  check:vuln:fast:
+    desc: Fast vulnerability scan with caching (for pre-commit hooks)
+    silent: true
+    cmds:
+      - ./scripts/check-vuln-fast.sh
 
   lint:
     desc: Run all linters
@@ -671,6 +686,24 @@ tasks:
     cmds:
       - ./scripts/generate-attribution.sh
     deps: [generate:license:report]
+    silent: false
+
+  generate:sbom:
+    desc: Generate SBOM in both SPDX and CycloneDX formats
+    cmds:
+      - ./scripts/generate-sbom.sh all
+    silent: false
+
+  generate:sbom:spdx:
+    desc: Generate SBOM in SPDX format only
+    cmds:
+      - ./scripts/generate-sbom.sh spdx
+    silent: false
+
+  generate:sbom:cyclonedx:
+    desc: Generate SBOM in CycloneDX format only
+    cmds:
+      - ./scripts/generate-sbom.sh cyclonedx
     silent: false
 
   # --- Quality Checks ---

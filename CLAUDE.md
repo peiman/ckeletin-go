@@ -731,11 +731,16 @@ git push -u origin <branch-name>
 | `task test` | After code changes | Runs tests with coverage |
 | `task generate:config:key-constants` | After config registry changes | Regenerates config constants |
 | `task check:deps` | Weekly/monthly | Checks for dependency updates |
+| `task check:deps:checksum` | Supply chain verification | Verify go.sum against checksum DB |
 | `task check:vuln` | Before releases | Scans for vulnerabilities |
+| `task check:vuln:fast` | Pre-commit (automatic) | Fast cached vulnerability scan |
 | `task check:license` | After `go get`, in CI | Checks dependency licenses (both source + binary) |
 | `task check:license:source` | After adding dependencies | Fast license check (~2-5s) |
 | `task check:license:binary` | Before releases | Accurate binary license check (~10-15s) |
 | `task generate:license` | Before releases | Generate all license artifacts |
+| `task generate:sbom` | Before releases | Generate SBOM (SPDX + CycloneDX) |
+| `task generate:sbom:spdx` | Compliance audits | Generate SPDX format only |
+| `task generate:sbom:cyclonedx` | Security audits | Generate CycloneDX format only |
 | `task check:release` | Before creating releases | Checks if GoReleaser is installed |
 | `task test:release` | Before tagging | Tests release build locally |
 | `task clean:release` | After testing releases | Cleans GoReleaser artifacts |

@@ -12,6 +12,8 @@ pre-commit:
       run: task validate:constants
     verify-deps:
       run: task check:deps:verify
+    vuln-scan:
+      run: task check:vuln:fast
     test:
       run: task test
 
