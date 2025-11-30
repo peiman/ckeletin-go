@@ -101,31 +101,33 @@ func TestCompositeHandler(t *testing.T) {
 		assert.Len(t, composite.Handlers(), 0)
 	})
 
-	t.Run("Remove handler", func(t *testing.T) {
+	t.Run("RemoveAt handler", func(t *testing.T) {
 		// SETUP
 		mock1 := NewMockHandler()
 		mock2 := NewMockHandler()
 		composite := NewCompositeHandler(mock1, mock2)
 
-		// EXECUTION
-		composite.Remove(mock1)
+		// EXECUTION - remove first handler (index 0)
+		removed := composite.RemoveAt(0)
 		composite.OnProgress(context.Background(), NewEvent(EventStart, "test"))
 
 		// ASSERTION
+		assert.True(t, removed)
 		assert.Equal(t, 0, mock1.EventCount())
 		assert.Equal(t, 1, mock2.EventCount())
 		assert.Len(t, composite.Handlers(), 1)
 	})
 
-	t.Run("Remove nil handler is no-op", func(t *testing.T) {
+	t.Run("RemoveAt out of bounds is no-op", func(t *testing.T) {
 		// SETUP
 		mock := NewMockHandler()
 		composite := NewCompositeHandler(mock)
 
 		// EXECUTION
-		composite.Remove(nil)
+		removed := composite.RemoveAt(5)
 
 		// ASSERTION
+		assert.False(t, removed)
 		assert.Len(t, composite.Handlers(), 1)
 	})
 

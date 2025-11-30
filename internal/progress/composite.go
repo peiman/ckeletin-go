@@ -52,20 +52,23 @@ func (h *CompositeHandler) Add(handler Handler) {
 	h.handlers = append(h.handlers, handler)
 }
 
-// Remove removes a handler from the composite (thread-safe).
-// Uses pointer comparison for identity.
-func (h *CompositeHandler) Remove(handler Handler) {
-	if handler == nil {
-		return
-	}
+// RemoveAt removes a handler at the given index (thread-safe).
+// Returns true if the handler was removed, false if index out of bounds.
+func (h *CompositeHandler) RemoveAt(index int) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for i, hdlr := range h.handlers {
-		if hdlr == handler {
-			h.handlers = append(h.handlers[:i], h.handlers[i+1:]...)
-			return
-		}
+	if index < 0 || index >= len(h.handlers) {
+		return false
 	}
+	h.handlers = append(h.handlers[:index], h.handlers[index+1:]...)
+	return true
+}
+
+// Len returns the number of handlers (thread-safe).
+func (h *CompositeHandler) Len() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.handlers)
 }
 
 // Handlers returns a copy of the handlers slice (thread-safe).
