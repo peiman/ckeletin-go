@@ -75,3 +75,23 @@ func TestNopHandler_MultipleCallsSafe(t *testing.T) {
 		h.OnProgress(ctx, event)
 	}
 }
+
+func TestNopHandler_OnProgress_AllEventTypes(t *testing.T) {
+	h := NewNopHandler()
+	ctx := context.Background()
+
+	// Test all event types don't panic
+	events := []Event{
+		NewEvent(EventStart, "start"),
+		NewEvent(EventProgress, "progress").WithProgress(1, 10),
+		NewEvent(EventComplete, "complete"),
+		NewEvent(EventError, "error"),
+		NewEvent(EventWarning, "warning"),
+	}
+
+	for _, event := range events {
+		h.OnProgress(ctx, event)
+	}
+
+	// NopHandler should do nothing - just verify no panic occurred
+}

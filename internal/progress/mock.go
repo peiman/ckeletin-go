@@ -8,9 +8,8 @@ import (
 // MockHandler records all events for testing.
 // This follows the same pattern as internal/ui/mock.go (ADR-003 compliant).
 type MockHandler struct {
-	Events      []Event
-	mu          sync.Mutex
-	ReturnError error
+	Events []Event
+	mu     sync.Mutex
 }
 
 // NewMockHandler creates a new MockHandler.

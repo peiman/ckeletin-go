@@ -35,7 +35,15 @@ func NewConsoleHandler(w io.Writer) *ConsoleHandler {
 }
 
 // OnProgress implements Handler by writing formatted progress to the writer.
-func (h *ConsoleHandler) OnProgress(_ context.Context, event Event) {
+// Respects context cancellation.
+func (h *ConsoleHandler) OnProgress(ctx context.Context, event Event) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 

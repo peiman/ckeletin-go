@@ -253,3 +253,19 @@ func TestLogHandler_OnProgress_Timestamp(t *testing.T) {
 func TestLogHandler_ImplementsHandler(t *testing.T) {
 	var _ Handler = (*LogHandler)(nil)
 }
+
+func TestLogHandler_OnProgress_ContextCancellation(t *testing.T) {
+	var buf bytes.Buffer
+	logger := zerolog.New(&buf).Level(zerolog.DebugLevel)
+
+	h := NewLogHandler(WithLogger(logger))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	event := NewEvent(EventStart, "should not log")
+	h.OnProgress(ctx, event)
+
+	// Buffer should be empty since context was cancelled
+	assert.Empty(t, buf.String(), "should not log when context is cancelled")
+}

@@ -2,6 +2,7 @@ package progress
 
 import (
 	"bytes"
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ func TestNewTeaHandler(t *testing.T) {
 	assert.NotNil(t, h)
 	assert.NotNil(t, h.style)
 	assert.NotNil(t, h.model)
+	assert.NotNil(t, h.ready)
 	assert.False(t, h.started)
 }
 
@@ -398,4 +400,20 @@ func TestProgressEventMsg(t *testing.T) {
 
 	assert.Equal(t, event.Type, msg.event.Type)
 	assert.Equal(t, event.Message, msg.event.Message)
+}
+
+func TestTeaHandler_OnProgress_ContextCancellation(t *testing.T) {
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	event := NewEvent(EventStart, "test")
+
+	// Should return immediately without panic
+	h.OnProgress(ctx, event)
+
+	// Handler should not have started since context was cancelled
+	assert.False(t, h.started)
 }

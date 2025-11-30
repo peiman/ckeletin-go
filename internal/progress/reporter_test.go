@@ -1,6 +1,7 @@
 package progress
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -239,4 +240,24 @@ func TestReporter_TimestampIsSet(t *testing.T) {
 	event, ok := mock.LastEvent()
 	require.True(t, ok)
 	assert.False(t, event.Timestamp.IsZero())
+}
+
+func TestReporter_WithOutput(t *testing.T) {
+	// Test non-interactive mode
+	var buf bytes.Buffer
+	reporter := NewReporter(WithOutput(&buf, false))
+
+	ctx := context.Background()
+	reporter.Start(ctx, "Test message")
+	reporter.Complete(ctx, "Done")
+
+	// Should have output
+	assert.NotEmpty(t, buf.String())
+}
+
+func TestReporter_WithInteractive(t *testing.T) {
+	// WithInteractive uses stderr internally
+	// Just verify it doesn't panic
+	reporter := NewReporter(WithInteractive(false))
+	assert.NotNil(t, reporter)
 }

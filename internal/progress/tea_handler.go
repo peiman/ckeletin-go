@@ -23,6 +23,7 @@ type TeaHandler struct {
 	program *tea.Program
 	model   *teaModel
 	started bool
+	ready   chan struct{} // signals when program is ready to receive messages
 }
 
 // NewTeaHandler creates a new Bubble Tea based progress handler.
@@ -33,52 +34,86 @@ func NewTeaHandler(out io.Writer) *TeaHandler {
 		out:   out,
 		style: style,
 		model: model,
+		ready: make(chan struct{}),
 	}
 }
 
 // OnProgress implements Handler by sending events to the Bubble Tea model.
+// Respects context cancellation.
 func (h *TeaHandler) OnProgress(ctx context.Context, event Event) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	h.mu.Lock()
-	defer h.mu.Unlock()
+	needsStart := !h.started
+	h.mu.Unlock()
 
 	// Start the program on first event if not started
-	if !h.started {
+	if needsStart {
 		h.start()
 	}
 
+	// Wait for program to be ready (with context cancellation support)
+	select {
+	case <-ctx.Done():
+		return
+	case <-h.ready:
+		// Program is ready
+	}
+
+	h.mu.Lock()
+	program := h.program
+	h.mu.Unlock()
+
 	// Send the event to the model
-	if h.program != nil {
-		h.program.Send(progressEventMsg{event: event})
+	if program != nil {
+		program.Send(progressEventMsg{event: event})
 
 		// If this is a terminal event, signal completion
 		if event.Type == EventComplete || event.Type == EventError {
-			// Small delay to let the final view render
-			time.Sleep(50 * time.Millisecond)
-			h.program.Send(tea.Quit())
+			// Use a short timer instead of sleep to allow for cancellation
+			timer := time.NewTimer(50 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+			program.Send(tea.Quit())
 		}
 	}
 }
 
 // start initializes the Bubble Tea program.
 func (h *TeaHandler) start() {
+	h.mu.Lock()
 	if h.started {
+		h.mu.Unlock()
 		return
 	}
 	h.started = true
+	h.mu.Unlock()
 
 	opts := []tea.ProgramOption{
 		tea.WithOutput(h.out),
 	}
 
+	h.mu.Lock()
 	h.program = tea.NewProgram(h.model, opts...)
+	program := h.program
+	h.mu.Unlock()
 
 	// Run in goroutine so OnProgress doesn't block
 	go func() {
-		_, _ = h.program.Run()
+		// Signal that the program is ready to receive messages
+		// Close the channel to signal all waiting goroutines
+		close(h.ready)
+		_, _ = program.Run()
 	}()
-
-	// Small delay to let the program initialize
-	time.Sleep(10 * time.Millisecond)
 }
 
 // Stop gracefully stops the Bubble Tea program.

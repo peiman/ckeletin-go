@@ -104,3 +104,18 @@ func TestConsoleHandler_ConcurrentWrites(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "✓")
 }
+
+func TestConsoleHandler_ContextCancellation(t *testing.T) {
+	// SETUP
+	var buf bytes.Buffer
+	handler := NewConsoleHandler(&buf)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	// EXECUTION
+	handler.OnProgress(ctx, NewEvent(EventComplete, "should not appear"))
+
+	// ASSERTION - should be empty since context was cancelled
+	assert.Empty(t, buf.String(), "should not write when context is cancelled")
+}

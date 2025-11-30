@@ -131,9 +131,9 @@ func (e Event) WithMeta(key string, value interface{}) Event {
 }
 
 // Percentage returns the progress as a percentage (0-100).
-// Returns -1 if progress is indeterminate (Total == 0).
+// Returns -1 if progress is indeterminate (Total <= 0).
 func (e Event) Percentage() float64 {
-	if e.Total == 0 {
+	if e.Total <= 0 {
 		return -1
 	}
 	return float64(e.Current) / float64(e.Total) * 100
@@ -141,5 +141,5 @@ func (e Event) Percentage() float64 {
 
 // IsIndeterminate returns true if progress cannot be calculated.
 func (e Event) IsIndeterminate() bool {
-	return e.Total == 0
+	return e.Total <= 0
 }

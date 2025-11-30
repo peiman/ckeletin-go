@@ -36,14 +36,29 @@ Examples:
 	RunE: runDevProgress,
 }
 
+// Default durations for demos (can be overridden via flags for testing).
+const (
+	defaultSpinnerDuration = 2 * time.Second
+	defaultStepDelay       = 500 * time.Millisecond
+	defaultPhaseStepDelay  = 300 * time.Millisecond
+)
+
 func init() {
 	devCmd.AddCommand(devProgressCmd)
 
 	devProgressCmd.Flags().Bool("ui", false, "Use interactive Bubble Tea UI")
 	devProgressCmd.Flags().Bool("spinner", false, "Run only spinner demo")
 	devProgressCmd.Flags().Bool("bar", false, "Run only progress bar demo")
+	devProgressCmd.Flags().Duration("delay", 0, "Override step delay duration (e.g., 100ms for fast demo)")
 
 	log.Debug().Msg("Dev progress command registered")
+}
+
+// demoConfig holds configuration for demo functions.
+type demoConfig struct {
+	spinnerDuration time.Duration
+	stepDelay       time.Duration
+	phaseStepDelay  time.Duration
 }
 
 func runDevProgress(cmd *cobra.Command, _ []string) error {
@@ -55,6 +70,19 @@ func runDevProgress(cmd *cobra.Command, _ []string) error {
 	useUI, _ := cmd.Flags().GetBool("ui")
 	spinnerOnly, _ := cmd.Flags().GetBool("spinner")
 	barOnly, _ := cmd.Flags().GetBool("bar")
+	delayOverride, _ := cmd.Flags().GetDuration("delay")
+
+	// Build demo config with defaults or override
+	cfg := demoConfig{
+		spinnerDuration: defaultSpinnerDuration,
+		stepDelay:       defaultStepDelay,
+		phaseStepDelay:  defaultPhaseStepDelay,
+	}
+	if delayOverride > 0 {
+		cfg.spinnerDuration = delayOverride
+		cfg.stepDelay = delayOverride
+		cfg.phaseStepDelay = delayOverride
+	}
 
 	// Create reporter with appropriate output mode
 	reporter := progress.NewReporter(
@@ -65,19 +93,19 @@ func runDevProgress(cmd *cobra.Command, _ []string) error {
 	runAll := !spinnerOnly && !barOnly
 
 	if runAll || spinnerOnly {
-		if err := demoSpinner(ctx, reporter); err != nil {
+		if err := demoSpinner(ctx, reporter, cfg); err != nil {
 			return err
 		}
 	}
 
 	if runAll || barOnly {
-		if err := demoProgressBar(ctx, reporter); err != nil {
+		if err := demoProgressBar(ctx, reporter, cfg); err != nil {
 			return err
 		}
 	}
 
 	if runAll {
-		if err := demoMultiPhase(ctx, reporter); err != nil {
+		if err := demoMultiPhase(ctx, reporter, cfg); err != nil {
 			return err
 		}
 	}
@@ -86,19 +114,23 @@ func runDevProgress(cmd *cobra.Command, _ []string) error {
 }
 
 // demoSpinner demonstrates indeterminate progress with a spinner.
-func demoSpinner(ctx context.Context, reporter *progress.Reporter) error {
+func demoSpinner(ctx context.Context, reporter *progress.Reporter, cfg demoConfig) error {
 	reporter.SetPhase("spinner-demo")
 	reporter.Start(ctx, "Simulating network request...")
 
-	// Simulate work
-	time.Sleep(2 * time.Second)
+	// Simulate work (respects context cancellation)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(cfg.spinnerDuration):
+	}
 
 	reporter.Complete(ctx, "Network request completed")
 	return nil
 }
 
 // demoProgressBar demonstrates determinate progress with a progress bar.
-func demoProgressBar(ctx context.Context, reporter *progress.Reporter) error {
+func demoProgressBar(ctx context.Context, reporter *progress.Reporter, cfg demoConfig) error {
 	reporter.SetPhase("progress-demo")
 	reporter.Start(ctx, "Processing items")
 
@@ -113,7 +145,11 @@ func demoProgressBar(ctx context.Context, reporter *progress.Reporter) error {
 	total := int64(len(items))
 	for i, item := range items {
 		reporter.Progress(ctx, int64(i+1), total, item)
-		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(cfg.stepDelay):
+		}
 	}
 
 	reporter.Complete(ctx, "All items processed successfully")
@@ -121,7 +157,7 @@ func demoProgressBar(ctx context.Context, reporter *progress.Reporter) error {
 }
 
 // demoMultiPhase demonstrates multi-phase progress reporting.
-func demoMultiPhase(ctx context.Context, reporter *progress.Reporter) error {
+func demoMultiPhase(ctx context.Context, reporter *progress.Reporter, cfg demoConfig) error {
 	phases := []struct {
 		name  string
 		steps int
@@ -138,7 +174,11 @@ func demoMultiPhase(ctx context.Context, reporter *progress.Reporter) error {
 
 		for i := 0; i < phase.steps; i++ {
 			reporter.Progress(ctx, int64(i+1), int64(phase.steps), "Step")
-			time.Sleep(300 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(cfg.phaseStepDelay):
+			}
 		}
 
 		reporter.Complete(ctx, phase.desc+" complete")

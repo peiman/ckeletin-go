@@ -48,7 +48,15 @@ func NewLogHandler(opts ...LogHandlerOption) *LogHandler {
 }
 
 // OnProgress implements Handler by logging the event to the audit stream.
-func (h *LogHandler) OnProgress(_ context.Context, event Event) {
+// Respects context cancellation.
+func (h *LogHandler) OnProgress(ctx context.Context, event Event) {
+	// Check context cancellation
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
+
 	// Create base log event with appropriate level
 	var logEvent *zerolog.Event
 	switch event.Type {
