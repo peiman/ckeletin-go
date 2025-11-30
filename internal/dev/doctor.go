@@ -195,21 +195,22 @@ func (d *Doctor) checkTool(name, description string) {
 func (d *Doctor) getToolVersion(name string) string {
 	var cmd *exec.Cmd
 
+	// Use literal strings for defense-in-depth against command injection
 	switch name {
 	case "go":
-		cmd = exec.Command(name, "version")
+		cmd = exec.Command("go", "version")
 	case "task":
-		cmd = exec.Command(name, "--version")
+		cmd = exec.Command("task", "--version")
 	case "golangci-lint":
-		cmd = exec.Command(name, "version")
+		cmd = exec.Command("golangci-lint", "version")
 	case "gotestsum":
-		cmd = exec.Command(name, "--version")
+		cmd = exec.Command("gotestsum", "--version")
 	case "go-licenses":
-		cmd = exec.Command(name, "--version")
+		cmd = exec.Command("go-licenses", "--version")
 	case "lichen":
-		cmd = exec.Command(name, "--version")
+		cmd = exec.Command("lichen", "--version")
 	case "git":
-		cmd = exec.Command(name, "--version")
+		cmd = exec.Command("git", "--version")
 	default:
 		return ""
 	}

@@ -1,0 +1,49 @@
+# Gitleaks configuration for ckeletin-go
+# See: https://github.com/gitleaks/gitleaks
+
+title = "ckeletin-go gitleaks config"
+
+# Use the default rules as a base
+[extend]
+useDefault = true
+
+# Project-specific allowlists
+[allowlist]
+description = "Global allowlist"
+
+# Allow paths that commonly contain false positives
+paths = [
+    '''go\.sum$''',
+    '''go\.mod$''',
+    '''vendor/''',
+    '''\.git/''',
+    '''testdata/''',
+    '''test/integration/testdata/''',
+    '''third_party/''',
+    '''reports/''',
+    '''\.github/workflows/''',
+]
+
+# Allow specific patterns that are false positives
+regexes = [
+    # Example placeholder tokens in docs
+    '''(?i)example[-_]?(api[-_]?)?key''',
+    '''(?i)your[-_]?api[-_]?key[-_]?here''',
+    '''(?i)placeholder''',
+    # Test fixtures with fake secrets
+    '''(?i)test[-_]?secret''',
+    '''(?i)fake[-_]?key''',
+    '''(?i)dummy[-_]?token''',
+]
+
+# Custom rules for this project (if needed)
+# [[rules]]
+# id = "custom-rule"
+# description = "Custom secret pattern"
+# regex = '''custom_pattern'''
+# tags = ["custom"]
+
+# Baseline commit - secrets before this are ignored
+# Uncomment and set to ignore historical secrets (not recommended for new projects)
+# [allowlist]
+# commits = ["abc123"]

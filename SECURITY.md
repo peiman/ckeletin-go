@@ -68,6 +68,9 @@ This project uses several automated security measures:
 - **Dependabot**: Automatic dependency updates for known vulnerabilities
 - **CodeQL**: Automated code scanning for security issues
 - **govulncheck**: Regular vulnerability scanning of Go dependencies
+- **gitleaks**: Secret scanning to prevent credential leaks
+- **semgrep**: Advanced static analysis (SAST)
+- **grype**: SBOM vulnerability scanning
 - **SBOM Generation**: Software Bill of Materials for transparency (SPDX & CycloneDX formats)
 
 ### Security Task Commands
@@ -75,6 +78,11 @@ This project uses several automated security measures:
 | Command | Purpose | When to Run |
 |---------|---------|-------------|
 | `task check:vuln` | Scan for known vulnerabilities | Before commits |
+| `task check:vuln:fast` | Fast cached vulnerability scan | Pre-commit (automatic) |
+| `task check:secrets` | Scan for hardcoded secrets | In `task check` |
+| `task check:secrets:staged` | Scan staged changes for secrets | Pre-commit (automatic) |
+| `task check:sast` | Static analysis with semgrep | In `task check` |
+| `task check:sbom:vulns` | Scan SBOM for vulnerabilities | In `task check` |
 | `task check:deps:verify` | Verify dependency integrity | Pre-commit (automatic) |
 | `task check:deps:checksum` | Verify go.sum checksums | Supply chain verification |
 | `task check:license` | Check dependency licenses | Before adding deps |

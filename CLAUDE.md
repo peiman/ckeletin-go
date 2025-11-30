@@ -734,6 +734,10 @@ git push -u origin <branch-name>
 | `task check:deps:checksum` | Supply chain verification | Verify go.sum against checksum DB |
 | `task check:vuln` | Before releases | Scans for vulnerabilities |
 | `task check:vuln:fast` | Pre-commit (automatic) | Fast cached vulnerability scan |
+| `task check:secrets` | In `task check` | Scan for hardcoded secrets (gitleaks) |
+| `task check:secrets:staged` | Pre-commit (automatic) | Scan staged changes for secrets |
+| `task check:sast` | In `task check` | Static analysis with semgrep |
+| `task check:sbom:vulns` | In `task check` | Scan SBOM for vulnerabilities (grype) |
 | `task check:license` | After `go get`, in CI | Checks dependency licenses (both source + binary) |
 | `task check:license:source` | After adding dependencies | Fast license check (~2-5s) |
 | `task check:license:binary` | Before releases | Accurate binary license check (~10-15s) |

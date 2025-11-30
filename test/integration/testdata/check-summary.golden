@@ -1,5 +1,5 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ All checks passed (17/17)
+✅ All checks passed (20/20)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ Development tools installed
@@ -14,10 +14,13 @@
 ✅ ADR-009: Layered architecture
 ✅ ADR-010: Package organization
 ✅ ADR-012: Output patterns
+✅ No hardcoded secrets (gitleaks)
+✅ Static analysis passed (semgrep)
 ✅ Dependency integrity
 ✅ No security vulnerabilities
 ✅ License compliance (source)
 ✅ License compliance (binary)
+✅ SBOM vulnerability scan
 ✅ All tests passing
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

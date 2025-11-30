@@ -34,6 +34,8 @@ vars:
   TOOL_GO_LICENSES_VERSION: v2.0.1             # License compliance (source) - CRITICAL: pin for reproducibility
   TOOL_LICHEN_VERSION: v0.1.7                  # License compliance (binary) - CRITICAL: pin for reproducibility
   TOOL_SYFT_VERSION: v1.18.1                   # SBOM generation - pinned for reproducibility
+  TOOL_GITLEAKS_VERSION: latest                # Secret scanning - use latest for compatibility
+  TOOL_GRYPE_VERSION: latest                   # SBOM vulnerability scanning - use latest for compatibility
 
 tasks:
   default:
@@ -54,6 +56,9 @@ tasks:
     - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
     - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
     - echo "   syft{{":"}} {{.TOOL_SYFT_VERSION}}"
+    - echo "   gitleaks{{":"}} {{.TOOL_GITLEAKS_VERSION}}"
+    - echo "   grype{{":"}} {{.TOOL_GRYPE_VERSION}}"
+    - echo "   semgrep{{":"}} (via pip/pipx)"
     - echo ""
     - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
     - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
@@ -64,6 +69,18 @@ tasks:
     - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
     - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
     - go install github.com/anchore/syft/cmd/syft@{{.TOOL_SYFT_VERSION}}
+    - go install github.com/zricethezav/gitleaks/v8@{{.TOOL_GITLEAKS_VERSION}}
+    - go install github.com/anchore/grype/cmd/grype@{{.TOOL_GRYPE_VERSION}}
+    - |
+      if command -v semgrep &> /dev/null; then
+        echo "  semgrep already installed"
+      elif command -v pipx &> /dev/null; then
+        pipx install semgrep
+      elif command -v pip3 &> /dev/null; then
+        pip3 install --user semgrep
+      else
+        echo "  Warning: semgrep requires pip/pipx. Install manually: pip install semgrep"
+      fi
     - lefthook install
     - echo "✅ Tools installed successfully"
     silent: false
@@ -390,6 +407,36 @@ tasks:
     silent: true
     cmds:
       - ./scripts/check-vuln-fast.sh
+
+  check:secrets:
+    desc: Scan for hardcoded secrets (full repository scan)
+    silent: true
+    cmds:
+      - ./scripts/check-secrets.sh all
+
+  check:secrets:staged:
+    desc: Scan staged changes for secrets (for pre-commit hooks)
+    silent: true
+    cmds:
+      - ./scripts/check-secrets.sh staged
+
+  check:sast:
+    desc: Run static analysis (SAST) with semgrep
+    silent: true
+    cmds:
+      - ./scripts/check-sast.sh local
+
+  check:sast:full:
+    desc: Run full SAST with registry rules (requires network)
+    silent: true
+    cmds:
+      - ./scripts/check-sast.sh full
+
+  check:sbom:vulns:
+    desc: Scan SBOM for vulnerabilities using grype
+    silent: true
+    cmds:
+      - ./scripts/check-sbom-vulns.sh
 
   lint:
     desc: Run all linters
@@ -744,10 +791,17 @@ tasks:
       - task: validate:security
       - cmd: |
           source scripts/lib/check-output.sh
+          category_header "Security Scanning"
+        silent: true
+      - task: check:secrets
+      - task: check:sast
+      - cmd: |
+          source scripts/lib/check-output.sh
           category_header "Dependencies"
         silent: true
       - task: check:deps
       - task: check:license
+      - task: check:sbom:vulns
       - cmd: |
           source scripts/lib/check-output.sh
           category_header "Tests"

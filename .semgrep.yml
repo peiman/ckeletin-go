@@ -1,0 +1,158 @@
+# Semgrep configuration for ckeletin-go
+# Advanced static analysis for security and code quality
+# See: https://semgrep.dev/docs/
+
+rules:
+  # === Security Rules ===
+
+  - id: go-dangerous-exec
+    patterns:
+      - pattern-either:
+          - pattern: exec.Command($CMD, ...)
+          - pattern: exec.CommandContext($CTX, $CMD, ...)
+      # Exclude hardcoded safe commands (string literals are safe)
+      - pattern-not: exec.Command("...", ...)
+      - pattern-not: exec.CommandContext($CTX, "...", ...)
+    message: "Potential command injection. Ensure $CMD is not user-controlled."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-78: OS Command Injection"
+
+  - id: go-sql-injection
+    pattern-either:
+      - pattern: $DB.Query($QUERY + ...)
+      - pattern: $DB.Exec($QUERY + ...)
+      - pattern: $DB.QueryRow($QUERY + ...)
+    message: "Potential SQL injection. Use parameterized queries instead."
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-89: SQL Injection"
+
+  - id: go-path-traversal
+    patterns:
+      - pattern-either:
+          - pattern: os.Open($PATH)
+          - pattern: os.ReadFile($PATH)
+          - pattern: ioutil.ReadFile($PATH)
+      # Exclude hardcoded paths (string literals are safe)
+      - pattern-not: os.Open("...")
+      - pattern-not: os.ReadFile("...")
+      - pattern-not: ioutil.ReadFile("...")
+    paths:
+      exclude:
+        - scripts/  # Build/scaffold scripts operate on known paths
+        - test/     # Test files use controlled paths
+    message: "Potential path traversal. Validate and sanitize file paths."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-22: Path Traversal"
+
+  - id: go-weak-crypto
+    pattern-either:
+      - pattern: md5.New()
+      - pattern: md5.Sum(...)
+      - pattern: sha1.New()
+      - pattern: sha1.Sum(...)
+      - pattern: des.NewCipher(...)
+      - pattern: rc4.NewCipher(...)
+    message: "Weak cryptographic algorithm. Use SHA-256 or stronger."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe: "CWE-327: Use of Broken Crypto Algorithm"
+
+  - id: go-hardcoded-secret
+    pattern-regex: '(?i)(password|secret|api[_-]?key|token)\s*[:=]\s*["\x27][^"\x27]{8,}["\x27]'
+    message: "Potential hardcoded secret. Use environment variables or secret management."
+    languages: [go]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: "CWE-798: Hardcoded Credentials"
+
+  # === Code Quality Rules ===
+
+  - id: go-empty-error-check
+    patterns:
+      - pattern: |
+          if $ERR != nil {
+          }
+      - pattern: |
+          if $ERR != nil {
+              // ...
+          }
+    message: "Empty error handling. Log or return the error."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: best-practice
+
+  - id: go-defer-in-loop
+    patterns:
+      - pattern-inside: |
+          for ... {
+            ...
+          }
+      - pattern: defer $FUNC(...)
+    message: "Defer inside loop may cause resource leaks. Consider moving outside."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: best-practice
+
+  - id: go-context-background-in-handler
+    patterns:
+      - pattern-inside: |
+          func $HANDLER($W http.ResponseWriter, $R *http.Request) {
+            ...
+          }
+      - pattern: context.Background()
+    message: "Use request context (r.Context()) instead of context.Background() in handlers."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: best-practice
+
+  # === Project-Specific Rules ===
+
+  - id: ckeletin-no-fmt-print-in-cmd
+    patterns:
+      - pattern-inside: |
+          func $FUNC(...) {
+            ...
+          }
+      - pattern-either:
+          - pattern: fmt.Println(...)
+          - pattern: fmt.Printf(...)
+          - pattern: fmt.Print(...)
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: ^(run|execute|init)
+    paths:
+      include:
+        - cmd/
+    message: "Use structured logging (log.Info/Error) instead of fmt.Print in commands (ADR-006)."
+    languages: [go]
+    severity: INFO
+    metadata:
+      category: project-convention
+      adr: ADR-006
+
+  - id: ckeletin-no-os-exit
+    pattern: os.Exit(...)
+    paths:
+      include:
+        - internal/
+    message: "Avoid os.Exit in internal packages. Return errors to let cmd layer handle exit."
+    languages: [go]
+    severity: WARNING
+    metadata:
+      category: project-convention
+      adr: ADR-001

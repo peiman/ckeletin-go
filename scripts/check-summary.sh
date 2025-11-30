@@ -12,7 +12,7 @@ echo "$SEPARATOR"
 if [ "$CHECK_MODE" = "fast" ]; then
   echo "✅ All fast checks passed"
 else
-  echo "✅ All checks passed (17/17)"
+  echo "✅ All checks passed (20/20)"
 fi
 echo "$SEPARATOR"
 echo ""
@@ -30,10 +30,13 @@ echo "✅ ADR-010: Package organization"
 echo "✅ ADR-012: Output patterns"
 
 if [ "$CHECK_MODE" != "fast" ]; then
+  echo "✅ No hardcoded secrets (gitleaks)"
+  echo "✅ Static analysis passed (semgrep)"
   echo "✅ Dependency integrity"
   echo "✅ No security vulnerabilities"
   echo "✅ License compliance (source)"
   echo "✅ License compliance (binary)"
+  echo "✅ SBOM vulnerability scan"
   echo "✅ All tests passing"
 else
   echo "✅ Tests passing (unit only)"
