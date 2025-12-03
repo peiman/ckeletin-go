@@ -542,25 +542,25 @@ tasks:
     desc: Run tests with coverage (dev build with dev commands - use test:prod for production)
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
 
   test:dev:
     desc: Run tests with dev commands (explicit - same as 'task test')
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
 
   test:prod:
     desc: Run tests without dev commands (production mode)
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
 
   test:unit:
     desc: Run unit tests only (skips integration tests)
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
 
   test:race:
     desc: Run tests with race detection
@@ -571,17 +571,17 @@ tasks:
     desc: Run all tests with both race detection and coverage (optimized for CI/Check)
     silent: true
     cmd: |
-      gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
 
   test:watch:
     desc: Run tests in watch mode
     cmd: |
-      gotestsum --format pkgname --watch --hide-summary=skipped
+      gotestsum --format short --watch --hide-summary=skipped
 
   test:integration:
     desc: Run integration tests (disables cache with -count=1)
     cmd: |
-      gotestsum --format pkgname -- -v -count=1 ./test/integration/...
+      gotestsum --format short -- -v -count=1 ./test/integration/...
 
   test:golden:
     desc: Test CLI output against golden files
@@ -602,7 +602,7 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data and display uncovered parts in the terminal
     cmds:
-      - gotestsum --format pkgname --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      - gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
       - echo "Detailed coverage report:"
       - go tool cover -func={{.COVERAGE_TXT}}
     silent: false
