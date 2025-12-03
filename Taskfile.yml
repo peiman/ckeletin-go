@@ -95,10 +95,30 @@ tasks:
 
         # Get current Go version
         CURRENT_GO_VERSION=$(go version | awk '{print $3}')
+        CURRENT_GO_VERSION_NUM=$(echo "$CURRENT_GO_VERSION" | sed 's/^go//')
 
-        # Go version
-        echo "Go:"
-        go version || echo "  ❌ Go not found"
+        # Check .go-version file (SSOT) and go.mod minimum
+        echo "Go Version:"
+        MIN_VERSION=""
+        if [ -f "go.mod" ]; then
+          MIN_VERSION=$(grep -E '^go [0-9]+\.[0-9]+' go.mod | awk '{print $2}')
+        fi
+        if [ -f ".go-version" ]; then
+          EXPECTED_VERSION=$(tr -d '[:space:]' < .go-version)
+          echo "  Minimum:   ${MIN_VERSION:-n/a} (from go.mod)"
+          echo "  Expected:  $EXPECTED_VERSION (from .go-version)"
+          echo "  Installed: $CURRENT_GO_VERSION_NUM"
+          if [ "$CURRENT_GO_VERSION_NUM" = "$EXPECTED_VERSION" ]; then
+            echo "  ✅ Version matches"
+          else
+            echo "  ⚠️  Version mismatch!"
+            echo "     Update Go to $EXPECTED_VERSION or update .go-version"
+          fi
+        else
+          echo "  ⚠️  .go-version file not found"
+          echo "     Minimum:   ${MIN_VERSION:-n/a} (from go.mod)"
+          echo "     Installed: $CURRENT_GO_VERSION_NUM"
+        fi
         echo ""
 
         # Task version
@@ -200,6 +220,20 @@ tasks:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
       - go mod tidy
+
+  # --- Go Version Check ---
+
+  check:go-version:
+    desc: Check if system Go version matches .go-version (SSOT)
+    silent: true
+    cmds:
+      - ./scripts/check-go-version.sh
+
+  check:go-version:minor:
+    desc: Check if Go minor version matches (allows patch differences)
+    silent: true
+    cmds:
+      - ./scripts/check-go-version.sh --minor
 
   # --- Tool Verification ---
 
@@ -582,6 +616,13 @@ tasks:
       - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
     silent: true
 
+  test:coverage:
+    desc: Run tests once, then check both patch and project coverage thresholds
+    cmds:
+      - task: test
+      - ./scripts/check-coverage-patch.sh
+      - ./scripts/check-coverage-project.sh
+
   test:coverage:project:
     desc: Check project coverage meets threshold (like codecov/project)
     deps: [test]
@@ -833,6 +874,7 @@ tasks:
           source scripts/lib/check-output.sh
           category_header "Development Environment"
         silent: true
+      - task: check:go-version
       - task: check:tools:installed
       - task: check:common
 
@@ -897,6 +939,7 @@ tasks:
           source scripts/lib/check-output.sh
           category_header "Development Environment"
         silent: true
+      - task: check:go-version
       - task: check:tools:version  # Strict: verify exact versions
       - task: check:common
 

@@ -1,6 +1,6 @@
 module github.com/peiman/ckeletin-go
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10

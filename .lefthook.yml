@@ -22,7 +22,5 @@ pre-commit:
 pre-push:
   parallel: false
   commands:
-    coverage-patch:
-      run: task test:coverage:patch
-    coverage-project:
-      run: task test:coverage:project
+    coverage:
+      run: task test:coverage

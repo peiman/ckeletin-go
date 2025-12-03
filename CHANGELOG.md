@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Go version management**: `.go-version` file as SSOT for build toolchain version
+  - `task check:go-version` validates system Go matches pinned version
+  - `task doctor` shows version comparison (minimum, expected, installed)
+  - CI workflows now read from `.go-version` instead of hardcoded values
 - **Development-only commands with build tags (ADR-012)**:
   - Added `dev` command tree (only available in dev builds with `-tags dev`)
   - `dev config` - Configuration inspector:
@@ -60,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **go.mod minimum**: Lowered from `go 1.25` to `go 1.24` (actual minimum required by dependencies)
+- **Pre-push hooks**: Combined `coverage-patch` and `coverage-project` into single `coverage` hook (faster)
 - **BREAKING: `task build` now defaults to dev builds**:
   - `task build` creates dev builds with `-tags dev` (includes dev commands)
   - Use `task build:prod` for production builds (previous behavior)
