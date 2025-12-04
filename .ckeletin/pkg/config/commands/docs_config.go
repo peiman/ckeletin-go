@@ -7,7 +7,7 @@
 
 package commands
 
-import "github.com/peiman/ckeletin-go/internal/config"
+import "github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 
 // DocsConfigMetadata defines all metadata for the docs config subcommand
 var DocsConfigMetadata = config.CommandMetadata{
