@@ -93,8 +93,12 @@ tasks:
           echo "   Adding remote 'ckeletin-upstream'..."
           git remote add ckeletin-upstream https://github.com/peiman/ckeletin-go.git
         fi
-        echo "   Pulling latest framework..."
-        git subtree pull --prefix=.ckeletin ckeletin-upstream main --squash -m "chore: update ckeletin framework"
+        echo "   Fetching latest framework..."
+        git fetch ckeletin-upstream main
+        echo "   Applying framework update..."
+        git checkout ckeletin-upstream/main -- .ckeletin/
+        git add .ckeletin
+        git commit -m "chore: update ckeletin framework"
         echo ""
         echo "✅ Framework updated successfully!"
         echo "   Review changes with: git diff HEAD~1"
