@@ -46,7 +46,6 @@ Import from `.ckeletin/pkg/`:
 import (
     "github.com/youruser/yourproject/.ckeletin/pkg/config"
     "github.com/youruser/yourproject/.ckeletin/pkg/logger"
-    "github.com/youruser/yourproject/.ckeletin/pkg/ui"
 )
 ```
 

@@ -50,9 +50,9 @@ components:
     in:
       - .ckeletin/pkg/config/**
       - .ckeletin/pkg/logger/**
-      - .ckeletin/pkg/ui/**
       - .ckeletin/pkg/testutil/**
       - internal/config/commands/**
+      - internal/ui/**
 
   # Layer 3: Business Logic Layer
   # - Feature-specific implementations
