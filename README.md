@@ -205,6 +205,35 @@ All architectural decisions are documented in **[Architecture Decision Records (
 
 ---
 
+## Framework Architecture
+
+ckeletin-go separates **framework code** (reusable infrastructure) from **project code** (your custom CLI):
+
+```
+myapp/
+├── .ckeletin/              # FRAMEWORK - updated via `task ckeletin:update`
+│   ├── Taskfile.yml        # Quality checks, build tasks
+│   ├── pkg/                # Config, logger, UI, testutil packages
+│   ├── scripts/            # Validation and check scripts
+│   └── docs/adr/           # Framework ADRs (000-099)
+│
+├── Taskfile.yml            # PROJECT - your task aliases + custom tasks
+├── cmd/                    # Your commands (ping is an example)
+├── internal/               # Your business logic
+├── docs/adr/               # Your ADRs (100+)
+└── .golangci.yml           # Your tool configs (customize freely)
+```
+
+**Key benefit**: Update framework without touching your code:
+
+```bash
+task ckeletin:update        # Pull latest framework improvements
+```
+
+Your commands, configs, and business logic are never affected by framework updates.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -793,20 +822,23 @@ Configuration options live alongside their commands and self-register with the g
 
 Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via the registry in `cmd/root.go`.
 
-### What’s Framework vs. What You Should Edit
+### What's Framework vs. What You Should Edit
 
-- Framework (avoid modifying unless you are changing the scaffold itself):
-  - `cmd/root.go` (bootstrap, root wiring, `setupCommandConfig`, helpers like `getConfigValueWithFlags`/`getKeyValue`)
-  - `cmd/flags.go` (auto-registration of flags from options)
-  - `internal/config/options.go` (types), `internal/config/registry.go` (provider registry + `SetDefaults`)
-  - `internal/logger/*`, `internal/ui/*`, `internal/docs/*` (shared subsystems)
-  - `Taskfile.yml`, scripts under `scripts/`
+- **Framework** (lives in `.ckeletin/`, updated via `task ckeletin:update`):
+  - `.ckeletin/Taskfile.yml` - Quality checks, build, test tasks
+  - `.ckeletin/pkg/config/` - Configuration registry, types, validation
+  - `.ckeletin/pkg/logger/` - Zerolog dual-output logging
+  - `.ckeletin/pkg/ui/` - Bubble Tea utilities
+  - `.ckeletin/scripts/` - All validation and check scripts
+  - `.ckeletin/docs/adr/` - Framework architectural decisions (000-099)
 
-- User-editable (where you implement your app):
-  - New commands under `cmd/<command>.go`
-  - Command options under `internal/config/<command>_options.go`
-  - Documentation content under `docs/` as needed
-  - Optional UI customizations under `internal/ui/*` for your app-specific UI
+- **Project** (yours to edit freely):
+  - `cmd/*.go` - Your commands (root.go, helpers.go are shared patterns)
+  - `internal/` - Your business logic
+  - `internal/config/commands/` - Your command configurations
+  - `docs/adr/` - Your project ADRs (100+)
+  - `.golangci.yml`, `.lefthook.yml`, etc. - Your tool configurations
+  - `Taskfile.yml` - Your aliases and custom tasks
 
 ### Customizing the UI
 
