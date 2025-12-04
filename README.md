@@ -213,13 +213,13 @@ ckeletin-go separates **framework code** (reusable infrastructure) from **projec
 myapp/
 ├── .ckeletin/              # FRAMEWORK - updated via `task ckeletin:update`
 │   ├── Taskfile.yml        # Quality checks, build tasks
-│   ├── pkg/                # Config, logger, UI, testutil packages
+│   ├── pkg/                # Config, logger, testutil packages
 │   ├── scripts/            # Validation and check scripts
 │   └── docs/adr/           # Framework ADRs (000-099)
 │
 ├── Taskfile.yml            # PROJECT - your task aliases + custom tasks
 ├── cmd/                    # Your commands (ping is an example)
-├── internal/               # Your business logic
+├── internal/               # Your business logic + UI
 ├── docs/adr/               # Your ADRs (100+)
 └── .golangci.yml           # Your tool configs (customize freely)
 ```
@@ -828,13 +828,13 @@ Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via 
   - `.ckeletin/Taskfile.yml` - Quality checks, build, test tasks
   - `.ckeletin/pkg/config/` - Configuration registry, types, validation
   - `.ckeletin/pkg/logger/` - Zerolog dual-output logging
-  - `.ckeletin/pkg/ui/` - Bubble Tea utilities
   - `.ckeletin/scripts/` - All validation and check scripts
   - `.ckeletin/docs/adr/` - Framework architectural decisions (000-099)
 
 - **Project** (yours to edit freely):
   - `cmd/*.go` - Your commands (root.go, helpers.go are shared patterns)
   - `internal/` - Your business logic
+  - `internal/ui/` - UI components (Bubble Tea examples)
   - `internal/config/commands/` - Your command configurations
   - `docs/adr/` - Your project ADRs (100+)
   - `.golangci.yml`, `.lefthook.yml`, etc. - Your tool configurations
