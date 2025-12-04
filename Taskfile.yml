@@ -60,6 +60,26 @@ tasks:
     desc: Clean all artifacts
     cmds: [task: ckeletin:clean]
 
+  # === Hook Aliases (used by .lefthook.yml) ===
+
+  format:staged:
+    cmds: [task: ckeletin:format:staged]
+
+  validate:constants:
+    cmds: [task: ckeletin:validate:constants]
+
+  check:deps:verify:
+    cmds: [task: ckeletin:check:deps:verify]
+
+  check:secrets:staged:
+    cmds: [task: ckeletin:check:secrets:staged]
+
+  check:vuln:fast:
+    cmds: [task: ckeletin:check:vuln:fast]
+
+  test:coverage:
+    cmds: [task: ckeletin:test:coverage]
+
   # === Framework Update ===
 
   ckeletin:update:
