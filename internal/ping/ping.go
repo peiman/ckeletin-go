@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/ui"
 	"github.com/rs/zerolog/log"
 )
 

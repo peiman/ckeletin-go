@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"

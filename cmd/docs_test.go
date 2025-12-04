@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/internal/docs"
-	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"

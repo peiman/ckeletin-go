@@ -3,10 +3,10 @@
 package cmd
 
 import (
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/internal/config/commands"
 	"github.com/peiman/ckeletin-go/internal/ping"
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/ui"
 	"github.com/spf13/cobra"
 )
 

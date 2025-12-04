@@ -7,7 +7,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 )
 
 // Function type for YAML content generation, used for testing

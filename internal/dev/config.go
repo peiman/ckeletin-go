@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/viper"
 )
 
