@@ -46,7 +46,7 @@ task doctor  # Checks if tools were built with older Go version
 ### First Steps
 1. Read `Taskfile.yml` to understand available commands
 2. Review `README.md` for project overview
-3. Check `docs/adr/*.md` for architectural decisions
+3. Check `.ckeletin/docs/adr/*.md` for architectural decisions
 4. Understand the codebase structure before making changes
 
 ## Task Command Usage (CRITICAL)
@@ -254,11 +254,11 @@ ckeletin-go/
 **Key Principles:**
 1. **Ultra-thin commands**: Commands in `cmd/` should be ~20-30 lines
 2. **Business logic in `internal/`**: Keep implementation details internal
-3. **Follow ADRs**: All architectural decisions are documented in `docs/adr/`
+3. **Follow ADRs**: Framework decisions in `.ckeletin/docs/adr/`, project decisions in `docs/adr/`
 
 ### Architecture Decision Records (ADRs)
 
-**MUST READ** `docs/adr/*.md` before making architectural changes!
+**MUST READ** `.ckeletin/docs/adr/*.md` before making architectural changes!
 
 | ADR | Topic | Key Principle |
 |-----|-------|---------------|
@@ -428,7 +428,7 @@ git diff test/integration/testdata/
 
 **ckeletin-go uses automated license compliance checking to prevent legal issues.**
 
-See [ADR-011](docs/adr/011-license-compliance.md) for full strategy and [docs/licenses.md](docs/licenses.md) for user guide.
+See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) for full strategy and [docs/licenses.md](docs/licenses.md) for user guide.
 
 ### When to Check Licenses
 
@@ -686,7 +686,7 @@ task check runs:
 task --list                    # See all available tasks
 cat Taskfile.yml              # Understand what tasks do
 cat README.md                 # Project overview
-ls docs/adr/                  # Review architectural decisions
+ls .ckeletin/docs/adr/        # Review architectural decisions
 
 # 3. Check your environment
 task check                    # Ensure everything works
@@ -753,14 +753,14 @@ git push -u origin <branch-name>
 
 ### When Stuck
 1. Check `Taskfile.yml` to understand what a task does
-2. Review relevant ADR in `docs/adr/` for architectural context
+2. Review relevant ADR in `.ckeletin/docs/adr/` for architectural context
 3. Look at similar code in the codebase for patterns
 4. Check `.cursor/rules/*.mdc` for detailed conventions
 5. Ask the user for clarification when uncertain
 
 ### Key Resources
-- **docs/adr/ARCHITECTURE.md** - System structure (WHAT the system is: components, flows, interactions)
-- **docs/adr/*.md** - Architectural decisions (WHY it's this way: rationale, alternatives, consequences)
+- **.ckeletin/docs/adr/ARCHITECTURE.md** - System structure (WHAT the system is: components, flows, interactions)
+- **.ckeletin/docs/adr/*.md** - Architectural decisions (WHY it's this way: rationale, alternatives, consequences)
 - **Taskfile.yml** - All available commands and their implementations
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage
