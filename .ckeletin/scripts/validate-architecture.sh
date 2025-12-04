@@ -18,8 +18,15 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 
 check_header "Validating architecture documentation SSOT"
 
-ARCHITECTURE_FILE="docs/adr/ARCHITECTURE.md"
-ADR_DIR="docs/adr"
+# Check for framework structure first, fall back to old structure
+if [ -f ".ckeletin/docs/adr/ARCHITECTURE.md" ]; then
+    ARCHITECTURE_FILE=".ckeletin/docs/adr/ARCHITECTURE.md"
+    ADR_DIR=".ckeletin/docs/adr"
+else
+    ARCHITECTURE_FILE="docs/adr/ARCHITECTURE.md"
+    ADR_DIR="docs/adr"
+fi
+
 EXIT_CODE=0
 ERROR_DETAILS=""
 

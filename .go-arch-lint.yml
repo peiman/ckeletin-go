@@ -45,13 +45,14 @@ components:
   # - Progress reporting (with Bubble Tea support)
   # - Test utilities (testutil package)
   # - Cross-cutting concerns available to all layers
+  # Note: Framework packages are in .ckeletin/pkg/, project configs in internal/config/commands/
   infrastructure:
     in:
-      - internal/config/**
-      - internal/logger/**
-      - internal/ui/**
-      - internal/progress/**
-      - internal/testutil/**
+      - .ckeletin/pkg/config/**
+      - .ckeletin/pkg/logger/**
+      - .ckeletin/pkg/ui/**
+      - .ckeletin/pkg/testutil/**
+      - internal/config/commands/**
 
   # Layer 3: Business Logic Layer
   # - Feature-specific implementations
@@ -65,6 +66,7 @@ components:
       - internal/ping/**
       - internal/docs/**
       - internal/dev/**
+      - internal/progress/**
 
 # External dependencies (vendors from go.mod)
 vendors:

@@ -30,10 +30,13 @@ for cmd_file in $COMMAND_FILES; do
         continue
     fi
 
-    # Check 1: Command metadata exists
+    # Check 1: Command metadata exists (check both project and framework locations)
     if ! find internal/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
-        ERROR_DETAILS+="$cmd_name: Missing metadata file internal/config/commands/${cmd_name}_config.go"$'\n'
-        ((ERRORS++))
+        # Also check framework location
+        if ! find .ckeletin/pkg/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
+            ERROR_DETAILS+="$cmd_name: Missing metadata file internal/config/commands/${cmd_name}_config.go"$'\n'
+            ((ERRORS++))
+        fi
     fi
 
     # Check 2: Uses NewCommand helper
