@@ -28,8 +28,12 @@ func runCheckSummary(t *testing.T) string {
 		}()
 	}
 
-	// Execute the check summary script
-	cmd := exec.Command("bash", "scripts/check-summary.sh")
+	// Execute the check summary script (check framework location first)
+	scriptPath := ".ckeletin/scripts/check-summary.sh"
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		scriptPath = "scripts/check-summary.sh" // Fallback to old location
+	}
+	cmd := exec.Command("bash", scriptPath)
 	output, err := cmd.CombinedOutput()
 
 	// For golden file testing, we want to capture successful runs

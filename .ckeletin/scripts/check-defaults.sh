@@ -16,10 +16,10 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 check_header "Validating ADR-002: Config defaults in registry"
 
 # Find all Go files that call viper.SetDefault(), excluding:
-# 1. registry.go (authorized location)
+# 1. registry.go (authorized location - both old and new paths)
 # 2. *_test.go files (allowed in tests)
 # 3. comment lines (not actual calls)
-UNAUTHORIZED_DEFAULTS=$(grep -rn --include="*.go" --exclude="*_test.go" "viper\.SetDefault" . | grep -v "internal/config/registry.go" | grep -v "//.*viper\.SetDefault" || true)
+UNAUTHORIZED_DEFAULTS=$(grep -rn --include="*.go" --exclude="*_test.go" "viper\.SetDefault" . | grep -v "internal/config/registry.go" | grep -v "\.ckeletin/pkg/config/registry.go" | grep -v "//.*viper\.SetDefault" || true)
 
 if [ -n "$UNAUTHORIZED_DEFAULTS" ]; then
     check_failure \
