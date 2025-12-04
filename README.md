@@ -178,7 +178,7 @@ Each command manages its own configuration and defaults, promoting modularity an
   - **CI integration**: Automated checks on every PR. Violations block merge
   - **Reproducible compliance**: Pinned tool versions ensure consistent license detection across environments
   - **Customizable policy**: Override allowed licenses via environment or `.lichen.yaml`
-  - See [ADR-011](docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
+  - See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
 - **High Test Coverage & Quality Checks**: >80% coverage enforced by CI. Hundreds of real tests ensure a robust codebase that meets production standards.
 
@@ -187,7 +187,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Architecture
 
 **ckeletin-go follows a principled architecture emphasizing:**
-- **Layered architecture** - 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with automated enforcement ([ADR-009](docs/adr/009-layered-architecture-pattern.md))
+- **Layered architecture** - 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with automated enforcement ([ADR-009](.ckeletin/docs/adr/009-layered-architecture-pattern.md))
 - **Separation of concerns** - CLI wiring separate from business logic
 - **Single source of truth** - One canonical place for all configuration, tasks, and patterns
 - **Type safety** - Auto-generated constants, strong typing throughout
@@ -197,10 +197,10 @@ Each command manages its own configuration and defaults, promoting modularity an
 All architectural decisions are documented in **[Architecture Decision Records (ADRs)](docs/adr/)** with detailed rationale and implementation guidance.
 
 **Key architectural patterns:**
-- Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](docs/adr/001-ultra-thin-command-pattern.md))
-- Centralized configuration registry with type-safe constants ([ADR-002](docs/adr/002-centralized-configuration-registry.md))
-- Dependency injection over mocking for testability ([ADR-003](docs/adr/003-dependency-injection-over-mocking.md))
-- Dual-tool license compliance checking (source + binary) ([ADR-011](docs/adr/011-license-compliance.md))
+- Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md))
+- Centralized configuration registry with type-safe constants ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md))
+- Dependency injection over mocking for testability ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
+- Dual-tool license compliance checking (source + binary) ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
 - Automated validation prevents architectural drift (`task validate:layering`)
 
 ---
@@ -352,7 +352,7 @@ This design ensures you don't need to search and replace names across multiple f
 
 Configuration options are defined in command files and self-register with the central registry.
 
-**To add new configuration options:** See examples in `cmd/ping.go` or `cmd/docs.go`, or read [ADR-002](docs/adr/002-centralized-configuration-registry.md) for the complete pattern.
+**To add new configuration options:** See examples in `cmd/ping.go` or `cmd/docs.go`, or read [ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md) for the complete pattern.
 
 **For all available configuration options:** Run `task generate:docs:config` to generate [docs/configuration.md](docs/configuration.md).
 
@@ -525,7 +525,7 @@ Validate configuration files for correctness, security, and completeness.
 
 ## Development Workflow
 
-This project follows a **task-based single source of truth** pattern where all development commands are defined in `Taskfile.yml` and used identically across local development, pre-commit hooks, and CI. See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md) for complete documentation.
+This project follows a **task-based single source of truth** pattern where all development commands are defined in `Taskfile.yml` and used identically across local development, pre-commit hooks, and CI. See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md) for complete documentation.
 
 Tasks follow the `action:target[:subvariant]` naming pattern for consistency and discoverability.
 
@@ -543,7 +543,7 @@ task build     # Build the binary
 ```
 
 **For the complete task list:** Run `task --list` or see [Taskfile.yml](Taskfile.yml).
-**For task naming pattern:** See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md).
+**For task naming pattern:** See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md).
 
 ### Development Tools & Reproducibility
 
@@ -678,7 +678,7 @@ Homebrew tap is disabled by default. To enable it:
 
 Once enabled, releases will automatically update your Homebrew tap.
 
-For more details, see [ADR-008: Release Automation](docs/adr/008-release-automation-with-goreleaser.md).
+For more details, see [ADR-008: Release Automation](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md).
 
 ---
 
