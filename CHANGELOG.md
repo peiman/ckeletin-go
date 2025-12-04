@@ -219,7 +219,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **GoReleaser for automated releases** (see [ADR-008](docs/adr/008-release-automation-with-goreleaser.md)):
+- **GoReleaser for automated releases** (see [ADR-008](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md)):
   - Multi-platform builds: Linux, macOS, Windows (amd64 and arm64)
   - Automated GitHub releases with changelog
   - Optional Homebrew tap support (configurable via HOMEBREW_TAP_OWNER env var)

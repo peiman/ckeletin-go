@@ -77,9 +77,9 @@ Be respectful, professional, and constructive in all interactions. This project 
    ```
 
 3. **Review relevant ADRs:**
-   - [ADR-001](docs/adr/001-ultra-thin-command-pattern.md) - Command structure
-   - [ADR-002](docs/adr/002-centralized-configuration-registry.md) - Configuration
-   - [ADR-003](docs/adr/003-dependency-injection-over-mocking.md) - Testing approach
+   - [ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md) - Command structure
+   - [ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md) - Configuration
+   - [ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md) - Testing approach
 
 ### During Development
 
@@ -118,7 +118,7 @@ Pre-commit hooks will also run automatically via Lefthook.
 
 ## Adding a New Command
 
-Follow the **ultra-thin command pattern** ([ADR-001](docs/adr/001-ultra-thin-command-pattern.md)):
+Follow the **ultra-thin command pattern** ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md)):
 
 ### Step 1: Scaffold the Command
 
@@ -390,7 +390,7 @@ Add test cases covering the new option.
 
 ### Testing Principles
 
-Follow [ADR-003](docs/adr/003-dependency-injection-over-mocking.md):
+Follow [ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md):
 
 1. **Use dependency injection** over mocking frameworks
 2. **Inject concrete implementations** via constructors
