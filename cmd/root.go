@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/peiman/ckeletin-go/internal/config"
-	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

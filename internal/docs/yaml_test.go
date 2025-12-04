@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 )
 
 // TestGenerateYAMLDocs tests the YAML document generation
