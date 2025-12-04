@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/peiman/ckeletin-go/internal/config"
-	_ "github.com/peiman/ckeletin-go/internal/config/commands" // Import to trigger init() registration
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	_ "github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands" // Import to trigger init() registration
 	"github.com/spf13/viper"
 )
 
