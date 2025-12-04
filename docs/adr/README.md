@@ -1,88 +1,76 @@
-# Architecture Decision Records
+# Project Architecture Decision Records
 
-This directory contains Architecture Decision Records (ADRs) for ckeletin-go.
+This directory contains Architecture Decision Records (ADRs) for your **project-specific** decisions.
 
-## What is an ADR?
+## Two-Tier ADR System
 
-An Architecture Decision Record (ADR) captures an important architectural decision made along with its context and consequences.
+| Location | Numbers | Purpose |
+|----------|---------|---------|
+| `.ckeletin/docs/adr/` | 000-099 | **Framework** decisions (updated with framework) |
+| `docs/adr/` | 100+ | **Project** decisions (your custom choices) |
 
-## Reading Guide
+## Framework ADRs (000-099)
 
-**New to ckeletin-go?** Start here for the fastest path to understanding the architecture:
+Framework ADRs document decisions about the ckeletin infrastructure:
 
-### 1. **Begin with the System Overview** (~20 min)
+- [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md) - Task-Based Workflow (Foundational)
+- [ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md) - Ultra-Thin Command Pattern
+- [ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md) - Centralized Configuration Registry
+- [ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md) - Dependency Injection Over Mocking
+- [ADR-004](.ckeletin/docs/adr/004-security-validation-in-config.md) - Security Validation in Configuration
+- [ADR-005](.ckeletin/docs/adr/005-auto-generated-config-constants.md) - Auto-Generated Config Constants
+- [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md) - Structured Logging with Zerolog
+- [ADR-007](.ckeletin/docs/adr/007-bubble-tea-for-interactive-ui.md) - Bubble Tea for Interactive UI
+- [ADR-008](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md) - Release Automation with GoReleaser
+- [ADR-009](.ckeletin/docs/adr/009-layered-architecture-pattern.md) - Layered Architecture Pattern
+- [ADR-010](.ckeletin/docs/adr/010-package-organization-strategy.md) - Package Organization Strategy
+- [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) - License Compliance Strategy
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Shows WHAT the system is
-  - Component structure and interactions
-  - Initialization sequence
-  - Configuration flow
-  - Command execution lifecycle
-  - How all ADRs work together
+See [.ckeletin/docs/adr/](../../.ckeletin/docs/adr/) for full framework documentation.
 
-### 2. **Understand the Foundation** (~10 min)
+## Project ADRs (100+)
 
-- **[ADR-000](000-task-based-single-source-of-truth.md)** - Task-Based Workflow (Foundational)
-  - Why task commands are the single source of truth
-  - How local development mirrors CI/CD
-  - Pattern enforcement automation
+Document your project-specific architectural decisions here:
 
-### 3. **Dive into Specific Areas** (Based on your interest)
-
-**Working on commands?**
-- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-thin commands (~20-30 lines)
-- [ADR-002](002-centralized-configuration-registry.md) - Config registry
-- [ADR-005](005-auto-generated-config-constants.md) - Type-safe constants
-
-**Writing tests?**
-- [ADR-003](003-dependency-injection-over-mocking.md) - DI over mocking
-
-**Security or compliance?**
-- [ADR-004](004-security-validation-in-config.md) - Security validation
-- [ADR-011](011-license-compliance.md) - License compliance
-
-**Infrastructure?**
-- [ADR-006](006-structured-logging-with-zerolog.md) - Structured logging
-- [ADR-007](007-bubble-tea-for-interactive-ui.md) - Interactive UIs
-- [ADR-008](008-release-automation-with-goreleaser.md) - Release automation
-
-### 4. **Making Architectural Changes?**
-
-1. Read **ARCHITECTURE.md** to understand system-wide impact
-2. Read relevant ADRs to understand constraints and rationale
-3. Validate your changes with `task check` (enforces all ADR patterns)
-
----
-
-## Document Separation of Concerns
-
-**ARCHITECTURE.md vs ADRs - What's the Difference?**
-
-| Document | Purpose | Contains |
-|----------|---------|----------|
-| **ARCHITECTURE.md** | System structure (WHAT) | Components, flows, diagrams, interactions |
-| **ADRs** | Decisions (WHY) | Context, rationale, alternatives, consequences |
-
-**Example:**
-- ARCHITECTURE.md: "Commands are ~20-30 lines and delegate to business logic"
-- ADR-001: "WHY commands are thin: testability, separation of concerns, alternatives considered"
-
-This separation prevents duplication and is enforced by `task validate:architecture`.
-
-**Known Gaps:**
-
-Some architectural decisions in ARCHITECTURE.md lack formal ADRs and are marked with `<!-- TODO: ADR -->` comments. These markers:
-- Make missing ADRs self-documenting (single source of truth)
-- Are excluded from validation failures (allowed WHY statements)
-- Track future ADR work without duplicating content
-
-To find all missing ADRs, search ARCHITECTURE.md:
-```bash
-grep -n "<!-- TODO: ADR" docs/adr/ARCHITECTURE.md
+```markdown
+docs/adr/
+├── README.md        # This file
+├── TEMPLATE.md      # Template for new ADRs
+├── 100-*.md         # Your first project ADR
+├── 101-*.md         # Your second project ADR
+└── ...
 ```
 
-This maintains SSOT - the TODO markers are the **only** place where missing ADRs are tracked.
+### Examples of Project ADRs
 
----
+- Database choice (PostgreSQL vs MySQL vs SQLite)
+- API design patterns (REST vs GraphQL)
+- Authentication strategy (JWT vs sessions)
+- Deployment architecture (Kubernetes vs serverless)
+- Third-party service integrations
+
+## Creating a New Project ADR
+
+1. Copy the template:
+   ```bash
+   cp docs/adr/TEMPLATE.md docs/adr/100-my-decision.md
+   ```
+
+2. Fill in all sections:
+   - Status, Context, Decision, Consequences
+
+3. Update this README's index (below)
+
+4. Commit with your implementation
+
+## Project ADR Index
+
+*(Add your project ADRs here as you create them)*
+
+<!-- Example:
+- [ADR-100](100-database-selection.md) - Database Selection (PostgreSQL)
+- [ADR-101](101-api-versioning.md) - API Versioning Strategy
+-->
 
 ## ADR Format
 
@@ -95,38 +83,14 @@ Each ADR follows this structure:
 [Proposed | Accepted | Deprecated | Superseded]
 
 ## Context
-What is the issue that we're seeing that is motivating this decision or change?
+What is the issue motivating this decision?
 
 ## Decision
-What is the change that we're proposing and/or doing?
+What is the change we're proposing/doing?
 
 ## Consequences
-What becomes easier or more difficult to do because of this change?
+What becomes easier or more difficult?
 ```
-
-## Index
-
-- [ADR-000](000-task-based-single-source-of-truth.md) - Task-Based Single Source of Truth (Foundational)
-- [ADR-001](001-ultra-thin-command-pattern.md) - Ultra-Thin Command Pattern
-- [ADR-002](002-centralized-configuration-registry.md) - Centralized Configuration Registry
-- [ADR-003](003-dependency-injection-over-mocking.md) - Dependency Injection Over Mocking
-- [ADR-004](004-security-validation-in-config.md) - Security Validation in Configuration
-- [ADR-005](005-auto-generated-config-constants.md) - Auto-Generated Configuration Constants
-- [ADR-006](006-structured-logging-with-zerolog.md) - Structured Logging with Zerolog
-- [ADR-007](007-bubble-tea-for-interactive-ui.md) - Bubble Tea for Interactive UI
-- [ADR-008](008-release-automation-with-goreleaser.md) - Release Automation with GoReleaser
-- [ADR-009](009-layered-architecture-pattern.md) - Layered Architecture Pattern
-- [ADR-010](010-package-organization-strategy.md) - Package Organization Strategy
-- [ADR-011](011-license-compliance.md) - License Compliance Strategy (Dual-Tool Approach)
-- [ADR-012](012-dev-commands-build-tags.md) - Build Tags for Dev-Only Commands
-
-## Creating a New ADR
-
-1. Copy the template
-2. Number it sequentially
-3. Fill in all sections thoughtfully
-4. Update this index
-5. Commit with the changes it describes
 
 ## References
 
