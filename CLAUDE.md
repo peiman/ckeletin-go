@@ -755,8 +755,7 @@ git push -u origin <branch-name>
 1. Check `Taskfile.yml` to understand what a task does
 2. Review relevant ADR in `.ckeletin/docs/adr/` for architectural context
 3. Look at similar code in the codebase for patterns
-4. Check `.cursor/rules/*.mdc` for detailed conventions
-5. Ask the user for clarification when uncertain
+4. Ask the user for clarification when uncertain
 
 ### Key Resources
 - **.ckeletin/docs/adr/ARCHITECTURE.md** - System structure (WHAT the system is: components, flows, interactions)
@@ -764,5 +763,4 @@ git push -u origin <branch-name>
 - **Taskfile.yml** - All available commands and their implementations
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage
-- **.cursor/rules/** - Detailed development rules and conventions
 - never use --no-verify before asking my permission with a good deviation description
