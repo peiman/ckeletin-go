@@ -98,7 +98,7 @@ Now add your feature and look like a senior engineer.
     - [Options Pattern for Command Configuration](#options-pattern-for-command-configuration)
     - [Modifying Configurations](#modifying-configurations)
     - [Customizing the UI](#customizing-the-ui)
-    - [Cursor AI Integration](#cursor-ai-integration)
+    - [AI Integration](#ai-integration)
   - [Tooling Best Practices](#tooling-best-practices)
   - [Contributing](#contributing)
   - [License](#license)
@@ -844,29 +844,21 @@ Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via 
 
 Explore the `internal/ui/` package to modify the Bubble Tea model, colors, and interactivity. Use configs to allow runtime customization of UI elements.
 
-### Cursor AI Integration
+### AI Integration
 
-The project includes a template for Cursor AI rules in `dot.cursorrules`. This template contains detailed project specifications that help Cursor AI understand the project structure, coding conventions, and requirements.
+This project includes `CLAUDE.md` with comprehensive guidelines for AI coding assistants:
 
-To use it with Cursor:
-
-1. Copy the template to a `.cursorrules` file:
-
-```bash
-cp dot.cursorrules .cursorrules
-```
-
-2. Cursor will automatically detect and use these rules to provide better code suggestions and assistance.
-
-The template covers:
-
-- Project structure and design principles
-- Command implementation patterns
-- Error handling guidelines
-- Testing requirements
+- Task-based workflow commands (`task check`, `task test`, etc.)
+- Architecture Decision Records (ADRs) references
+- Code quality standards and coverage requirements
+- Testing conventions (table-driven tests, dependency injection)
+- Structured logging with Zerolog
 - Git commit conventions
+- License compliance workflow
 
-You can customize the rules to match your project's specific requirements.
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) automatically reads `CLAUDE.md` when working in this repository.
+
+For other AI assistants (Cursor, Copilot, etc.), point them to `CLAUDE.md` as the authoritative source for project conventions.
 
 ---
 
