@@ -11,9 +11,10 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 
 check_header "Validating ADR-005: Config constants in sync"
 
-# Generate to temp file
-TEMP_FILE=$(mktemp)
-trap "rm -f $TEMP_FILE" EXIT
+# Temp files for comparison
+TEMP_CURRENT=$(mktemp)
+TEMP_FRESH=$(mktemp)
+trap "rm -f $TEMP_CURRENT $TEMP_FRESH" EXIT
 
 # Determine keys file location (framework vs old structure)
 if [ -f ".ckeletin/pkg/config/keys_generated.go" ]; then
@@ -24,19 +25,21 @@ else
     GEN_SCRIPT="scripts/generate-config-constants.go"
 fi
 
-# Run full generation task (includes formatting)
-# Suppress output and capture the file before git restore
+# Save current working tree version (may have uncommitted changes)
+cp "$KEYS_FILE" "$TEMP_CURRENT"
+
+# Generate fresh constants to the actual file
 go run "$GEN_SCRIPT" > /dev/null 2>&1
 task ckeletin:format:staged -- "$KEYS_FILE" > /dev/null 2>&1
 
-# Copy newly generated and formatted file to temp
-cp "$KEYS_FILE" "$TEMP_FILE"
+# Save freshly generated version
+cp "$KEYS_FILE" "$TEMP_FRESH"
 
-# Restore original from git
-git checkout "$KEYS_FILE" 2>/dev/null || true
+# Restore working tree version (don't lose uncommitted work)
+cp "$TEMP_CURRENT" "$KEYS_FILE"
 
-# Compare
-if ! diff -q "$TEMP_FILE" "$KEYS_FILE" > /dev/null 2>&1; then
+# Compare: current working tree should match freshly generated
+if ! diff -q "$TEMP_CURRENT" "$TEMP_FRESH" > /dev/null 2>&1; then
     check_failure \
         "Config constants are out of date" \
         "Generated constants in keys_generated.go don't match the registry" \

@@ -29,6 +29,10 @@ type ConfigOption struct {
 	// Type is the data type of the option (string, int, bool, etc.)
 	Type string
 
+	// ShortFlag is the single-character short flag (e.g., "f" for -f)
+	// Leave empty if no short flag is desired
+	ShortFlag string
+
 	// Required indicates whether this option is required
 	Required bool
 
