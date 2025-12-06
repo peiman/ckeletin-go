@@ -80,6 +80,10 @@ tasks:
   test:coverage:
     cmds: [task: ckeletin:test:coverage]
 
+  test:unit:
+    desc: Run unit tests only (fast, skips integration tests)
+    cmds: [task: ckeletin:test:unit]
+
   # === Framework Update ===
 
   ckeletin:update:
