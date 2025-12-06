@@ -258,7 +258,9 @@ func updateGoreleaser(oldName, newName string) error {
 
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
-		if strings.Contains(line, "project_name:") {
+		// Match actual config line, not comments (line must start with project_name:)
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "project_name:") && !strings.HasPrefix(trimmed, "#") {
 			// Replace the old name with new name
 			lines[i] = strings.ReplaceAll(line, oldName, newName)
 			break
