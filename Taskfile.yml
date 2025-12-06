@@ -84,6 +84,34 @@ tasks:
     desc: Run unit tests only (fast, skips integration tests)
     cmds: [task: ckeletin:test:unit]
 
+  test:race:
+    desc: Run tests with race detection
+    cmds: [task: ckeletin:test:race]
+
+  test:dev:
+    desc: Run tests with dev commands
+    cmds: [task: ckeletin:test:dev]
+
+  test:prod:
+    desc: Run tests without dev commands
+    cmds: [task: ckeletin:test:prod]
+
+  test:integration:
+    desc: Run integration tests
+    cmds: [task: ckeletin:test:integration]
+
+  build:dev:
+    desc: Build the binary with dev commands
+    cmds: [task: ckeletin:build:dev]
+
+  build:prod:
+    desc: Build production binary without dev commands
+    cmds: [task: ckeletin:build:prod]
+
+  generate:license:report:
+    desc: Generate license report (CSV format)
+    cmds: [task: ckeletin:generate:license:report]
+
   # === Framework Update ===
 
   ckeletin:update:
