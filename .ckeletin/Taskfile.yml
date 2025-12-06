@@ -565,7 +565,7 @@ tasks:
     desc: Check licenses in compiled binary (accurate, for releases)
     silent: true
     cmds:
-      - '{{.SCRIPTS_DIR}}/check-licenses-binary.sh'
+      - '{{.SCRIPTS_DIR}}/check-licenses-binary.sh ./{{._BINARY_NAME}}'
     deps: [build]
 
   generate:license:
