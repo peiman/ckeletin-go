@@ -722,9 +722,9 @@ tasks:
     cmds:
       - |
         {{if eq OS "windows"}}
-        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null 2>&1
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
         {{else}}
-        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null 2>&1
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
         {{end}}
 
   build:dev:
@@ -733,9 +733,9 @@ tasks:
     cmds:
       - |
         {{if eq OS "windows"}}
-        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null 2>&1
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
         {{else}}
-        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null 2>&1
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
         {{end}}
 
   build:prod:
@@ -744,9 +744,9 @@ tasks:
     cmds:
       - |
         {{if eq OS "windows"}}
-        go build {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null 2>&1
+        go build {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
         {{else}}
-        go build {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null 2>&1
+        go build {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
         {{end}}
 
   run:
