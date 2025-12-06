@@ -1,11 +1,27 @@
 # GoReleaser configuration for ckeletin-go
 # See: https://goreleaser.com
 #
-# CUSTOMIZATION FOR FORKS:
+# ============================================================================
+# OWNERSHIP MODEL (Framework Separation)
+# ============================================================================
 #
-# Required:
-#   - Update 'project_name' below to match BINARY_NAME in Taskfile.yml
-#     This is the SINGLE SOURCE for binary name in GoReleaser
+# This file has MIXED OWNERSHIP:
+#
+# PROJECT-MANAGED (line ~30):
+#   - project_name: Must match BINARY_NAME in Taskfile.yml
+#   - Updated by `task init` during scaffold initialization
+#
+# FRAMEWORK-MANAGED (everything else):
+#   - Build configuration, archives, checksums, SBOM
+#   - Changelog, Homebrew, release settings
+#   - These use templates ({{ .ProjectName }}) and auto-detection
+#
+# When running `task ckeletin:update`:
+# - This file is NOT automatically updated (it's in project root)
+# - Check framework CHANGELOG for release configuration changes
+# - Manually incorporate framework improvements if needed
+#
+# ============================================================================
 #
 # Optional (Homebrew tap):
 #   - Set HOMEBREW_TAP_OWNER env var in CI to your GitHub username
@@ -19,9 +35,18 @@
 
 version: 2
 
-# Metadata - Single source of truth for binary/project name
+# -------------------------------------------------------------------------
+# PROJECT-MANAGED: Binary/Project Name
+# -------------------------------------------------------------------------
 # IMPORTANT: Must match BINARY_NAME in Taskfile.yml
+# Updated by `task init` during scaffold initialization
 project_name: ckeletin-go
+
+# -------------------------------------------------------------------------
+# FRAMEWORK-MANAGED: Build, Archive, Release Configuration
+# -------------------------------------------------------------------------
+# Everything below uses templates ({{ .ProjectName }}) and auto-detection.
+# Rarely needs modification. Check framework CHANGELOG for updates.
 
 # Build configuration
 # Binary name automatically uses 'project_name' defined above

@@ -6,8 +6,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/config"
-	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

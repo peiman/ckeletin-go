@@ -3,8 +3,8 @@
 package cmd
 
 import (
-	"github.com/peiman/ckeletin-go/internal/config"
-	"github.com/peiman/ckeletin-go/internal/config/commands"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands"
 	"github.com/peiman/ckeletin-go/internal/docs"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
