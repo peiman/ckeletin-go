@@ -92,6 +92,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("  ✓ Updating .gitignore")
+	if err := updateGitignore(oldName, newName); err != nil {
+		fmt.Fprintf(os.Stderr, "Error updating .gitignore: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("  ✓ Updating template files")
 	templateCount, err := updateTemplateFiles(oldModule, newModule)
 	if err != nil {
@@ -261,6 +267,23 @@ func updateGoreleaser(oldName, newName string) error {
 
 	updated := strings.Join(lines, "\n")
 	return os.WriteFile(".goreleaser.yml", []byte(updated), 0600)
+}
+
+// updateGitignore replaces the old binary name with the new one in .gitignore
+func updateGitignore(oldName, newName string) error {
+	content, err := os.ReadFile(".gitignore")
+	if err != nil {
+		// If .gitignore doesn't exist, that's okay
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	// Replace all occurrences of old binary name with new name
+	updated := strings.ReplaceAll(string(content), oldName, newName)
+
+	return os.WriteFile(".gitignore", []byte(updated), 0600)
 }
 
 // updateTemplateFiles updates module references in .example template files
