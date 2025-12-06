@@ -12,10 +12,24 @@ workdir: .
 # - internal/ packages cannot import cmd/
 # - Business logic packages are isolated from each other
 #
-# Maintenance Note:
-# - When adding new business logic packages (e.g., internal/init/), add them to
-#   the 'business' component list below
-# - Infrastructure packages (config, logger, ui) rarely change
+# ============================================================================
+# OWNERSHIP MODEL (Framework Separation)
+# ============================================================================
+#
+# This file has MIXED OWNERSHIP - some sections are framework-managed,
+# others are project-managed. See markers below.
+#
+# When running `task ckeletin:update`:
+# - This file is NOT automatically updated (it's in project root, not .ckeletin/)
+# - Check framework CHANGELOG for any infrastructure changes
+# - Manually incorporate framework improvements if needed
+#
+# ADDING NEW BUSINESS LOGIC:
+#   When you add a new command package (e.g., internal/baseline/):
+#   1. Add it to the 'business.in' list below
+#   2. Run `task ckeletin:validate:layering` to verify
+#
+# ============================================================================
 
 # Global allow settings
 allow:
@@ -32,12 +46,18 @@ excludeFiles:
   - /main_test\.go$
 
 components:
+  # -------------------------------------------------------------------------
+  # FRAMEWORK-MANAGED: Command Layer
+  # -------------------------------------------------------------------------
   # Layer 2: Command Layer (cmd/)
   # - Ultra-thin command wrappers (ADR-001)
   # - Only layer that can import Cobra
   commands:
     in: cmd
 
+  # -------------------------------------------------------------------------
+  # FRAMEWORK-MANAGED: Infrastructure Layer
+  # -------------------------------------------------------------------------
   # Layer 4: Infrastructure Layer (shared services)
   # - Configuration management (ADR-002, ADR-005) - includes subpackages
   # - Logging infrastructure (ADR-006)
@@ -45,7 +65,10 @@ components:
   # - Progress reporting (with Bubble Tea support)
   # - Test utilities (testutil package)
   # - Cross-cutting concerns available to all layers
-  # Note: Framework packages are in .ckeletin/pkg/, project configs in internal/config/commands/
+  #
+  # Framework packages: .ckeletin/pkg/*
+  # Project config: internal/config/commands/** (rarely changes)
+  # Project UI: internal/ui/** (rarely changes)
   infrastructure:
     in:
       - .ckeletin/pkg/config/**
@@ -54,19 +77,25 @@ components:
       - internal/config/commands/**
       - internal/ui/**
 
+  # -------------------------------------------------------------------------
+  # PROJECT-MANAGED: Business Logic Layer
+  # -------------------------------------------------------------------------
   # Layer 3: Business Logic Layer
   # - Feature-specific implementations
   # - No CLI framework dependencies
   # - Packages isolated from each other
   #
-  # TODO: When adding new commands, add their internal/ packages here
-  # Example: Adding 'task init' → add 'internal/init/**' below
+  # ⚠️  ADD YOUR BUSINESS LOGIC PACKAGES HERE
+  # When adding new commands, add their internal/ packages to this list.
+  # Example: Adding 'internal/baseline/**' for a new baseline command
   business:
     in:
       - internal/ping/**
       - internal/docs/**
       - internal/dev/**
       - internal/progress/**
+      # Add your business logic packages below:
+      # - internal/yourpackage/**
 
 # External dependencies (vendors from go.mod)
 vendors:
@@ -82,11 +111,17 @@ vendors:
 commonComponents:
   - infrastructure
 
+# -------------------------------------------------------------------------
+# FRAMEWORK-MANAGED: Dependency Rules
+# -------------------------------------------------------------------------
 # Dependency Rules (ADR-009)
 #
 # Enforces layered architecture dependency flow using allowlist approach
 # - Components can ONLY depend on what's listed in mayDependOn
 # - Unlisted dependencies will cause validation failures
+#
+# These rules rarely need modification. If you find yourself changing them,
+# you may be violating the layered architecture.
 deps:
   # Command layer delegates to business logic and uses infrastructure
   # Can also use Cobra and Viper (CLI framework)
