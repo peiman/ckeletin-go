@@ -156,6 +156,11 @@ func TestScaffoldInit(t *testing.T) {
 				return nil
 			}
 
+			// Skip the test file itself - it intentionally keeps upstream module reference
+			if strings.HasSuffix(path, "scaffold_init_test.go") {
+				return nil
+			}
+
 			if !info.IsDir() && strings.HasSuffix(path, ".go") {
 				content, err := os.ReadFile(path)
 				if err != nil {
