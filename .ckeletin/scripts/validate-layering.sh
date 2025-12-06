@@ -50,12 +50,22 @@ if run_check "go-arch-lint check 2>&1"; then
     exit 0
 else
     REMEDIATION="Review layer dependencies and fix violations"$'\n'
-    REMEDIATION+="Common issues:"$'\n'
+    REMEDIATION+=$'\n'"Common issues and solutions:"$'\n'
     REMEDIATION+="  • internal/ package importing from cmd/"$'\n'
+    REMEDIATION+="    → Move shared types/interfaces to infrastructure layer"$'\n'
+    REMEDIATION+=$'\n'
     REMEDIATION+="  • Business logic importing Cobra"$'\n'
+    REMEDIATION+="    → Extract CLI logic to cmd/, keep pure business logic in internal/"$'\n'
+    REMEDIATION+=$'\n'
     REMEDIATION+="  • Business logic packages importing each other"$'\n'
+    REMEDIATION+="    → Move shared code to infrastructure (e.g., internal/shared/)"$'\n'
+    REMEDIATION+="    → Or use interfaces in infrastructure that both packages implement"$'\n'
+    REMEDIATION+=$'\n'
     REMEDIATION+="  • Infrastructure importing business logic"$'\n'
-    REMEDIATION+="See ADR-009: docs/adr/009-layered-architecture-pattern.md"
+    REMEDIATION+="    → Invert the dependency using interfaces"$'\n'
+    REMEDIATION+="    → Business logic should import infrastructure, not vice versa"$'\n'
+    REMEDIATION+=$'\n'
+    REMEDIATION+="See ADR-009: .ckeletin/docs/adr/009-layered-architecture-pattern.md"
 
     check_failure \
         "Layered architecture validation failed" \
