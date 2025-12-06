@@ -158,10 +158,17 @@ tasks:
       - echo "🚀 Initializing scaffold..."
       - go run .ckeletin/scripts/scaffold-init.go "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
       - go mod tidy
+      - |
+        # Create initial version tag for clean --version output
+        if ! git tag | grep -q "^v"; then
+          git tag -a v0.0.0 -m "Initial version"
+          echo "  ✓ Created initial version tag v0.0.0"
+        fi
       - echo ""
       - echo "✅ Scaffold initialized successfully!"
       - echo "   Binary{{":"}} {{.NAME}}"
       - echo "   Module{{":"}} {{.MODULE}}"
+      - echo "   Version{{":"}} v0.0.0"
       - echo ""
       - echo "Next steps{{":"}}"
       - echo "  1. Format code{{":"}} task format"
