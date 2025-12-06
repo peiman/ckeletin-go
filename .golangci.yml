@@ -1,6 +1,29 @@
 # golangci-lint configuration
 # See: https://golangci-lint.run/usage/configuration/
 #
+# ============================================================================
+# OWNERSHIP MODEL (Framework Separation)
+# ============================================================================
+#
+# This file is FRAMEWORK-MANAGED with project customization options.
+#
+# FRAMEWORK-MANAGED:
+#   - Linter selection and settings
+#   - Exclude rules using generic patterns (_test\.go$, ^cmd/, etc.)
+#   - Severity and threshold settings
+#
+# PROJECT CUSTOMIZATION:
+#   - To enable/disable linters: modify the enable/disable lists
+#   - To add project-specific exclusions: add to issues.exclude-rules
+#   - To change thresholds: adjust linters-settings values
+#
+# When running `task ckeletin:update`:
+# - This file is NOT automatically updated (it's in project root)
+# - Check framework CHANGELOG for linter configuration changes
+# - Manually incorporate framework improvements if needed
+#
+# ============================================================================
+#
 # Simplified configuration for golangci-lint v2
 # Focuses on most impactful linters
 
