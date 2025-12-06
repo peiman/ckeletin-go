@@ -162,6 +162,12 @@ func updateGoMod(newModule string) error {
 func updateGoFiles(oldModule, newModule string) (int, error) {
 	count := 0
 
+	// Files to skip - these contain upstream module references that should be preserved
+	// (e.g., scaffold tests that need to detect if they're running in derived projects)
+	skipFiles := map[string]bool{
+		"test/integration/scaffold_init_test.go": true,
+	}
+
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -178,6 +184,11 @@ func updateGoFiles(oldModule, newModule string) (int, error) {
 
 		// Only process .go files
 		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+
+		// Skip files that should preserve upstream module references
+		if skipFiles[path] {
 			return nil
 		}
 
