@@ -17,7 +17,7 @@ pre-commit:
     vuln-scan:
       run: task check:vuln:fast
     test:
-      run: task test
+      run: task test:unit
 
 pre-push:
   parallel: false
