@@ -43,7 +43,7 @@ if ! diff -q "$TEMP_CURRENT" "$TEMP_FRESH" > /dev/null 2>&1; then
     check_failure \
         "Config constants are out of date" \
         "Generated constants in keys_generated.go don't match the registry" \
-        "Run: task generate:config:key-constants"$'\n'"Then commit the updated file"
+        "Run: task ckeletin:generate:config:key-constants"$'\n'"Then commit the updated file"
     exit 1
 fi
 

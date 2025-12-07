@@ -147,6 +147,12 @@ tasks:
     desc: Build production binary without dev commands
     cmds: [task: ckeletin:build:prod]
 
+  # === Generate Aliases ===
+
+  generate:config:key-constants:
+    desc: Generate type-safe config key constants
+    cmds: [task: ckeletin:generate:config:key-constants]
+
   generate:license:report:
     desc: Generate license report (CSV format)
     cmds: [task: ckeletin:generate:license:report]
