@@ -60,13 +60,52 @@ tasks:
     desc: Clean all artifacts
     cmds: [task: ckeletin:clean]
 
+  # === Validate Aliases ===
+
+  validate:constants:
+    desc: Validate config constants are in sync with registry
+    cmds: [task: ckeletin:validate:constants]
+
+  validate:commands:
+    desc: Validate command files follow ultra-thin patterns
+    cmds: [task: ckeletin:validate:commands]
+
+  validate:defaults:
+    desc: Validate no unauthorized viper.SetDefault() calls
+    cmds: [task: ckeletin:validate:defaults]
+
+  validate:layering:
+    desc: Validate 4-layer architecture dependency rules
+    cmds: [task: ckeletin:validate:layering]
+
+  validate:security:
+    desc: Validate security patterns
+    cmds: [task: ckeletin:validate:security]
+
+  validate:architecture:
+    desc: Validate architecture documentation follows SSOT pattern
+    cmds: [task: ckeletin:validate:architecture]
+
+  validate:package-organization:
+    desc: Validate package organization follows CLI-first strategy
+    cmds: [task: ckeletin:validate:package-organization]
+
+  validate:config-consumption:
+    desc: Validate type-safe config consumption pattern
+    cmds: [task: ckeletin:validate:config-consumption]
+
+  validate:output:
+    desc: Validate output patterns
+    cmds: [task: ckeletin:validate:output]
+
+  validate:task-naming:
+    desc: Validate task names follow action:target pattern
+    cmds: [task: ckeletin:validate:task-naming]
+
   # === Hook Aliases (used by .lefthook.yml) ===
 
   format:staged:
     cmds: [task: ckeletin:format:staged]
-
-  validate:constants:
-    cmds: [task: ckeletin:validate:constants]
 
   check:deps:verify:
     cmds: [task: ckeletin:check:deps:verify]
@@ -144,7 +183,12 @@ tasks:
         git checkout ckeletin-upstream/main -- .ckeletin/
 
         echo "   Updating module paths..."
-        find .ckeletin -name "*.go" -exec sed -i '' "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          find .ckeletin -name "*.go" -exec sed -i '' "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        else
+          find .ckeletin -name "*.go" -exec sed -i "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        fi
 
         echo "   Formatting code..."
         task ckeletin:format 2>/dev/null || true
