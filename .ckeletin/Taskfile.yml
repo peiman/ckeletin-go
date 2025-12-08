@@ -98,6 +98,58 @@ tasks:
     - echo "✅ Tools installed successfully"
     silent: false
 
+  update:
+    desc: Update ckeletin framework to latest version
+    cmds:
+      - |
+        echo "🔄 Updating ckeletin framework..."
+
+        # Get current module path from go.mod
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        UPSTREAM_MODULE="github.com/peiman/ckeletin-go"
+
+        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
+          echo "❌ Cannot update: this appears to be the upstream repo itself"
+          echo "   Run 'task init' first to initialize your project"
+          exit 1
+        fi
+
+        if git remote | grep -q ckeletin-upstream; then
+          echo "   Remote 'ckeletin-upstream' already exists"
+        else
+          echo "   Adding remote 'ckeletin-upstream'..."
+          git remote add ckeletin-upstream https://github.com/peiman/ckeletin-go.git
+        fi
+
+        echo "   Fetching latest framework..."
+        git fetch ckeletin-upstream main
+
+        echo "   Applying framework update..."
+        git checkout ckeletin-upstream/main -- .ckeletin/
+
+        echo "   Updating module paths..."
+        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          find .ckeletin -name "*.go" -exec sed -i '' "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        else
+          find .ckeletin -name "*.go" -exec sed -i "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        fi
+
+        echo "   Regenerating config constants..."
+        task ckeletin:generate:config:key-constants 2>/dev/null || true
+
+        echo "   Formatting code..."
+        task ckeletin:format 2>/dev/null || true
+
+        echo "   Committing framework update..."
+        git add .ckeletin
+        git commit --no-verify -m "chore: update ckeletin framework"
+
+        echo ""
+        echo "✅ Framework updated successfully!"
+        echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
+        echo "   Review changes with: git diff HEAD~1"
+
   doctor:
     desc: Check development environment and tool installation
     silent: true
