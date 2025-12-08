@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # Required for uploading SARIF results
+      actions: read # Required for trivy telemetry
 
     steps:
       - name: Checkout Code
