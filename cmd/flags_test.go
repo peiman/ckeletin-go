@@ -5,11 +5,30 @@ package cmd
 import (
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// testShortFlagOptions returns test config options with ShortFlags for all types
+// This is used to test the ShortFlag branches in RegisterFlagsForPrefixWithOverrides
+func testShortFlagOptions() []config.ConfigOption {
+	return []config.ConfigOption{
+		{Key: "test.shortflag.string_opt", DefaultValue: "default", Description: "Test string with short flag", Type: "string", ShortFlag: "s"},
+		{Key: "test.shortflag.bool_opt", DefaultValue: true, Description: "Test bool with short flag", Type: "bool", ShortFlag: "b"},
+		{Key: "test.shortflag.int_opt", DefaultValue: 42, Description: "Test int with short flag", Type: "int", ShortFlag: "i"},
+		{Key: "test.shortflag.float_opt", DefaultValue: 3.14, Description: "Test float with short flag", Type: "float64", ShortFlag: "f"},
+		{Key: "test.shortflag.slice_opt", DefaultValue: []string{"a", "b"}, Description: "Test slice with short flag", Type: "[]string", ShortFlag: "l"},
+		{Key: "test.shortflag.unknown_type", DefaultValue: "value", Description: "Test unknown type with short flag", Type: "customtype", ShortFlag: "u"},
+	}
+}
+
+func init() {
+	// Register test options provider for ShortFlag testing
+	config.RegisterOptionsProvider(testShortFlagOptions)
+}
 
 func TestStringDefault(t *testing.T) {
 	tests := []struct {
@@ -642,4 +661,45 @@ func TestShortFlagRegistration_DirectCobra(t *testing.T) {
 			assert.Equal(t, tt.shortFlag, flag.Shorthand, "Flag should have correct shorthand")
 		})
 	}
+}
+
+// TestRegisterFlagsForPrefixWithOverrides_AllTypesWithShortFlags tests ShortFlag branches for all types
+// This test uses the test options registered in init() above
+func TestRegisterFlagsForPrefixWithOverrides_AllTypesWithShortFlags(t *testing.T) {
+	viper.Reset()
+	cmd := &cobra.Command{Use: "test"}
+
+	// Register flags for the test.shortflag prefix (registered in init() above)
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "test.shortflag.", nil)
+	require.NoError(t, err, "RegisterFlagsForPrefixWithOverrides should not return error")
+
+	// Verify string flag with short flag
+	stringFlag := cmd.Flags().Lookup("string-opt")
+	require.NotNil(t, stringFlag, "string flag should exist")
+	assert.Equal(t, "s", stringFlag.Shorthand, "string flag should have shorthand 's'")
+
+	// Verify bool flag with short flag
+	boolFlag := cmd.Flags().Lookup("bool-opt")
+	require.NotNil(t, boolFlag, "bool flag should exist")
+	assert.Equal(t, "b", boolFlag.Shorthand, "bool flag should have shorthand 'b'")
+
+	// Verify int flag with short flag
+	intFlag := cmd.Flags().Lookup("int-opt")
+	require.NotNil(t, intFlag, "int flag should exist")
+	assert.Equal(t, "i", intFlag.Shorthand, "int flag should have shorthand 'i'")
+
+	// Verify float flag with short flag
+	floatFlag := cmd.Flags().Lookup("float-opt")
+	require.NotNil(t, floatFlag, "float flag should exist")
+	assert.Equal(t, "f", floatFlag.Shorthand, "float flag should have shorthand 'f'")
+
+	// Verify stringslice flag with short flag
+	sliceFlag := cmd.Flags().Lookup("slice-opt")
+	require.NotNil(t, sliceFlag, "stringslice flag should exist")
+	assert.Equal(t, "l", sliceFlag.Shorthand, "stringslice flag should have shorthand 'l'")
+
+	// Verify unknown type flag with short flag (falls through to default case)
+	unknownFlag := cmd.Flags().Lookup("unknown-type")
+	require.NotNil(t, unknownFlag, "unknown type flag should exist")
+	assert.Equal(t, "u", unknownFlag.Shorthand, "unknown type flag should have shorthand 'u'")
 }
