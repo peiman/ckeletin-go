@@ -140,15 +140,22 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
+      - name: Get Binary Name from SSOT
+        id: binary-name
+        run: |
+          BINARY_NAME=$(grep 'BINARY_NAME:' Taskfile.yml | head -1 | awk '{print $2}')
+          echo "name=$BINARY_NAME" >> "$GITHUB_OUTPUT"
+          echo "Binary name: $BINARY_NAME"
+
       - name: Build Dev Binary
         run: task build:dev
 
       - name: Verify Dev Commands Exist
         run: |
           echo "Testing dev build..."
-          ./ckeletin-go dev --help > /dev/null
-          ./ckeletin-go dev config --help > /dev/null
-          ./ckeletin-go dev doctor --help > /dev/null
+          ./${{ steps.binary-name.outputs.name }} dev --help > /dev/null
+          ./${{ steps.binary-name.outputs.name }} dev config --help > /dev/null
+          ./${{ steps.binary-name.outputs.name }} dev doctor --help > /dev/null
           echo "✅ Dev commands exist in dev build"
 
       - name: Run Tests with Dev Tag
@@ -160,7 +167,7 @@ jobs:
       - name: Verify Dev Commands Hidden
         run: |
           echo "Testing production build..."
-          if ./ckeletin-go dev 2>&1 | grep -q "unknown command"; then
+          if ./${{ steps.binary-name.outputs.name }} dev 2>&1 | grep -q "unknown command"; then
             echo "✅ Dev commands hidden in production build"
           else
             echo "❌ Dev commands should not exist in production build"
@@ -221,6 +228,13 @@ jobs:
       - name: Install Project Dependencies
         run: task setup
 
+      - name: Get Binary Name from SSOT
+        id: binary-name
+        run: |
+          BINARY_NAME=$(grep 'BINARY_NAME:' Taskfile.yml | head -1 | awk '{print $2}')
+          echo "name=$BINARY_NAME" >> "$GITHUB_OUTPUT"
+          echo "Binary name: $BINARY_NAME"
+
       - name: Run Quality Checks
         run: task check
 
@@ -234,7 +248,7 @@ jobs:
           fail_ci_if_error: true
           verbose: true
           flags: unittests
-          name: codecov-ckeletin-go
+          name: codecov-${{ steps.binary-name.outputs.name }}
 
       - name: Generate License Report
         if: always()
