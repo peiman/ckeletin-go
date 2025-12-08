@@ -28,6 +28,14 @@ tasks:
     desc: Install development tools
     cmds: [task: ckeletin:setup]
 
+  setup:pinned:
+    desc: Install pinned dev tools (cacheable in CI)
+    cmds: [task: ckeletin:setup:pinned]
+
+  setup:latest:
+    desc: Install @latest tools (security tools, always fresh)
+    cmds: [task: ckeletin:setup:latest]
+
   doctor:
     desc: Check development environment
     cmds: [task: ckeletin:doctor]

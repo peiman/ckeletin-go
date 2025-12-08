@@ -22,7 +22,7 @@ ERROR_DETAILS=""
 check_header "Validating ADR-000: Task naming convention"
 
 # Valid actions from ADR-000
-VALID_ACTIONS=(check validate test generate build clean format bench)
+VALID_ACTIONS=(check validate test generate build clean format bench setup)
 
 # Allowed standalone tasks (tasks without colons that don't need action:target pattern)
 # These are utility/orchestrator tasks that operate on "everything"

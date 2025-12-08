@@ -57,33 +57,9 @@ tasks:
   # --- Setup & Environment ---
 
   setup:
-    desc: Install development tools with pinned versions
+    desc: Install all development tools
+    deps: [setup:pinned, setup:latest]
     cmds:
-    - echo "📦 Installing development tools with pinned versions..."
-    - echo "   goimports{{":"}} {{.TOOL_GOIMPORTS_VERSION}}"
-    - echo "   govulncheck{{":"}} {{.TOOL_GOVULNCHECK_VERSION}}"
-    - echo "   gotestsum{{":"}} {{.TOOL_GOTESTSUM_VERSION}}"
-    - echo "   golangci-lint{{":"}} {{.TOOL_GOLANGCI_LINT_VERSION}}"
-    - echo "   lefthook{{":"}} {{.TOOL_LEFTHOOK_VERSION}}"
-    - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
-    - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
-    - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
-    - echo "   syft{{":"}} {{.TOOL_SYFT_VERSION}}"
-    - echo "   gitleaks{{":"}} {{.TOOL_GITLEAKS_VERSION}}"
-    - echo "   grype{{":"}} {{.TOOL_GRYPE_VERSION}}"
-    - echo "   semgrep{{":"}} (via pip/pipx)"
-    - echo ""
-    - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
-    - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
-    - go install gotest.tools/gotestsum@{{.TOOL_GOTESTSUM_VERSION}}
-    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.TOOL_GOLANGCI_LINT_VERSION}}
-    - go install github.com/evilmartians/lefthook@{{.TOOL_LEFTHOOK_VERSION}}
-    - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
-    - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
-    - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
-    - go install github.com/anchore/syft/cmd/syft@{{.TOOL_SYFT_VERSION}}
-    - go install github.com/zricethezav/gitleaks/v8@{{.TOOL_GITLEAKS_VERSION}}
-    - go install github.com/anchore/grype/cmd/grype@{{.TOOL_GRYPE_VERSION}}
     - |
       if command -v semgrep &> /dev/null; then
         echo "  semgrep already installed"
@@ -95,7 +71,43 @@ tasks:
         echo "  Warning: semgrep requires pip/pipx. Install manually: pip install semgrep"
       fi
     - lefthook install
-    - echo "✅ Tools installed successfully"
+    - echo "✅ All tools installed successfully"
+    silent: false
+
+  setup:pinned:
+    desc: Install pinned dev tools (cacheable in CI)
+    cmds:
+    - echo "📦 Installing pinned tools (cacheable)..."
+    - echo "   goimports{{":"}} {{.TOOL_GOIMPORTS_VERSION}}"
+    - echo "   golangci-lint{{":"}} {{.TOOL_GOLANGCI_LINT_VERSION}}"
+    - echo "   lefthook{{":"}} {{.TOOL_LEFTHOOK_VERSION}}"
+    - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
+    - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
+    - echo "   syft{{":"}} {{.TOOL_SYFT_VERSION}}"
+    - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
+    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.TOOL_GOLANGCI_LINT_VERSION}}
+    - go install github.com/evilmartians/lefthook@{{.TOOL_LEFTHOOK_VERSION}}
+    - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
+    - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
+    - go install github.com/anchore/syft/cmd/syft@{{.TOOL_SYFT_VERSION}}
+    - echo "✅ Pinned tools installed"
+    silent: false
+
+  setup:latest:
+    desc: Install @latest tools (security tools, always fresh)
+    cmds:
+    - echo "📦 Installing @latest tools (always fresh)..."
+    - echo "   govulncheck{{":"}} {{.TOOL_GOVULNCHECK_VERSION}}"
+    - echo "   gotestsum{{":"}} {{.TOOL_GOTESTSUM_VERSION}}"
+    - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
+    - echo "   gitleaks{{":"}} {{.TOOL_GITLEAKS_VERSION}}"
+    - echo "   grype{{":"}} {{.TOOL_GRYPE_VERSION}}"
+    - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
+    - go install gotest.tools/gotestsum@{{.TOOL_GOTESTSUM_VERSION}}
+    - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
+    - go install github.com/zricethezav/gitleaks/v8@{{.TOOL_GITLEAKS_VERSION}}
+    - go install github.com/anchore/grype/cmd/grype@{{.TOOL_GRYPE_VERSION}}
+    - echo "✅ Latest tools installed"
     silent: false
 
   update:

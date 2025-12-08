@@ -25,6 +25,8 @@ env:
   # Use setup-go's go-version-file parameter instead of hardcoding
   YQ_VERSION: '4.34.1'       # Define yq version here
   TASK_VERSION: '3.39.2'     # Define Task version here
+  # Pinned tool versions for cache key (must match .ckeletin/Taskfile.yml)
+  PINNED_TOOLS_VERSION: 'v1'  # Bump to invalidate cache when tool versions change
 
 jobs:
   # Matrix testing across multiple OS and Go versions
@@ -88,8 +90,28 @@ jobs:
       - name: Verify Task Installation
         run: task --version
 
-      - name: Install Project Dependencies
-        run: task setup
+      - name: Cache Dev Tools (pinned versions)
+        id: cache-devtools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+
+      - name: Add Go bin to PATH (Unix)
+        if: runner.os != 'Windows'
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Add Go bin to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: echo "$env:USERPROFILE\go\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        shell: pwsh
+
+      - name: Install Pinned Tools
+        if: steps.cache-devtools.outputs.cache-hit != 'true'
+        run: task setup:pinned
+
+      - name: Install Latest Tools (always fresh)
+        run: task setup:latest
 
       - name: Build
         run: task build
@@ -141,8 +163,22 @@ jobs:
           curl -sL https://taskfile.dev/install.sh | sh -s -- -b "$INSTALL_DIR" v${{ env.TASK_VERSION }}
           echo "$INSTALL_DIR" >> "$GITHUB_PATH"
 
-      - name: Install Project Dependencies
-        run: task setup
+      - name: Cache Dev Tools (pinned versions)
+        id: cache-devtools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+
+      - name: Add Go bin to PATH
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Install Pinned Tools
+        if: steps.cache-devtools.outputs.cache-hit != 'true'
+        run: task setup:pinned
+
+      - name: Install Latest Tools (always fresh)
+        run: task setup:latest
 
       - name: Get Binary Name from SSOT
         id: binary-name
@@ -231,8 +267,28 @@ jobs:
       - name: Display Task Version
         run: task --version
 
-      - name: Install Project Dependencies
-        run: task setup
+      - name: Cache Dev Tools (pinned versions)
+        id: cache-devtools
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+
+      - name: Add Go bin to PATH
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Install Pinned Tools
+        if: steps.cache-devtools.outputs.cache-hit != 'true'
+        run: task setup:pinned
+
+      - name: Install Latest Tools (always fresh)
+        run: |
+          task setup:latest
+          lefthook install
+
+      - name: Install semgrep (full checks only)
+        if: github.event_name != 'pull_request'
+        run: pip3 install --user semgrep
 
       - name: Get Binary Name from SSOT
         id: binary-name
