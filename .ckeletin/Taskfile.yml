@@ -106,7 +106,8 @@ tasks:
 
         # Get current module path from go.mod
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman/ckeletin-go"
+        # NOTE: String split prevents scaffold-init from replacing this upstream reference
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
 
         if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
           echo "❌ Cannot update: this appears to be the upstream repo itself"
@@ -118,7 +119,8 @@ tasks:
           echo "   Remote 'ckeletin-upstream' already exists"
         else
           echo "   Adding remote 'ckeletin-upstream'..."
-          git remote add ckeletin-upstream https://github.com/peiman/ckeletin-go.git
+          # NOTE: String split prevents scaffold-init from replacing this upstream URL
+          git remote add ckeletin-upstream https://github.com/peiman"/ckeletin-go.git"
         fi
 
         echo "   Fetching latest framework..."
