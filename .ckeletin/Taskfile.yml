@@ -130,12 +130,9 @@ tasks:
         git checkout ckeletin-upstream/main -- .ckeletin/
 
         echo "   Updating module paths..."
-        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          find .ckeletin -name "*.go" -exec sed -i '' "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
-        else
-          find .ckeletin -name "*.go" -exec sed -i "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
-        fi
+        # Cross-platform sed: use backup extension then delete (works on macOS and Linux)
+        find .ckeletin -name "*.go" -exec sed -i.bak "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        find .ckeletin -name "*.go.bak" -delete 2>/dev/null || true
 
         echo "   Regenerating config constants..."
         task ckeletin:generate:config:key-constants 2>/dev/null || true
