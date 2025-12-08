@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Run Trivy Vulnerability Scanner in Repo Mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -45,7 +45,7 @@ jobs:
           category: 'trivy-filesystem'
 
       - name: Run Trivy in Table Mode (PR Comment)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         if: github.event_name == 'pull_request'
         with:
           scan-type: 'fs'
