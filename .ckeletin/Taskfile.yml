@@ -143,12 +143,18 @@ tasks:
 
         echo "   Committing framework update..."
         git add .ckeletin
-        git commit --no-verify -m "chore: update ckeletin framework"
-
-        echo ""
-        echo "✅ Framework updated successfully!"
-        echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
-        echo "   Review changes with: git diff HEAD~1"
+        # Only commit if there are staged changes
+        if git diff --cached --quiet; then
+          echo ""
+          echo "✅ Framework is already up-to-date!"
+          echo "   No changes needed."
+        else
+          git commit --no-verify -m "chore: update ckeletin framework"
+          echo ""
+          echo "✅ Framework updated successfully!"
+          echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
+          echo "   Review changes with: git diff HEAD~1"
+        fi
 
   doctor:
     desc: Check development environment and tool installation

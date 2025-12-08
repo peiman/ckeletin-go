@@ -89,8 +89,8 @@ func TestScaffoldInit(t *testing.T) {
 
 	if useTaskFallback {
 		// Fallback: run scaffold-init.go directly
-		t.Logf("Running: go run scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
-		cmd := exec.Command("go", "run", "scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		t.Logf("Running: go run .ckeletin/scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
+		cmd := exec.Command("go", "run", ".ckeletin/scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))

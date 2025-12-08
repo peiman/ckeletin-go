@@ -16,12 +16,18 @@ import (
 // This is used to test the ShortFlag branches in RegisterFlagsForPrefixWithOverrides
 func testShortFlagOptions() []config.ConfigOption {
 	return []config.ConfigOption{
+		// Options WITH short flags (test ShortFlag branches)
 		{Key: "test.shortflag.string_opt", DefaultValue: "default", Description: "Test string with short flag", Type: "string", ShortFlag: "s"},
 		{Key: "test.shortflag.bool_opt", DefaultValue: true, Description: "Test bool with short flag", Type: "bool", ShortFlag: "b"},
 		{Key: "test.shortflag.int_opt", DefaultValue: 42, Description: "Test int with short flag", Type: "int", ShortFlag: "i"},
 		{Key: "test.shortflag.float_opt", DefaultValue: 3.14, Description: "Test float with short flag", Type: "float64", ShortFlag: "f"},
 		{Key: "test.shortflag.slice_opt", DefaultValue: []string{"a", "b"}, Description: "Test slice with short flag", Type: "[]string", ShortFlag: "l"},
 		{Key: "test.shortflag.unknown_type", DefaultValue: "value", Description: "Test unknown type with short flag", Type: "customtype", ShortFlag: "u"},
+		// Options WITHOUT short flags (test else branches for int, float64, stringslice, unknown)
+		{Key: "test.shortflag.int_no_short", DefaultValue: 100, Description: "Test int without short flag", Type: "int", ShortFlag: ""},
+		{Key: "test.shortflag.float_no_short", DefaultValue: 2.71, Description: "Test float without short flag", Type: "float64", ShortFlag: ""},
+		{Key: "test.shortflag.slice_no_short", DefaultValue: []string{"x", "y"}, Description: "Test slice without short flag", Type: "[]string", ShortFlag: ""},
+		{Key: "test.shortflag.unknown_no_short", DefaultValue: "val", Description: "Test unknown without short flag", Type: "weirdtype", ShortFlag: ""},
 	}
 }
 
@@ -702,4 +708,21 @@ func TestRegisterFlagsForPrefixWithOverrides_AllTypesWithShortFlags(t *testing.T
 	unknownFlag := cmd.Flags().Lookup("unknown-type")
 	require.NotNil(t, unknownFlag, "unknown type flag should exist")
 	assert.Equal(t, "u", unknownFlag.Shorthand, "unknown type flag should have shorthand 'u'")
+
+	// Verify flags WITHOUT short flags (else branches)
+	intNoShort := cmd.Flags().Lookup("int-no-short")
+	require.NotNil(t, intNoShort, "int flag without short should exist")
+	assert.Empty(t, intNoShort.Shorthand, "int flag should not have shorthand")
+
+	floatNoShort := cmd.Flags().Lookup("float-no-short")
+	require.NotNil(t, floatNoShort, "float flag without short should exist")
+	assert.Empty(t, floatNoShort.Shorthand, "float flag should not have shorthand")
+
+	sliceNoShort := cmd.Flags().Lookup("slice-no-short")
+	require.NotNil(t, sliceNoShort, "stringslice flag without short should exist")
+	assert.Empty(t, sliceNoShort.Shorthand, "stringslice flag should not have shorthand")
+
+	unknownNoShort := cmd.Flags().Lookup("unknown-no-short")
+	require.NotNil(t, unknownNoShort, "unknown type flag without short should exist")
+	assert.Empty(t, unknownNoShort.Shorthand, "unknown type flag should not have shorthand")
 }

@@ -194,7 +194,9 @@ func updateGoFiles(oldModule, newModule string) (int, error) {
 		}
 
 		// Skip files that should preserve upstream module references
-		if skipFiles[path] {
+		// Normalize path to forward slashes for cross-platform compatibility
+		normalizedPath := filepath.ToSlash(path)
+		if skipFiles[normalizedPath] {
 			return nil
 		}
 
