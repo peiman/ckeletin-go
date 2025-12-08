@@ -148,7 +148,7 @@ for task in $TASK_NAMES; do
             fi
 
             ERROR_DETAILS+=$'\n'
-            ((ERRORS++))
+            ((++ERRORS))
         fi
     else
         # Standalone task not in allowed list
@@ -160,7 +160,7 @@ for task in $TASK_NAMES; do
         ERROR_DETAILS+="$suggestions"$'\n'
         ERROR_DETAILS+=$'\n'
 
-        ((ERRORS++))
+        ((++ERRORS))
     fi
 done
 

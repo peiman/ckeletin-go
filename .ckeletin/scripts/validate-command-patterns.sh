@@ -35,21 +35,21 @@ for cmd_file in $COMMAND_FILES; do
         # Also check framework location
         if ! find .ckeletin/pkg/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
             ERROR_DETAILS+="$cmd_name: Missing metadata file internal/config/commands/${cmd_name}_config.go"$'\n'
-            ((ERRORS++))
+            ((++ERRORS))
         fi
     fi
 
     # Check 2: Uses NewCommand helper
     if ! grep -q "NewCommand(" "$cmd_file"; then
         ERROR_DETAILS+="$cmd_name: Does not use NewCommand() helper"$'\n'
-        ((WARNINGS++))
+        ((++WARNINGS))
     fi
 
     # Check 3: Uses MustAddToRoot helper
     if ! grep -q "MustAddToRoot(" "$cmd_file"; then
         if grep -q "RootCmd.AddCommand" "$cmd_file" && grep -q "setupCommandConfig" "$cmd_file"; then
             ERROR_DETAILS+="$cmd_name: Manual RootCmd setup (consider MustAddToRoot)"$'\n'
-            ((WARNINGS++))
+            ((++WARNINGS))
         fi
     fi
 
@@ -57,14 +57,14 @@ for cmd_file in $COMMAND_FILES; do
     # Look for complex control flow outside of run* functions
     if grep -v "^func run" "$cmd_file" | grep -E "(for\s+.*{|if\s+.*{\s*$|switch\s+.*{)" | grep -v "^//" | grep -q .; then
         ERROR_DETAILS+="$cmd_name: Possible business logic in command file (should be in internal/$cmd_name/)"$'\n'
-        ((WARNINGS++))
+        ((++WARNINGS))
     fi
 
     # Check 5: File length check (should be ~20-30 lines for ultra-thin)
     line_count=$(wc -l < "$cmd_file")
     if [ "$line_count" -gt 80 ]; then
         ERROR_DETAILS+="$cmd_name: Command file is $line_count lines (expected ~20-30)"$'\n'
-        ((WARNINGS++))
+        ((++WARNINGS))
     fi
 done
 

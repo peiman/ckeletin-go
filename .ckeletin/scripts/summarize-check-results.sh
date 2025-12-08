@@ -27,15 +27,15 @@ while IFS= read -r line; do
         # Skip generic success messages, keep specific ones
         if [[ "$message" != "All"* ]] && [[ "$message" != "No"* ]]; then
             CHECK_RESULTS+=("✅ $message")
-            ((TOTAL++))
-            ((PASSED++))
+            ((++TOTAL))
+            ((++PASSED))
         fi
     # Check for failure indicators
     elif [[ "$line" =~ ^❌[[:space:]](.+)$ ]]; then
         message="${BASH_REMATCH[1]}"
         CHECK_RESULTS+=("❌ $message")
-        ((TOTAL++))
-        ((FAILED++))
+        ((++TOTAL))
+        ((++FAILED))
     # Check for check headers to count checks
     elif [[ "$line" =~ ^🔍[[:space:]](.+)\.\.\. ]]; then
         # This is a check header, we'll get the result later
