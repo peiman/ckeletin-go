@@ -98,7 +98,7 @@ Now add your feature and look like a senior engineer.
     - [Options Pattern for Command Configuration](#options-pattern-for-command-configuration)
     - [Modifying Configurations](#modifying-configurations)
     - [Customizing the UI](#customizing-the-ui)
-    - [Cursor AI Integration](#cursor-ai-integration)
+    - [AI Integration](#ai-integration)
   - [Tooling Best Practices](#tooling-best-practices)
   - [Contributing](#contributing)
   - [License](#license)
@@ -178,7 +178,7 @@ Each command manages its own configuration and defaults, promoting modularity an
   - **CI integration**: Automated checks on every PR. Violations block merge
   - **Reproducible compliance**: Pinned tool versions ensure consistent license detection across environments
   - **Customizable policy**: Override allowed licenses via environment or `.lichen.yaml`
-  - See [ADR-011](docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
+  - See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
 - **High Test Coverage & Quality Checks**: >80% coverage enforced by CI. Hundreds of real tests ensure a robust codebase that meets production standards.
 
@@ -187,7 +187,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Architecture
 
 **ckeletin-go follows a principled architecture emphasizing:**
-- **Layered architecture** - 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with automated enforcement ([ADR-009](docs/adr/009-layered-architecture-pattern.md))
+- **Layered architecture** - 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with automated enforcement ([ADR-009](.ckeletin/docs/adr/009-layered-architecture-pattern.md))
 - **Separation of concerns** - CLI wiring separate from business logic
 - **Single source of truth** - One canonical place for all configuration, tasks, and patterns
 - **Type safety** - Auto-generated constants, strong typing throughout
@@ -197,11 +197,40 @@ Each command manages its own configuration and defaults, promoting modularity an
 All architectural decisions are documented in **[Architecture Decision Records (ADRs)](docs/adr/)** with detailed rationale and implementation guidance.
 
 **Key architectural patterns:**
-- Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](docs/adr/001-ultra-thin-command-pattern.md))
-- Centralized configuration registry with type-safe constants ([ADR-002](docs/adr/002-centralized-configuration-registry.md))
-- Dependency injection over mocking for testability ([ADR-003](docs/adr/003-dependency-injection-over-mocking.md))
-- Dual-tool license compliance checking (source + binary) ([ADR-011](docs/adr/011-license-compliance.md))
+- Ultra-thin commands (~20-30 lines) delegate to business logic ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md))
+- Centralized configuration registry with type-safe constants ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md))
+- Dependency injection over mocking for testability ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
+- Dual-tool license compliance checking (source + binary) ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
 - Automated validation prevents architectural drift (`task validate:layering`)
+
+---
+
+## Framework Architecture
+
+ckeletin-go separates **framework code** (reusable infrastructure) from **project code** (your custom CLI):
+
+```
+myapp/
+├── .ckeletin/              # FRAMEWORK - updated via `task ckeletin:update`
+│   ├── Taskfile.yml        # Quality checks, build tasks
+│   ├── pkg/                # Config, logger, testutil packages
+│   ├── scripts/            # Validation and check scripts
+│   └── docs/adr/           # Framework ADRs (000-099)
+│
+├── Taskfile.yml            # PROJECT - your task aliases + custom tasks
+├── cmd/                    # Your commands (ping is an example)
+├── internal/               # Your business logic + UI
+├── docs/adr/               # Your ADRs (100+)
+└── .golangci.yml           # Your tool configs (customize freely)
+```
+
+**Key benefit**: Update framework without touching your code:
+
+```bash
+task ckeletin:update        # Pull latest framework improvements
+```
+
+Your commands, configs, and business logic are never affected by framework updates.
 
 ---
 
@@ -323,7 +352,7 @@ This design ensures you don't need to search and replace names across multiple f
 
 Configuration options are defined in command files and self-register with the central registry.
 
-**To add new configuration options:** See examples in `cmd/ping.go` or `cmd/docs.go`, or read [ADR-002](docs/adr/002-centralized-configuration-registry.md) for the complete pattern.
+**To add new configuration options:** See examples in `cmd/ping.go` or `cmd/docs.go`, or read [ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md) for the complete pattern.
 
 **For all available configuration options:** Run `task generate:docs:config` to generate [docs/configuration.md](docs/configuration.md).
 
@@ -496,7 +525,7 @@ Validate configuration files for correctness, security, and completeness.
 
 ## Development Workflow
 
-This project follows a **task-based single source of truth** pattern where all development commands are defined in `Taskfile.yml` and used identically across local development, pre-commit hooks, and CI. See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md) for complete documentation.
+This project follows a **task-based single source of truth** pattern where all development commands are defined in `Taskfile.yml` and used identically across local development, pre-commit hooks, and CI. See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md) for complete documentation.
 
 Tasks follow the `action:target[:subvariant]` naming pattern for consistency and discoverability.
 
@@ -514,7 +543,7 @@ task build     # Build the binary
 ```
 
 **For the complete task list:** Run `task --list` or see [Taskfile.yml](Taskfile.yml).
-**For task naming pattern:** See [ADR-000](docs/adr/000-task-based-single-source-of-truth.md).
+**For task naming pattern:** See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md).
 
 ### Development Tools & Reproducibility
 
@@ -649,7 +678,7 @@ Homebrew tap is disabled by default. To enable it:
 
 Once enabled, releases will automatically update your Homebrew tap.
 
-For more details, see [ADR-008: Release Automation](docs/adr/008-release-automation-with-goreleaser.md).
+For more details, see [ADR-008: Release Automation](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md).
 
 ---
 
@@ -793,48 +822,43 @@ Configuration options live alongside their commands and self-register with the g
 
 Remember: **Never** use `viper.SetDefault()` directly. Defaults are applied via the registry in `cmd/root.go`.
 
-### What’s Framework vs. What You Should Edit
+### What's Framework vs. What You Should Edit
 
-- Framework (avoid modifying unless you are changing the scaffold itself):
-  - `cmd/root.go` (bootstrap, root wiring, `setupCommandConfig`, helpers like `getConfigValueWithFlags`/`getKeyValue`)
-  - `cmd/flags.go` (auto-registration of flags from options)
-  - `internal/config/options.go` (types), `internal/config/registry.go` (provider registry + `SetDefaults`)
-  - `internal/logger/*`, `internal/ui/*`, `internal/docs/*` (shared subsystems)
-  - `Taskfile.yml`, scripts under `scripts/`
+- **Framework** (lives in `.ckeletin/`, updated via `task ckeletin:update`):
+  - `.ckeletin/Taskfile.yml` - Quality checks, build, test tasks
+  - `.ckeletin/pkg/config/` - Configuration registry, types, validation
+  - `.ckeletin/pkg/logger/` - Zerolog dual-output logging
+  - `.ckeletin/scripts/` - All validation and check scripts
+  - `.ckeletin/docs/adr/` - Framework architectural decisions (000-099)
 
-- User-editable (where you implement your app):
-  - New commands under `cmd/<command>.go`
-  - Command options under `internal/config/<command>_options.go`
-  - Documentation content under `docs/` as needed
-  - Optional UI customizations under `internal/ui/*` for your app-specific UI
+- **Project** (yours to edit freely):
+  - `cmd/*.go` - Your commands (root.go, helpers.go are shared patterns)
+  - `internal/` - Your business logic
+  - `internal/ui/` - UI components (Bubble Tea examples)
+  - `internal/config/commands/` - Your command configurations
+  - `docs/adr/` - Your project ADRs (100+)
+  - `.golangci.yml`, `.lefthook.yml`, etc. - Your tool configurations
+  - `Taskfile.yml` - Your aliases and custom tasks
 
 ### Customizing the UI
 
 Explore the `internal/ui/` package to modify the Bubble Tea model, colors, and interactivity. Use configs to allow runtime customization of UI elements.
 
-### Cursor AI Integration
+### AI Integration
 
-The project includes a template for Cursor AI rules in `dot.cursorrules`. This template contains detailed project specifications that help Cursor AI understand the project structure, coding conventions, and requirements.
+This project includes `CLAUDE.md` with comprehensive guidelines for AI coding assistants:
 
-To use it with Cursor:
-
-1. Copy the template to a `.cursorrules` file:
-
-```bash
-cp dot.cursorrules .cursorrules
-```
-
-2. Cursor will automatically detect and use these rules to provide better code suggestions and assistance.
-
-The template covers:
-
-- Project structure and design principles
-- Command implementation patterns
-- Error handling guidelines
-- Testing requirements
+- Task-based workflow commands (`task check`, `task test`, etc.)
+- Architecture Decision Records (ADRs) references
+- Code quality standards and coverage requirements
+- Testing conventions (table-driven tests, dependency injection)
+- Structured logging with Zerolog
 - Git commit conventions
+- License compliance workflow
 
-You can customize the rules to match your project's specific requirements.
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) automatically reads `CLAUDE.md` when working in this repository.
+
+For other AI assistants (Cursor, Copilot, etc.), point them to `CLAUDE.md` as the authoritative source for project conventions.
 
 ---
 

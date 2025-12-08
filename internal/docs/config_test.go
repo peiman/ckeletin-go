@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 )
 
 func TestConfig(t *testing.T) {

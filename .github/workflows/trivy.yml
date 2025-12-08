@@ -1,10 +1,10 @@
 name: Trivy Security Scan
 
+# Only run on main branch pushes and weekly schedule
+# PRs are covered by task check:fast (secrets scan)
+# Full security scan (trivy + grype) runs on main
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
   schedule:
@@ -18,13 +18,14 @@ jobs:
     permissions:
       contents: read
       security-events: write # Required for uploading SARIF results
+      actions: read # Required for trivy telemetry
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
 
       - name: Run Trivy Vulnerability Scanner in Repo Mode
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -43,13 +44,3 @@ jobs:
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
-
-      - name: Run Trivy in Table Mode (PR Comment)
-        uses: aquasecurity/trivy-action@master
-        if: github.event_name == 'pull_request'
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '0' # Don't fail the build, just report

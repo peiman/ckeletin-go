@@ -317,7 +317,7 @@ func TestNewFeatureStructure(t *testing.T) {
 ## References
 
 - **Golden Files Library:** [goldie/v2](https://github.com/sebdah/goldie)
-- **ADR-003:** Testing Strategy (docs/adr/003-testing-strategy.md)
+- **ADR-003:** Dependency Injection Over Mocking (.ckeletin/docs/adr/003-dependency-injection-over-mocking.md)
 - **Testify Assertions:** [testify/assert](https://github.com/stretchr/testify)
 
 ## FAQ

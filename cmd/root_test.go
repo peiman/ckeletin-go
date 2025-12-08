@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/internal/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"

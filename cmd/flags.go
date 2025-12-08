@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -36,21 +36,47 @@ func RegisterFlagsForPrefixWithOverrides(cmd *cobra.Command, prefix string, over
 		}
 
 		// Create flag based on option type and bind to Viper
+		// Use short flag variant (StringP, BoolP, etc.) when ShortFlag is specified
+		shortFlag := opt.ShortFlag
 		switch strings.ToLower(opt.Type) {
 		case "string":
-			cmd.Flags().String(flagName, stringDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().StringP(flagName, shortFlag, stringDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().String(flagName, stringDefault(opt.DefaultValue), opt.Description)
+			}
 		case "bool":
-			cmd.Flags().Bool(flagName, boolDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().BoolP(flagName, shortFlag, boolDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().Bool(flagName, boolDefault(opt.DefaultValue), opt.Description)
+			}
 		case "int":
-			cmd.Flags().Int(flagName, intDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().IntP(flagName, shortFlag, intDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().Int(flagName, intDefault(opt.DefaultValue), opt.Description)
+			}
 		case "float", "float64":
-			cmd.Flags().Float64(flagName, floatDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().Float64P(flagName, shortFlag, floatDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().Float64(flagName, floatDefault(opt.DefaultValue), opt.Description)
+			}
 		case "[]string", "stringslice":
-			cmd.Flags().StringSlice(flagName, stringSliceDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().StringSliceP(flagName, shortFlag, stringSliceDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().StringSlice(flagName, stringSliceDefault(opt.DefaultValue), opt.Description)
+			}
 		default:
 			// Fallback to string flag if type is unknown, but log a warning
 			log.Warn().Str("key", opt.Key).Str("type", opt.Type).Msg("Unknown option type, defaulting to string flag")
-			cmd.Flags().String(flagName, stringDefault(opt.DefaultValue), opt.Description)
+			if shortFlag != "" {
+				cmd.Flags().StringP(flagName, shortFlag, stringDefault(opt.DefaultValue), opt.Description)
+			} else {
+				cmd.Flags().String(flagName, stringDefault(opt.DefaultValue), opt.Description)
+			}
 		}
 
 		if err := viper.BindPFlag(opt.Key, cmd.Flags().Lookup(flagName)); err != nil {

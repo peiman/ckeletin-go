@@ -7,7 +7,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/peiman/ckeletin-go/internal/config/validator"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/validator"
 	"github.com/spf13/cobra"
 )
 

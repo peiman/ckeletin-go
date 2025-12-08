@@ -23,8 +23,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// upstreamModule is the canonical upstream module path.
+// This constant is used to detect if we're in a derived project.
+// NOTE: This value should NOT be replaced by scaffold-init because it's
+// a const declaration, not a string in an import or go.mod.
+const upstreamModule = "github.com/peiman/ckeletin-go"
+
 // TestScaffoldInit tests the complete scaffold initialization workflow
 func TestScaffoldInit(t *testing.T) {
+	// Skip in derived projects - this test only makes sense in the upstream repo
+	// because it tests the scaffold initialization process itself
+	currentModule := getCurrentModule(t)
+	if currentModule != upstreamModule {
+		t.Skipf("Scaffold init test only runs in upstream repo (current: %s, upstream: %s)", currentModule, upstreamModule)
+	}
+
 	// Check if task is available, use fallback if not
 	_, taskErr := exec.LookPath("task")
 	useTaskFallback := taskErr != nil
@@ -71,13 +84,13 @@ func TestScaffoldInit(t *testing.T) {
 	// Run: task init name=testapp module=github.com/test/testapp
 	testName := "testapp"
 	testModule := "github.com/test/testapp"
-	oldModule := "github.com/peiman/ckeletin-go"
+	oldModule := upstreamModule // Use constant to avoid replacement by scaffold-init
 	oldName := "ckeletin-go"
 
 	if useTaskFallback {
 		// Fallback: run scaffold-init.go directly
-		t.Logf("Running: go run scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
-		cmd := exec.Command("go", "run", "scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		t.Logf("Running: go run .ckeletin/scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
+		cmd := exec.Command("go", "run", ".ckeletin/scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))
@@ -131,7 +144,6 @@ func TestScaffoldInit(t *testing.T) {
 
 	// Verify: No old module references remain in Go files
 	t.Run("no old module references", func(t *testing.T) {
-		oldModule := "github.com/peiman/ckeletin-go"
 		var filesWithOldRefs []string
 
 		err := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
@@ -144,13 +156,18 @@ func TestScaffoldInit(t *testing.T) {
 				return nil
 			}
 
+			// Skip the test file itself - it intentionally keeps upstream module reference
+			if strings.HasSuffix(path, "scaffold_init_test.go") {
+				return nil
+			}
+
 			if !info.IsDir() && strings.HasSuffix(path, ".go") {
 				content, err := os.ReadFile(path)
 				if err != nil {
 					return err
 				}
 
-				if strings.Contains(string(content), oldModule) {
+				if strings.Contains(string(content), upstreamModule) {
 					relPath, _ := filepath.Rel(tmpDir, path)
 					filesWithOldRefs = append(filesWithOldRefs, relPath)
 				}
@@ -305,4 +322,30 @@ func copyProjectFiles(dstRoot string) error {
 		// Preserve file permissions
 		return os.Chmod(dstPath, info.Mode())
 	})
+}
+
+// getCurrentModule reads the module path from go.mod
+func getCurrentModule(t *testing.T) string {
+	t.Helper()
+
+	// Get project root (two levels up from test/integration)
+	projectRoot, err := filepath.Abs("../..")
+	require.NoError(t, err, "failed to get project root")
+
+	goModPath := filepath.Join(projectRoot, "go.mod")
+	content, err := os.ReadFile(goModPath)
+	require.NoError(t, err, "failed to read go.mod")
+
+	// Parse first line: "module github.com/..."
+	lines := strings.Split(string(content), "\n")
+	if len(lines) == 0 {
+		t.Fatal("go.mod is empty")
+	}
+
+	firstLine := strings.TrimSpace(lines[0])
+	if !strings.HasPrefix(firstLine, "module ") {
+		t.Fatalf("unexpected go.mod format: %s", firstLine)
+	}
+
+	return strings.TrimPrefix(firstLine, "module ")
 }

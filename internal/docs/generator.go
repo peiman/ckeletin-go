@@ -8,7 +8,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/rs/zerolog/log"
 )
 

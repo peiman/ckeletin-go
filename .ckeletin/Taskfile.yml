@@ -1,0 +1,907 @@
+# .ckeletin/Taskfile.yml - Framework tasks
+# This file contains all framework infrastructure tasks.
+# Users should not modify this file directly.
+# To customize, add tasks to your project's Taskfile.yml
+version: '3'
+
+vars:
+  # Fallback defaults - parent Taskfile should override these via includes.vars
+  _BINARY_NAME_DEFAULT: ckeletin-go
+  _MODULE_PATH_DEFAULT: github.com/peiman/ckeletin-go
+
+  # Computed vars
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "dev"
+  COMMIT:
+    sh: git rev-parse HEAD 2>/dev/null || echo "unknown"
+  DATE:
+    sh: date -u '+%Y-%m-%d_%H:%M:%S'
+  # Use passed variables or fall back to defaults
+  _BINARY_NAME: '{{.BINARY_NAME | default ._BINARY_NAME_DEFAULT}}'
+  _MODULE_PATH: '{{.MODULE_PATH | default ._MODULE_PATH_DEFAULT}}'
+
+  LDFLAGS: >-
+    -ldflags="
+    -X '{{._MODULE_PATH}}/cmd.binaryName={{._BINARY_NAME}}'
+    -X '{{._MODULE_PATH}}/cmd.Version={{.VERSION}}'
+    -X '{{._MODULE_PATH}}/cmd.Commit={{.COMMIT}}'
+    -X '{{._MODULE_PATH}}/cmd.Date={{.DATE}}'
+    "
+
+  # Test output file variables
+  TEST_OUTPUT_JSON: "test-output.json"
+  COVERAGE_TXT: "coverage.txt"
+
+  # Scripts directory (relative to this Taskfile)
+  SCRIPTS_DIR: '{{.TASKFILE_DIR}}/scripts'
+
+  # Pinned tool versions for reproducibility
+  TOOL_GOIMPORTS_VERSION: v0.28.0
+  TOOL_GOVULNCHECK_VERSION: latest
+  TOOL_GOTESTSUM_VERSION: latest
+  TOOL_GOLANGCI_LINT_VERSION: v2.3.0
+  TOOL_LEFTHOOK_VERSION: v1.7.18
+  TOOL_GO_MOD_OUTDATED_VERSION: latest
+  TOOL_GO_LICENSES_VERSION: v2.0.1
+  TOOL_LICHEN_VERSION: v0.1.7
+  TOOL_SYFT_VERSION: v1.18.1
+  TOOL_GITLEAKS_VERSION: latest
+  TOOL_GRYPE_VERSION: latest
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  # --- Setup & Environment ---
+
+  setup:
+    desc: Install all development tools
+    deps: [setup:pinned, setup:latest]
+    cmds:
+    - |
+      if command -v semgrep &> /dev/null; then
+        echo "  semgrep already installed"
+      elif command -v pipx &> /dev/null; then
+        pipx install semgrep
+      elif command -v pip3 &> /dev/null; then
+        pip3 install --user semgrep
+      else
+        echo "  Warning: semgrep requires pip/pipx. Install manually: pip install semgrep"
+      fi
+    - lefthook install
+    - echo "✅ All tools installed successfully"
+    silent: false
+
+  setup:pinned:
+    desc: Install pinned dev tools (cacheable in CI)
+    cmds:
+    - echo "📦 Installing pinned tools (cacheable)..."
+    - echo "   goimports{{":"}} {{.TOOL_GOIMPORTS_VERSION}}"
+    - echo "   golangci-lint{{":"}} {{.TOOL_GOLANGCI_LINT_VERSION}}"
+    - echo "   lefthook{{":"}} {{.TOOL_LEFTHOOK_VERSION}}"
+    - echo "   go-licenses{{":"}} {{.TOOL_GO_LICENSES_VERSION}}"
+    - echo "   lichen{{":"}} {{.TOOL_LICHEN_VERSION}}"
+    - echo "   syft{{":"}} {{.TOOL_SYFT_VERSION}}"
+    - go install golang.org/x/tools/cmd/goimports@{{.TOOL_GOIMPORTS_VERSION}}
+    - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.TOOL_GOLANGCI_LINT_VERSION}}
+    - go install github.com/evilmartians/lefthook@{{.TOOL_LEFTHOOK_VERSION}}
+    - go install github.com/google/go-licenses/v2@{{.TOOL_GO_LICENSES_VERSION}}
+    - go install github.com/uw-labs/lichen@{{.TOOL_LICHEN_VERSION}}
+    - go install github.com/anchore/syft/cmd/syft@{{.TOOL_SYFT_VERSION}}
+    - echo "✅ Pinned tools installed"
+    silent: false
+
+  setup:latest:
+    desc: Install @latest tools (security tools, always fresh)
+    cmds:
+    - echo "📦 Installing @latest tools (always fresh)..."
+    - echo "   govulncheck{{":"}} {{.TOOL_GOVULNCHECK_VERSION}}"
+    - echo "   gotestsum{{":"}} {{.TOOL_GOTESTSUM_VERSION}}"
+    - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
+    - echo "   gitleaks{{":"}} {{.TOOL_GITLEAKS_VERSION}}"
+    - echo "   grype{{":"}} {{.TOOL_GRYPE_VERSION}}"
+    - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
+    - go install gotest.tools/gotestsum@{{.TOOL_GOTESTSUM_VERSION}}
+    - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
+    - go install github.com/zricethezav/gitleaks/v8@{{.TOOL_GITLEAKS_VERSION}}
+    - go install github.com/anchore/grype/cmd/grype@{{.TOOL_GRYPE_VERSION}}
+    - echo "✅ Latest tools installed"
+    silent: false
+
+  update:
+    desc: Update ckeletin framework to latest version
+    cmds:
+      - |
+        echo "🔄 Updating ckeletin framework..."
+
+        # Get current module path from go.mod
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        # NOTE: String split prevents scaffold-init from replacing this upstream reference
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+
+        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
+          echo "❌ Cannot update: this appears to be the upstream repo itself"
+          echo "   Run 'task init' first to initialize your project"
+          exit 1
+        fi
+
+        if git remote | grep -q ckeletin-upstream; then
+          echo "   Remote 'ckeletin-upstream' already exists"
+        else
+          echo "   Adding remote 'ckeletin-upstream'..."
+          # NOTE: String split prevents scaffold-init from replacing this upstream URL
+          git remote add ckeletin-upstream https://github.com/peiman"/ckeletin-go.git"
+        fi
+
+        echo "   Fetching latest framework..."
+        git fetch ckeletin-upstream main
+
+        echo "   Applying framework update..."
+        git checkout ckeletin-upstream/main -- .ckeletin/
+
+        echo "   Updating module paths..."
+        # Cross-platform sed: use backup extension then delete (works on macOS and Linux)
+        find .ckeletin -name "*.go" -exec sed -i.bak "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+        find .ckeletin -name "*.go.bak" -delete 2>/dev/null || true
+
+        echo "   Regenerating config constants..."
+        task ckeletin:generate:config:key-constants 2>/dev/null || true
+
+        echo "   Formatting code..."
+        task ckeletin:format 2>/dev/null || true
+
+        echo "   Committing framework update..."
+        git add .ckeletin
+        # Only commit if there are staged changes
+        if git diff --cached --quiet; then
+          echo ""
+          echo "✅ Framework is already up-to-date!"
+          echo "   No changes needed."
+        else
+          git commit --no-verify -m "chore: update ckeletin framework"
+          echo ""
+          echo "✅ Framework updated successfully!"
+          echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
+          echo "   Review changes with: git diff HEAD~1"
+        fi
+
+  doctor:
+    desc: Check development environment and tool installation
+    silent: true
+    cmds:
+      - |
+        echo "🔍 Checking development environment..."
+        echo ""
+        CURRENT_GO_VERSION=$(go version | awk '{print $3}')
+        CURRENT_GO_VERSION_NUM=$(echo "$CURRENT_GO_VERSION" | sed 's/^go//')
+        echo "Go Version:"
+        MIN_VERSION=""
+        if [ -f "go.mod" ]; then
+          MIN_VERSION=$(grep -E '^go [0-9]+\.[0-9]+' go.mod | awk '{print $2}')
+        fi
+        if [ -f ".go-version" ]; then
+          EXPECTED_VERSION=$(tr -d '[:space:]' < .go-version)
+          echo "  Minimum:   ${MIN_VERSION:-n/a} (from go.mod)"
+          echo "  Expected:  $EXPECTED_VERSION (from .go-version)"
+          echo "  Installed: $CURRENT_GO_VERSION_NUM"
+          if [ "$CURRENT_GO_VERSION_NUM" = "$EXPECTED_VERSION" ]; then
+            echo "  ✅ Version matches"
+          else
+            echo "  ⚠️  Version mismatch!"
+          fi
+        else
+          echo "  ⚠️  .go-version file not found"
+          echo "     Installed: $CURRENT_GO_VERSION_NUM"
+        fi
+        echo ""
+        echo "Task:"
+        task --version || echo "  ❌ Task not found"
+        echo ""
+        echo "Development Tools:"
+        for tool in goimports golangci-lint gotestsum govulncheck lefthook go-mod-outdated go-licenses lichen; do
+          if command -v "$tool" > /dev/null 2>&1; then
+            echo "  $tool: ✅ installed"
+          else
+            echo "  $tool: ❌ not found"
+          fi
+        done
+        echo ""
+        echo "💡 If any tools are missing, run: task ckeletin:setup"
+
+  tidy:
+    desc: Ensure go.mod and go.sum are up to date
+    cmds:
+      - go mod tidy
+
+  # --- Go Version Check ---
+
+  check:go-version:
+    desc: Check if system Go version matches .go-version (SSOT)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-go-version.sh'
+
+  check:go-version:minor:
+    desc: Check if Go minor version matches (allows patch differences)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-go-version.sh --minor'
+
+  # --- Tool Verification ---
+
+  check:tools:installed:
+    desc: Check that required development tools are installed
+    silent: true
+    cmds:
+      - |
+        echo "🔍 Checking development tools installation..."
+        all_good=true
+        missing_tools=""
+        check_tool() {
+          if ! command -v "$1" > /dev/null 2>&1; then
+            missing_tools="$missing_tools\n  ❌ $1 not found"
+            all_good=false
+          fi
+        }
+        check_tool "goimports"
+        check_tool "golangci-lint"
+        check_tool "gotestsum"
+        check_tool "govulncheck"
+        check_tool "go-licenses"
+        check_tool "lichen"
+        if [ "$all_good" = false ]; then
+          echo -e "$missing_tools"
+          echo ""
+          echo "❌ Some tools are missing. Run: task ckeletin:setup"
+          exit 1
+        fi
+        echo "✅ All required tools are installed"
+
+  check:tools:version:
+    desc: Verify development tools match expected versions (strict, for CI)
+    silent: true
+    cmds:
+      - |
+        echo "🔍 Verifying development tool versions..."
+        all_match=true
+        echo "  Checking go-licenses..."
+        if ! command -v go-licenses > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          echo "    ✅ installed"
+        fi
+        echo "  Checking lichen..."
+        if ! command -v lichen > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          echo "    ✅ installed"
+        fi
+        echo "  Checking golangci-lint..."
+        if ! command -v golangci-lint > /dev/null 2>&1; then
+          echo "    ❌ not installed"
+          all_match=false
+        else
+          installed_version=$(golangci-lint version --format short 2>/dev/null || echo "unknown")
+          echo "    Installed: $installed_version"
+          echo "    Expected:  {{.TOOL_GOLANGCI_LINT_VERSION}}"
+        fi
+        if [ "$all_match" = false ]; then
+          echo ""
+          echo "❌ Tool version verification failed"
+          echo "   Run: task ckeletin:setup"
+          exit 1
+        fi
+        echo ""
+        echo "✅ Tool versions verified"
+
+  # --- Dependencies ---
+
+  check:deps:verify:
+    desc: Verify that dependencies haven't been modified
+    cmds:
+      - go mod verify
+    silent: true
+
+  check:deps:checksum:
+    desc: Verify go.sum checksums against checksum database
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-deps-checksum.sh'
+    silent: true
+
+  check:deps:outdated:
+    desc: Check for outdated dependencies
+    cmds:
+      - echo "Checking for outdated dependencies..."
+      - go list -u -m -json all | go-mod-outdated -update -direct
+    silent: true
+
+  check:deps:
+    desc: Run all dependency checks
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-deps.sh'
+
+  # --- Formatting ---
+
+  format:
+    desc: Format all Go code
+    cmds:
+      - '{{.SCRIPTS_DIR}}/format-go.sh fix'
+
+  format:staged:
+    desc: Format specific files (for pre-commit hooks)
+    cmds:
+      - '{{.SCRIPTS_DIR}}/format-go.sh fix {{.CLI_ARGS}}'
+
+  check:format:
+    desc: Check if Go code is formatted (CI mode)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/format-go.sh check'
+
+  # --- Security Scanning ---
+
+  check:vuln:
+    desc: Check for vulnerabilities
+    silent: true
+    cmds:
+      - govulncheck ./...
+
+  check:vuln:fast:
+    desc: Fast vulnerability scan with caching (for pre-commit hooks)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-vuln-fast.sh'
+
+  check:secrets:
+    desc: Scan for hardcoded secrets (full repository scan)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-secrets.sh all'
+
+  check:secrets:staged:
+    desc: Scan staged changes for secrets (for pre-commit hooks)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-secrets.sh staged'
+
+  check:sast:
+    desc: Run static analysis (SAST) with semgrep
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-sast.sh local'
+
+  check:sast:full:
+    desc: Run full SAST with registry rules (requires network)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-sast.sh full'
+
+  check:sbom:vulns:
+    desc: Scan SBOM for vulnerabilities using grype
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-sbom-vulns.sh'
+
+  # --- Linting ---
+
+  lint:
+    desc: Run all linters
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/lint.sh'
+
+  # --- ADR Validations ---
+
+  validate:defaults:
+    desc: Validate no unauthorized viper.SetDefault() calls (enforces ADR-002)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-defaults.sh'
+
+  validate:commands:
+    desc: Validate command files follow ultra-thin patterns (enforces ADR-001)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-command-patterns.sh'
+
+  validate:constants:
+    desc: Validate config constants are in sync with registry (enforces ADR-005)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-constants.sh'
+
+  validate:architecture:
+    desc: Validate architecture documentation follows SSOT pattern
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-architecture.sh'
+
+  validate:layering:
+    desc: Validate 4-layer architecture dependency rules (enforces ADR-009)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-layering.sh'
+
+  validate:package-organization:
+    desc: Validate package organization follows CLI-first strategy (enforces ADR-010)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-package-organization.sh'
+
+  validate:config-consumption:
+    desc: Validate type-safe config consumption pattern (enforces ADR-002)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-config-consumption.sh'
+
+  validate:output:
+    desc: Validate output patterns (enforces ADR-012)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-output-patterns.sh'
+
+  validate:security:
+    desc: Validate security patterns (enforces ADR-004)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-security-patterns.sh'
+
+  validate:task-naming:
+    desc: Validate task names follow action:target pattern (enforces ADR-000)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-task-naming.sh'
+
+  # --- Testing ---
+
+  test:
+    desc: Run tests with coverage
+    silent: true
+    cmd: |
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:dev:
+    desc: Run tests with dev commands (explicit - same as 'test')
+    silent: true
+    cmd: |
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:prod:
+    desc: Run tests without dev commands (production mode)
+    silent: true
+    cmd: |
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:unit:
+    desc: Run unit tests only (skips integration tests)
+    silent: true
+    cmd: |
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
+
+  test:race:
+    desc: Run tests with race detection
+    cmd: |
+      gotestsum --format standard-verbose --jsonfile {{.TEST_OUTPUT_JSON}} -- -v -race ./...
+
+  test:full:
+    desc: Run all tests with both race detection and coverage
+    silent: true
+    cmd: |
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+
+  test:watch:
+    desc: Run tests in watch mode
+    cmd: |
+      gotestsum --format short --watch --hide-summary=skipped
+
+  test:integration:
+    desc: Run integration tests (disables cache with -count=1)
+    cmd: |
+      gotestsum --format short -- -v -count=1 ./test/integration/...
+
+  test:golden:
+    desc: Test CLI output against golden files
+    dir: .
+    cmd: |
+      go test ./test/integration -v -run Golden
+
+  test:golden:update:
+    desc: Update golden files (MUST manually review changes!)
+    dir: .
+    cmds:
+      - GOLDEN_UPDATE=1 go test ./test/integration -run Golden
+      - echo ""
+      - echo "Review golden file changes before committing!"
+      - echo "Run git diff test/integration/testdata/"
+      - echo ""
+
+  test:coverage:text:
+    desc: Run tests with detailed coverage data
+    cmds:
+      - gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      - echo "Detailed coverage report:"
+      - go tool cover -func={{.COVERAGE_TXT}}
+    silent: false
+
+  test:coverage:html:
+    desc: Generate HTML coverage report and open in browser
+    cmds:
+      - task: test
+      - go tool cover -html={{.COVERAGE_TXT}} -o coverage.html
+      - echo "Coverage report saved to coverage.html"
+      - '{{if eq OS "darwin"}}open{{else if eq OS "windows"}}start{{else}}xdg-open{{end}} coverage.html'
+    silent: true
+
+  test:coverage:
+    desc: Run tests once, then check coverage thresholds
+    cmds:
+      - task: test
+      - '{{.SCRIPTS_DIR}}/check-coverage-patch.sh'
+      - '{{.SCRIPTS_DIR}}/check-coverage-project.sh'
+
+  test:coverage:project:
+    desc: Check project coverage meets threshold
+    deps: [test]
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-coverage-project.sh'
+
+  test:coverage:patch:
+    desc: Check patch coverage for changed lines
+    deps: [test]
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-coverage-patch.sh'
+
+  # --- Benchmarks ---
+
+  bench:
+    desc: Run all benchmarks
+    cmd: |
+      go test -bench=. -benchmem ./... -run=^$ | tee bench-results.txt
+      echo "Benchmark results saved to bench-results.txt"
+    silent: false
+
+  bench:cmd:
+    desc: Run benchmarks for cmd package
+    cmd: |
+      go test -bench=. -benchmem ./cmd -run=^$
+
+  bench:config:
+    desc: Run benchmarks for config package
+    cmd: |
+      go test -bench=. -benchmem ./.ckeletin/pkg/config -run=^$
+
+  bench:logger:
+    desc: Run benchmarks for logger package
+    cmd: |
+      go test -bench=. -benchmem ./.ckeletin/pkg/logger -run=^$
+
+  # --- Fuzz Testing ---
+
+  test:fuzz:
+    desc: Run all fuzz tests (default 10s per function)
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      echo "Running fuzz tests for $FUZZTIME each..."
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./.ckeletin/pkg/config
+      go test -fuzz=FuzzValidate -fuzztime=$FUZZTIME ./.ckeletin/pkg/config/validator
+      go test -fuzz=FuzzFindUnknownKeys -fuzztime=$FUZZTIME ./.ckeletin/pkg/config/validator
+      echo "✅ Fuzz testing completed"
+
+  test:fuzz:config:
+    desc: Run fuzz tests for config package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./.ckeletin/pkg/config
+
+  test:fuzz:validator:
+    desc: Run fuzz tests for validator package
+    cmd: |
+      FUZZTIME=${FUZZTIME:-10s}
+      go test -fuzz=. -fuzztime=$FUZZTIME ./.ckeletin/pkg/config/validator
+
+  bench:compare:
+    desc: Compare benchmark results (requires benchstat)
+    cmds:
+      - |
+        if [ ! -f bench-old.txt ]; then
+          echo "No baseline found. Run 'task bench' first and copy bench-results.txt to bench-old.txt"
+          exit 1
+        fi
+      - task: bench
+      - cp bench-results.txt bench-new.txt
+      - benchstat bench-old.txt bench-new.txt
+
+  # --- License Compliance (ADR-011) ---
+
+  check:license:
+    desc: Check all license compliance (orchestrator)
+    cmds:
+      - task: check:license:source
+      - task: check:license:binary
+
+  check:license:source:
+    desc: Check dependency licenses from source (fast, for development)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-licenses-source.sh'
+
+  check:license:binary:
+    desc: Check licenses in compiled binary (accurate, for releases)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-licenses-binary.sh ./{{._BINARY_NAME}}'
+    deps: [build]
+
+  generate:license:
+    desc: Generate all license artifacts (orchestrator)
+    cmds:
+      - task: generate:license:report
+      - task: generate:license:files
+      - task: generate:attribution
+
+  generate:license:report:
+    desc: Generate license report (CSV format)
+    cmds:
+      - mkdir -p reports
+      - '{{.SCRIPTS_DIR}}/generate-license-report.sh'
+    silent: false
+
+  generate:license:files:
+    desc: Save license files to third_party/ for distribution
+    cmds:
+      - mkdir -p third_party/licenses
+      - go-licenses save ./... --save_path=third_party/licenses
+      - echo "License files saved to third_party/licenses/"
+    silent: false
+
+  generate:attribution:
+    desc: Generate NOTICE file with attribution
+    cmds:
+      - '{{.SCRIPTS_DIR}}/generate-attribution.sh'
+    deps: [generate:license:report]
+    silent: false
+
+  generate:sbom:
+    desc: Generate SBOM in both SPDX and CycloneDX formats
+    cmds:
+      - '{{.SCRIPTS_DIR}}/generate-sbom.sh all'
+    silent: false
+
+  generate:sbom:spdx:
+    desc: Generate SBOM in SPDX format only
+    cmds:
+      - '{{.SCRIPTS_DIR}}/generate-sbom.sh spdx'
+    silent: false
+
+  generate:sbom:cyclonedx:
+    desc: Generate SBOM in CycloneDX format only
+    cmds:
+      - '{{.SCRIPTS_DIR}}/generate-sbom.sh cyclonedx'
+    silent: false
+
+  # --- Quality Check Orchestrators ---
+
+  check:summary:
+    desc: Display check summary (internal task)
+    silent: true
+    cmds:
+      - CHECK_MODE={{.CHECK_MODE}} {{.SCRIPTS_DIR}}/check-summary.sh
+
+  check:common:
+    desc: Common quality checks (internal task - SSOT for check list)
+    cmds:
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Code Quality"
+        silent: true
+      - task: check:format
+      - task: lint
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Architecture Validation"
+        silent: true
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: validate:task-naming
+      - task: validate:architecture
+      - task: validate:layering
+      - task: validate:package-organization
+      - task: validate:config-consumption
+      - task: validate:output
+      - task: validate:security
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Security Scanning"
+        silent: true
+      - task: check:secrets
+      - task: check:sast
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Dependencies"
+        silent: true
+      - task: check:deps
+      - task: check:license
+      - task: check:sbom:vulns
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Tests"
+        silent: true
+      - task: test:full
+      - task: check:summary
+
+  check:
+    desc: Run all quality checks (developer workflow)
+    cmds:
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
+      - task: check:go-version
+      - task: check:tools:installed
+      - task: check:common
+
+  check:fast:
+    desc: Run fast quality checks (skip race detection and integration tests)
+    cmds:
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Development Environment (Fast Mode)"
+        silent: true
+      - task: check:format
+      - task: lint
+      - task: validate:defaults
+      - task: validate:commands
+      - task: validate:constants
+      - task: validate:task-naming
+      - task: validate:architecture
+      - task: validate:layering
+      - task: validate:package-organization
+      - task: validate:config-consumption
+      - task: validate:output
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Tests (Unit Only)"
+        silent: true
+      - task: test:unit
+      - task: check:summary
+        vars: { CHECK_MODE: "fast" }
+
+  check:ci:
+    desc: Run all quality checks with strict tool version verification (CI workflow)
+    cmds:
+      - cmd: |
+          source {{.SCRIPTS_DIR}}/lib/check-output.sh
+          category_header "Development Environment"
+        silent: true
+      - task: check:go-version
+      - task: check:tools:version
+      - task: check:common
+
+  # --- Build ---
+
+  build:
+    desc: Build the binary (dev build with dev commands)
+    silent: true
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
+        {{else}}
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
+        {{end}}
+
+  build:dev:
+    desc: Build the binary with dev commands (explicit - same as 'build')
+    silent: true
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
+        {{else}}
+        go build -tags dev {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
+        {{end}}
+
+  build:prod:
+    desc: Build production binary without dev commands
+    silent: true
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        go build {{.LDFLAGS}} -o {{._BINARY_NAME}}.exe main.go > /dev/null
+        {{else}}
+        go build {{.LDFLAGS}} -o {{._BINARY_NAME}} main.go > /dev/null
+        {{end}}
+
+  run:
+    desc: Run the application
+    deps: [build]
+    cmds:
+      - |
+        {{if eq OS "windows"}}
+        ./{{._BINARY_NAME}}.exe
+        {{else}}
+        ./{{._BINARY_NAME}}
+        {{end}}
+
+  install:
+    desc: Install the application
+    cmds:
+      - go install {{.LDFLAGS}} ./...
+
+  # --- Clean ---
+
+  clean:local:
+    desc: Clean local build artifacts
+    cmds:
+      - go clean
+      - |
+        {{if eq OS "windows"}}
+        rm -f {{._BINARY_NAME}}.exe {{.COVERAGE_TXT}} {{.TEST_OUTPUT_JSON}} coverage.html
+        {{else}}
+        rm -f {{._BINARY_NAME}} {{.COVERAGE_TXT}} {{.TEST_OUTPUT_JSON}} coverage.html
+        {{end}}
+
+  clean:release:
+    desc: Clean GoReleaser artifacts
+    cmds:
+      - rm -rf ./dist
+      - echo "✅ Cleaned release artifacts"
+
+  clean:
+    desc: Clean all artifacts
+    cmds:
+      - task: clean:local
+      - task: clean:release
+
+  # --- Code Generation ---
+
+  generate:config:key-constants:
+    desc: Generate type-safe config key constants
+    cmds:
+      - go run {{.SCRIPTS_DIR}}/generate-config-constants.go
+      - task: format
+
+  # --- Release ---
+
+  check:release:
+    desc: Check if GoReleaser is installed
+    cmds:
+      - |
+        if ! command -v goreleaser &> /dev/null; then
+          echo "❌ GoReleaser is not installed."
+          echo ""
+          echo "Install GoReleaser:"
+          echo "  macOS:   brew install goreleaser"
+          echo "  Linux:   https://goreleaser.com/install/"
+          echo "  Go:      go install github.com/goreleaser/goreleaser@latest"
+          exit 1
+        fi
+        echo "✅ GoReleaser is installed: $(goreleaser --version)"
+    silent: false
+
+  test:release:
+    desc: Test GoReleaser configuration (snapshot build, no release)
+    deps: [check:release]
+    cmds:
+      - echo "Building snapshot release (no tags required)..."
+      - goreleaser release --snapshot --clean --skip=publish
+      - echo ""
+      - echo "✅ Snapshot build successful!"
+      - echo "Artifacts are in ./dist/"
+    silent: false
+
+  build:release:
+    desc: Build release artifacts locally (requires git tag)
+    deps: [check:release]
+    cmds:
+      - echo "Building release artifacts..."
+      - goreleaser build --clean --snapshot
+      - echo ""
+      - echo "✅ Build successful!"
+      - echo "   Binaries are in ./dist/"

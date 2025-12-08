@@ -1,26 +1,36 @@
 # .lefthook.yml
-pre-commit:
-  parallel: true
-  commands:
-    format:
-      glob: "*.go"
-      run: task format:staged -- {staged_files}
-      stage_fixed: true
-    lint:
-      run: task lint
-    validate-constants:
-      run: task validate:constants
-    verify-deps:
-      run: task check:deps:verify
-    secret-scan:
-      run: task check:secrets:staged
-    vuln-scan:
-      run: task check:vuln:fast
-    test:
-      run: task test
+#
+# ============================================================================
+# OWNERSHIP MODEL (Framework Separation)
+# ============================================================================
+#
+# This file EXTENDS the framework's base hooks configuration.
+# Framework hooks are in: .ckeletin/configs/lefthook.base.yml
+#
+# FRAMEWORK-MANAGED (via extends):
+#   - Standard quality checks (format, lint, test, secrets, vuln)
+#   - Pre-commit and pre-push hook structure
+#
+# PROJECT CUSTOMIZATION:
+#   - Add project-specific hooks below the extends
+#   - Override framework hooks by redefining them here
+#   - Add new hook types (e.g., commit-msg)
+#
+# When running `task ckeletin:update`:
+# - Framework hooks (.ckeletin/configs/lefthook.base.yml) are automatically updated
+# - This file is NOT updated (project customizations preserved)
+#
+# Use `lefthook dump` to see the merged configuration.
+#
+# ============================================================================
 
-pre-push:
-  parallel: false
-  commands:
-    coverage:
-      run: task test:coverage
+# Extend framework base hooks
+extends:
+  - .ckeletin/configs/lefthook.base.yml
+
+# Project-specific hooks (add below)
+# Example: Add a commit-msg hook
+# commit-msg:
+#   commands:
+#     validate:
+#       run: scripts/validate-commit-msg.sh {1}

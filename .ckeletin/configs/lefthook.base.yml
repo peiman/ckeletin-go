@@ -1,0 +1,35 @@
+# .ckeletin/configs/lefthook.base.yml
+#
+# FRAMEWORK-MANAGED: Base git hooks configuration
+#
+# This file defines the standard quality checks that run as git hooks.
+# Projects extend this file in their .lefthook.yml.
+#
+# Updates to this file are automatically picked up when running
+# `task ckeletin:update` (since it's in .ckeletin/).
+
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.go"
+      run: task format:staged -- {staged_files}
+      stage_fixed: true
+    lint:
+      run: task lint
+    validate-constants:
+      run: task validate:constants
+    verify-deps:
+      run: task check:deps:verify
+    secret-scan:
+      run: task check:secrets:staged
+    vuln-scan:
+      run: task check:vuln:fast
+    test:
+      run: task test:unit
+
+pre-push:
+  parallel: false
+  commands:
+    coverage:
+      run: task test:coverage
