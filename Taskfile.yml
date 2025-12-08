@@ -196,11 +196,15 @@ tasks:
           find .ckeletin -name "*.go" -exec sed -i "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
         fi
 
+        echo "   Regenerating config constants..."
+        task ckeletin:generate:config:key-constants 2>/dev/null || true
+
         echo "   Formatting code..."
         task ckeletin:format 2>/dev/null || true
 
+        echo "   Committing framework update..."
         git add .ckeletin
-        git commit -m "chore: update ckeletin framework"
+        git commit --no-verify -m "chore: update ckeletin framework"
 
         echo ""
         echo "✅ Framework updated successfully!"
