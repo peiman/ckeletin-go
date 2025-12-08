@@ -28,8 +28,10 @@ env:
 
 jobs:
   # Matrix testing across multiple OS and Go versions
+  # Only runs on main branch pushes and releases (expensive runners)
   test-matrix:
     name: Test on ${{ matrix.os }}
+    if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -101,8 +103,10 @@ jobs:
         run: task test
 
   # Test dev vs prod builds to ensure build tags work correctly
+  # Only runs on main branch pushes and releases (not needed for every PR)
   test-dev-prod:
     name: Test Dev/Prod Build Separation
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -177,7 +181,9 @@ jobs:
       - name: Run Tests without Dev Tag
         run: task test:prod
 
-  # Main build job with full quality checks (Linux only)
+  # Main build job with quality checks (Linux only)
+  # PRs: Fast checks (format, lint, validate, unit tests) - ~2-3 min
+  # Main/releases: Full checks (+ security, license, integration) - ~5-8 min
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -235,7 +241,12 @@ jobs:
           echo "name=$BINARY_NAME" >> "$GITHUB_OUTPUT"
           echo "Binary name: $BINARY_NAME"
 
-      - name: Run Quality Checks
+      - name: Run Quality Checks (Fast - PRs only)
+        if: github.event_name == 'pull_request'
+        run: task check:fast
+
+      - name: Run Quality Checks (Full - main/releases)
+        if: github.event_name != 'pull_request'
         run: task check
 
       - name: Upload Coverage to Codecov
@@ -245,17 +256,17 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage.txt
-          fail_ci_if_error: true
+          fail_ci_if_error: ${{ github.event_name != 'pull_request' }}
           verbose: true
           flags: unittests
           name: codecov-${{ steps.binary-name.outputs.name }}
 
       - name: Generate License Report
-        if: always()
+        if: github.event_name != 'pull_request'
         run: task generate:license:report
 
       - name: Upload License Report
-        if: always()
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v5
         with:
           name: license-report
