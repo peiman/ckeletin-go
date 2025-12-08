@@ -361,5 +361,3 @@ func RestoreLoggerState(logger zerolog.Logger, level zerolog.Level) {
 	log.Logger = logger
 	zerolog.SetGlobalLevel(level)
 }
-
-// Test framework update marker

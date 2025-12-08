@@ -216,13 +216,25 @@ tasks:
         if [ -z "{{.NAME}}" ]; then
           echo "Usage: task generate:command name=<command_name>" >&2; exit 1; fi
       - |
-        cp cmd/template_command.go.example {{.CMD_FILE}} && \
-        sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}} && \
-        sed -i '' "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
+        cp cmd/template_command.go.example {{.CMD_FILE}}
+        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}}
+          sed -i '' "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
+        else
+          sed -i "s/template/{{.NAME}}/g" {{.CMD_FILE}}
+          sed -i "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
+        fi
       - |
-        cp internal/config/commands/template_config.go.example {{.CFG_FILE}} && \
-        sed -i '' "s/template/{{.NAME}}/g" {{.CFG_FILE}} && \
-        sed -i '' "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
+        cp internal/config/commands/template_config.go.example {{.CFG_FILE}}
+        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+          sed -i '' "s/template/{{.NAME}}/g" {{.CFG_FILE}}
+          sed -i '' "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
+        else
+          sed -i "s/template/{{.NAME}}/g" {{.CFG_FILE}}
+          sed -i "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
+        fi
       - echo "✅ Scaffolded ultra-thin command"
       - echo "   Command {{.CMD_FILE}}"
       - echo "   Config {{.CFG_FILE}}"
