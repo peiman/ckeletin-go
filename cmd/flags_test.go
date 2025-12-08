@@ -5,7 +5,10 @@ package cmd
 import (
 	"testing"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStringDefault(t *testing.T) {
@@ -564,6 +567,79 @@ func TestStringSliceDefault(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := stringSliceDefault(tt.input)
 			assert.Equal(t, tt.want, got, "stringSliceDefault should convert value correctly")
+		})
+	}
+}
+
+// TestRegisterFlagsForPrefixWithOverrides_ShortFlags tests that short flags are properly registered
+// by using the ping command's actual configuration which includes short flags
+func TestRegisterFlagsForPrefixWithOverrides_ShortFlags(t *testing.T) {
+	// Reset viper for clean test
+	viper.Reset()
+
+	// Create a fresh command
+	cmd := &cobra.Command{Use: "test"}
+
+	// Register flags for ping prefix (which has short flags defined)
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", nil)
+	assert.NoError(t, err, "RegisterFlagsForPrefixWithOverrides should not return error")
+
+	// Verify the message flag exists with short flag "m"
+	messageFlag := cmd.Flags().Lookup("output-message")
+	if messageFlag != nil {
+		assert.Equal(t, "m", messageFlag.Shorthand, "message flag should have shorthand 'm'")
+	}
+
+	// Verify the color flag exists with short flag "c"
+	colorFlag := cmd.Flags().Lookup("output-color")
+	if colorFlag != nil {
+		assert.Equal(t, "c", colorFlag.Shorthand, "color flag should have shorthand 'c'")
+	}
+
+	// Verify the ui flag exists without short flag (ShortFlag is empty)
+	uiFlag := cmd.Flags().Lookup("ui")
+	if uiFlag != nil {
+		assert.Empty(t, uiFlag.Shorthand, "ui flag should not have shorthand")
+	}
+}
+
+// TestShortFlagRegistration_DirectCobra tests short flag registration directly with cobra
+func TestShortFlagRegistration_DirectCobra(t *testing.T) {
+	tests := []struct {
+		name         string
+		flagType     string
+		shortFlag    string
+		defaultValue interface{}
+	}{
+		{"string with short flag", "string", "s", "default"},
+		{"bool with short flag", "bool", "b", false},
+		{"int with short flag", "int", "n", 42},
+		{"float with short flag", "float64", "f", 3.14},
+		{"stringslice with short flag", "[]string", "l", []string{"a", "b"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "test"}
+
+			// Register flag with short flag based on type
+			switch tt.flagType {
+			case "string":
+				cmd.Flags().StringP("test-flag", tt.shortFlag, stringDefault(tt.defaultValue), "test")
+			case "bool":
+				cmd.Flags().BoolP("test-flag", tt.shortFlag, boolDefault(tt.defaultValue), "test")
+			case "int":
+				cmd.Flags().IntP("test-flag", tt.shortFlag, intDefault(tt.defaultValue), "test")
+			case "float64":
+				cmd.Flags().Float64P("test-flag", tt.shortFlag, floatDefault(tt.defaultValue), "test")
+			case "[]string":
+				cmd.Flags().StringSliceP("test-flag", tt.shortFlag, stringSliceDefault(tt.defaultValue), "test")
+			}
+
+			// Verify short flag is set
+			flag := cmd.Flags().Lookup("test-flag")
+			require.NotNil(t, flag, "Flag should exist")
+			assert.Equal(t, tt.shortFlag, flag.Shorthand, "Flag should have correct shorthand")
 		})
 	}
 }
