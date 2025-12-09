@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Scaffold workflow commands**:
+  - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
+  - `task ckeletin:update` - Pull framework updates from upstream without affecting project code
+- **Two-tier ADR system**: Framework ADRs (000-099) in `.ckeletin/docs/adr/`, project ADRs (100+) in `docs/adr/`
+- **Dev tools caching tasks**: `setup:pinned` (cacheable tools), `setup:latest` (security tools always fresh)
+
 - **Go version management**: `.go-version` file as SSOT for build toolchain version
   - `task check:go-version` validates system Go matches pinned version
   - `task doctor` shows version comparison (minimum, expected, installed)
@@ -74,6 +80,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`task test` now includes dev command tests by default**:
   - Tests run with `-tags dev` to test dev commands
   - Use `task test:prod` to test without dev commands
+- **Framework/project separation**: Framework code moved to `.ckeletin/` directory
+  - Import paths changed to `.ckeletin/pkg/*` (config, logger, testutil)
+  - Taskfile uses `includes:` to import framework tasks from `.ckeletin/Taskfile.yml`
+  - Framework tasks namespaced as `ckeletin:*` with convenience aliases
+  - Lefthook configuration extends `.ckeletin/configs/lefthook.base.yml`
+- **CI workflow optimization**:
+  - PRs now run `task check:fast` (~2-3 min) instead of full checks (~5-8 min)
+  - Cross-platform matrix and dev/prod tests only run on main branch and tags
+  - Trivy action pinned to `@0.28.0` for reproducibility
+
+### Removed
+
+- **`.cursor/rules/` directory**: Consolidated into `CLAUDE.md` for AI assistant instructions
 
 ## [0.8.0] - 2025-11-15
 
