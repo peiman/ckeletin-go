@@ -81,7 +81,7 @@ project/
 
 ## Decision
 
-We adopt a **CLI-first package organization** with no public API surface:
+We adopt a **CLI-first package organization** with optional public packages:
 
 ```
 ckeletin-go/
@@ -93,32 +93,43 @@ ckeletin-go/
 │   ├── docs.go
 │   └── *.go                   # Additional commands
 │
-├── internal/                  # ALL implementation (private)
+├── internal/                  # Private implementation
 │   ├── ping/                  # Business logic packages
 │   ├── docs/
 │   ├── config/                # Infrastructure packages
 │   ├── logger/
 │   └── ui/
 │
+├── pkg/                       # (Optional) Standalone reusable packages
+│   └── <package>/             # Must NOT import from internal/
+│
 ├── scripts/                   # Build and validation scripts
 ├── test/integration/          # Integration tests
-├── docs/                      # Documentation
-└── (NO pkg/ directory)        # Explicitly absent
+└── docs/                      # Documentation
 ```
 
 ### Key Principles
 
-**1. No `pkg/` Directory**
-- ckeletin-go is a **CLI application**, not a reusable library
-- No public Go API to maintain
-- All implementation is private (in `internal/`)
-- Users interact via compiled binary, not Go imports
+**1. Optional `pkg/` Directory**
+- `pkg/` MAY be used for standalone, reusable packages
+- Packages in `pkg/` must NOT import from `internal/` (enforced by validation)
+- These are truly standalone libraries useful to external Go projects
+- Requires conscious decision: you're committing to maintain a public API
 
-**2. `internal/` for All Implementation**
+**Criteria for `pkg/` packages:**
+1. No dependencies on `internal/` packages
+2. Useful to external Go projects (not just this CLI)
+3. Complete documentation (`doc.go`)
+4. Comprehensive tests
+5. You're willing to maintain API compatibility
+
+**If your project is purely a CLI tool**, omit `pkg/` to signal "CLI only" intent.
+
+**2. `internal/` for Private Implementation**
 - Go's `internal/` visibility rules prevent external imports
-- Enforces "CLI application only" identity
 - Freedom to refactor without breaking external consumers
 - No semantic versioning burden for internal APIs
+- CLI-specific business logic belongs here
 
 **3. `cmd/` for CLI Interface**
 - Only public interface is the command-line tool itself
@@ -144,16 +155,15 @@ ckeletin-go/
 
 **✅ Allowed:**
 - `main.go` at root (entry point)
-- All packages in `cmd/` or `internal/`
+- All packages in `cmd/`, `internal/`, or `pkg/`
 - Go files in `scripts/` (build tools, not packages)
 - Test files anywhere (`*_test.go`)
+- `pkg/` packages that are standalone (no `internal/` imports)
 
 **❌ Forbidden:**
-- `pkg/` directory with Go code
 - `.go` files at root except `main.go` and `main_test.go`
-- Public packages outside `cmd/` or `internal/`
 - Business logic in root directory
-- Any Go package importable by external projects (except via `cmd/`)
+- `pkg/` packages that import from `internal/` (they must be standalone)
 
 ### Enforcement
 
@@ -162,9 +172,9 @@ ckeletin-go/
 task validate:package-organization
 ```
 Validates:
-- No `pkg/` directory with Go packages
 - No `.go` files at root except `main.go` and `main_test.go`
-- All packages in `cmd/`, `internal/`, `scripts/`, or `test/`
+- All packages in `cmd/`, `internal/`, `pkg/`, `scripts/`, or `test/`
+- `pkg/` packages do NOT import from `internal/` (standalone requirement)
 
 **2. Integrated into Quality Pipeline**
 ```bash
@@ -208,14 +218,14 @@ task check  # Includes package organization validation
 
 ### Negative
 
-**1. Not Reusable as Library**
-- Business logic in `internal/` cannot be imported externally
-- If users want Go API, must expose via `pkg/`
-- Migration would require conscious refactoring
+**1. API Maintenance Burden (if using `pkg/`)**
+- Packages in `pkg/` require API stability commitment
+- Semantic versioning applies to public packages
+- Must maintain backwards compatibility
 
 **2. Strict Structure**
 - Cannot "just add a package at root"
-- Must think about placement (cmd/ vs internal/)
+- Must think about placement (cmd/ vs internal/ vs pkg/)
 - More structure than flat layout
 
 **3. Potential Over-Engineering**
@@ -225,15 +235,14 @@ task check  # Includes package organization validation
 ### Mitigations
 
 **1. Documentation**
-- This ADR explains WHY we're CLI-only
+- This ADR explains the organization strategy
 - [ARCHITECTURE.md](ARCHITECTURE.md) shows HOW packages organize
 - Clear guidance for contributors
 
-**2. If Library Needed Later**
-- Extract desired packages from `internal/` to `pkg/`
-- Requires conscious decision (not accidental)
-- Can maintain CLI tool while adding library mode
-- Semantic versioning applies only after extraction
+**2. Standalone Enforcement**
+- `pkg/` packages cannot import `internal/` - enforced by validation
+- This ensures `pkg/` packages are truly reusable
+- Prevents tight coupling between public and private code
 
 **3. Examples**
 - Current codebase demonstrates pattern
@@ -244,13 +253,13 @@ task check  # Includes package organization validation
 
 ### Current State Validation
 
-The current project **already follows this pattern**:
-- ✅ No Go code in `pkg/` (directory exists but empty)
-- ✅ All implementation in `internal/` and `cmd/`
+The current project **follows this pattern**:
+- ✅ `pkg/` contains only standalone packages (no `internal/` imports)
+- ✅ CLI-specific implementation in `internal/` and `cmd/`
 - ✅ Only `main.go` and `main_test.go` at root
 - ✅ Auxiliary directories (`scripts/`, `test/`, `docs/`) present
 
-This ADR **documents existing practice** and adds enforcement.
+This ADR **documents the organization strategy** and adds enforcement.
 
 ### Directory Purposes
 
@@ -268,6 +277,9 @@ ckeletin-go/
 │   ├── config/, logger/, ui/  # Infrastructure packages
 │   └── */                     # Additional internal packages
 │
+├── pkg/                       # (Optional) Standalone reusable packages
+│   └── <package>/             # Must NOT import from internal/
+│
 ├── scripts/                   # Build and validation tooling
 │   ├── *.sh                   # Bash scripts
 │   └── *.go                   # Go build tools (not packages)
@@ -275,28 +287,28 @@ ckeletin-go/
 ├── test/integration/          # Integration tests
 ├── docs/                      # ADRs, guides, documentation
 ├── testdata/                  # Test fixtures
-├── .github/                   # CI/CD workflows
-│
-└── (no pkg/)                  # Explicitly absent (CLI only)
+└── .github/                   # CI/CD workflows
 ```
 
-### When to Create `pkg/`
+### When to Use `pkg/`
 
-Only create `pkg/` if we make a **conscious decision** to expose a public Go API.
+Create packages in `pkg/` when you want to expose a public Go API.
 
 **Questions to ask first:**
-1. Do external projects need to import our code?
-2. Are we willing to maintain API compatibility?
-3. Should we version the library separately from the CLI?
-4. Can users accomplish their goals with the CLI alone?
+1. Is this package useful to external Go projects?
+2. Can it work standalone (no `internal/` dependencies)?
+3. Are you willing to maintain API compatibility?
+4. Does it have complete documentation and tests?
 
-**If yes to all:** Extract relevant packages from `internal/` to `pkg/`, add semantic versioning, document public API.
+**If yes to all:** Create the package in `pkg/`, document the public API, commit to stability.
 
 **If no:** Keep everything in `internal/`, users interact via CLI binary.
 
+**Key rule:** `pkg/` packages must NOT import from `internal/`. This ensures they are truly standalone and reusable. The validation script enforces this.
+
 ### Adding New Packages
 
-**For new features:**
+**For new CLI features:**
 1. Create business logic in `internal/<feature>/`
 2. Create command in `cmd/<feature>.go`
 3. No need to update validation (automatically covered)
@@ -305,6 +317,13 @@ Only create `pkg/` if we make a **conscious decision** to expose a public Go API
 1. Follow [ADR-001](001-ultra-thin-command-pattern.md) (ultra-thin pattern)
 2. Follow [ADR-009](009-layered-architecture-pattern.md) (layering rules)
 3. Run `task validate:package-organization` to verify
+
+**For new reusable packages:**
+1. Create package in `pkg/<package>/`
+2. Ensure NO imports from `internal/` (standalone requirement)
+3. Add `doc.go` with package documentation
+4. Add comprehensive tests
+5. Run `task validate:package-organization` to verify standalone status
 
 ## Related ADRs
 

@@ -97,6 +97,19 @@ components:
       # Add your business logic packages below:
       # - internal/yourpackage/**
 
+  # -------------------------------------------------------------------------
+  # PUBLIC PACKAGES: Standalone Reusable Libraries
+  # -------------------------------------------------------------------------
+  # pkg/ contains standalone packages that:
+  # - Do NOT import from internal/ (enforced by validate-package-organization.sh)
+  # - Can be imported by external Go projects
+  # - Are independent of the CLI architecture
+  #
+  # See ADR-010 for guidance on when to use pkg/
+  public:
+    in:
+      - pkg/**
+
 # External dependencies (vendors from go.mod)
 vendors:
   # Cobra CLI framework
@@ -110,6 +123,7 @@ vendors:
 # Common components available to all layers
 commonComponents:
   - infrastructure
+  - public  # Public packages can be used by any layer
 
 # -------------------------------------------------------------------------
 # FRAMEWORK-MANAGED: Dependency Rules
@@ -148,3 +162,9 @@ deps:
     mayDependOn: []  # Empty - depends on nothing
     canUse:
       - viper
+
+  # Public packages are completely standalone
+  # Cannot depend on any internal packages (enforced by validation script too)
+  # Can use any external vendor dependencies
+  public:
+    anyVendorDeps: true  # Allow external dependencies (lipgloss, etc.)
