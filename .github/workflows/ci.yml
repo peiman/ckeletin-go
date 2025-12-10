@@ -6,10 +6,30 @@ on:
       - main
     tags:
       - "*" # Trigger for all tags
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.ckeletin/docs/**'
+      - 'logo/**'
+      - 'research/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'LICENSE'
+      - '.gitignore'
 
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.ckeletin/docs/**'
+      - 'logo/**'
+      - 'research/**'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - 'LICENSE'
+      - '.gitignore'
 
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC (catch upstream license changes)
