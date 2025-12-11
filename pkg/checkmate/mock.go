@@ -2,6 +2,7 @@ package checkmate
 
 import (
 	"bytes"
+	"context"
 	"sync"
 )
 
@@ -132,14 +133,21 @@ func (m *MockPrinter) CallCount(method string) int {
 	return count
 }
 
-// GetCalls returns all calls to a specific method.
-func (m *MockPrinter) GetCalls(method string) []MockCall {
+// GetCalls returns all argument lists for calls to a specific method.
+// Each element is a slice of arguments passed to that method call.
+//
+// Example:
+//
+//	calls := mock.GetCalls("CheckFailure")
+//	assert.Equal(t, "title", calls[0][0])
+//	assert.Equal(t, "details", calls[0][1])
+func (m *MockPrinter) GetCalls(method string) [][]interface{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var calls []MockCall
+	var calls [][]interface{}
 	for _, call := range m.Calls {
 		if call.Method == method {
-			calls = append(calls, call)
+			calls = append(calls, call.Args)
 		}
 	}
 	return calls
@@ -147,3 +155,122 @@ func (m *MockPrinter) GetCalls(method string) []MockCall {
 
 // Ensure MockPrinter implements PrinterInterface.
 var _ PrinterInterface = (*MockPrinter)(nil)
+
+// MockRunner records all check registrations and run calls for testing.
+// It allows you to verify that checks were registered correctly without
+// actually running them.
+//
+// Example:
+//
+//	mock := checkmate.NewMockRunner()
+//	registerChecks(mock)
+//	assert.Equal(t, 3, mock.CheckCount())
+//	assert.True(t, mock.HasCheck("format"))
+type MockRunner struct {
+	checks       []Check
+	lastRunCalls int
+	lastResult   RunResult
+	mu           sync.Mutex
+}
+
+// NewMockRunner creates a new MockRunner for testing.
+func NewMockRunner() *MockRunner {
+	return &MockRunner{}
+}
+
+// Add records the check.
+func (m *MockRunner) Add(check Check) *Runner {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.checks = append(m.checks, check)
+	// Return nil - this is a mock, chaining is not supported
+	return nil
+}
+
+// AddFunc records the check.
+func (m *MockRunner) AddFunc(name string, fn func(ctx context.Context) error) *Runner {
+	m.Add(Check{Name: name, Fn: fn})
+	return nil
+}
+
+// WithRemediation sets remediation for the last check.
+func (m *MockRunner) WithRemediation(text string) *Runner {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.checks) > 0 {
+		m.checks[len(m.checks)-1].Remediation = text
+	}
+	return nil
+}
+
+// WithDetails sets details for the last check.
+func (m *MockRunner) WithDetails(text string) *Runner {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.checks) > 0 {
+		m.checks[len(m.checks)-1].Details = text
+	}
+	return nil
+}
+
+// Run records the call and returns a configurable result.
+func (m *MockRunner) Run(ctx context.Context) RunResult {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lastRunCalls++
+	return m.lastResult
+}
+
+// SetResult sets the result that Run() will return.
+func (m *MockRunner) SetResult(result RunResult) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.lastResult = result
+}
+
+// CheckCount returns the number of checks registered.
+func (m *MockRunner) CheckCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.checks)
+}
+
+// HasCheck checks if a check with the given name was registered.
+func (m *MockRunner) HasCheck(name string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, check := range m.checks {
+		if check.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+// GetCheck returns the check with the given name, or nil if not found.
+func (m *MockRunner) GetCheck(name string) *Check {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, check := range m.checks {
+		if check.Name == name {
+			return &m.checks[i]
+		}
+	}
+	return nil
+}
+
+// RunCalls returns the number of times Run was called.
+func (m *MockRunner) RunCalls() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastRunCalls
+}
+
+// Reset clears all recorded checks and run calls.
+func (m *MockRunner) Reset() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.checks = nil
+	m.lastRunCalls = 0
+	m.lastResult = RunResult{}
+}

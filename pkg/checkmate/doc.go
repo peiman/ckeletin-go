@@ -83,4 +83,64 @@
 //	• Linting
 //	• Tests
 //	━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// # Check Runner
+//
+// Use Runner to orchestrate multiple checks with automatic output handling:
+//
+//	p := checkmate.New()
+//	result := checkmate.NewRunner(p, checkmate.WithCategory("Code Quality")).
+//	    AddFunc("format", checkFormat).WithRemediation("Run: task format").
+//	    AddFunc("lint", checkLint).WithRemediation("Run: task lint").
+//	    Run(context.Background())
+//
+//	if !result.Success() {
+//	    os.Exit(1)
+//	}
+//
+// The runner automatically:
+//   - Displays category headers
+//   - Shows check progress with CheckHeader
+//   - Reports success/failure for each check
+//   - Generates a summary at the end
+//   - Recovers from panics (converts to failed checks)
+//   - Respects context cancellation
+//
+// # Runner Options
+//
+//	// Stop on first failure
+//	runner := checkmate.NewRunner(p, checkmate.WithFailFast())
+//
+//	// Set category header
+//	runner := checkmate.NewRunner(p, checkmate.WithCategory("Tests"))
+//
+// # Fluent API
+//
+// The runner supports a fluent API for easy check definition:
+//
+//	result := checkmate.NewRunner(p).
+//	    AddFunc("check1", func(ctx context.Context) error {
+//	        return nil // success
+//	    }).WithRemediation("Fix instruction").
+//	    Add(checkmate.Check{
+//	        Name:        "check2",
+//	        Fn:          check2Func,
+//	        Remediation: "How to fix",
+//	        Details:     "Additional context shown on failure",
+//	    }).
+//	    Run(ctx)
+//
+// # Testing Runners
+//
+// Use MockPrinter to test code that uses Runner:
+//
+//	func TestChecks(t *testing.T) {
+//	    mock := checkmate.NewMockPrinter()
+//	    result := checkmate.NewRunner(mock).
+//	        AddFunc("test", func(ctx context.Context) error { return nil }).
+//	        Run(context.Background())
+//
+//	    assert.True(t, result.Success())
+//	    assert.True(t, mock.HasCall("CheckSuccess"))
+//	}
 package checkmate

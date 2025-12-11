@@ -60,8 +60,8 @@ func TestMockPrinter_GetCalls(t *testing.T) {
 
 	calls := mock.GetCalls("CheckSuccess")
 	assert.Len(t, calls, 2)
-	assert.Equal(t, "first", calls[0].Args[0])
-	assert.Equal(t, "second", calls[1].Args[0])
+	assert.Equal(t, "first", calls[0][0])
+	assert.Equal(t, "second", calls[1][0])
 }
 
 func TestMockPrinter_Reset(t *testing.T) {

@@ -1,5 +1,7 @@
 package checkmate
 
+import "context"
+
 // Status represents the outcome of a check or operation.
 type Status string
 
@@ -52,4 +54,24 @@ type PrinterInterface interface {
 	// CheckNote displays an informational note.
 	// Example output: "Note: This is informational"
 	CheckNote(message string)
+}
+
+// RunnerInterface defines the contract for running checks.
+// Use this interface for dependency injection in your code,
+// allowing easy substitution of MockRunner in tests.
+type RunnerInterface interface {
+	// Add adds a check to the runner. Returns the runner for chaining.
+	Add(check Check) *Runner
+
+	// AddFunc is a convenience for adding simple checks.
+	AddFunc(name string, fn func(ctx context.Context) error) *Runner
+
+	// WithRemediation sets remediation text for the last added check.
+	WithRemediation(text string) *Runner
+
+	// WithDetails sets details text for the last added check.
+	WithDetails(text string) *Runner
+
+	// Run executes all checks and returns results.
+	Run(ctx context.Context) RunResult
 }
