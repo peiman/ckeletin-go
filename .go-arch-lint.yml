@@ -94,6 +94,7 @@ components:
       - internal/docs/**
       - internal/dev/**
       - internal/progress/**
+      - internal/check/**
       # Add your business logic packages below:
       # - internal/yourpackage/**
 
