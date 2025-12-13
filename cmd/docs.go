@@ -43,8 +43,10 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 
 	// Set config paths
 	paths := ConfigPaths()
-	appInfo.ConfigPaths.DefaultPath = paths.DefaultPath
-	appInfo.ConfigPaths.DefaultFullName = paths.DefaultFullName
+	if paths.XDGDir != "" {
+		appInfo.ConfigPaths.DefaultPath = paths.XDGDir + "/config.yaml"
+	}
+	appInfo.ConfigPaths.DefaultFullName = "config.yaml" // local project config
 
 	// Create document generator configuration
 	cfg := docs.Config{

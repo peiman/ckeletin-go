@@ -60,13 +60,17 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 	// Determine which config file to validate
 	configPath := validateConfigFile
 	if configPath == "" {
-		// Use the global --config flag if set
-		if cfgFile != "" {
+		// Use the config file viper already found, or the global --config flag
+		if configFileUsed != "" {
+			configPath = configFileUsed
+		} else if cfgFile != "" {
 			configPath = cfgFile
 		} else {
-			// Use default config path
+			// Default to XDG path for validation target
 			configPaths := ConfigPaths()
-			configPath = configPaths.DefaultPath
+			if configPaths.XDGDir != "" {
+				configPath = configPaths.XDGDir + "/config.yaml"
+			}
 		}
 	}
 

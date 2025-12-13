@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Single source of truth pattern via `xdg.SetAppName()` initialized from `binaryName`
   - Check timing data now stored in XDG cache directory
 
+- **Simplified config file discovery** (uses viper's native search):
+  - `./config.yaml` - project-local config (highest priority)
+  - `$XDG_CONFIG_HOME/appname/config.yaml` - user config via XDG
+  - Supports multiple formats: yaml, yml, json, toml (auto-detected by viper)
+  - Removed legacy `~/.appname.yaml` home directory config
+
 - **Scaffold workflow commands**:
   - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
   - `task ckeletin:update` - Pull framework updates from upstream without affecting project code

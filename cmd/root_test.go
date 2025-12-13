@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -273,54 +274,29 @@ func TestExecute_ErrorPropagation(t *testing.T) {
 
 // TestConfigPaths tests the ConfigPaths function that returns the configuration paths
 func TestConfigPaths(t *testing.T) {
-	tests := []struct {
-		name                    string
-		binaryName              string
-		wantDefaultName         string
-		wantDefaultFullName     string
-		wantDefaultPathContains string
-	}{
-		{
-			name:                    "Standard binary name",
-			binaryName:              "myapp",
-			wantDefaultName:         ".myapp",
-			wantDefaultFullName:     ".myapp.yaml",
-			wantDefaultPathContains: ".myapp.yaml",
-		},
-		{
-			name:                    "Name with hyphens",
-			binaryName:              "my-app",
-			wantDefaultName:         ".my-app",
-			wantDefaultFullName:     ".my-app.yaml",
-			wantDefaultPathContains: ".my-app.yaml",
-		},
-		{
-			name:                    "Name with dots",
-			binaryName:              "app.v2",
-			wantDefaultName:         ".app.v2",
-			wantDefaultFullName:     ".app.v2.yaml",
-			wantDefaultPathContains: ".app.v2.yaml",
-		},
-	}
+	// SETUP PHASE
+	// Save original and restore after test
+	origBinaryName := binaryName
+	origAppName := xdg.GetAppName()
+	defer func() {
+		binaryName = origBinaryName
+		xdg.SetAppName(origAppName)
+	}()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// SETUP PHASE
-			// Save original and restore after test
-			origBinaryName := binaryName
-			defer func() { binaryName = origBinaryName }()
+	// Set test binary name and XDG app name
+	binaryName = "testapp"
+	xdg.SetAppName("testapp")
 
-			// Set test binary name
-			binaryName = tt.binaryName
+	// EXECUTION PHASE
+	paths := ConfigPaths()
 
-			// EXECUTION PHASE
-			paths := ConfigPaths()
+	// ASSERTION PHASE
+	// ConfigName is always "config" (viper will search for config.yaml, config.json, etc.)
+	assert.Equal(t, "config", paths.ConfigName, "ConfigPaths().ConfigName should be 'config'")
 
-			// ASSERTION PHASE
-			assert.Equal(t, tt.wantDefaultName, paths.DefaultName, "ConfigPaths().DefaultName should match")
-			assert.Equal(t, tt.wantDefaultFullName, paths.DefaultFullName, "ConfigPaths().DefaultFullName should match")
-			assert.Contains(t, paths.DefaultPath, tt.wantDefaultPathContains, "ConfigPaths().DefaultPath should contain expected file name")
-		})
+	// XDGDir should contain the app name
+	if paths.XDGDir != "" {
+		assert.Contains(t, paths.XDGDir, "testapp", "ConfigPaths().XDGDir should contain app name")
 	}
 }
 
@@ -982,9 +958,9 @@ func TestConfigFromCurrentDirectory(t *testing.T) {
 	defer os.Chdir(oldWd)
 	os.Chdir(tempDir)
 
-	// Create config file in current directory
+	// Create config file in current directory (config.yaml is the new standard)
 	configContent := []byte("app:\n  log_level: debug\n")
-	configPath := filepath.Join(tempDir, ".ckeletin-go.yaml")
+	configPath := filepath.Join(tempDir, "config.yaml")
 	err := os.WriteFile(configPath, configContent, 0600)
 	require.NoError(t, err, "Failed to write test config")
 
@@ -1026,9 +1002,13 @@ func TestConfigFromCurrentDirectory(t *testing.T) {
 	assert.Contains(t, configFileStatus, "Using config file", "Expected 'Using config file' status")
 }
 
-// TestConfigPriorityCurrentDirFirst tests that current directory config has priority over home directory
-// This test will initially FAIL - current directory search doesn't exist yet
+// TestConfigPriorityCurrentDirFirst tests that current directory config has priority over XDG config
 func TestConfigPriorityCurrentDirFirst(t *testing.T) {
+	// Skip on Windows due to path handling differences
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping config priority test on Windows")
+	}
+
 	// SETUP PHASE
 	savedLogger, savedLevel := logger.SaveLoggerState()
 	defer logger.RestoreLoggerState(savedLogger, savedLevel)
@@ -1040,14 +1020,24 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(currentDir, 0755)
 
-	// Write different values to home and current directory configs
-	homeConfigContent := []byte("app:\n  log_level: info\n")
-	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
-	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
-	require.NoError(t, err, "Failed to write home config")
+	// Create XDG config directory structure based on OS
+	var xdgConfigDir string
+	if runtime.GOOS == "darwin" {
+		xdgConfigDir = filepath.Join(homeDir, "Library", "Application Support", "ckeletin-go")
+	} else {
+		xdgConfigDir = filepath.Join(homeDir, ".config", "ckeletin-go")
+	}
+	os.MkdirAll(xdgConfigDir, 0700)
 
+	// Write config to XDG directory with "info" level
+	xdgConfigContent := []byte("app:\n  log_level: info\n")
+	xdgConfigPath := filepath.Join(xdgConfigDir, "config.yaml")
+	err := os.WriteFile(xdgConfigPath, xdgConfigContent, 0600)
+	require.NoError(t, err, "Failed to write XDG config")
+
+	// Write config to current directory with "debug" level (should win)
 	currentConfigContent := []byte("app:\n  log_level: debug\n")
-	currentConfig := filepath.Join(currentDir, ".ckeletin-go.yaml")
+	currentConfig := filepath.Join(currentDir, "config.yaml")
 	err = os.WriteFile(currentConfig, currentConfigContent, 0600)
 	require.NoError(t, err, "Failed to write current dir config")
 
@@ -1093,11 +1083,11 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 	}
 }
 
-// TestConfigFromHomeDirectoryOnly tests config discovery when config only exists in home directory
-func TestConfigFromHomeDirectoryOnly(t *testing.T) {
+// TestConfigFromXDGDirectory tests config discovery when config only exists in XDG config directory
+func TestConfigFromXDGDirectory(t *testing.T) {
 	// Skip on Windows due to path handling differences
 	if runtime.GOOS == "windows" {
-		t.Skip("Skipping home directory config test on Windows")
+		t.Skip("Skipping XDG config test on Windows")
 	}
 
 	// SETUP PHASE
@@ -1111,11 +1101,20 @@ func TestConfigFromHomeDirectoryOnly(t *testing.T) {
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(currentDir, 0755)
 
-	// Write config ONLY to home directory (not current directory)
-	homeConfigContent := []byte("app:\n  log_level: warn\n")
-	homeConfig := filepath.Join(homeDir, ".ckeletin-go.yaml")
-	err := os.WriteFile(homeConfig, homeConfigContent, 0600)
-	require.NoError(t, err, "Failed to write home config")
+	// Create XDG config directory structure based on OS
+	var xdgConfigDir string
+	if runtime.GOOS == "darwin" {
+		xdgConfigDir = filepath.Join(homeDir, "Library", "Application Support", "ckeletin-go")
+	} else {
+		xdgConfigDir = filepath.Join(homeDir, ".config", "ckeletin-go")
+	}
+	os.MkdirAll(xdgConfigDir, 0700)
+
+	// Write config to XDG directory (not current directory)
+	xdgConfigContent := []byte("app:\n  log_level: warn\n")
+	xdgConfigPath := filepath.Join(xdgConfigDir, "config.yaml")
+	err := os.WriteFile(xdgConfigPath, xdgConfigContent, 0600)
+	require.NoError(t, err, "Failed to write XDG config")
 
 	// Save originals
 	origCfgFile := cfgFile
@@ -1147,11 +1146,11 @@ func TestConfigFromHomeDirectoryOnly(t *testing.T) {
 	err = initConfig()
 
 	// ASSERTION PHASE
-	require.NoError(t, err, "initConfig should succeed with home directory config")
+	require.NoError(t, err, "initConfig should succeed with XDG directory config")
 
-	// Home directory config should be loaded
+	// XDG directory config should be loaded
 	logLevel := viper.GetString("app.log_level")
-	assert.Equal(t, "warn", logLevel, "Expected log_level='warn' from home dir")
+	assert.Equal(t, "warn", logLevel, "Expected log_level='warn' from XDG dir")
 
 	// Config file path should be from home directory
 	if configFileUsed != "" {
