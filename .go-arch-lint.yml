@@ -76,6 +76,7 @@ components:
       - .ckeletin/pkg/testutil/**
       - internal/config/commands/**
       - internal/ui/**
+      - internal/xdg/**
 
   # -------------------------------------------------------------------------
   # PROJECT-MANAGED: Business Logic Layer

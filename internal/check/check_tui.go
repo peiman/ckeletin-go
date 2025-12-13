@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
 
@@ -42,14 +43,15 @@ type checkItem struct {
 	remediation string
 }
 
-// timingFilePath returns the path to the timing history file
+// timingFilePath returns the path to the timing history file.
+// Uses XDG cache directory since timing data is ephemeral/regenerable.
 func timingFilePath() string {
-	configDir, err := os.UserConfigDir()
+	path, err := xdg.CacheFile("check-timings.json")
 	if err != nil {
-		configDir = os.TempDir()
+		// Fallback to temp dir if XDG not configured
+		return filepath.Join(os.TempDir(), "ckeletin-go-check-timings.json")
 	}
-	// Use Clean to sanitize the path and prevent traversal
-	return filepath.Clean(filepath.Join(configDir, "ckeletin-go", "check-timings.json"))
+	return path
 }
 
 // loadTimingHistory loads timing data from disk

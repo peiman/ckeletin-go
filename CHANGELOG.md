@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **XDG Base Directory Specification compliance** (`internal/xdg`):
+  - Platform-aware path helpers for config, data, cache, and state directories
+  - Linux/Unix: follows XDG spec (`$XDG_CONFIG_HOME`, `$XDG_CACHE_HOME`, etc.)
+  - macOS: uses Apple conventions (`~/Library/Application Support`, `~/Library/Caches`)
+  - Windows: uses standard paths (`%AppData%`, `%LocalAppData%`)
+  - Single source of truth pattern via `xdg.SetAppName()` initialized from `binaryName`
+  - Check timing data now stored in XDG cache directory
+
 - **Scaffold workflow commands**:
   - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
   - `task ckeletin:update` - Pull framework updates from upstream without affecting project code

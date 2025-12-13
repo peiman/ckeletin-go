@@ -23,6 +23,7 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -152,6 +153,9 @@ func init() {
 	if binaryName == "" {
 		binaryName = "ckeletin-go"
 	}
+
+	// Initialize XDG paths with app name (single source of truth)
+	xdg.SetAppName(binaryName)
 
 	configPaths := ConfigPaths()
 
