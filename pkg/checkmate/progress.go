@@ -13,11 +13,12 @@ import (
 
 // CheckProgress represents a check with progress tracking.
 type CheckProgress struct {
-	Name     string
-	Status   CheckStatus
-	Progress float64 // 0.0 to 1.0
-	Duration time.Duration
-	Error    error
+	Name        string
+	Status      CheckStatus
+	Progress    float64 // 0.0 to 1.0
+	Duration    time.Duration
+	Error       error
+	Remediation string // How to fix the error
 }
 
 // CheckStatus represents the status of a check.
@@ -33,7 +34,6 @@ const (
 // ProgressModel is the Bubble Tea model for progress display.
 type ProgressModel struct {
 	checks    []CheckProgress
-	current   int
 	spinner   spinner.Model
 	progress  progress.Model
 	done      bool
@@ -148,6 +148,7 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.checks[msg.Index].Progress = msg.Progress
 			m.checks[msg.Index].Duration = msg.Duration
 			m.checks[msg.Index].Error = msg.Error
+			m.checks[msg.Index].Remediation = msg.Remediation
 		}
 		return m, nil
 
@@ -165,11 +166,12 @@ func (m ProgressModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // CheckUpdateMsg updates a check's status.
 type CheckUpdateMsg struct {
-	Index    int
-	Status   CheckStatus
-	Progress float64
-	Duration time.Duration
-	Error    error
+	Index       int
+	Status      CheckStatus
+	Progress    float64
+	Duration    time.Duration
+	Error       error
+	Remediation string // How to fix the error (shown on failure)
 }
 
 // DoneMsg signals completion.
@@ -190,7 +192,7 @@ func (m ProgressModel) View() string {
 	b.WriteString("\n\n")
 
 	// Progress bars for each check
-	for i, check := range m.checks {
+	for _, check := range m.checks {
 		name := m.styles.checkName.Render(check.Name)
 
 		var status string
@@ -225,12 +227,15 @@ func (m ProgressModel) View() string {
 
 		b.WriteString(fmt.Sprintf("  %s %s %s%s\n", name, bar, status, dur))
 
-		// Show error if failed
-		if check.Status == CheckFailed && check.Error != nil && i == m.current {
+		// Show error summary if failed (first line only, details in summary box)
+		if check.Status == CheckFailed && check.Error != nil {
+			errSummary := getErrorSummary(check.Error.Error())
 			errStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("196")).
-				MarginLeft(14)
-			b.WriteString(errStyle.Render(fmt.Sprintf("└─ %s", check.Error.Error())))
+				Foreground(lipgloss.Color("196"))
+			treeStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("241"))
+			b.WriteString(treeStyle.Render("              └─ "))
+			b.WriteString(errStyle.Render(errSummary))
 			b.WriteString("\n")
 		}
 	}
@@ -242,6 +247,63 @@ func (m ProgressModel) View() string {
 	}
 
 	return b.String()
+}
+
+// getErrorSummary returns a short summary of an error message (first line, truncated).
+func getErrorSummary(errMsg string) string {
+	// Get first line
+	firstLine := errMsg
+	if idx := strings.Index(errMsg, "\n"); idx != -1 {
+		firstLine = errMsg[:idx]
+	}
+
+	// Truncate if too long
+	const maxLen = 50
+	if len(firstLine) > maxLen {
+		firstLine = firstLine[:maxLen-3] + "..."
+	}
+
+	return firstLine
+}
+
+// formatErrorDetails splits error message into lines, limiting width and count.
+func formatErrorDetails(errMsg string, maxWidth int) []string {
+	const maxLines = 10 // Limit lines to keep output manageable
+
+	// Split by newlines first
+	rawLines := strings.Split(errMsg, "\n")
+	var result []string
+
+	for _, line := range rawLines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Wrap long lines
+		for len(line) > maxWidth {
+			// Find last space before maxWidth
+			breakPoint := maxWidth
+			for i := maxWidth; i > maxWidth/2; i-- {
+				if line[i] == ' ' {
+					breakPoint = i
+					break
+				}
+			}
+			result = append(result, line[:breakPoint])
+			line = strings.TrimSpace(line[breakPoint:])
+		}
+		if line != "" {
+			result = append(result, line)
+		}
+
+		if len(result) >= maxLines {
+			result = append(result, "... (truncated)")
+			break
+		}
+	}
+
+	return result
 }
 
 func (m ProgressModel) renderProgressBar(percent float64, color lipgloss.Color) string {
@@ -347,20 +409,68 @@ func (m ProgressModel) renderSummaryBox() string {
 		content.WriteString(fmt.Sprintf("  %s %s%s\n", style, name, dur))
 	}
 
-	// Code coverage bar
-	content.WriteString("\n")
-	coveragePercent := m.coverage / 100.0 // Convert to 0.0-1.0 range
-	var coverageColor lipgloss.Color
-	switch {
-	case m.coverage >= 80:
-		coverageColor = lipgloss.Color("42") // Green
-	case m.coverage >= 60:
-		coverageColor = lipgloss.Color("214") // Yellow/Orange
-	default:
-		coverageColor = lipgloss.Color("196") // Red
+	// Error details section for failed checks
+	hasErrors := false
+	for _, check := range m.checks {
+		if check.Status == CheckFailed && check.Error != nil {
+			hasErrors = true
+			break
+		}
 	}
-	bar := m.renderProgressBar(coveragePercent, coverageColor)
-	content.WriteString(fmt.Sprintf("  Coverage: %s", bar))
+
+	if hasErrors {
+		content.WriteString("\n")
+		errorHeader := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Render("─── Errors ───")
+		content.WriteString("  " + errorHeader + "\n")
+
+		for _, check := range m.checks {
+			if check.Status != CheckFailed || check.Error == nil {
+				continue
+			}
+
+			// Check name
+			nameStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("196")).
+				Bold(true)
+			content.WriteString("\n  " + nameStyle.Render(check.Name) + ":\n")
+
+			// Error details (word-wrapped, indented)
+			errLines := formatErrorDetails(check.Error.Error(), 60)
+			errStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252"))
+			for _, line := range errLines {
+				content.WriteString("    " + errStyle.Render(line) + "\n")
+			}
+
+			// Remediation if available
+			if check.Remediation != "" {
+				remStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("214")).
+					Bold(true)
+				content.WriteString("\n    " + remStyle.Render("Fix: ") + check.Remediation + "\n")
+			}
+		}
+	}
+
+	// Code coverage bar (only show when all checks passed)
+	if allPassed {
+		content.WriteString("\n")
+		coveragePercent := m.coverage / 100.0 // Convert to 0.0-1.0 range
+		var coverageColor lipgloss.Color
+		switch {
+		case m.coverage >= 80:
+			coverageColor = lipgloss.Color("42") // Green
+		case m.coverage >= 60:
+			coverageColor = lipgloss.Color("214") // Yellow/Orange
+		default:
+			coverageColor = lipgloss.Color("196") // Red
+		}
+		bar := m.renderProgressBar(coveragePercent, coverageColor)
+		content.WriteString(fmt.Sprintf("  Coverage: %s", bar))
+	}
 
 	// Duration
 	duration := time.Since(m.startTime).Round(time.Millisecond)

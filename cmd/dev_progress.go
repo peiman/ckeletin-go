@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/peiman/ckeletin-go/internal/progress"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -50,8 +49,6 @@ func init() {
 	devProgressCmd.Flags().Bool("spinner", false, "Run only spinner demo")
 	devProgressCmd.Flags().Bool("bar", false, "Run only progress bar demo")
 	devProgressCmd.Flags().Duration("delay", 0, "Override step delay duration (e.g., 100ms for fast demo)")
-
-	log.Debug().Msg("Dev progress command registered")
 }
 
 // demoConfig holds configuration for demo functions.

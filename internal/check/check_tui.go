@@ -193,11 +193,12 @@ func (e *TUIExecutor) Execute(ctx context.Context) error {
 
 			if err != nil {
 				p.Send(checkmate.CheckUpdateMsg{
-					Index:    i,
-					Status:   checkmate.CheckFailed,
-					Progress: 1.0,
-					Duration: duration,
-					Error:    err,
+					Index:       i,
+					Status:      checkmate.CheckFailed,
+					Progress:    1.0,
+					Duration:    duration,
+					Error:       err,
+					Remediation: check.remediation,
 				})
 
 				if e.cfg.FailFast {
