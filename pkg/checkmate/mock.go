@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"sync"
+	"time"
 )
 
 // MockCall represents a single method call to the printer.
@@ -91,6 +92,13 @@ func (m *MockPrinter) CheckNote(message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.Calls = append(m.Calls, MockCall{Method: "CheckNote", Args: []interface{}{message}})
+}
+
+// CheckLine records the call.
+func (m *MockPrinter) CheckLine(name string, status Status, duration time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Calls = append(m.Calls, MockCall{Method: "CheckLine", Args: []interface{}{name, status, duration}})
 }
 
 // Output returns all captured output as a string.

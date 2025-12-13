@@ -42,8 +42,13 @@ func TestNewCheckPrinterWithWriter_AdditionalOptions(t *testing.T) {
 	p := NewCheckPrinterWithWriter(&buf, checkmate.WithTheme(checkmate.MinimalTheme()))
 	require.NotNil(t, p)
 
+	// CheckHeader skips output in non-TTY mode
 	p.CheckHeader("testing")
-	assert.Contains(t, buf.String(), "[-]") // Minimal theme icon
+	assert.Empty(t, buf.String(), "CheckHeader should skip in non-TTY")
+
+	// CheckSuccess should work
+	p.CheckSuccess("testing")
+	assert.Contains(t, buf.String(), "[OK]") // Minimal theme success icon
 }
 
 func TestStdoutCheckPrinter(t *testing.T) {
@@ -66,12 +71,14 @@ func TestCheckPrinter_Integration(t *testing.T) {
 
 	// Test a typical check workflow
 	p.CategoryHeader("Tests")
+	// CheckHeader skips in non-TTY mode
 	p.CheckHeader("Running unit tests")
 	p.CheckSuccess("All tests passed")
 
 	output := buf.String()
 	assert.Contains(t, output, "Tests")
-	assert.Contains(t, output, "Running unit tests")
+	// CheckHeader skips output in non-TTY, only result shows
+	assert.NotContains(t, output, "Running unit tests")
 	assert.Contains(t, output, "All tests passed")
 	assert.Contains(t, output, "[OK]")
 }

@@ -21,9 +21,11 @@ type Config struct {
 
 // Executor handles the execution of the check command
 type Executor struct {
-	cfg     Config
-	printer checkmate.PrinterInterface
-	writer  io.Writer
+	cfg        Config
+	printer    checkmate.PrinterInterface
+	writer     io.Writer
+	onCoverage func(float64) // Callback for coverage percentage
+	coverage   float64       // Stored coverage for display
 }
 
 // NewExecutor creates a new check command executor
@@ -71,12 +73,21 @@ func (e *Executor) Execute(ctx context.Context) error {
 
 	result := runner.Run(ctx)
 
-	log.Info().
-		Int("passed", result.Passed).
-		Int("failed", result.Failed).
-		Int("total", result.Total).
-		Dur("duration", result.Duration).
-		Msg("Check run completed")
+	// Display coverage if available
+	if e.coverage > 0 {
+		e.printer.CheckInfo(fmt.Sprintf("Coverage: %.1f%%", e.coverage))
+	}
+
+	// Only log in verbose mode to avoid noise in CI output
+	if e.cfg.Verbose {
+		log.Info().
+			Int("passed", result.Passed).
+			Int("failed", result.Failed).
+			Int("total", result.Total).
+			Float64("coverage", e.coverage).
+			Dur("duration", result.Duration).
+			Msg("Check run completed")
+	}
 
 	if !result.Success() {
 		return fmt.Errorf("%d/%d checks failed", result.Failed, result.Total)

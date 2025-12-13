@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -66,13 +67,13 @@ func TestCategoryHeader(t *testing.T) {
 			name:     "default theme",
 			title:    "Code Quality",
 			theme:    forceColorTheme(DefaultTheme()),
-			contains: []string{"─", "Code Quality"},
+			contains: []string{"Code Quality"},
 		},
 		{
 			name:     "minimal theme",
 			title:    "Tests",
 			theme:    MinimalTheme(),
-			contains: []string{"-", "Tests"},
+			contains: []string{"Tests"},
 		},
 		{
 			name:     "long title",
@@ -98,39 +99,29 @@ func TestCategoryHeader(t *testing.T) {
 }
 
 func TestCheckHeader(t *testing.T) {
-	tests := []struct {
-		name     string
-		message  string
-		theme    *Theme
-		contains []string
-	}{
-		{
-			name:     "default theme",
-			message:  "Running tests",
-			theme:    forceColorTheme(DefaultTheme()),
-			contains: []string{"🔍", "Running tests", "..."},
-		},
-		{
-			name:     "minimal theme",
-			message:  "Building",
-			theme:    MinimalTheme(),
-			contains: []string{"[-]", "Building", "..."},
-		},
-	}
+	// In non-TTY mode (bytes.Buffer), CheckHeader skips output
+	// since we can't do the "replace" animation effect
+	t.Run("non-TTY skips output", func(t *testing.T) {
+		var buf bytes.Buffer
+		p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			p := New(WithWriter(&buf), WithTheme(tt.theme))
+		p.CheckHeader("Running tests")
 
-			p.CheckHeader(tt.message)
+		output := buf.String()
+		assert.Empty(t, output, "CheckHeader should produce no output in non-TTY mode")
+	})
 
-			output := buf.String()
-			for _, expected := range tt.contains {
-				assert.Contains(t, output, expected)
-			}
+	// Test that the method doesn't panic with various inputs
+	t.Run("handles various inputs", func(t *testing.T) {
+		var buf bytes.Buffer
+		p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+		assert.NotPanics(t, func() {
+			p.CheckHeader("")
+			p.CheckHeader("Short")
+			p.CheckHeader("A very long message that might cause issues with formatting")
 		})
-	}
+	})
 }
 
 func TestCheckSuccess(t *testing.T) {
@@ -141,16 +132,10 @@ func TestCheckSuccess(t *testing.T) {
 		contains []string
 	}{
 		{
-			name:     "default theme",
-			message:  "All tests passed",
-			theme:    forceColorTheme(DefaultTheme()),
-			contains: []string{"✅", "All tests passed"},
-		},
-		{
 			name:     "minimal theme",
 			message:  "Build complete",
 			theme:    MinimalTheme(),
-			contains: []string{"[OK]", "Build complete"},
+			contains: []string{"|--", "[OK]", "Build complete"},
 		},
 	}
 
@@ -167,6 +152,18 @@ func TestCheckSuccess(t *testing.T) {
 			}
 		})
 	}
+
+	// Test that the method doesn't panic with various inputs
+	t.Run("handles various inputs", func(t *testing.T) {
+		var buf bytes.Buffer
+		p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+		assert.NotPanics(t, func() {
+			p.CheckSuccess("")
+			p.CheckSuccess("Short")
+			p.CheckSuccess("A very long message that might cause issues with formatting")
+		})
+	})
 }
 
 func TestCheckFailure(t *testing.T) {
@@ -185,7 +182,7 @@ func TestCheckFailure(t *testing.T) {
 			details:     "main.go:10: error",
 			remediation: "Fix the error",
 			theme:       forceColorTheme(DefaultTheme()),
-			contains:    []string{"❌", "Test failed", "Details:", "main.go:10", "How to fix:", "Fix the error"},
+			contains:    []string{"├──", "✗", "Test failed", "Details:", "main.go:10", "How to fix:", "Fix the error"},
 		},
 		{
 			name:        "minimal theme",
@@ -246,17 +243,17 @@ func TestCheckSummary(t *testing.T) {
 			name:     "success with items",
 			status:   StatusSuccess,
 			title:    "All checks passed",
-			items:    []string{"• Formatting", "• Linting"},
+			items:    []string{"Formatting", "Linting"},
 			theme:    forceColorTheme(DefaultTheme()),
-			contains: []string{"━", "✅", "All checks passed", "Formatting", "Linting"},
+			contains: []string{"─", "✓", "All checks passed", "Formatting", "Linting"},
 		},
 		{
 			name:     "failure minimal",
 			status:   StatusFailure,
 			title:    "2 checks failed",
-			items:    []string{"* Build", "* Test"},
+			items:    []string{"Build", "Test"},
 			theme:    MinimalTheme(),
-			contains: []string{"=", "[FAIL]", "2 checks failed", "Build", "Test"},
+			contains: []string{"[FAIL]", "2 checks failed", "Build", "Test"},
 		},
 		{
 			name:     "no items",
@@ -338,6 +335,54 @@ func TestPrinter_ImplementsInterface(t *testing.T) {
 	// Runtime check
 	var p PrinterInterface = New(WithWriter(&bytes.Buffer{}))
 	require.NotNil(t, p)
+}
+
+func TestCheckLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		checkNm  string
+		status   Status
+		duration time.Duration
+		contains []string
+	}{
+		{
+			name:     "success with milliseconds",
+			checkNm:  "format",
+			status:   StatusSuccess,
+			duration: 500 * time.Millisecond,
+			contains: []string{"format", "[OK]", "500ms"},
+		},
+		{
+			name:     "success with seconds",
+			checkNm:  "test",
+			status:   StatusSuccess,
+			duration: 2500 * time.Millisecond,
+			contains: []string{"test", "[OK]", "2.500s"},
+		},
+		{
+			name:     "failure",
+			checkNm:  "lint",
+			status:   StatusFailure,
+			duration: 1200 * time.Millisecond,
+			contains: []string{"lint", "[FAIL]", "1.200s"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+			p.CheckLine(tt.checkNm, tt.status, tt.duration)
+
+			output := buf.String()
+			for _, expected := range tt.contains {
+				assert.Contains(t, output, expected)
+			}
+			// Should contain dots for alignment
+			assert.Contains(t, output, ".")
+		})
+	}
 }
 
 // Helper to force colors in theme (prevents auto-switch to minimal)

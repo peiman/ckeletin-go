@@ -1,6 +1,9 @@
 package checkmate
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Status represents the outcome of a check or operation.
 type Status string
@@ -54,6 +57,11 @@ type PrinterInterface interface {
 	// CheckNote displays an informational note.
 	// Example output: "Note: This is informational"
 	CheckNote(message string)
+
+	// CheckLine displays a single-line check result with duration.
+	// Used in non-TTY mode to mimic TUI output structure.
+	// Example output: "format .......................... [OK] 1.451s"
+	CheckLine(name string, status Status, duration time.Duration)
 }
 
 // RunnerInterface defines the contract for running checks.

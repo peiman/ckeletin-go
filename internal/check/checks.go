@@ -59,15 +59,55 @@ func (e *Executor) checkLint(ctx context.Context) error {
 	return nil
 }
 
-// checkTest runs tests with race detection
+// checkTest runs tests with race detection and returns coverage
 func (e *Executor) checkTest(ctx context.Context) error {
 	log.Debug().Msg("Running test check")
 
-	cmd := exec.CommandContext(ctx, "go", "test", "-race", "./...")
-	if output, err := cmd.CombinedOutput(); err != nil {
+	cmd := exec.CommandContext(ctx, "go", "test", "-race", "-cover", "./...")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
 		return fmt.Errorf("tests failed:\n%s", strings.TrimSpace(string(output)))
 	}
+
+	// Parse and store coverage
+	coverage := parseCoverage(string(output))
+	e.coverage = coverage
+
+	// Call callback if set (for TUI mode)
+	if e.onCoverage != nil {
+		e.onCoverage(coverage)
+	}
+
 	return nil
+}
+
+// parseCoverage extracts average coverage from go test -cover output
+func parseCoverage(output string) float64 {
+	var total float64
+	var count int
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		// Look for "coverage: XX.X% of statements"
+		if idx := strings.Index(line, "coverage:"); idx != -1 {
+			// Extract the percentage
+			part := line[idx+len("coverage:"):]
+			part = strings.TrimSpace(part)
+			if pctIdx := strings.Index(part, "%"); pctIdx != -1 {
+				pctStr := strings.TrimSpace(part[:pctIdx])
+				var pct float64
+				if _, err := fmt.Sscanf(pctStr, "%f", &pct); err == nil {
+					total += pct
+					count++
+				}
+			}
+		}
+	}
+
+	if count == 0 {
+		return 0
+	}
+	return total / float64(count)
 }
 
 // checkDeps verifies dependency integrity

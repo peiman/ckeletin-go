@@ -20,5 +20,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		FailFast: getConfigValueWithFlags[bool](cmd, "fail-fast", config.KeyAppCheckFailFast),
 		Verbose:  getConfigValueWithFlags[bool](cmd, "verbose", config.KeyAppCheckVerbose),
 	}
-	return check.NewExecutor(cfg, cmd.OutOrStdout()).Execute(cmd.Context())
+
+	// Use TUI mode - Bubble Tea handles both TTY and non-TTY with WithInput(nil)
+	return check.NewTUIExecutor(cfg, cmd.OutOrStdout()).Execute(cmd.Context())
 }

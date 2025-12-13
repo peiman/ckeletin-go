@@ -4,14 +4,19 @@ import (
 	"io"
 	"os"
 	"sync"
+	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Printer renders check output to a writer.
 // All methods are thread-safe for concurrent use.
 type Printer struct {
-	writer io.Writer
-	theme  *Theme
-	mu     sync.Mutex
+	writer     io.Writer
+	theme      *Theme
+	renderer   *lipgloss.Renderer
+	isTerminal bool // Whether writer is an interactive terminal
+	mu         sync.Mutex
 }
 
 // Option configures a Printer.
@@ -33,9 +38,15 @@ func New(opts ...Option) *Printer {
 	for _, opt := range opts {
 		opt(p)
 	}
+	// Create a lipgloss renderer for this writer to enable colors
+	p.renderer = lipgloss.NewRenderer(p.writer)
+
+	// Detect if we're writing to a terminal
+	p.isTerminal = IsTerminal(p.writer)
+
 	// Auto-detect TTY and switch to minimal theme if needed
 	// (unless ForceColors is set)
-	if !p.theme.ForceColors && !IsTerminal(p.writer) {
+	if !p.theme.ForceColors && !p.isTerminal {
 		p.theme = MinimalTheme()
 	}
 	return p
@@ -127,6 +138,21 @@ func (p *Printer) CheckNote(message string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.renderCheckNote(message)
+}
+
+// CheckLine displays a single-line check result with duration.
+// Used in non-TTY mode to mimic TUI output structure.
+// Example: "format .......................... [OK] 1.451s"
+func (p *Printer) CheckLine(name string, status Status, duration time.Duration) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.renderCheckLine(name, status, duration)
+}
+
+// style renders text with a theme style using the printer's renderer.
+// This ensures proper color output by binding the style to our renderer.
+func (p *Printer) style(s lipgloss.Style, text string) string {
+	return p.renderer.NewStyle().Inherit(s).Render(text)
 }
 
 // Ensure Printer implements PrinterInterface.
