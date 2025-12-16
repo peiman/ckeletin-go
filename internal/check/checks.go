@@ -56,7 +56,7 @@ const scriptsDir = ".ckeletin/scripts"
 // shellCheck creates a check function that delegates to a shell script.
 // The script path is relative to the project root.
 // Note: The script name must be a constant from this package's predefined scripts.
-func (e *Executor) shellCheck(scriptName string, args ...string) func(ctx context.Context) error {
+func (e *checkMethods) shellCheck(scriptName string, args ...string) func(ctx context.Context) error {
 	return func(ctx context.Context) error {
 		scriptPath := filepath.Join(scriptsDir, scriptName)
 		log.Debug().Str("script", scriptPath).Strs("args", args).Msg("Running shell check")
@@ -144,7 +144,7 @@ func isLetter(b byte) bool {
 }
 
 // checkFormat checks code formatting using goimports and gofmt
-func (e *Executor) checkFormat(ctx context.Context) error {
+func (e *checkMethods) checkFormat(ctx context.Context) error {
 	log.Debug().Msg("Running format check")
 
 	// Check goimports
@@ -171,7 +171,7 @@ func (e *Executor) checkFormat(ctx context.Context) error {
 }
 
 // checkLint runs go vet and golangci-lint
-func (e *Executor) checkLint(ctx context.Context) error {
+func (e *checkMethods) checkLint(ctx context.Context) error {
 	log.Debug().Msg("Running lint check")
 
 	// go vet
@@ -231,7 +231,7 @@ func filterLintOutput(output, tool string) string {
 }
 
 // checkTest runs tests with race detection and returns coverage
-func (e *Executor) checkTest(ctx context.Context) error {
+func (e *checkMethods) checkTest(ctx context.Context) error {
 	log.Debug().Msg("Running test check")
 
 	cmd := exec.CommandContext(ctx, "go", "test", "-race", "-cover", "./...")
@@ -409,7 +409,7 @@ func parseCoverage(output string) float64 {
 }
 
 // checkDeps verifies dependency integrity
-func (e *Executor) checkDeps(ctx context.Context) error {
+func (e *checkMethods) checkDeps(ctx context.Context) error {
 	log.Debug().Msg("Running deps check")
 
 	cmd := exec.CommandContext(ctx, "go", "mod", "verify")
@@ -420,7 +420,7 @@ func (e *Executor) checkDeps(ctx context.Context) error {
 }
 
 // checkVuln scans for vulnerabilities using govulncheck
-func (e *Executor) checkVuln(ctx context.Context) error {
+func (e *checkMethods) checkVuln(ctx context.Context) error {
 	log.Debug().Msg("Running vulnerability check")
 
 	cmd := exec.CommandContext(ctx, "govulncheck", "./...")

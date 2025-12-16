@@ -45,11 +45,5 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		ShowTiming: getConfigValueWithFlags[bool](cmd, "timing", config.KeyAppCheckTiming),
 	}
 
-	// Use TUI executor if --tui flag is set
-	if getConfigValueWithFlags[bool](cmd, "tui", config.KeyAppCheckTui) {
-		return check.NewTUIExecutor(cfg, cmd.OutOrStdout()).Execute(cmd.Context())
-	}
-
-	// Use standard executor with checkmate output (supports all 22 checks)
 	return check.NewExecutor(cfg, cmd.OutOrStdout()).Execute(cmd.Context())
 }

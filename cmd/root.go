@@ -93,6 +93,7 @@ var RootCmd = &cobra.Command{
 	Short: "A scaffold for building professional CLI applications in Go",
 	Long: fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
 It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName),
+	SilenceErrors: true, // Errors are handled by main.go, don't print twice
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Bind flags to viper first (must happen before initConfig)
 		if err := bindFlags(cmd); err != nil {

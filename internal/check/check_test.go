@@ -2,10 +2,8 @@ package check
 
 import (
 	"bytes"
-	"context"
 	"testing"
 
-	"github.com/peiman/ckeletin-go/pkg/checkmate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,33 +16,8 @@ func TestNewExecutor(t *testing.T) {
 
 	require.NotNil(t, executor)
 	assert.Equal(t, cfg, executor.cfg)
-	assert.NotNil(t, executor.printer)
-}
-
-func TestNewExecutorWithPrinter(t *testing.T) {
-	var buf bytes.Buffer
-	cfg := Config{FailFast: true}
-	mock := checkmate.NewMockPrinter()
-
-	executor := NewExecutorWithPrinter(cfg, mock, &buf)
-
-	require.NotNil(t, executor)
-	assert.Equal(t, mock, executor.printer)
-}
-
-func TestExecutor_Execute_WithMock(t *testing.T) {
-	// This test verifies the executor integrates with checkmate correctly
-	// by using a mock printer to capture output calls
-	var buf bytes.Buffer
-	mock := checkmate.NewMockPrinter()
-	cfg := Config{FailFast: false}
-
-	executor := NewExecutorWithPrinter(cfg, mock, &buf)
-
-	// Note: This will actually run the checks against the real system
-	// In a real test scenario, we would mock exec.Command
-	// For now, we just verify the structure works
-	_ = executor // Executor is correctly constructed
+	assert.NotNil(t, executor.writer)
+	assert.NotNil(t, executor.timings)
 }
 
 func TestConfig(t *testing.T) {
@@ -53,30 +26,42 @@ func TestConfig(t *testing.T) {
 		cfg      Config
 		failFast bool
 		verbose  bool
+		parallel bool
 	}{
 		{
 			name:     "default config",
 			cfg:      Config{},
 			failFast: false,
 			verbose:  false,
+			parallel: false,
 		},
 		{
 			name:     "fail fast enabled",
 			cfg:      Config{FailFast: true},
 			failFast: true,
 			verbose:  false,
+			parallel: false,
 		},
 		{
 			name:     "verbose enabled",
 			cfg:      Config{Verbose: true},
 			failFast: false,
 			verbose:  true,
+			parallel: false,
 		},
 		{
-			name:     "both enabled",
-			cfg:      Config{FailFast: true, Verbose: true},
+			name:     "parallel enabled",
+			cfg:      Config{Parallel: true},
+			failFast: false,
+			verbose:  false,
+			parallel: true,
+		},
+		{
+			name:     "all enabled",
+			cfg:      Config{FailFast: true, Verbose: true, Parallel: true},
 			failFast: true,
 			verbose:  true,
+			parallel: true,
 		},
 	}
 
@@ -84,41 +69,188 @@ func TestConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.failFast, tt.cfg.FailFast)
 			assert.Equal(t, tt.verbose, tt.cfg.Verbose)
+			assert.Equal(t, tt.parallel, tt.cfg.Parallel)
 		})
 	}
 }
 
-func TestExecutor_Execute_CallsRunner(t *testing.T) {
-	// Test that Execute properly sets up the runner with checks
-	var buf bytes.Buffer
-	mock := checkmate.NewMockPrinter()
-	cfg := Config{FailFast: false}
+func TestValidateCategories(t *testing.T) {
+	tests := []struct {
+		name       string
+		categories []string
+		wantErr    bool
+	}{
+		{
+			name:       "valid single category",
+			categories: []string{"environment"},
+			wantErr:    false,
+		},
+		{
+			name:       "valid multiple categories",
+			categories: []string{"environment", "quality", "tests"},
+			wantErr:    false,
+		},
+		{
+			name:       "all valid categories",
+			categories: AllCategories,
+			wantErr:    false,
+		},
+		{
+			name:       "invalid category",
+			categories: []string{"invalid"},
+			wantErr:    true,
+		},
+		{
+			name:       "mixed valid and invalid",
+			categories: []string{"environment", "invalid"},
+			wantErr:    true,
+		},
+		{
+			name:       "empty slice",
+			categories: []string{},
+			wantErr:    false,
+		},
+		{
+			name:       "case insensitive",
+			categories: []string{"ENVIRONMENT", "Quality", "TESTS"},
+			wantErr:    false,
+		},
+	}
 
-	executor := NewExecutorWithPrinter(cfg, mock, &buf)
-	require.NotNil(t, executor)
-
-	// We can't easily test the full execution without mocking exec.Command
-	// but we can verify the executor is properly constructed
-	assert.Equal(t, cfg.FailFast, executor.cfg.FailFast)
-	assert.Equal(t, cfg.Verbose, executor.cfg.Verbose)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateCategories(tt.categories)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
-func TestExecutor_Execute_ContextCancellation(t *testing.T) {
-	// Test that a cancelled context is respected
+func TestAllCategories(t *testing.T) {
+	// Verify all expected categories exist
+	expectedCategories := []string{
+		CategoryEnvironment,
+		CategoryQuality,
+		CategoryArchitecture,
+		CategorySecurity,
+		CategoryDependencies,
+		CategoryTests,
+	}
+
+	assert.Equal(t, expectedCategories, AllCategories)
+	assert.Len(t, AllCategories, 6)
+}
+
+func TestCategoryConstants(t *testing.T) {
+	// Verify category constants have expected values
+	assert.Equal(t, "environment", CategoryEnvironment)
+	assert.Equal(t, "quality", CategoryQuality)
+	assert.Equal(t, "architecture", CategoryArchitecture)
+	assert.Equal(t, "security", CategorySecurity)
+	assert.Equal(t, "dependencies", CategoryDependencies)
+	assert.Equal(t, "tests", CategoryTests)
+}
+
+func TestExecutor_BuildCategories(t *testing.T) {
 	var buf bytes.Buffer
-	mock := checkmate.NewMockPrinter()
-	cfg := Config{FailFast: false}
+	cfg := Config{}
 
-	executor := NewExecutorWithPrinter(cfg, mock, &buf)
+	executor := NewExecutor(cfg, &buf)
+	methods := &checkMethods{cfg: cfg}
+	categories := executor.buildCategories(methods)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // Cancel immediately
+	// Verify we have all 6 categories
+	assert.Len(t, categories, 6)
 
-	// Execute with cancelled context - the runner should handle this
-	// The exact behavior depends on how quickly checks start
-	_ = executor.Execute(ctx)
+	// Verify category names and check counts
+	expectedCategories := map[string]int{
+		"Development Environment": 2,
+		"Code Quality":            2,
+		"Architecture Validation": 10,
+		"Security Scanning":       2,
+		"Dependencies":            5,
+		"Tests":                   1,
+	}
 
-	// The category header should have been printed before cancellation
-	// (runner prints it before starting checks)
-	assert.True(t, mock.HasCall("CategoryHeader"))
+	for _, cat := range categories {
+		expectedCount, ok := expectedCategories[cat.name]
+		require.True(t, ok, "unexpected category: %s", cat.name)
+		assert.Len(t, cat.checks, expectedCount, "wrong check count for %s", cat.name)
+	}
+
+	// Verify total check count is 22
+	total := 0
+	for _, cat := range categories {
+		total += len(cat.checks)
+	}
+	assert.Equal(t, 22, total, "should have 22 total checks")
+}
+
+func TestExecutor_ShouldRunCategory(t *testing.T) {
+	var buf bytes.Buffer
+
+	tests := []struct {
+		name         string
+		categories   []string
+		categoryName string
+		want         bool
+	}{
+		{
+			// Note: When categories is nil, Execute() doesn't call shouldRunCategory
+			// so this returns false (no match), but the caller handles this case
+			name:         "no filter returns false (caller handles this)",
+			categories:   nil,
+			categoryName: "Development Environment",
+			want:         false,
+		},
+		{
+			name:         "filter matches environment",
+			categories:   []string{"environment"},
+			categoryName: "Development Environment",
+			want:         true,
+		},
+		{
+			name:         "filter doesn't match",
+			categories:   []string{"security"},
+			categoryName: "Development Environment",
+			want:         false,
+		},
+		{
+			name:         "filter matches quality",
+			categories:   []string{"quality"},
+			categoryName: "Code Quality",
+			want:         true,
+		},
+		{
+			name:         "filter matches architecture",
+			categories:   []string{"architecture"},
+			categoryName: "Architecture Validation",
+			want:         true,
+		},
+		{
+			name:         "case insensitive filter",
+			categories:   []string{"SECURITY"},
+			categoryName: "Security Scanning",
+			want:         true,
+		},
+		{
+			name:         "unknown category returns true",
+			categories:   []string{"security"},
+			categoryName: "Unknown Category",
+			want:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := Config{Categories: tt.categories}
+			executor := NewExecutor(cfg, &buf)
+
+			got := executor.shouldRunCategory(tt.categoryName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

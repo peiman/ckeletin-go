@@ -68,7 +68,7 @@ func WithSkipSummary() ProgressModelOption {
 func NewProgressModel(title string, checkNames []string, opts ...ProgressModelOption) ProgressModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#78B0E7"))
 
 	p := progress.New(
 		progress.WithDefaultGradient(),
@@ -93,16 +93,16 @@ func NewProgressModel(title string, checkNames []string, opts ...ProgressModelOp
 		startTime: time.Now(),
 		styles: progressStyles{
 			title: lipgloss.NewStyle().
-				Background(lipgloss.Color("63")).
-				Foreground(lipgloss.Color("230")).
+				Background(lipgloss.Color("#78B0E7")).
+				Foreground(lipgloss.Color("#000000")).
 				Bold(true).
 				Padding(0, 2),
 			checkName: lipgloss.NewStyle().
-				Width(12),
+				Width(20), // Wide enough for "config-consumption"
 			pending: lipgloss.NewStyle().
 				Foreground(lipgloss.Color("241")),
 			running: lipgloss.NewStyle().
-				Foreground(lipgloss.Color("205")),
+				Foreground(lipgloss.Color("#78B0E7")),
 			passed: lipgloss.NewStyle().
 				Foreground(lipgloss.Color("42")).
 				Bold(true),
@@ -111,7 +111,7 @@ func NewProgressModel(title string, checkNames []string, opts ...ProgressModelOp
 				Bold(true),
 			box: lipgloss.NewStyle().
 				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("63")).
+				BorderForeground(lipgloss.Color("#78B0E7")).
 				Padding(1, 2),
 		},
 	}
@@ -222,7 +222,7 @@ func (m ProgressModel) View() string {
 
 		case CheckRunning:
 			// Animated spinner effect
-			bar = m.renderProgressBar(check.Progress, lipgloss.Color("205"))
+			bar = m.renderProgressBar(check.Progress, lipgloss.Color("#78B0E7"))
 			status = m.spinner.View()
 
 		case CheckPassed:

@@ -91,6 +91,9 @@ func (p *Printer) renderCheckFailure(title, details, remediation string) {
 			}
 		}
 	}
+
+	// Add blank line between failures for readability
+	_, _ = fmt.Fprintf(p.writer, "%s\n", treeLine)
 }
 
 // renderCheckSummary renders a beautiful summary box with borders.

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
@@ -29,8 +30,8 @@ type timingHistory struct {
 	mu     sync.RWMutex
 }
 
-// TUIExecutor runs checks with a Bubble Tea progress UI.
-type TUIExecutor struct {
+// Executor runs checks with a Bubble Tea progress UI.
+type Executor struct {
 	cfg      Config
 	writer   io.Writer
 	checks   []checkItem
@@ -145,17 +146,17 @@ type categoryDef struct {
 	checks []checkItem
 }
 
-// NewTUIExecutor creates a new TUI-based executor.
-func NewTUIExecutor(cfg Config, writer io.Writer) *TUIExecutor {
-	e := &TUIExecutor{
+// NewExecutor creates a new TUI-based executor.
+func NewExecutor(cfg Config, writer io.Writer) *Executor {
+	e := &Executor{
 		cfg:     cfg,
 		writer:  writer,
 		timings: loadTimingHistory(),
 	}
 
 	// Build the full check list from all categories
-	executor := &Executor{cfg: cfg}
-	categories := e.buildCategories(executor)
+	methods := &checkMethods{cfg: cfg}
+	categories := e.buildCategories(methods)
 
 	// Flatten for backwards compatibility (single category mode)
 	for _, cat := range categories {
@@ -166,52 +167,52 @@ func NewTUIExecutor(cfg Config, writer io.Writer) *TUIExecutor {
 }
 
 // buildCategories returns all check categories with their checks
-func (e *TUIExecutor) buildCategories(executor *Executor) []categoryDef {
+func (e *Executor) buildCategories(methods *checkMethods) []categoryDef {
 	return []categoryDef{
 		{
 			name: "Development Environment",
 			checks: []checkItem{
-				{"go-version", executor.shellCheck("check-go-version.sh"), "Ensure Go version matches .go-version"},
-				{"tools", executor.shellCheck("install_tools.sh", "--check"), "Run: task setup"},
+				{"go-version", methods.shellCheck("check-go-version.sh"), "Ensure Go version matches .go-version"},
+				{"tools", methods.shellCheck("install_tools.sh", "--check"), "Run: task setup"},
 			},
 		},
 		{
 			name: "Code Quality",
 			checks: []checkItem{
-				{"format", executor.checkFormat, "Run: task format"},
-				{"lint", executor.checkLint, "Run: task lint"},
+				{"format", methods.checkFormat, "Run: task format"},
+				{"lint", methods.checkLint, "Run: task lint"},
 			},
 		},
 		{
 			name: "Architecture Validation",
 			checks: []checkItem{
-				{"defaults", executor.shellCheck("check-defaults.sh"), "Use registry for SetDefault (ADR-002)"},
-				{"commands", executor.shellCheck("validate-command-patterns.sh"), "Keep commands ultra-thin (ADR-001)"},
-				{"constants", executor.shellCheck("check-constants.sh"), "Run: task generate:config:key-constants"},
-				{"task-naming", executor.shellCheck("validate-task-naming.sh"), "Follow ADR-000 naming convention"},
-				{"architecture", executor.shellCheck("validate-architecture.sh"), "Update ARCHITECTURE.md (ADR-008)"},
-				{"layering", executor.shellCheck("validate-layering.sh"), "Fix layer dependencies (ADR-009)"},
-				{"package-org", executor.shellCheck("validate-package-organization.sh"), "Follow package organization (ADR-010)"},
-				{"config-consumption", executor.shellCheck("validate-config-consumption.sh"), "Use type-safe config (ADR-002)"},
-				{"output-patterns", executor.shellCheck("validate-output-patterns.sh"), "Follow output patterns (ADR-012)"},
-				{"security-patterns", executor.shellCheck("validate-security-patterns.sh"), "Implement security patterns (ADR-004)"},
+				{"defaults", methods.shellCheck("check-defaults.sh"), "Use registry for SetDefault (ADR-002)"},
+				{"commands", methods.shellCheck("validate-command-patterns.sh"), "Keep commands ultra-thin (ADR-001)"},
+				{"constants", methods.shellCheck("check-constants.sh"), "Run: task generate:config:key-constants"},
+				{"task-naming", methods.shellCheck("validate-task-naming.sh"), "Follow ADR-000 naming convention"},
+				{"architecture", methods.shellCheck("validate-architecture.sh"), "Update ARCHITECTURE.md (ADR-008)"},
+				{"layering", methods.shellCheck("validate-layering.sh"), "Fix layer dependencies (ADR-009)"},
+				{"package-org", methods.shellCheck("validate-package-organization.sh"), "Follow package organization (ADR-010)"},
+				{"config-consumption", methods.shellCheck("validate-config-consumption.sh"), "Use type-safe config (ADR-002)"},
+				{"output-patterns", methods.shellCheck("validate-output-patterns.sh"), "Follow output patterns (ADR-012)"},
+				{"security-patterns", methods.shellCheck("validate-security-patterns.sh"), "Implement security patterns (ADR-004)"},
 			},
 		},
 		{
 			name: "Security Scanning",
 			checks: []checkItem{
-				{"secrets", executor.shellCheck("check-secrets.sh"), "Remove hardcoded secrets"},
-				{"sast", executor.shellCheck("check-sast.sh"), "Fix SAST issues or update .semgrep.yml"},
+				{"secrets", methods.shellCheck("check-secrets.sh"), "Remove hardcoded secrets"},
+				{"sast", methods.shellCheck("check-sast.sh"), "Fix SAST issues or update .semgrep.yml"},
 			},
 		},
 		{
 			name: "Dependencies",
 			checks: []checkItem{
-				{"deps", executor.checkDeps, "Run: go mod tidy"},
-				{"vuln", executor.checkVuln, "Update vulnerable dependencies"},
-				{"license-source", executor.shellCheck("check-licenses-source.sh"), "Check dependency licenses"},
-				{"license-binary", executor.shellCheck("check-licenses-binary.sh"), "Check binary licenses"},
-				{"sbom-vulns", executor.shellCheck("check-sbom-vulns.sh"), "Fix SBOM vulnerabilities"},
+				{"deps", methods.checkDeps, "Run: go mod tidy"},
+				{"vuln", methods.checkVuln, "Update vulnerable dependencies"},
+				{"license-source", methods.shellCheck("check-licenses-source.sh"), "Check dependency licenses"},
+				{"license-binary", methods.shellCheck("check-licenses-binary.sh"), "Check binary licenses"},
+				{"sbom-vulns", methods.shellCheck("check-sbom-vulns.sh"), "Fix SBOM vulnerabilities"},
 			},
 		},
 		{
@@ -235,9 +236,9 @@ type allCheckResult struct {
 
 // Execute runs all checks with the TUI progress display.
 // Runs each category sequentially with its own progress display.
-func (e *TUIExecutor) Execute(ctx context.Context) error {
-	executor := &Executor{cfg: e.cfg}
-	categories := e.buildCategories(executor)
+func (e *Executor) Execute(ctx context.Context) error {
+	methods := &checkMethods{cfg: e.cfg}
+	categories := e.buildCategories(methods)
 
 	var allResults []allCheckResult
 	var totalPassed, totalFailed int
@@ -283,7 +284,7 @@ func (e *TUIExecutor) Execute(ctx context.Context) error {
 }
 
 // shouldRunCategory checks if a category matches the filter
-func (e *TUIExecutor) shouldRunCategory(categoryName string) bool {
+func (e *Executor) shouldRunCategory(categoryName string) bool {
 	// Map display names to filter names
 	categoryMap := map[string]string{
 		"Development Environment": CategoryEnvironment,
@@ -308,7 +309,7 @@ func (e *TUIExecutor) shouldRunCategory(categoryName string) bool {
 }
 
 // runCategoryTUI runs a single category with TUI progress display
-func (e *TUIExecutor) runCategoryTUI(ctx context.Context, category categoryDef) ([]allCheckResult, error) {
+func (e *Executor) runCategoryTUI(ctx context.Context, category categoryDef) ([]allCheckResult, error) {
 	// Get check names for this category
 	names := make([]string, len(category.checks))
 	for i, c := range category.checks {
@@ -401,9 +402,9 @@ func (e *TUIExecutor) runCategoryTUI(ctx context.Context, category categoryDef) 
 	return results, categoryErr
 }
 
-// checkTest wraps the executor's checkTest to send coverage updates to the TUI.
-func (e *TUIExecutor) checkTest(ctx context.Context) error {
-	executor := &Executor{
+// checkTest wraps the checkMethods' checkTest to send coverage updates to the TUI.
+func (e *Executor) checkTest(ctx context.Context) error {
+	methods := &checkMethods{
 		cfg: e.cfg,
 		onCoverage: func(coverage float64) {
 			e.coverage = coverage // Store for final summary
@@ -412,11 +413,11 @@ func (e *TUIExecutor) checkTest(ctx context.Context) error {
 			}
 		},
 	}
-	return executor.checkTest(ctx)
+	return methods.checkTest(ctx)
 }
 
 // animateProgress sends progress updates based on historical timing data
-func (e *TUIExecutor) animateProgress(p *tea.Program, idx int, checkName string, done <-chan struct{}) {
+func (e *Executor) animateProgress(p *tea.Program, idx int, checkName string, done <-chan struct{}) {
 	expectedDuration := e.timings.getExpectedDuration(checkName)
 	startTime := time.Now()
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -444,47 +445,194 @@ func (e *TUIExecutor) animateProgress(p *tea.Program, idx int, checkName string,
 }
 
 // printFinalSummary prints the final summary box with all check results
-func (e *TUIExecutor) printFinalSummary(results []allCheckResult, passed, failed int, totalDuration time.Duration) {
-	// Use checkmate printer for consistent styling
-	printer := checkmate.New(checkmate.WithWriter(e.writer))
+func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed int, totalDuration time.Duration) {
+	// Clear screen using lipgloss-compatible method
+	_, _ = fmt.Fprint(e.writer, "\033[2J\033[H")
 
-	// Determine status
 	allPassed := failed == 0
-	var status checkmate.Status
-	var title string
+
+	// Group results by category
+	categoryOrder := []string{
+		"Development Environment",
+		"Code Quality",
+		"Architecture Validation",
+		"Security Scanning",
+		"Dependencies",
+		"Tests",
+	}
+
+	resultsByCategory := make(map[string][]allCheckResult)
+	for _, r := range results {
+		resultsByCategory[r.category] = append(resultsByCategory[r.category], r)
+	}
+
+	// Define styles using lipgloss (handles terminal compatibility automatically)
+	accentColor := lipgloss.Color("#78B0E7")
+	failColor := lipgloss.Color("#FF5555")
+	successColor := lipgloss.Color("#50FA7B")
+	dimColor := lipgloss.Color("#6272A4")
+
+	var borderColor lipgloss.Color
+	var titleStyle lipgloss.Style
 	if allPassed {
-		status = checkmate.StatusSuccess
-		title = fmt.Sprintf("All %d Checks Passed", passed)
+		borderColor = accentColor
+		titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Background(accentColor).
+			Foreground(lipgloss.Color("#000000"))
 	} else {
-		status = checkmate.StatusFailure
-		title = fmt.Sprintf("%d/%d Checks Failed", failed, passed+failed)
+		borderColor = failColor
+		titleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Background(failColor).
+			Foreground(lipgloss.Color("#000000"))
 	}
 
-	// Build items list (just check names with timing)
-	var items []string
-	for _, r := range results {
-		item := r.name
-		if r.duration > 0 {
-			item = fmt.Sprintf("%s (%s)", item, r.duration.Round(time.Millisecond))
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	dimStyle := lipgloss.NewStyle().Foreground(dimColor)
+	boldStyle := lipgloss.NewStyle().Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(successColor)
+	failStyle := lipgloss.NewStyle().Foreground(failColor)
+
+	// Box characters
+	topLeft := "╭"
+	topRight := "╮"
+	bottomLeft := "╰"
+	bottomRight := "╯"
+	horizontal := "─"
+	vertical := "│"
+
+	boxWidth := 60
+	contentWidth := boxWidth - 2
+
+	var sb strings.Builder
+
+	// Top border
+	sb.WriteString(borderStyle.Render(topLeft+strings.Repeat(horizontal, boxWidth-2)+topRight) + "\n")
+
+	// Empty line
+	sb.WriteString(borderStyle.Render(vertical) + strings.Repeat(" ", contentWidth) + borderStyle.Render(vertical) + "\n")
+
+	// Title
+	var titleText string
+	if allPassed {
+		titleText = fmt.Sprintf(" ✓ All %d Checks Passed ", passed)
+	} else {
+		titleText = fmt.Sprintf(" ✗ %d/%d Checks Failed ", failed, passed+failed)
+	}
+	titleRendered := titleStyle.Render(titleText)
+	// Calculate padding (lipgloss.Width handles unicode properly)
+	titleWidth := lipgloss.Width(titleRendered)
+	leftPad := (contentWidth - titleWidth) / 2
+	rightPad := contentWidth - leftPad - titleWidth
+	sb.WriteString(borderStyle.Render(vertical))
+	sb.WriteString(strings.Repeat(" ", leftPad))
+	sb.WriteString(titleRendered)
+	sb.WriteString(strings.Repeat(" ", rightPad))
+	sb.WriteString(borderStyle.Render(vertical) + "\n")
+
+	// Empty line
+	sb.WriteString(borderStyle.Render(vertical) + strings.Repeat(" ", contentWidth) + borderStyle.Render(vertical) + "\n")
+
+	// Results grouped by category
+	for _, catName := range categoryOrder {
+		catResults, ok := resultsByCategory[catName]
+		if !ok || len(catResults) == 0 {
+			continue
 		}
-		items = append(items, item)
-	}
 
-	// Print summary
-	printer.CheckSummary(status, title, items...)
-
-	// Print errors if any
-	for _, r := range results {
-		if !r.passed && r.err != nil {
-			printer.CheckFailure(r.name, r.err.Error(), r.remediation)
+		// Category header
+		catHeader := "  " + dimStyle.Render("─── "+catName)
+		catHeaderWidth := 2 + 4 + len(catName) // "  " + "─── " + name
+		padding := contentWidth - catHeaderWidth
+		sb.WriteString(borderStyle.Render(vertical) + catHeader)
+		if padding > 0 {
+			sb.WriteString(strings.Repeat(" ", padding))
 		}
+		sb.WriteString(borderStyle.Render(vertical) + "\n")
+
+		// Check results
+		for i, r := range catResults {
+			var iconStyle lipgloss.Style
+			var icon string
+			if r.passed {
+				icon = "✓"
+				iconStyle = successStyle
+			} else {
+				icon = "✗"
+				iconStyle = failStyle
+			}
+
+			// Tree connector
+			connector := "├──"
+			if i == len(catResults)-1 {
+				connector = "└──"
+			}
+
+			// Format duration
+			durStr := ""
+			durLen := 0
+			if r.duration > 0 {
+				durText := fmt.Sprintf("(%s)", r.duration.Round(time.Millisecond))
+				durStr = dimStyle.Render(durText)
+				durLen = len(durText)
+			}
+
+			// Build line: "  ├── ✓ name              (duration)"
+			line := "  " + dimStyle.Render(connector) + " " + iconStyle.Render(icon) + " " + fmt.Sprintf("%-18s", r.name) + " " + durStr
+			visibleLen := 2 + 3 + 1 + 1 + 1 + 18 + 1 + durLen // spaces + connector + space + icon + space + name + space + dur
+			padding := contentWidth - visibleLen
+			sb.WriteString(borderStyle.Render(vertical) + line)
+			if padding > 0 {
+				sb.WriteString(strings.Repeat(" ", padding))
+			}
+			sb.WriteString(borderStyle.Render(vertical) + "\n")
+		}
+
+		// Empty line after category
+		sb.WriteString(borderStyle.Render(vertical) + strings.Repeat(" ", contentWidth) + borderStyle.Render(vertical) + "\n")
 	}
 
-	// Print coverage if available
+	// Coverage
 	if e.coverage > 0 {
-		printer.CheckInfo(fmt.Sprintf("Coverage: %.1f%%", e.coverage))
+		covText := fmt.Sprintf("%.1f%%", e.coverage)
+		covLine := "  " + boldStyle.Render("Coverage:") + " " + covText
+		covVisibleLen := 2 + 9 + 1 + len(covText)
+		padding := contentWidth - covVisibleLen
+		sb.WriteString(borderStyle.Render(vertical) + covLine)
+		if padding > 0 {
+			sb.WriteString(strings.Repeat(" ", padding))
+		}
+		sb.WriteString(borderStyle.Render(vertical) + "\n")
 	}
 
-	// Print total duration
-	printer.CheckInfo(fmt.Sprintf("Total Duration: %s", totalDuration.Round(time.Millisecond)))
+	// Duration
+	durText := totalDuration.Round(time.Millisecond).String()
+	durLine := "  " + boldStyle.Render("Duration:") + " " + durText
+	durVisibleLen := 2 + 9 + 1 + len(durText)
+	padding := contentWidth - durVisibleLen
+	sb.WriteString(borderStyle.Render(vertical) + durLine)
+	if padding > 0 {
+		sb.WriteString(strings.Repeat(" ", padding))
+	}
+	sb.WriteString(borderStyle.Render(vertical) + "\n")
+
+	// Empty line
+	sb.WriteString(borderStyle.Render(vertical) + strings.Repeat(" ", contentWidth) + borderStyle.Render(vertical) + "\n")
+
+	// Bottom border
+	sb.WriteString(borderStyle.Render(bottomLeft+strings.Repeat(horizontal, boxWidth-2)+bottomRight) + "\n")
+
+	_, _ = fmt.Fprint(e.writer, sb.String())
+
+	// Print errors below the box if any
+	if !allPassed {
+		_, _ = fmt.Fprint(e.writer, "\n")
+		printer := checkmate.New(checkmate.WithWriter(e.writer))
+		for _, r := range results {
+			if !r.passed && r.err != nil {
+				printer.CheckFailure(r.name, r.err.Error(), r.remediation)
+			}
+		}
+	}
 }
