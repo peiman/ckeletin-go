@@ -36,11 +36,12 @@ import (
 // The runE function signature must be: func(*cobra.Command, []string) error
 func NewCommand(meta config.CommandMetadata, runE func(*cobra.Command, []string) error) (*cobra.Command, error) {
 	cmd := &cobra.Command{
-		Use:    meta.Use,
-		Short:  meta.Short,
-		Long:   meta.Long,
-		RunE:   runE,
-		Hidden: meta.Hidden,
+		Use:          meta.Use,
+		Short:        meta.Short,
+		Long:         meta.Long,
+		RunE:         runE,
+		Hidden:       meta.Hidden,
+		SilenceUsage: true, // Don't show usage on runtime errors (RunE errors)
 	}
 
 	// Auto-register flags from config registry based on ConfigPrefix

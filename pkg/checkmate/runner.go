@@ -45,13 +45,14 @@ func (r RunResult) Success() bool { return r.Failed == 0 }
 // Runner orchestrates running multiple checks with beautiful output.
 // All methods are thread-safe for concurrent use.
 type Runner struct {
-	printer  PrinterInterface
-	checks   []Check
-	failFast bool
-	category string
-	parallel bool
-	workers  int // 0 means unlimited (all checks run concurrently)
-	mu       sync.Mutex
+	printer    PrinterInterface
+	checks     []Check
+	failFast   bool
+	category   string
+	parallel   bool
+	workers    int // 0 means unlimited (all checks run concurrently)
+	showTiming bool
+	mu         sync.Mutex
 }
 
 // RunnerOption configures a Runner.
@@ -92,6 +93,16 @@ func WithWorkers(n int) RunnerOption {
 		r.parallel = true
 		r.workers = n
 	}
+}
+
+// WithShowTiming displays duration for each check in the output.
+// Shows timing like "format passed (1.234s)" instead of just "format passed".
+//
+// Example:
+//
+//	runner := checkmate.NewRunner(printer, checkmate.WithShowTiming())
+func WithShowTiming() RunnerOption {
+	return func(r *Runner) { r.showTiming = true }
 }
 
 // NewRunner creates a runner that outputs to the given printer.
@@ -185,6 +196,7 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 	failFast := r.failFast
 	parallel := r.parallel
 	workers := r.workers
+	showTiming := r.showTiming
 	printer := r.printer
 	r.mu.Unlock()
 
@@ -197,9 +209,9 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 
 	var result RunResult
 	if parallel {
-		result = r.runParallel(ctx, checks, printer, failFast, workers)
+		result = r.runParallel(ctx, checks, printer, failFast, workers, showTiming)
 	} else {
-		result = r.runSequential(ctx, checks, printer, failFast)
+		result = r.runSequential(ctx, checks, printer, failFast, showTiming)
 	}
 
 	result.Duration = time.Since(start)
@@ -209,7 +221,7 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 }
 
 // runSequential executes checks one at a time in order.
-func (r *Runner) runSequential(ctx context.Context, checks []Check, printer PrinterInterface, failFast bool) RunResult {
+func (r *Runner) runSequential(ctx context.Context, checks []Check, printer PrinterInterface, failFast, showTiming bool) RunResult {
 	result := RunResult{Total: len(checks)}
 
 	for _, check := range checks {
@@ -240,7 +252,11 @@ func (r *Runner) runSequential(ctx context.Context, checks []Check, printer Prin
 			if details == "" {
 				details = err.Error()
 			}
-			printer.CheckFailure(check.Name+" failed", details, check.Remediation)
+			failMsg := check.Name + " failed"
+			if showTiming {
+				failMsg = fmt.Sprintf("%s (%s)", failMsg, formatDuration(checkDuration))
+			}
+			printer.CheckFailure(failMsg, details, check.Remediation)
 
 			if failFast {
 				result.Checks = append(result.Checks, checkResult)
@@ -249,7 +265,11 @@ func (r *Runner) runSequential(ctx context.Context, checks []Check, printer Prin
 		} else {
 			checkResult.Status = StatusSuccess
 			result.Passed++
-			printer.CheckSuccess(check.Name + " passed")
+			successMsg := check.Name + " passed"
+			if showTiming {
+				successMsg = fmt.Sprintf("%s (%s)", successMsg, formatDuration(checkDuration))
+			}
+			printer.CheckSuccess(successMsg)
 		}
 
 		result.Checks = append(result.Checks, checkResult)
@@ -272,7 +292,7 @@ type checkJobResult struct {
 }
 
 // runParallel executes checks concurrently with optional worker limit.
-func (r *Runner) runParallel(ctx context.Context, checks []Check, printer PrinterInterface, failFast bool, workers int) RunResult {
+func (r *Runner) runParallel(ctx context.Context, checks []Check, printer PrinterInterface, failFast bool, workers int, showTiming bool) RunResult {
 	result := RunResult{Total: len(checks)}
 
 	if len(checks) == 0 {
@@ -333,10 +353,18 @@ func (r *Runner) runParallel(ctx context.Context, checks []Check, printer Printe
 			if details == "" && jr.result.Error != nil {
 				details = jr.result.Error.Error()
 			}
-			printer.CheckFailure(jr.check.Name+" failed", details, jr.check.Remediation)
+			failMsg := jr.check.Name + " failed"
+			if showTiming {
+				failMsg = fmt.Sprintf("%s (%s)", failMsg, formatDuration(jr.result.Duration))
+			}
+			printer.CheckFailure(failMsg, details, jr.check.Remediation)
 		} else {
 			result.Passed++
-			printer.CheckSuccess(jr.check.Name + " passed")
+			successMsg := jr.check.Name + " passed"
+			if showTiming {
+				successMsg = fmt.Sprintf("%s (%s)", successMsg, formatDuration(jr.result.Duration))
+			}
+			printer.CheckSuccess(successMsg)
 		}
 	}
 

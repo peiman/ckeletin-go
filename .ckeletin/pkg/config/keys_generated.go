@@ -23,6 +23,8 @@ const (
 	KeyAppCheckFailFast         = "app.check.fail_fast"         // Stop on first failed check
 	KeyAppCheckVerbose          = "app.check.verbose"           // Show verbose output including command details
 	KeyAppCheckParallel         = "app.check.parallel"          // Run checks within each category in parallel (disable with --parallel=false)
+	KeyAppCheckCategory         = "app.check.category"          // Filter to specific categories (comma-separated: environment,quality,architect...
+	KeyAppCheckTiming           = "app.check.timing"            // Show duration for each check in the output
 	KeyAppPingOutputMessage     = "app.ping.output_message"     // Default message to display for the ping command
 	KeyAppPingOutputColor       = "app.ping.output_color"       // Text color for ping command output (white, red, green, blue, cyan, yellow, ma...
 	KeyAppPingUi                = "app.ping.ui"                 // Enable interactive UI for the ping command
