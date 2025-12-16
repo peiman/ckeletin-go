@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fail-fast cancels remaining checks on first failure
   - Significant speedup for independent checks (e.g., 5x faster for 5 parallel checks)
 
+- **Hybrid Go check command** (`ckeletin-go check`):
+  - Now runs all 22 checks across 6 categories (up from 5)
+  - Categories: Development Environment, Code Quality, Architecture Validation,
+    Security Scanning, Dependencies, Tests
+  - Shell delegators wrap existing bash scripts for consistent output
+  - `--parallel` / `-p` flag enables parallel execution within categories
+  - `--fail-fast` / `-f` stops on first failure
+  - Uses checkmate library for beautiful terminal output
+
 - **Scaffold workflow commands**:
   - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
   - `task ckeletin:update` - Pull framework updates from upstream without affecting project code

@@ -13,25 +13,43 @@ import "github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 var CheckMetadata = config.CommandMetadata{
 	Use:   "check",
 	Short: "Run quality checks",
-	Long: `Run code quality checks using checkmate.
+	Long: `Run comprehensive code quality checks using checkmate.
 
-Includes the following checks:
-  - format: Check code formatting (goimports + gofmt)
-  - lint: Run linters (go vet + golangci-lint)
-  - test: Run tests with race detection
-  - deps: Verify dependency integrity
-  - vuln: Scan for vulnerabilities
+Includes 22 checks across 6 categories:
 
+  Development Environment (2):
+    go-version, tools
+
+  Code Quality (2):
+    format, lint
+
+  Architecture Validation (10):
+    defaults, commands, constants, task-naming, architecture,
+    layering, package-org, config-consumption, output-patterns,
+    security-patterns
+
+  Security Scanning (2):
+    secrets, sast
+
+  Dependencies (5):
+    deps, vuln, license-source, license-binary, sbom-vulns
+
+  Tests (1):
+    test
+
+Use --parallel to run checks within each category concurrently.
 Use --fail-fast to stop on the first failure.`,
 	ConfigPrefix: "app.check",
 	FlagOverrides: map[string]string{
 		"app.check.fail_fast": "fail-fast",
 		"app.check.verbose":   "verbose",
+		"app.check.parallel":  "parallel",
 	},
 	Examples: []string{
 		"check",
+		"check --parallel",
 		"check --fail-fast",
-		"check -v",
+		"check -p -f",
 	},
 	SeeAlso: []string{"docs"},
 }
@@ -54,6 +72,15 @@ func CheckOptions() []config.ConfigOption {
 			Description:  "Show verbose output including command details",
 			Type:         "bool",
 			ShortFlag:    "v",
+			Required:     false,
+			Example:      "true",
+		},
+		{
+			Key:          "app.check.parallel",
+			DefaultValue: false,
+			Description:  "Run checks within each category in parallel",
+			Type:         "bool",
+			ShortFlag:    "p",
 			Required:     false,
 			Example:      "true",
 		},

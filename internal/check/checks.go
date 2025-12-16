@@ -1,6 +1,42 @@
 // internal/check/checks.go
 //
 // Individual check implementations for the check command.
+//
+// Check Status Tracking:
+// =====================
+// Native Go (5):
+//   ✅ format      - goimports + gofmt
+//   ✅ lint        - go vet + golangci-lint
+//   ✅ test        - go test -race -cover
+//   ✅ deps        - go mod verify
+//   ✅ vuln        - govulncheck
+//
+// Shell Delegators - Environment (2):
+//   ✅ go-version  - check-go-version.sh
+//   ✅ tools       - install_tools.sh --check
+//
+// Shell Delegators - Architecture Validation (10):
+//   ✅ defaults           - check-defaults.sh (ADR-002)
+//   ✅ commands           - validate-command-patterns.sh (ADR-001)
+//   ✅ constants          - check-constants.sh (ADR-005)
+//   ✅ task-naming        - validate-task-naming.sh (ADR-000)
+//   ✅ architecture       - validate-architecture.sh (ADR-008)
+//   ✅ layering           - validate-layering.sh (ADR-009)
+//   ✅ package-org        - validate-package-organization.sh (ADR-010)
+//   ✅ config-consumption - validate-config-consumption.sh (ADR-002)
+//   ✅ output-patterns    - validate-output-patterns.sh (ADR-012)
+//   ✅ security-patterns  - validate-security-patterns.sh (ADR-004)
+//
+// Shell Delegators - Security (2):
+//   ✅ secrets     - check-secrets.sh
+//   ✅ sast        - check-sast.sh
+//
+// Shell Delegators - Dependencies (3):
+//   ✅ license-source - check-licenses-source.sh
+//   ✅ license-binary - check-licenses-binary.sh
+//   ✅ sbom-vulns     - check-sbom-vulns.sh
+//
+// Total: 22 checks (5 native Go + 17 shell delegators)
 
 package check
 
@@ -8,10 +44,104 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/rs/zerolog/log"
 )
+
+// scriptsDir is the base directory for check scripts
+const scriptsDir = ".ckeletin/scripts"
+
+// shellCheck creates a check function that delegates to a shell script.
+// The script path is relative to the project root.
+// Note: The script name must be a constant from this package's predefined scripts.
+func (e *Executor) shellCheck(scriptName string, args ...string) func(ctx context.Context) error {
+	return func(ctx context.Context) error {
+		scriptPath := filepath.Join(scriptsDir, scriptName)
+		log.Debug().Str("script", scriptPath).Strs("args", args).Msg("Running shell check")
+
+		cmdArgs := append([]string{scriptPath}, args...)
+		// #nosec G204 -- scriptName is from predefined constants, not user input
+		cmd := exec.CommandContext(ctx, "bash", cmdArgs...)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			// Extract meaningful error from output
+			errMsg := extractShellError(string(output))
+			if errMsg == "" {
+				errMsg = fmt.Sprintf("script failed: %v", err)
+			}
+			return fmt.Errorf("%s", errMsg)
+		}
+		return nil
+	}
+}
+
+// extractShellError extracts the most relevant error message from shell output.
+// It looks for common error patterns and removes noise.
+func extractShellError(output string) string {
+	lines := strings.Split(output, "\n")
+	var errorLines []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Skip success indicators
+		if strings.HasPrefix(trimmed, "✅") || strings.HasPrefix(trimmed, "[0;32m✅") {
+			continue
+		}
+
+		// Keep error indicators
+		if strings.HasPrefix(trimmed, "❌") || strings.HasPrefix(trimmed, "✗") ||
+			strings.Contains(trimmed, "error") || strings.Contains(trimmed, "Error") ||
+			strings.Contains(trimmed, "failed") || strings.Contains(trimmed, "FAIL") {
+			// Strip ANSI codes
+			clean := stripANSI(trimmed)
+			if clean != "" {
+				errorLines = append(errorLines, clean)
+			}
+		}
+	}
+
+	if len(errorLines) == 0 {
+		// Return last non-empty lines as fallback
+		for i := len(lines) - 1; i >= 0 && len(errorLines) < 3; i-- {
+			trimmed := strings.TrimSpace(lines[i])
+			if trimmed != "" {
+				errorLines = append([]string{stripANSI(trimmed)}, errorLines...)
+			}
+		}
+	}
+
+	return strings.Join(errorLines, "\n")
+}
+
+// stripANSI removes ANSI escape codes from a string
+func stripANSI(s string) string {
+	// Simple approach: remove escape sequences
+	result := s
+	for strings.Contains(result, "\033[") {
+		start := strings.Index(result, "\033[")
+		end := start + 2
+		// Find the end of the escape sequence (letter)
+		for end < len(result) && !isLetter(result[end]) {
+			end++
+		}
+		if end < len(result) {
+			end++ // Include the letter
+		}
+		result = result[:start] + result[end:]
+	}
+	return result
+}
+
+func isLetter(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
 
 // checkFormat checks code formatting using goimports and gofmt
 func (e *Executor) checkFormat(ctx context.Context) error {
