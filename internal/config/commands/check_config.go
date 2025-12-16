@@ -77,12 +77,12 @@ func CheckOptions() []config.ConfigOption {
 		},
 		{
 			Key:          "app.check.parallel",
-			DefaultValue: false,
-			Description:  "Run checks within each category in parallel",
+			DefaultValue: true,
+			Description:  "Run checks within each category in parallel (disable with --parallel=false)",
 			Type:         "bool",
 			ShortFlag:    "p",
 			Required:     false,
-			Example:      "true",
+			Example:      "false",
 		},
 	}
 }

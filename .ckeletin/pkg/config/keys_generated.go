@@ -22,7 +22,7 @@ const (
 	KeyAppDocsOutputFile        = "app.docs.output_file"        // Output file for documentation (defaults to stdout)
 	KeyAppCheckFailFast         = "app.check.fail_fast"         // Stop on first failed check
 	KeyAppCheckVerbose          = "app.check.verbose"           // Show verbose output including command details
-	KeyAppCheckParallel         = "app.check.parallel"          // Run checks within each category in parallel
+	KeyAppCheckParallel         = "app.check.parallel"          // Run checks within each category in parallel (disable with --parallel=false)
 	KeyAppPingOutputMessage     = "app.ping.output_message"     // Default message to display for the ping command
 	KeyAppPingOutputColor       = "app.ping.output_color"       // Text color for ping command output (white, red, green, blue, cyan, yellow, ma...
 	KeyAppPingUi                = "app.ping.ui"                 // Enable interactive UI for the ping command

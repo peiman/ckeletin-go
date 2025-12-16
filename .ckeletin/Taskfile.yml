@@ -738,6 +738,15 @@ tasks:
   check:
     desc: Run all quality checks (developer workflow)
     cmds:
+      - task: build:dev
+        vars: { CLI_ARGS: "" }
+      - cmd: ./{{._BINARY_NAME}} check {{.CLI_ARGS}}
+    vars:
+      CLI_ARGS: ""
+
+  check:bash:
+    desc: Run all quality checks using bash scripts (legacy)
+    cmds:
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Development Environment"
