@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Supports multiple formats: yaml, yml, json, toml (auto-detected by viper)
   - Removed legacy `~/.appname.yaml` home directory config
 
+- **Parallel check execution** (`pkg/checkmate`):
+  - `WithParallel()` option runs all checks concurrently
+  - `WithWorkers(n)` limits concurrent checks to n workers
+  - Results maintain original order despite completion order
+  - Fail-fast cancels remaining checks on first failure
+  - Significant speedup for independent checks (e.g., 5x faster for 5 parallel checks)
+
 - **Scaffold workflow commands**:
   - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
   - `task ckeletin:update` - Pull framework updates from upstream without affecting project code

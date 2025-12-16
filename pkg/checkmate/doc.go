@@ -114,6 +114,33 @@
 //	// Set category header
 //	runner := checkmate.NewRunner(p, checkmate.WithCategory("Tests"))
 //
+//	// Run checks in parallel (all at once)
+//	runner := checkmate.NewRunner(p, checkmate.WithParallel())
+//
+//	// Run checks in parallel with limited concurrency
+//	runner := checkmate.NewRunner(p, checkmate.WithWorkers(3))
+//
+// # Parallel Execution
+//
+// Use WithParallel() to run checks concurrently for faster execution:
+//
+//	result := checkmate.NewRunner(p, checkmate.WithParallel()).
+//	    AddFunc("format", checkFormat).
+//	    AddFunc("lint", checkLint).    // Runs concurrently with format
+//	    AddFunc("test", checkTest).    // Runs concurrently with both
+//	    Run(ctx)
+//
+// Parallel execution maintains result order - even though checks may complete
+// in any order, the results and output are reported in the original order.
+//
+// Use WithWorkers(n) to limit concurrency:
+//
+//	// Run at most 2 checks at a time
+//	runner := checkmate.NewRunner(p, checkmate.WithWorkers(2))
+//
+// Fail-fast works with parallel execution - when enabled, remaining checks
+// are cancelled after the first failure:
+//
 // # Fluent API
 //
 // The runner supports a fluent API for easy check definition:

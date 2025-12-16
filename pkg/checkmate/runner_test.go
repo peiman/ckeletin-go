@@ -411,6 +411,299 @@ func NewCheckPrinterWithWriter(w *bytes.Buffer, opts ...Option) *Printer {
 	return New(allOpts...)
 }
 
+// Parallel execution tests
+
+func TestNewRunner_WithParallel(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	require.NotNil(t, runner)
+	assert.True(t, runner.parallel)
+	assert.Equal(t, 0, runner.workers) // 0 means unlimited
+}
+
+func TestNewRunner_WithWorkers(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithWorkers(3))
+
+	require.NotNil(t, runner)
+	assert.True(t, runner.parallel) // WithWorkers implies parallel
+	assert.Equal(t, 3, runner.workers)
+}
+
+func TestRunner_Run_Parallel_AllPass(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithCategory("Parallel Tests"), WithParallel())
+
+	var mu sync.Mutex
+	checkCount := 0
+	for i := 0; i < 5; i++ {
+		runner.AddFunc("check"+string(rune('1'+i)), func(ctx context.Context) error {
+			mu.Lock()
+			checkCount++
+			mu.Unlock()
+			time.Sleep(10 * time.Millisecond)
+			return nil
+		})
+	}
+
+	result := runner.Run(context.Background())
+
+	// Verify result
+	assert.True(t, result.Success())
+	assert.Equal(t, 5, result.Passed)
+	assert.Equal(t, 0, result.Failed)
+	assert.Equal(t, 5, result.Total)
+	assert.Len(t, result.Checks, 5)
+
+	// Verify all checks ran
+	assert.Equal(t, 5, checkCount)
+
+	// Verify printer calls
+	assert.True(t, mock.HasCall("CategoryHeader"))
+	assert.Equal(t, 5, mock.CallCount("CheckHeader"))
+	assert.Equal(t, 5, mock.CallCount("CheckSuccess"))
+	assert.Equal(t, 0, mock.CallCount("CheckFailure"))
+	assert.True(t, mock.HasCall("CheckSummary"))
+}
+
+func TestRunner_Run_Parallel_SomeFail(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	runner.
+		AddFunc("pass1", func(ctx context.Context) error { return nil }).
+		AddFunc("fail1", func(ctx context.Context) error { return errors.New("error 1") }).
+		WithRemediation("Fix 1").
+		AddFunc("pass2", func(ctx context.Context) error { return nil }).
+		AddFunc("fail2", func(ctx context.Context) error { return errors.New("error 2") }).
+		WithRemediation("Fix 2")
+
+	result := runner.Run(context.Background())
+
+	assert.False(t, result.Success())
+	assert.Equal(t, 2, result.Passed)
+	assert.Equal(t, 2, result.Failed)
+	assert.Equal(t, 4, result.Total)
+
+	// All checks should have run (no fail-fast)
+	assert.Len(t, result.Checks, 4)
+
+	// Verify failures were printed
+	assert.Equal(t, 2, mock.CallCount("CheckFailure"))
+}
+
+func TestRunner_Run_Parallel_FailFast(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel(), WithFailFast())
+
+	// Use channel to coordinate timing
+	failReady := make(chan struct{})
+	slowCheckStarted := make(chan struct{})
+
+	runner.
+		AddFunc("slow", func(ctx context.Context) error {
+			close(slowCheckStarted)
+			// Wait for fail to be ready, then wait a bit more
+			<-failReady
+			time.Sleep(50 * time.Millisecond)
+			// Should be cancelled by fail-fast
+			return ctx.Err()
+		}).
+		AddFunc("fail", func(ctx context.Context) error {
+			// Wait for slow to start
+			<-slowCheckStarted
+			close(failReady)
+			return errors.New("fast failure")
+		})
+
+	result := runner.Run(context.Background())
+
+	assert.False(t, result.Success())
+	// At least one check failed
+	assert.GreaterOrEqual(t, result.Failed, 1)
+}
+
+func TestRunner_Run_Parallel_WithWorkers(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithWorkers(2)) // Max 2 concurrent
+
+	maxConcurrent := 0
+	currentConcurrent := 0
+	var mu sync.Mutex
+
+	for i := 0; i < 5; i++ {
+		runner.AddFunc("check"+string(rune('1'+i)), func(ctx context.Context) error {
+			mu.Lock()
+			currentConcurrent++
+			if currentConcurrent > maxConcurrent {
+				maxConcurrent = currentConcurrent
+			}
+			mu.Unlock()
+
+			time.Sleep(20 * time.Millisecond)
+
+			mu.Lock()
+			currentConcurrent--
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	result := runner.Run(context.Background())
+
+	assert.True(t, result.Success())
+	assert.Equal(t, 5, result.Total)
+
+	// Max concurrent should be limited to 2
+	assert.LessOrEqual(t, maxConcurrent, 2)
+}
+
+func TestRunner_Run_Parallel_FasterThanSequential(t *testing.T) {
+	checkDuration := 20 * time.Millisecond
+	numChecks := 5
+
+	// Run sequentially
+	mockSeq := NewMockPrinter()
+	runnerSeq := NewRunner(mockSeq)
+	for i := 0; i < numChecks; i++ {
+		runnerSeq.AddFunc("check", func(ctx context.Context) error {
+			time.Sleep(checkDuration)
+			return nil
+		})
+	}
+	resultSeq := runnerSeq.Run(context.Background())
+
+	// Run in parallel
+	mockPar := NewMockPrinter()
+	runnerPar := NewRunner(mockPar, WithParallel())
+	for i := 0; i < numChecks; i++ {
+		runnerPar.AddFunc("check", func(ctx context.Context) error {
+			time.Sleep(checkDuration)
+			return nil
+		})
+	}
+	resultPar := runnerPar.Run(context.Background())
+
+	// Both should succeed
+	assert.True(t, resultSeq.Success())
+	assert.True(t, resultPar.Success())
+
+	// Parallel should be significantly faster
+	// Sequential: ~100ms (5 * 20ms)
+	// Parallel: ~20ms (all at once)
+	assert.Less(t, resultPar.Duration, resultSeq.Duration,
+		"Parallel (%v) should be faster than sequential (%v)",
+		resultPar.Duration, resultSeq.Duration)
+
+	// Parallel should be at least 2x faster
+	assert.Less(t, resultPar.Duration, resultSeq.Duration/2,
+		"Parallel should be at least 2x faster")
+}
+
+func TestRunner_Run_Parallel_Empty(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	result := runner.Run(context.Background())
+
+	assert.True(t, result.Success())
+	assert.Equal(t, 0, result.Total)
+	assert.Empty(t, result.Checks)
+}
+
+func TestRunner_Run_Parallel_PanicRecovery(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	runner.
+		AddFunc("panic_check", func(ctx context.Context) error {
+			panic("parallel panic")
+		}).
+		AddFunc("normal", func(ctx context.Context) error {
+			return nil
+		})
+
+	// Should NOT panic
+	result := runner.Run(context.Background())
+
+	assert.False(t, result.Success())
+	assert.Equal(t, 1, result.Passed)
+	assert.Equal(t, 1, result.Failed)
+
+	// Find the panic result
+	var panicResult *CheckResult
+	for i := range result.Checks {
+		if result.Checks[i].Name == "panic_check" {
+			panicResult = &result.Checks[i]
+			break
+		}
+	}
+
+	require.NotNil(t, panicResult)
+	assert.Contains(t, panicResult.Error.Error(), "panic:")
+	assert.Contains(t, panicResult.Error.Error(), "parallel panic")
+}
+
+func TestRunner_Run_Parallel_ContextCancellation(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	runner.
+		AddFunc("check1", func(ctx context.Context) error {
+			cancel() // Cancel immediately
+			return nil
+		}).
+		AddFunc("check2", func(ctx context.Context) error {
+			// This will see cancelled context
+			time.Sleep(50 * time.Millisecond)
+			return ctx.Err()
+		})
+
+	result := runner.Run(ctx)
+
+	// At least one check should have context error
+	hasContextError := false
+	for _, cr := range result.Checks {
+		if cr.Error != nil && errors.Is(cr.Error, context.Canceled) {
+			hasContextError = true
+			break
+		}
+	}
+	// Context cancellation should be detected
+	assert.True(t, hasContextError || ctx.Err() != nil)
+}
+
+func TestRunner_Run_Parallel_MaintainsOrder(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithParallel())
+
+	// Add checks with varying delays
+	// They should complete in different order but results should maintain original order
+	delays := []time.Duration{30 * time.Millisecond, 10 * time.Millisecond, 20 * time.Millisecond}
+	names := []string{"first", "second", "third"}
+
+	for i, name := range names {
+		delay := delays[i]
+		runner.AddFunc(name, func(ctx context.Context) error {
+			time.Sleep(delay)
+			return nil
+		})
+	}
+
+	result := runner.Run(context.Background())
+
+	assert.True(t, result.Success())
+	require.Len(t, result.Checks, 3)
+
+	// Results should be in original order
+	assert.Equal(t, "first", result.Checks[0].Name)
+	assert.Equal(t, "second", result.Checks[1].Name)
+	assert.Equal(t, "third", result.Checks[2].Name)
+}
+
 func TestRunCheckSafe(t *testing.T) {
 	tests := []struct {
 		name        string

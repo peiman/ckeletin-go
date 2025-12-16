@@ -49,6 +49,8 @@ type Runner struct {
 	checks   []Check
 	failFast bool
 	category string
+	parallel bool
+	workers  int // 0 means unlimited (all checks run concurrently)
 	mu       sync.Mutex
 }
 
@@ -65,6 +67,31 @@ func WithFailFast() RunnerOption {
 // Example: WithCategory("Code Quality")
 func WithCategory(name string) RunnerOption {
 	return func(r *Runner) { r.category = name }
+}
+
+// WithParallel enables parallel check execution.
+// All checks run concurrently by default.
+// Use WithWorkers to limit concurrency.
+//
+// Example:
+//
+//	runner := checkmate.NewRunner(printer, checkmate.WithParallel())
+func WithParallel() RunnerOption {
+	return func(r *Runner) { r.parallel = true }
+}
+
+// WithWorkers sets the number of concurrent workers for parallel execution.
+// Implies WithParallel(). A value of 0 means unlimited (all checks run concurrently).
+//
+// Example:
+//
+//	// Run at most 3 checks concurrently
+//	runner := checkmate.NewRunner(printer, checkmate.WithWorkers(3))
+func WithWorkers(n int) RunnerOption {
+	return func(r *Runner) {
+		r.parallel = true
+		r.workers = n
+	}
 }
 
 // NewRunner creates a runner that outputs to the given printer.
@@ -141,6 +168,9 @@ func (r *Runner) WithDetails(text string) *Runner {
 // Automatically prints category header, check headers, success/failure, and summary.
 // Respects context cancellation.
 //
+// When WithParallel() is enabled, checks run concurrently.
+// Use WithWorkers(n) to limit concurrency.
+//
 // Example:
 //
 //	result := runner.Run(ctx)
@@ -153,18 +183,34 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 	copy(checks, r.checks)
 	category := r.category
 	failFast := r.failFast
+	parallel := r.parallel
+	workers := r.workers
 	printer := r.printer
 	r.mu.Unlock()
 
 	start := time.Now()
-	result := RunResult{Total: len(checks)}
 
 	// Print category header if set
 	if category != "" {
 		printer.CategoryHeader(category)
 	}
 
-	passedNames := []string{}
+	var result RunResult
+	if parallel {
+		result = r.runParallel(ctx, checks, printer, failFast, workers)
+	} else {
+		result = r.runSequential(ctx, checks, printer, failFast)
+	}
+
+	result.Duration = time.Since(start)
+	r.printSummary(printer, result)
+
+	return result
+}
+
+// runSequential executes checks one at a time in order.
+func (r *Runner) runSequential(ctx context.Context, checks []Check, printer PrinterInterface, failFast bool) RunResult {
+	result := RunResult{Total: len(checks)}
 
 	for _, check := range checks {
 		// Check context cancellation
@@ -203,20 +249,112 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 		} else {
 			checkResult.Status = StatusSuccess
 			result.Passed++
-			passedNames = append(passedNames, check.Name)
 			printer.CheckSuccess(check.Name + " passed")
 		}
 
 		result.Checks = append(result.Checks, checkResult)
 	}
 
-	result.Duration = time.Since(start)
+	return result
+}
 
-	// Print summary
+// checkJob represents a check to be executed by a worker.
+type checkJob struct {
+	index int
+	check Check
+}
+
+// checkJobResult represents the result of executing a check job.
+type checkJobResult struct {
+	index  int
+	result CheckResult
+	check  Check // Original check for remediation/details
+}
+
+// runParallel executes checks concurrently with optional worker limit.
+func (r *Runner) runParallel(ctx context.Context, checks []Check, printer PrinterInterface, failFast bool, workers int) RunResult {
+	result := RunResult{Total: len(checks)}
+
+	if len(checks) == 0 {
+		return result
+	}
+
+	// Create cancellable context for fail-fast
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Print all check headers upfront (shows what will run)
+	for _, check := range checks {
+		printer.CheckHeader(check.Name)
+	}
+
+	// Determine worker count
+	workerCount := len(checks)
+	if workers > 0 && workers < workerCount {
+		workerCount = workers
+	}
+
+	// Create channels
+	jobs := make(chan checkJob, len(checks))
+	results := make(chan checkJobResult, len(checks))
+
+	// Start workers
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go r.runWorker(ctx, &wg, jobs, results, failFast, cancel)
+	}
+
+	// Send all jobs
+	for i, check := range checks {
+		jobs <- checkJob{index: i, check: check}
+	}
+	close(jobs)
+
+	// Wait for all workers to complete
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect results (maintain order for consistent output)
+	checkResults := make([]checkJobResult, len(checks))
+	for jr := range results {
+		checkResults[jr.index] = jr
+	}
+
+	// Process results in order and print outcomes
+	for _, jr := range checkResults {
+		result.Checks = append(result.Checks, jr.result)
+
+		if jr.result.Status == StatusFailure {
+			result.Failed++
+			details := jr.check.Details
+			if details == "" && jr.result.Error != nil {
+				details = jr.result.Error.Error()
+			}
+			printer.CheckFailure(jr.check.Name+" failed", details, jr.check.Remediation)
+		} else {
+			result.Passed++
+			printer.CheckSuccess(jr.check.Name + " passed")
+		}
+	}
+
+	return result
+}
+
+// printSummary prints the final summary based on results.
+func (r *Runner) printSummary(printer PrinterInterface, result RunResult) {
 	if result.Success() {
+		passedNames := make([]string, 0, result.Passed)
+		for _, cr := range result.Checks {
+			if cr.Status == StatusSuccess {
+				passedNames = append(passedNames, cr.Name)
+			}
+		}
 		printer.CheckSummary(StatusSuccess, "All checks passed", passedNames...)
 	} else {
-		failedNames := []string{}
+		failedNames := make([]string, 0, result.Failed)
 		for _, cr := range result.Checks {
 			if cr.Status == StatusFailure {
 				failedNames = append(failedNames, cr.Name)
@@ -226,8 +364,52 @@ func (r *Runner) Run(ctx context.Context) RunResult {
 			fmt.Sprintf("%d/%d checks failed", result.Failed, result.Total),
 			failedNames...)
 	}
+}
 
-	return result
+// runWorker processes jobs from the jobs channel and sends results to results channel.
+func (r *Runner) runWorker(ctx context.Context, wg *sync.WaitGroup, jobs <-chan checkJob, results chan<- checkJobResult, failFast bool, cancel context.CancelFunc) {
+	defer wg.Done()
+	for job := range jobs {
+		// Check if context is cancelled
+		if ctx.Err() != nil {
+			results <- checkJobResult{
+				index: job.index,
+				result: CheckResult{
+					Name:   job.check.Name,
+					Status: StatusFailure,
+					Error:  ctx.Err(),
+				},
+				check: job.check,
+			}
+			continue
+		}
+
+		// Run the check
+		checkStart := time.Now()
+		err := runCheckSafe(ctx, job.check.Fn)
+		checkDuration := time.Since(checkStart)
+
+		jr := checkJobResult{
+			index: job.index,
+			result: CheckResult{
+				Name:     job.check.Name,
+				Duration: checkDuration,
+			},
+			check: job.check,
+		}
+
+		if err != nil {
+			jr.result.Status = StatusFailure
+			jr.result.Error = err
+			if failFast {
+				cancel() // Cancel remaining checks
+			}
+		} else {
+			jr.result.Status = StatusSuccess
+		}
+
+		results <- jr
+	}
 }
 
 // runCheckSafe runs a check function with panic recovery.
