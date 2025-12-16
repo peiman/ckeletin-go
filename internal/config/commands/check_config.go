@@ -46,13 +46,14 @@ Use --fail-fast to stop on the first failure.`,
 		"app.check.parallel":  "parallel",
 		"app.check.category":  "category",
 		"app.check.timing":    "timing",
+		"app.check.tui":       "tui",
 	},
 	Examples: []string{
 		"check",
+		"check --tui",
 		"check --category=security",
 		"check -c security,tests",
 		"check --fail-fast",
-		"check --timing=false",
 	},
 	SeeAlso: []string{"docs"},
 }
@@ -104,6 +105,15 @@ func CheckOptions() []config.ConfigOption {
 			ShortFlag:    "t",
 			Required:     false,
 			Example:      "false",
+		},
+		{
+			Key:          "app.check.tui",
+			DefaultValue: false,
+			Description:  "Use interactive TUI with progress bars (requires TTY)",
+			Type:         "bool",
+			ShortFlag:    "u",
+			Required:     false,
+			Example:      "true",
 		},
 	}
 }

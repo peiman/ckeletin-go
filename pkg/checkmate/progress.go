@@ -33,15 +33,16 @@ const (
 
 // ProgressModel is the Bubble Tea model for progress display.
 type ProgressModel struct {
-	checks    []CheckProgress
-	spinner   spinner.Model
-	progress  progress.Model
-	done      bool
-	title     string
-	width     int
-	startTime time.Time
-	coverage  float64 // Code coverage percentage (0.0 to 100.0)
-	styles    progressStyles
+	checks      []CheckProgress
+	spinner     spinner.Model
+	progress    progress.Model
+	done        bool
+	title       string
+	width       int
+	startTime   time.Time
+	coverage    float64 // Code coverage percentage (0.0 to 100.0)
+	styles      progressStyles
+	skipSummary bool // If true, don't show summary box when done
 }
 
 type progressStyles struct {
@@ -54,8 +55,17 @@ type progressStyles struct {
 	box       lipgloss.Style
 }
 
+// ProgressModelOption configures a ProgressModel.
+type ProgressModelOption func(*ProgressModel)
+
+// WithSkipSummary disables the summary box at the end.
+// Use this when showing multiple categories and you want one final summary.
+func WithSkipSummary() ProgressModelOption {
+	return func(m *ProgressModel) { m.skipSummary = true }
+}
+
 // NewProgressModel creates a new progress display model.
-func NewProgressModel(title string, checkNames []string) ProgressModel {
+func NewProgressModel(title string, checkNames []string, opts ...ProgressModelOption) ProgressModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -74,7 +84,7 @@ func NewProgressModel(title string, checkNames []string) ProgressModel {
 		}
 	}
 
-	return ProgressModel{
+	m := ProgressModel{
 		checks:    checks,
 		spinner:   s,
 		progress:  p,
@@ -105,6 +115,13 @@ func NewProgressModel(title string, checkNames []string) ProgressModel {
 				Padding(1, 2),
 		},
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(&m)
+	}
+
+	return m
 }
 
 // Init initializes the model.
@@ -240,8 +257,8 @@ func (m ProgressModel) View() string {
 		}
 	}
 
-	// If done, show summary box
-	if m.done {
+	// If done and summary not skipped, show summary box
+	if m.done && !m.skipSummary {
 		b.WriteString("\n")
 		b.WriteString(m.renderSummaryBox())
 	}
