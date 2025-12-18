@@ -127,6 +127,7 @@ func (th *timingHistory) getExpectedDuration(name string) time.Duration {
 		// Dependencies
 		"deps":           1 * time.Second,
 		"vuln":           2 * time.Second,
+		"outdated":       2 * time.Second,
 		"license-source": 1 * time.Second,
 		"license-binary": 1 * time.Second,
 		"sbom-vulns":     5 * time.Second,
@@ -233,6 +234,7 @@ func (e *Executor) buildCategories(methods *checkMethods) []categoryDef {
 			checks: []checkItem{
 				{"deps", methods.checkDeps, "Run: go mod tidy"},
 				{"vuln", methods.checkVuln, "Update vulnerable dependencies"},
+				{"outdated", methods.shellCheck("check-deps-outdated.sh"), "Run: go get -u"},
 				{"license-source", methods.shellCheck("check-licenses-source.sh"), "Check dependency licenses"},
 				{"license-binary", methods.shellCheck("check-licenses-binary.sh"), "Check binary licenses"},
 				{"sbom-vulns", methods.shellCheck("check-sbom-vulns.sh"), "Fix SBOM vulnerabilities"},

@@ -15,7 +15,7 @@ var CheckMetadata = config.CommandMetadata{
 	Short: "Run quality checks",
 	Long: `Run comprehensive code quality checks using checkmate.
 
-Includes 22 checks across 6 categories:
+Includes 23 checks across 6 categories:
 
   Development Environment (2):
     go-version, tools
@@ -31,8 +31,8 @@ Includes 22 checks across 6 categories:
   Security Scanning (2):
     secrets, sast
 
-  Dependencies (5):
-    deps, vuln, license-source, license-binary, sbom-vulns
+  Dependencies (6):
+    deps, vuln, outdated, license-source, license-binary, sbom-vulns
 
   Tests (1):
     test

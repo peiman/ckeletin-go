@@ -31,12 +31,13 @@
 //   ✅ secrets     - check-secrets.sh
 //   ✅ sast        - check-sast.sh
 //
-// Shell Delegators - Dependencies (3):
+// Shell Delegators - Dependencies (4):
+//   ✅ outdated       - check-deps-outdated.sh
 //   ✅ license-source - check-licenses-source.sh
 //   ✅ license-binary - check-licenses-binary.sh
 //   ✅ sbom-vulns     - check-sbom-vulns.sh
 //
-// Total: 22 checks (5 native Go + 17 shell delegators)
+// Total: 23 checks (5 native Go + 18 shell delegators)
 
 package check
 

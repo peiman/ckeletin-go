@@ -171,7 +171,7 @@ func TestExecutor_BuildCategories(t *testing.T) {
 		"Code Quality":            2,
 		"Architecture Validation": 10,
 		"Security Scanning":       2,
-		"Dependencies":            5,
+		"Dependencies":            6,
 		"Tests":                   1,
 	}
 
@@ -181,12 +181,12 @@ func TestExecutor_BuildCategories(t *testing.T) {
 		assert.Len(t, cat.checks, expectedCount, "wrong check count for %s", cat.name)
 	}
 
-	// Verify total check count is 22
+	// Verify total check count is 23
 	total := 0
 	for _, cat := range categories {
 		total += len(cat.checks)
 	}
-	assert.Equal(t, 22, total, "should have 22 total checks")
+	assert.Equal(t, 23, total, "should have 23 total checks")
 }
 
 func TestExecutor_ShouldRunCategory(t *testing.T) {
