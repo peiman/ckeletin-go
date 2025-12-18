@@ -102,18 +102,41 @@ func (th *timingHistory) getExpectedDuration(name string) time.Duration {
 	if t, ok := th.Checks[name]; ok && t.AvgDuration > 0 {
 		return t.AvgDuration
 	}
-	// Default estimates for first run (in seconds)
+	// Default estimates for first run
 	defaults := map[string]time.Duration{
-		"format": 2 * time.Second,
-		"lint":   5 * time.Second,
-		"test":   10 * time.Second,
-		"deps":   1 * time.Second,
-		"vuln":   3 * time.Second,
+		// Environment
+		"go-version": 100 * time.Millisecond,
+		"tools":      100 * time.Millisecond,
+		// Quality
+		"format": 500 * time.Millisecond,
+		"lint":   3 * time.Second,
+		// Architecture
+		"defaults":           100 * time.Millisecond,
+		"commands":           200 * time.Millisecond,
+		"constants":          500 * time.Millisecond,
+		"task-naming":        200 * time.Millisecond,
+		"architecture":       500 * time.Millisecond,
+		"layering":           4 * time.Second,
+		"package-org":        500 * time.Millisecond,
+		"config-consumption": 100 * time.Millisecond,
+		"output-patterns":    100 * time.Millisecond,
+		"security-patterns":  100 * time.Millisecond,
+		// Security
+		"secrets": 200 * time.Millisecond,
+		"sast":    4 * time.Second,
+		// Dependencies
+		"deps":           1 * time.Second,
+		"vuln":           2 * time.Second,
+		"license-source": 1 * time.Second,
+		"license-binary": 1 * time.Second,
+		"sbom-vulns":     5 * time.Second,
+		// Tests
+		"test": 10 * time.Second,
 	}
 	if d, ok := defaults[name]; ok {
 		return d
 	}
-	return 5 * time.Second // Generic default
+	return 3 * time.Second // Generic default for unknown checks
 }
 
 // recordDuration updates timing data after a check completes

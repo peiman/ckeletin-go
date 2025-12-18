@@ -1,3 +1,5 @@
+//go:build dev
+
 // cmd/check.go
 
 package cmd
