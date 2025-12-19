@@ -1,8 +1,11 @@
 package checkmate
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -154,4 +157,142 @@ func TestMockPrinter_ImplementsInterface(t *testing.T) {
 
 	mock := p.(*MockPrinter)
 	assert.True(t, mock.HasCall("CheckSuccess"))
+}
+
+func TestMockPrinter_CheckLine(t *testing.T) {
+	mock := NewMockPrinter()
+	mock.CheckLine("test", StatusSuccess, 100*time.Millisecond)
+
+	assert.True(t, mock.HasCall("CheckLine"))
+	calls := mock.GetCalls("CheckLine")
+	require.Len(t, calls, 1)
+	assert.Equal(t, "test", calls[0][0])
+	assert.Equal(t, StatusSuccess, calls[0][1])
+	assert.Equal(t, 100*time.Millisecond, calls[0][2])
+}
+
+func TestMockPrinter_Output(t *testing.T) {
+	mock := NewMockPrinter()
+	assert.Empty(t, mock.Output())
+	mock.Buffer.WriteString("test output")
+	assert.Equal(t, "test output", mock.Output())
+}
+
+func TestMockRunner_NewMockRunner(t *testing.T) {
+	mock := NewMockRunner()
+	require.NotNil(t, mock)
+	assert.Equal(t, 0, mock.CheckCount())
+}
+
+func TestMockRunner_Add(t *testing.T) {
+	mock := NewMockRunner()
+	mock.Add(Check{Name: "test", Fn: func(_ context.Context) error { return nil }})
+
+	assert.Equal(t, 1, mock.CheckCount())
+	assert.True(t, mock.HasCheck("test"))
+}
+
+func TestMockRunner_AddFunc(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("format", func(_ context.Context) error { return nil })
+
+	assert.True(t, mock.HasCheck("format"))
+	assert.Equal(t, 1, mock.CheckCount())
+}
+
+func TestMockRunner_WithRemediation(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("test", nil)
+	mock.WithRemediation("fix it")
+
+	check := mock.GetCheck("test")
+	require.NotNil(t, check)
+	assert.Equal(t, "fix it", check.Remediation)
+}
+
+func TestMockRunner_WithDetails(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("test", nil)
+	mock.WithDetails("some details")
+
+	check := mock.GetCheck("test")
+	require.NotNil(t, check)
+	assert.Equal(t, "some details", check.Details)
+}
+
+func TestMockRunner_WithRemediationNoChecks(t *testing.T) {
+	mock := NewMockRunner()
+	// Should not panic when no checks exist
+	mock.WithRemediation("fix it")
+	mock.WithDetails("details")
+	assert.Equal(t, 0, mock.CheckCount())
+}
+
+func TestMockRunner_Run(t *testing.T) {
+	mock := NewMockRunner()
+	mock.SetResult(RunResult{Passed: 5, Failed: 2, Total: 7})
+
+	result := mock.Run(context.Background())
+	assert.Equal(t, 5, result.Passed)
+	assert.Equal(t, 2, result.Failed)
+	assert.Equal(t, 7, result.Total)
+	assert.Equal(t, 1, mock.RunCalls())
+}
+
+func TestMockRunner_HasCheck(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("format", nil)
+	mock.AddFunc("lint", nil)
+
+	assert.True(t, mock.HasCheck("format"))
+	assert.True(t, mock.HasCheck("lint"))
+	assert.False(t, mock.HasCheck("test"))
+}
+
+func TestMockRunner_GetCheck(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("format", nil)
+
+	check := mock.GetCheck("format")
+	require.NotNil(t, check)
+	assert.Equal(t, "format", check.Name)
+
+	noCheck := mock.GetCheck("nonexistent")
+	assert.Nil(t, noCheck)
+}
+
+func TestMockRunner_Reset(t *testing.T) {
+	mock := NewMockRunner()
+	mock.AddFunc("test", nil)
+	mock.Run(context.Background())
+	mock.SetResult(RunResult{Passed: 1})
+
+	mock.Reset()
+	assert.Equal(t, 0, mock.CheckCount())
+	assert.Equal(t, 0, mock.RunCalls())
+}
+
+func TestMockRunner_ConcurrentAccess(t *testing.T) {
+	mock := NewMockRunner()
+	var wg sync.WaitGroup
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			mock.AddFunc(fmt.Sprintf("check%d", i), nil)
+		}(i)
+	}
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = mock.CheckCount()
+			_ = mock.HasCheck("check0")
+		}()
+	}
+
+	wg.Wait()
+	assert.Equal(t, 50, mock.CheckCount())
 }

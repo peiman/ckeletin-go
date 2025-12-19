@@ -1,6 +1,10 @@
 #!/bin/bash
 # Check if project coverage meets minimum threshold
 # Similar to codecov/project check
+#
+# Excludes from coverage calculation:
+# - _tui.go files (TUI code requires interactive testing)
+# - /demo/ directories (demo code is for documentation)
 
 set -e
 
@@ -13,13 +17,35 @@ if [ ! -f "$COVERAGE_FILE" ]; then
     exit 1
 fi
 
-# Calculate total coverage using go tool cover
-total_coverage=$(go tool cover -func="$COVERAGE_FILE" | grep "total:" | awk '{print $3}' | sed 's/%//')
+# Calculate coverage ourselves, excluding TUI and demo code
+# Format: file:line.col,line.col numStatements numHits
+total_statements=0
+covered_statements=0
 
-if [ -z "$total_coverage" ]; then
+while IFS= read -r line; do
+    # Skip lines containing _tui.go or /demo/
+    if [[ "$line" == *"_tui.go"* ]] || [[ "$line" == *"/demo/"* ]]; then
+        continue
+    fi
+
+    # Parse: file:10.2,12.3 5 2 where 5 is statements, 2 is hits
+    if [[ $line =~ ([0-9]+)[[:space:]]+([0-9]+)$ ]]; then
+        stmts="${BASH_REMATCH[1]}"
+        hits="${BASH_REMATCH[2]}"
+
+        total_statements=$((total_statements + stmts))
+        if [ "$hits" -gt 0 ]; then
+            covered_statements=$((covered_statements + stmts))
+        fi
+    fi
+done < "$COVERAGE_FILE"
+
+if [ "$total_statements" -eq 0 ]; then
     echo "❌ Failed to parse coverage data"
     exit 1
 fi
+
+total_coverage=$(echo "scale=1; $covered_statements * 100 / $total_statements" | bc -l)
 
 # Compare coverage (using bc for floating point comparison)
 if command -v bc &> /dev/null; then
