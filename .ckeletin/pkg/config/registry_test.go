@@ -12,11 +12,10 @@ import (
 
 func TestRegistryHasExpectedKeys(t *testing.T) {
 	// SETUP PHASE
+	// Only test framework-level keys, not project-specific keys (like ping, check)
 	requiredKeys := []string{
 		"app.log_level",
-		"app.ping.output_message",
-		"app.ping.output_color",
-		"app.ping.ui",
+		"app.docs.output_format",
 	}
 
 	// EXECUTION PHASE
@@ -24,8 +23,8 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 
 	// ASSERTION PHASE
 	// Check that the registry has the expected minimum number of entries
-	if len(registry) < 4 {
-		t.Errorf("Registry() returned %d entries, expected at least 4", len(registry))
+	if len(registry) < 2 {
+		t.Errorf("Registry() returned %d entries, expected at least 2", len(registry))
 	}
 
 	// Check for essential keys
@@ -72,12 +71,7 @@ func TestSetDefaults(t *testing.T) {
 // Test command-specific options are included in Registry
 func TestRegistryIncludesCommandOptions(t *testing.T) {
 	// SETUP PHASE
-	pingKeys := map[string]bool{
-		"app.ping.output_message": false,
-		"app.ping.output_color":   false,
-		"app.ping.ui":             false,
-	}
-
+	// Only test framework command keys, not project-specific keys (like ping, check)
 	docsKeys := map[string]bool{
 		"app.docs.output_format": false,
 		"app.docs.output_file":   false,
@@ -93,21 +87,11 @@ func TestRegistryIncludesCommandOptions(t *testing.T) {
 	// ASSERTION PHASE
 	// Mark keys as found
 	for _, opt := range registry {
-		if _, ok := pingKeys[opt.Key]; ok {
-			pingKeys[opt.Key] = true
-		}
 		if _, ok := docsKeys[opt.Key]; ok {
 			docsKeys[opt.Key] = true
 		}
 		if _, ok := coreKeys[opt.Key]; ok {
 			coreKeys[opt.Key] = true
-		}
-	}
-
-	// Check that all ping keys were found
-	for key, found := range pingKeys {
-		if !found {
-			t.Errorf("Registry() missing ping key %q", key)
 		}
 	}
 

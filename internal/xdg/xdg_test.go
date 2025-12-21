@@ -253,3 +253,83 @@ func TestConcurrentAccess(t *testing.T) {
 	name := GetAppName()
 	assert.True(t, name == "app1" || name == "app2")
 }
+
+func TestDataFile(t *testing.T) {
+	setupTest(t)
+	tempDir := t.TempDir()
+
+	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
+		t.Setenv("XDG_DATA_HOME", tempDir)
+	}
+
+	SetAppName("testapp")
+	file, err := DataFile("data.db")
+	require.NoError(t, err)
+	assert.Contains(t, file, "testapp")
+	assert.Equal(t, "data.db", filepath.Base(file))
+}
+
+func TestDataFile_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := DataFile("data.db")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestConfigFile_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := ConfigFile("config.yaml")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestCacheFile_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := CacheFile("cache.json")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestStateFile_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := StateFile("state.log")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestDataDir_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := DataDir()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestCacheDir_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := CacheDir()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestStateDir_AppNameNotSet(t *testing.T) {
+	setupTest(t)
+
+	_, err := StateDir()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "app name not set")
+}
+
+func TestHomeDirFallback(t *testing.T) {
+	// Test that homeDir() returns something even with HOME unset
+	// Note: Can't actually unset HOME in a running test safely,
+	// but we can verify the function doesn't panic and returns valid path
+	home := homeDir()
+	assert.NotEmpty(t, home)
+	assert.NotEqual(t, ".", home) // Should find actual home
+}

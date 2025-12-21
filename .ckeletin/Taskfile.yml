@@ -47,6 +47,7 @@ vars:
   TOOL_SYFT_VERSION: v1.18.1
   TOOL_GITLEAKS_VERSION: latest
   TOOL_GRYPE_VERSION: latest
+  TOOL_GOCOVMERGE_VERSION: latest
 
 tasks:
   default:
@@ -102,11 +103,13 @@ tasks:
     - echo "   go-mod-outdated{{":"}} {{.TOOL_GO_MOD_OUTDATED_VERSION}}"
     - echo "   gitleaks{{":"}} {{.TOOL_GITLEAKS_VERSION}}"
     - echo "   grype{{":"}} {{.TOOL_GRYPE_VERSION}}"
+    - echo "   gocovmerge{{":"}} {{.TOOL_GOCOVMERGE_VERSION}}"
     - go install golang.org/x/vuln/cmd/govulncheck@{{.TOOL_GOVULNCHECK_VERSION}}
     - go install gotest.tools/gotestsum@{{.TOOL_GOTESTSUM_VERSION}}
     - go install github.com/psampaz/go-mod-outdated@{{.TOOL_GO_MOD_OUTDATED_VERSION}}
     - go install github.com/zricethezav/gitleaks/v8@{{.TOOL_GITLEAKS_VERSION}}
     - go install github.com/anchore/grype/cmd/grype@{{.TOOL_GRYPE_VERSION}}
+    - go install github.com/wadey/gocovmerge@{{.TOOL_GOCOVMERGE_VERSION}}
     - echo "✅ Latest tools installed"
     silent: false
 
@@ -200,7 +203,7 @@ tasks:
         task --version || echo "  ❌ Task not found"
         echo ""
         echo "Development Tools:"
-        for tool in goimports golangci-lint gotestsum govulncheck lefthook go-mod-outdated go-licenses lichen; do
+        for tool in goimports golangci-lint gotestsum govulncheck lefthook go-mod-outdated go-licenses lichen gocovmerge; do
           if command -v "$tool" > /dev/null 2>&1; then
             echo "  $tool: ✅ installed"
           else
@@ -251,6 +254,7 @@ tasks:
         check_tool "govulncheck"
         check_tool "go-licenses"
         check_tool "lichen"
+        check_tool "gocovmerge"
         if [ "$all_good" = false ]; then
           echo -e "$missing_tools"
           echo ""
@@ -463,19 +467,25 @@ tasks:
     desc: Run tests with coverage
     silent: true
     cmd: |
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
+      rm -f coverage.raw.txt
 
   test:dev:
     desc: Run tests with dev commands (explicit - same as 'test')
     silent: true
     cmd: |
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
+      rm -f coverage.raw.txt
 
   test:prod:
     desc: Run tests without dev commands (production mode)
     silent: true
     cmd: |
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
+      rm -f coverage.raw.txt
 
   test:unit:
     desc: Run unit tests only (skips integration tests)
@@ -492,7 +502,9 @@ tasks:
     desc: Run all tests with both race detection and coverage
     silent: true
     cmd: |
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
+      rm -f coverage.raw.txt
 
   test:watch:
     desc: Run tests in watch mode
@@ -523,7 +535,9 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data
     cmds:
-      - gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile={{.COVERAGE_TXT}} -covermode=atomic ./...
+      - gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      - gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
+      - rm -f coverage.raw.txt
       - echo "Detailed coverage report:"
       - go tool cover -func={{.COVERAGE_TXT}}
     silent: false
