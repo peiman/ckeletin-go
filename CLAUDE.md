@@ -675,6 +675,16 @@ task check runs:
    - Check `task check:license:binary` before releases
    - Review `.lichen.yaml` for policy customization
 
+6. **Log-and-Throw at ERROR Level** - Using `log.Error()` for returnable errors
+   - **Can you return this error?**
+     - **YES** → Use `log.Debug()`, then `return err`
+     - **NO, but expected** (user input error) → Use formatted output only
+     - **NO, unexpected** (bug, system failure) → Use `log.Error()`
+   - Never use `log.Error()` for validation failures or user input errors
+   - The formatted command output (`✘ Errors:`) is the user-facing error channel
+   - Zerolog is for diagnostic breadcrumbs, not user communication
+   - See ADR-006 "Best Practices" section for full guidance
+
 ## Quick Reference
 
 ### New Session Checklist
