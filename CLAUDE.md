@@ -1,11 +1,70 @@
 # Claude Code Guidelines for ckeletin-go
 
-This document provides guidelines specifically for Claude Code when working on the ckeletin-go project.
+## TL;DR - Non-Negotiable Rules
+
+**Memorize these 7 rules before doing anything else:**
+
+1. **`task check` before every commit** - Non-negotiable, runs all quality checks
+2. **Commands ≤30 lines** - `cmd/*.go` files wire things together; logic goes in `internal/`
+3. **Use `config.Key*` constants** - Never hardcode config strings; run `task generate:config:key-constants` after registry changes
+4. **Never reduce test coverage** - 80% minimum overall, use `testify/assert`
+5. **Check licenses after `go get`** - Run `task check:license:source` immediately
+6. **Never `--no-verify`** - Ask user permission first with justification
+7. **Task for workflows, Go for debugging** - `task test` for full suite, `go test -v -run TestName` for debugging
+
+## Quick Decision Trees
+
+```
+Where does this code go?
+├── CLI command entry point? → cmd/<name>.go (≤30 lines)
+├── Business logic? → internal/<name>/
+├── Reusable public API? → pkg/
+└── Test helpers? → test/ or *_test.go
+
+Which command to run?
+├── All tests? → task test
+├── Debug one test? → go test -v -run TestName ./path/...
+├── Before commit? → task check (MANDATORY)
+├── Format code? → task format
+└── Quick compile? → go build ./... (OK for iteration)
+
+Which log level?
+├── Can return this error? → log.Debug() + return err
+├── User input error? → Formatted output only (no log)
+├── Important event in normal flow? → log.Info()
+├── Recoverable issue needing attention? → log.Warn()
+└── Unrecoverable system failure/bug? → log.Error()
+```
+
+**Something broke?** → Jump to [Troubleshooting](#troubleshooting) for cascading failures, rollback, and recovery.
+
+**When rules conflict, prioritize:** Security → License compliance → Correctness → Coverage → Style
+
+<details>
+<summary>📋 Table of Contents (click to expand)</summary>
+
+- [TL;DR - Non-Negotiable Rules](#tldr---non-negotiable-rules)
+- [About This Project](#about-this-project)
+- [Getting Started](#getting-started)
+- [Task Command Usage](#task-command-usage-critical)
+- [Git Workflow](#git-workflow)
+- [Code Quality Standards](#code-quality-standards)
+- [Code Organization](#code-organization)
+- [Architecture Decision Records](#architecture-decision-records-adrs)
+- [Project-Specific Conventions](#project-specific-conventions)
+- [License Compliance](#license-compliance)
+- [Mistakes and Anti-Patterns](#mistakes-and-anti-patterns)
+- [Troubleshooting](#troubleshooting)
+- [Getting Help](#getting-help)
+
+</details>
+
+---
 
 ## About This Project
 
 **ckeletin-go** is a Go-based CLI skeleton/template generator with:
-- Ultra-thin command pattern (commands are ~20-30 lines)
+- Ultra-thin command pattern (commands ≤30 lines)
 - Centralized configuration registry with auto-generated constants
 - Structured logging with Zerolog (dual console + file output)
 - Bubble Tea for interactive UIs
@@ -13,6 +72,8 @@ This document provides guidelines specifically for Claude Code when working on t
 - Dependency injection over mocking
 
 ## Getting Started
+
+**Platform:** This project is developed and tested on macOS and Linux. Windows is not officially supported.
 
 ### Automatic Setup
 When you start a new session, development tools are automatically installed:
@@ -22,7 +83,9 @@ When you start a new session, development tools are automatically installed:
 - Test runners (gotestsum)
 - Security scanners (govulncheck)
 
-**Important:** Tools install automatically via SessionStart hook. You'll see a success message when ready.
+**Important:** Tools install automatically when you start a session. The SessionStart hook (defined in `.claude/hooks.json`) runs `.ckeletin/scripts/install_tools.sh` which installs task, goimports, golangci-lint, and other required tools. You'll see a success message when ready.
+
+If tools fail to install, run manually: `bash .ckeletin/scripts/install_tools.sh`
 
 ### After Upgrading Go
 
@@ -49,69 +112,110 @@ task doctor  # Checks if tools were built with older Go version
 3. Check `.ckeletin/docs/adr/*.md` for architectural decisions
 4. Understand the codebase structure before making changes
 
+### First 5 Minutes Verification
+
+After tools install, verify your environment:
+
+```bash
+task --list          # Should show all available tasks
+go build ./...       # Should compile cleanly
+task test            # Should pass with ≥80% coverage
+```
+
+If any fail, run `task setup` to rebuild tools, then retry.
+
 ## Task Command Usage (CRITICAL)
 
-**ALWAYS use `task` commands - never run go/script commands directly.**
+**Use `task` commands for standard workflows. Direct `go` commands are OK for debugging.**
+
+### Quick Reference
+
+| Scenario | Command |
+|----------|---------|
+| Build (official) | `task build` |
+| Run all tests | `task test` |
+| Format code | `task format` |
+| Lint code | `task lint` |
+| **Before commits** | `task check` |
+| **Trivial changes** | `task check:fast` |
+| Debug specific test | `go test -v -run TestName ./path/...` |
+| Quick compile check | `go build ./...` |
 
 ### Essential Task Commands
 
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `task check` | Run ALL quality checks | **Before every commit** |
-| `task format` | Format all Go code | When code needs formatting |
-| `task check:format` | Check formatting (no changes) | In CI or verification |
-| `task lint` | Run golangci-lint | Fix code quality issues |
-| `task test` | Run tests with coverage | During development |
-| `task test:integration` | Run integration tests | Full system testing |
-| `task bench` | Run benchmarks | Performance validation |
-| `task check:vuln` | Check for vulnerabilities | Security audit |
-| `task check:deps` | Check all dependency issues | Maintenance |
-| `task validate:constants` | Validate constants in sync | After registry changes |
-| `task generate:config:key-constants` | Regenerate config constants | After registry changes |
+**Daily workflow:** `task format` → `task test` → `task lint` → `task check`
+
+<details>
+<summary>📋 Full task list (click to expand)</summary>
+
+| Command | Purpose |
+|---------|---------|
+| `task check` | Run ALL quality checks |
+| `task format` | Format all Go code |
+| `task lint` | Run golangci-lint |
+| `task test` | Run tests with coverage |
+| `task test:integration` | Run integration tests |
+| `task bench` | Run benchmarks |
+| `task check:vuln` | Check for vulnerabilities |
+| `task check:deps` | Check dependency issues |
+| `task generate:config:key-constants` | Regenerate config constants |
+
+</details>
 
 ### Development Workflow
 
-**1. Before You Start Coding**
-```bash
-# Understand available commands
-task --list
-
-# Read the Taskfile to understand what each task does
-cat Taskfile.yml
+```
+During development: task format → task test → task lint
+Before committing:  task check (MANDATORY - runs everything)
+Trivial changes:    task check:fast (docs, comments, typos only)
 ```
 
-**2. During Development**
-```bash
-# Format your code frequently
-task format
+**When to use `task check:fast`:** For documentation-only changes, comment updates, or trivial typo fixes where full validation is overkill. Skips race detection and integration tests. Still runs format, lint, and unit tests. Use full `task check` for any code logic changes.
 
-# Run tests for the package you're working on
-task test
-
-# Check for linting issues
-task lint
+**What `task check` runs (in order):**
+```
+Code Quality        → format, lint
+Architecture        → validate:defaults, commands, constants, task-naming,
+                      architecture, layering, package-organization,
+                      config-consumption, output, security
+Security Scanning   → check:secrets, check:sast
+Dependencies        → check:deps, check:license, check:sbom:vulns
+Tests               → test:full (unit + integration + race detection)
 ```
 
-**3. Before Committing (MANDATORY)**
-```bash
-# Run ALL checks - this is non-negotiable
-task check
+**If `task check` fails:** Fix the issue, don't work around it. Common fixes:
+- Format issues → `task format`
+- Lint issues → Read output and fix code
+- Test failures → Debug and fix tests
+- Coverage drops → Add more tests
 
-# Fix any failures before committing
-# Common fixes:
-# - Format issues: task format
-# - Lint issues: Read golangci-lint output and fix
-# - Test failures: Debug and fix the tests
-# - Coverage drops: Add more tests
+### When Direct Go Commands Are OK
+
+Direct `go` commands are acceptable for **debugging and iteration**:
+
+```bash
+# Debug a specific test with verbose output
+go test -v -run TestSpecificFunction ./internal/check/...
+
+# Run tests with race detector for a specific package
+go test -race ./pkg/checkmate/...
+
+# Quick compile check while iterating
+go build ./...
+
+# Debug with delve
+dlv test ./internal/config/...
 ```
 
-### Why Task Commands Matter
+**Always return to task commands for:**
+- Final validation before commits → `task check`
+- Official builds → `task build`
+- Full test suite with coverage → `task test`
+- Code formatting → `task format`
 
-1. **Consistency**: Everyone runs the same checks
-2. **Completeness**: `task check` runs everything needed
-3. **Efficiency**: Tasks are optimized and cached
-4. **Documentation**: Taskfile.yml is self-documenting
-5. **CI Alignment**: Local tasks match CI pipeline
+**The principle:** Task commands ensure all flags, coverage settings, and checks are applied consistently. Direct commands are fine for exploration, but finish with `task check`.
+
+**IDE note:** Your editor may auto-format differently than `task format`. Always run `task format` before commits to ensure consistency, regardless of editor settings.
 
 ### If a Task Fails
 
@@ -150,7 +254,7 @@ task check                 # Check everything (orchestrator)
 
 Lefthook, CI, and local all use Task commands. If you rename scripts, only Taskfile.yml changes.
 
-See ADR-000 "Task Naming Convention" for full details.
+See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md) for full details.
 
 ## Git Workflow
 
@@ -182,6 +286,11 @@ git commit -m "type: concise summary
 git push -u origin <branch-name>
 ```
 
+**⚠️ NEVER use `--no-verify`** - Do not skip pre-commit hooks. If you believe there's a legitimate reason to skip, you MUST:
+1. Ask the user for permission first
+2. Provide a clear justification for why skipping is necessary
+3. Only proceed if explicitly approved
+
 ### Commit Message Format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
@@ -208,9 +317,11 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 **Note:** This project uses `includeCoAuthoredBy: false` - commits do not include Claude Code attribution.
 
 ### Branch Naming
-- Branches use `claude/` prefix with session ID suffix
-- Example: `claude/add-logging-feature-<session-id>`
-- The system enforces this automatically
+Use descriptive branch names with conventional prefixes:
+- `feat/` - New features (e.g., `feat/add-user-auth`)
+- `fix/` - Bug fixes (e.g., `fix/config-validation`)
+- `refactor/` - Code refactoring (e.g., `refactor/logger-cleanup`)
+- `docs/` - Documentation updates (e.g., `docs/readme-update`)
 
 ## Code Quality Standards
 
@@ -224,8 +335,14 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 | `internal/logger` | 80% | 90%+ |
 | Other packages | 70% | 80%+ |
 
+**How coverage is enforced:**
+- Each package must meet its category minimum (70-80% depending on type)
+- The overall project must meet 80%
+- **Both conditions must pass.** A package at 65% fails even if overall is 85%.
+- **Enforcement:** CI runs `.ckeletin/scripts/check-coverage-project.sh` which fails the build if thresholds aren't met. This is automated, not honor system.
+
 **Rules:**
-- **Never** reduce test coverage
+- **Maintain coverage thresholds in every PR.** During refactoring, temporary drops up to 2% are acceptable if restored before the PR merges.
 - Add tests for all new features
 - Add tests for all bug fixes
 - Use table-driven tests for multiple scenarios
@@ -235,7 +352,8 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
 ckeletin-go/
-├── cmd/                    # Commands (ultra-thin, 20-30 lines each)
+├── .claude/               # Claude Code config (hooks.json for auto-setup)
+├── cmd/                    # Commands (ultra-thin, ≤30 lines each)
 │   ├── root.go            # Root command setup
 │   └── *.go               # Feature commands
 ├── internal/              # Private application code
@@ -244,6 +362,8 @@ ckeletin-go/
 │   │   └── keys_generated.go  # Auto-generated constants
 │   ├── logger/            # Logging infrastructure
 │   └── */                 # Other internal packages
+├── pkg/                   # Public reusable libraries (importable by others)
+│   └── checkmate/         # Beautiful terminal output for check results
 ├── test/
 │   └── integration/       # Integration tests
 ├── docs/
@@ -252,9 +372,43 @@ ckeletin-go/
 ```
 
 **Key Principles:**
-1. **Ultra-thin commands**: Commands in `cmd/` should be ~20-30 lines
+1. **Ultra-thin commands**: Commands in `cmd/` should be ≤30 lines
 2. **Business logic in `internal/`**: Keep implementation details internal
 3. **Follow ADRs**: Framework decisions in `.ckeletin/docs/adr/`, project decisions in `docs/adr/`
+
+**30-line guidance:** Target ≤30 lines. Commands at 31-35 lines are acceptable if refactoring would reduce clarity. Beyond 35 lines requires refactoring to `internal/`. If you must exceed, add a comment explaining why.
+
+**Example: Ultra-thin command (cmd/ping.go)**
+```go
+// cmd/ping.go - This is GOOD: wiring only, no business logic
+package cmd
+
+func runPing(cmd *cobra.Command, args []string) error {
+    cfg := ping.Config{
+        Message: getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutputMessage),
+        Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
+    }
+    return ping.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
+}
+// Business logic lives in internal/ping/ping.go
+```
+
+**What "wiring" means:** Reading config, creating structs, calling into `internal/`. If you're writing loops, conditionals, or string manipulation in `cmd/`, move it to `internal/`.
+
+### New Command Checklist
+
+When adding a new command (e.g., `analyze`):
+
+```
+[ ] Create cmd/analyze.go (≤30 lines, wiring only)
+[ ] Create internal/analyze/ package for business logic
+[ ] Add config options to internal/config/registry.go
+[ ] Run: task generate:config:key-constants
+[ ] Write unit tests in internal/analyze/*_test.go
+[ ] Add integration test in test/integration/ (if needed)
+[ ] Update CHANGELOG.md
+[ ] Run: task check (must pass)
+```
 
 ### Architecture Decision Records (ADRs)
 
@@ -262,8 +416,8 @@ ckeletin-go/
 
 | ADR | Topic | Key Principle |
 |-----|-------|---------------|
-| ADR-000 | Task-Based Workflow (Foundational) | Single source of truth for dev commands |
-| ADR-001 | Command Pattern | Commands are ultra-thin (~20-30 lines) |
+| ADR-000 | Task-Based Workflow | Single source of truth for dev commands |
+| ADR-001 | Command Pattern | Commands are ultra-thin (≤30 lines) |
 | ADR-002 | Config Registry | Centralized config with type safety |
 | ADR-003 | Testing Strategy | Dependency injection over mocking |
 | ADR-004 | Security | Input validation and safe defaults |
@@ -271,6 +425,21 @@ ckeletin-go/
 | ADR-006 | Logging | Structured logging with Zerolog |
 | ADR-007 | UI Framework | Bubble Tea for interactive UIs |
 | ADR-008 | Release Automation | Multi-platform releases with GoReleaser |
+| ADR-009 | Layered Architecture | 4-layer dependency rules |
+| ADR-010 | Package Organization | pkg/ for public, internal/ for private |
+| ADR-011 | License Compliance | Dual-tool license checking |
+| ADR-012 | Dev Commands | Build tags for dev-only commands |
+| ADR-013 | Structured Output | Shadow logging and checkmate patterns |
+
+**Quick ADR lookup - "I'm working on..."**
+| Task | Read |
+|------|------|
+| Adding a command | ADR-001, ADR-009 |
+| Adding config option | ADR-002, ADR-005 |
+| Writing tests | ADR-003 |
+| Adding logging | ADR-006 |
+| Adding dependency | ADR-011 |
+| Creating UI | ADR-007 |
 
 **When to Update ADRs:**
 - Making architectural changes
@@ -302,7 +471,7 @@ ckeletin-go/
 
 3. **Use Type-Safe Retrieval**
    ```go
-   import "github.com/yourusername/ckeletin-go/internal/config"
+   import "github.com/peiman/ckeletin-go/internal/config"
 
    enabled := viper.GetBool(config.KeyAppFeatureEnabled)
    ```
@@ -337,13 +506,37 @@ log.Error().
 - **Console**: INFO+ level, colored, human-friendly
 - **File**: DEBUG+ level, JSON format, for debugging
 
-See ADR-006 for details.
+See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md) for details.
+
+### Checkmate Library (pkg/checkmate/)
+
+**What it does:** Beautiful terminal output for CLI check results with automatic TTY detection.
+
+```go
+import "github.com/peiman/ckeletin-go/pkg/checkmate"
+
+p := checkmate.New()
+p.CategoryHeader("Code Quality")
+p.CheckHeader("Running linter...")
+p.CheckSuccess("lint passed")
+p.CheckFailure("format", "2 files need formatting", "Run: task format")
+p.CheckSummary(checkmate.StatusSuccess, "All Checks Passed")
+```
+
+**Features:** Thread-safe, auto-detects TTY (colors in terminal, plain in CI), customizable themes, progress indicators.
+
+**When to use:** Building CLI tools that run multiple checks and need consistent, beautiful output.
 
 ### Testing Standards
 
-**⚠️ IMPORTANT: All new tests MUST use testify/assert or testify/require**
+**Rules:**
+- All new tests MUST use `testify/assert` or `testify/require`
+- Use table-driven tests for multiple scenarios
+- Unit tests: `*_test.go` in same package
+- Integration tests: `test/integration/`
 
-**Structure your tests like this:**
+<details>
+<summary>📋 Test template example (click to expand)</summary>
 
 ```go
 import (
@@ -358,259 +551,110 @@ func TestFeature(t *testing.T) {
         expected string
         wantErr  bool
     }{
-        {
-            name:     "valid input",
-            input:    "test",
-            expected: "test_processed",
-            wantErr:  false,
-        },
-        // More test cases...
+        {"valid input", "test", "test_processed", false},
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            // SETUP PHASE
-            // (setup code here)
-
-            // EXECUTION PHASE
             got, err := ProcessFeature(tt.input)
-
-            // ASSERTION PHASE
             if tt.wantErr {
-                assert.Error(t, err, "ProcessFeature should return error")
+                assert.Error(t, err)
             } else {
-                assert.NoError(t, err, "ProcessFeature should not return error")
-                assert.Equal(t, tt.expected, got, "ProcessFeature should return expected value")
+                assert.NoError(t, err)
+                assert.Equal(t, tt.expected, got)
             }
         })
     }
 }
 ```
 
-**Testing Locations:**
-- Unit tests: `*_test.go` in same package
-- Integration tests: `test/integration/`
-- Benchmarks: `*_bench_test.go`
+</details>
 
 ### Golden File Testing
 
-**Golden files** are "reference snapshots" of CLI output used to ensure consistency.
+**Golden files** are reference snapshots of CLI output. **Never blindly update them - always review changes first!**
 
-**When to use golden files:**
-- Testing CLI output formatting that should stay consistent
-- Verifying user-facing messages and layouts
-- Ensuring the "neat and nice" restructured output stays that way
-
-**Commands:**
 ```bash
-# Run golden file tests
-task test:golden
-
-# Update golden files after intentionally changing output
-task test:golden:update
-
-# IMPORTANT: Always review changes before committing!
-git diff test/integration/testdata/
+task test:golden         # Run golden tests
+task test:golden:update  # Update (then review with git diff!)
 ```
 
-**Workflow for updating output format:**
-1. Make changes to output script (e.g., `scripts/check-summary.sh`)
-2. Run `task test:golden:update` to regenerate golden files
-3. **CRITICAL:** Review changes with `git diff test/integration/testdata/`
-4. Verify changes match your intent
-5. Commit golden files WITH your code changes
+<details>
+<summary>📋 Golden file workflow (click to expand)</summary>
 
-**⚠️ WARNING:** Never blindly update golden files without reviewing changes! Golden files are the "answer key" - if you update them without checking, you might be making wrong answers the new correct ones.
+1. Make changes to output code
+2. Run `task test:golden:update`
+3. **CRITICAL:** Review with `git diff test/integration/testdata/`
+4. Commit golden files WITH your code changes
 
-**See [docs/testing.md](docs/testing.md) for comprehensive golden file testing documentation.**
+**See [docs/testing.md](docs/testing.md) for full documentation.**
+
+</details>
 
 ## License Compliance
 
-**ckeletin-go uses automated license compliance checking to prevent legal issues.**
+**Rule:** Run `task check:license:source` before committing new dependencies.
 
-See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) for full strategy and [docs/licenses.md](docs/licenses.md) for user guide.
+| Allowed | Denied (will contaminate your code) |
+|---------|-------------------------------------|
+| MIT, Apache-2.0, BSD-2/3-Clause, ISC, 0BSD, Unlicense | GPL, AGPL, SSPL, LGPL, MPL |
+
+| Task | When | Speed |
+|------|------|-------|
+| `task check:license:source` | Before committing deps | ~2-5s |
+| `task check:license:binary` | Before release | ~10-15s |
+
+**Transitive dependencies matter:** Even if you add a MIT-licensed package, if *that package* depends on GPL code, your project is contaminated. The license tools scan the entire dependency tree, not just direct imports. Always run checks after `go mod tidy`.
+
+<details>
+<summary>📋 Detailed license procedures (click to expand)</summary>
 
 ### When to Check Licenses
-
-**ALWAYS check licenses when adding dependencies:**
 
 ```bash
 # After adding a dependency
 go get github.com/example/package
+task check:license:source  # Fast check
 
-# Fast check (source-based, ~2-5 seconds)
-task check:license:source
+# Before releases
+task check:license:binary  # Accurate check
 ```
-
-**Before committing:**
-```bash
-# Runs all checks including license compliance
-task check
-```
-
-**Before releases:**
-```bash
-# Accurate check (binary-based, ~10-15 seconds)
-task check:license:binary
-```
-
-### Default Policy (Conservative)
-
-**✅ Allowed Licenses:**
-- MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense
-
-**❌ Denied Licenses:**
-- GPL, AGPL, SSPL (strong copyleft - forces entire codebase to be open-source)
-- LGPL, MPL (weak copyleft - requires source for modified libraries)
-
-**⚠️ Unknown Licenses:**
-- Requires manual review and possible override in `.lichen.yaml`
-
-### Two-Tier Checking System
-
-**Source-Based (go-licenses) - Development:**
-- Fast (~2-5 seconds)
-- Scans `go.mod` and source code
-- May include test-only dependencies
-- Use: `task check:license:source`
-
-**Binary-Based (lichen) - Release:**
-- Accurate (~10-15 seconds)
-- Scans compiled binary only
-- Only runtime dependencies
-- Use: `task check:license:binary`
-
-**Both (orchestrator) - CI:**
-- Runs both checks
-- Defense in depth
-- Use: `task check:license`
 
 ### Handling Violations
 
-When you see a license violation:
-
 ```bash
-❌ License compliance check failed
-
-Found disallowed licenses:
-  github.com/example/gpl-lib@v1.0.0: GPL-3.0 (forbidden)
+# Remove violating dependency
+go get github.com/example/gpl-lib@none
+go mod tidy
+task check:license:source
 ```
 
-**Actions:**
-
-1. **Remove the dependency:**
-   ```bash
-   go get github.com/example/gpl-lib@none
-   go mod tidy
-   task check:license:source
-   ```
-
-2. **Find an alternative:**
-   - Search [pkg.go.dev](https://pkg.go.dev) for MIT/Apache-2.0 alternatives
-   - Check "Similar packages" section
-   - Verify license before adding
-
-3. **Request exception (justified cases only):**
-   - Edit `.lichen.yaml` exceptions section
-   - Document justification
-   - Get approval before committing
-
-4. **Override policy (if allowed for your project):**
-   ```bash
-   # Temporarily allow MPL-2.0
-   LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0" task check:license:source
-
-   # Or edit scripts/check-licenses-source.sh for permanent change
-   ```
+**Or find an alternative:** Search [pkg.go.dev](https://pkg.go.dev) for MIT/Apache-2.0 alternatives.
 
 ### Customizing Policy
 
-**Via Environment Variables:**
-```bash
-# Allow additional licenses
-export LICENSE_ALLOWED="MIT,Apache-2.0,BSD-3-Clause,MPL-2.0"
-task check:license:source
-
-# Note: go-licenses only supports --allowed_licenses
-# (not --disallowed_types simultaneously)
-```
-
-**Via .lichen.yaml (for binary checks):**
+**Via .lichen.yaml:**
 ```yaml
-# .lichen.yaml
 allow:
   - "MIT"
   - "Apache-2.0"
-  - "MPL-2.0"  # Add weak copyleft if acceptable
-
 override:
   - path: "github.com/example/package"
-    licenses: ["MIT"]  # Override mis-detected license
+    licenses: ["MIT"]
 ```
 
 ### Generating Artifacts
 
-**License Report (CSV):**
 ```bash
-task generate:license:report
-# Output: reports/licenses.csv
+task generate:license:report   # CSV report
+task generate:license:files    # License files for distribution
+task generate:attribution      # NOTICE file
+task generate:license          # All artifacts
 ```
 
-**License Files (for distribution):**
-```bash
-task generate:license:files
-# Output: third_party/licenses/
-```
+**Full details:** [docs/licenses.md](docs/licenses.md) and [ADR-011](.ckeletin/docs/adr/011-license-compliance.md)
 
-**NOTICE File (attribution):**
-```bash
-task generate:attribution
-# Output: NOTICE
-```
-
-**All Artifacts:**
-```bash
-task generate:license
-```
-
-### Integration with Development Workflow
-
-License checking is integrated into `task check`:
-
-```
-task check runs:
-  ├─ check:format
-  ├─ lint
-  ├─ validate:* (all ADR validations)
-  ├─ check:deps
-  ├─ check:license  ← Includes license compliance
-  │   ├─ check:license:source (fast, go-licenses)
-  │   └─ check:license:binary (accurate, lichen)
-  └─ test
-```
-
-**Pre-commit hooks do NOT include license checks** (too slow for every commit).
-
-**CI DOES include license checks** (blocks merge on violations).
-
-### Why This Matters
-
-- **Legal Protection:** Prevent GPL/AGPL from forcing your code open-source
-- **Commercial Use:** Scaffold users can build proprietary products
-- **Professional Standard:** Enterprise-grade compliance from day one
-- **Early Detection:** Catch issues during development, not during audits
-- **Education:** Learn license implications through tooling
-
-### Quick Reference
-
-| Task | When | Speed | Purpose |
-|------|------|-------|---------|
-| `task check:license:source` | After `go get` | ~2-5s | Fast dev feedback |
-| `task check:license:binary` | Before release | ~10-15s | Accurate verification |
-| `task check:license` | CI, comprehensive | ~15-20s | Both checks |
-| `task generate:license` | Before release | ~5s | All artifacts |
-
-**For complete details, see [docs/licenses.md](docs/licenses.md)**
+</details>
 
 ### Documentation Requirements
 
@@ -636,128 +680,156 @@ task check runs:
    - Explain "why" not "what"
    - Keep comments up to date with code
 
-## Common Mistakes to Avoid
+## Mistakes and Anti-Patterns
 
-### Critical Errors
+### Commands & Workflow
 
-| ❌ Don't Do This | ✅ Do This Instead | Why |
-|------------------|-------------------|-----|
-| `go test ./...` | `task test` | Task runs coverage, gotestsum, and formatting |
-| `goimports -w .` | `task format` | Task handles all formatting consistently |
-| `git commit` without checks | `task check && git commit` | Must pass all checks before committing |
+| ❌ Don't | ✅ Do | Why |
+|----------|-------|-----|
+| `go test ./...` for full suite | `task test` | Task runs coverage, gotestsum correctly |
+| `goimports -w .` | `task format` | Task handles all formatting |
+| `git commit` without checks | `task check && git commit` | Must pass checks first |
+| Put logic in `cmd/*.go` | Put logic in `internal/*` | Commands ≤30 lines, wiring only |
+| Use `sed`/`awk` for edits | Use the Edit tool | sed often corrupts code |
+
+**Note:** `go test -v -run TestName` is fine for debugging. See "When Direct Go Commands Are OK".
+
+### Configuration
+
+| ❌ Don't | ✅ Do | Why |
+|----------|-------|-----|
 | Hardcode `"app.log.level"` | Use `config.KeyAppLogLevel` | Type-safe, refactor-friendly |
-| Put logic in `cmd/*.go` | Put logic in `internal/*` | Commands must be ultra-thin (~20-30 lines) |
-| Skip tests for "simple" code | Write tests anyway | Coverage requirements are mandatory |
-| Mock everything | Use dependency injection | Simpler, more maintainable (ADR-003) |
-| Forget CHANGELOG.md | Update it with every change | Users need to know what changed |
-| Add deps without license check | `go get pkg && task check:license:source` | Prevent GPL/AGPL contamination |
+| Forget to regenerate constants | `task generate:config:key-constants` | Keep registry and constants in sync |
 
-### Anti-Patterns Specific to ckeletin-go
+### Testing
 
-1. **Fat Commands** - Commands with >30 lines of logic
-   - Move logic to `internal/` packages
-   - Commands should only wire things together
+| ❌ Don't | ✅ Do | Why |
+|----------|-------|-----|
+| Skip tests for "simple" code | Write tests anyway | 80% coverage is mandatory |
+| Mock everything | Use dependency injection | Simpler, more maintainable ([ADR-003](.ckeletin/docs/adr/003-testing-strategy.md)) |
+| Only run unit tests | Run `task test:integration` too | Integration tests catch real issues |
 
-2. **Config Key Magic Strings** - Using raw strings for config keys
-   - Always use generated constants
-   - Run `task generate:config:key-constants` after registry changes
+### Dependencies & Licensing
 
-3. **Unstructured Logging** - Using `fmt.Println()` or basic log
-   - Use `log.Info()`, `log.Error()`, etc.
-   - Add structured fields with `.Str()`, `.Int()`, etc.
+| ❌ Don't | ✅ Do | Why |
+|----------|-------|-----|
+| Add deps without license check | `go get pkg && task check:license:source` | Prevent GPL contamination |
+| Forget CHANGELOG.md | Update with every change | Users need to know what changed |
 
-4. **Skipping Integration Tests** - Only running unit tests
-   - Run `task test:integration` for full coverage
-   - Integration tests catch real-world issues
+### Logging
 
-5. **Ignoring License Compliance** - Adding dependencies without checking licenses
-   - Always run `task check:license:source` after `go get`
-   - Check `task check:license:binary` before releases
-   - Review `.lichen.yaml` for policy customization
+**Which log level?** (See decision tree in TL;DR)
 
-6. **Log-and-Throw at ERROR Level** - Using `log.Error()` for returnable errors
-   - **Can you return this error?**
-     - **YES** → Use `log.Debug()`, then `return err`
-     - **NO, but expected** (user input error) → Use formatted output only
-     - **NO, unexpected** (bug, system failure) → Use `log.Error()`
-   - Never use `log.Error()` for validation failures or user input errors
-   - The formatted command output (`✘ Errors:`) is the user-facing error channel
-   - Zerolog is for diagnostic breadcrumbs, not user communication
-   - See ADR-006 "Best Practices" section for full guidance
+| ❌ Don't | ✅ Do |
+|----------|-------|
+| `fmt.Println()` or basic log | `log.Info()`, `log.Error()` with structured fields |
+| `log.Error()` for returnable errors | `log.Debug()` + `return err` |
+| `log.Error()` for user input errors | Formatted output only (no log) |
 
-## Quick Reference
+Use `log.Error()` only for unrecoverable system failures. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
 
-### New Session Checklist
-```bash
-# 1. Wait for automatic tool installation
-# (SessionStart hook installs task, goimports, golangci-lint, etc.)
+## Troubleshooting
 
-# 2. Understand the project
-task --list                    # See all available tasks
-cat Taskfile.yml              # Understand what tasks do
-cat README.md                 # Project overview
-ls .ckeletin/docs/adr/        # Review architectural decisions
+### Common Errors and Solutions
 
-# 3. Check your environment
-task check                    # Ensure everything works
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `task: command not found` | Task not installed | Run `bash .ckeletin/scripts/install_tools.sh` or `go install github.com/go-task/task/v3/cmd/task@latest` |
+| `go-licenses: package does not have module info` | Tools built with old Go version | Run `task setup` to rebuild tools |
+| Coverage below 80% | Missing tests | Run `go tool cover -html=coverage.out` to see uncovered lines |
+| License check fails | Copyleft dependency added | Remove dep with `go get pkg@none && go mod tidy`, find MIT alternative |
+| `golangci-lint` timeout | Large codebase or slow machine | Run `task lint` (has proper timeout settings) |
+| Validate commands fails | Command file too long | Move logic to `internal/` package, keep cmd file ≤30 lines |
+
+### Local Passes but CI Fails
+
+1. **Go version mismatch**: Check `.go-version` file matches your local Go
+2. **Stale tools**: Run `task setup` to rebuild all dev tools
+3. **Missing test dependencies**: Run `go mod tidy`
+4. **Race conditions**: Run `task test:race` locally to reproduce
+
+### When `task check` Fails Midway
+
+The checks run in this order - find which category failed:
+1. **Code Quality** (format, lint) - Run `task format`, then `task lint` to see issues
+2. **Architecture** (validate:*) - Check the specific validator output
+3. **Security** (secrets, sast) - Review flagged code patterns
+4. **Dependencies** (deps, license) - Check for new/changed dependencies
+5. **Tests** (test:full) - Run `task test` for detailed output
+
+### Cascading Failures (Fix in This Order)
+
+When one fix causes another failure, follow this triage order.
+
+**Note:** This order is for *fixing* failures, not the execution order of `task check`. License issues block everything downstream, so fix them first even though `task check` runs format/lint earlier.
+
+```
+1. LICENSE VIOLATION (fix first - blocks everything)
+   └→ Remove/replace the dependency
+   └→ Run: go mod tidy && task check:license:source
+
+2. BUILD FAILURE (fix second - can't test what won't compile)
+   └→ Fix compilation errors
+   └→ Run: go build ./...
+
+3. LINT/FORMAT ERRORS (fix third - quick wins)
+   └→ Run: task format
+   └→ Fix remaining lint issues manually
+
+4. TEST FAILURES (fix fourth)
+   └→ Run: task test to see failures
+   └→ Fix tests or code causing failures
+
+5. COVERAGE DROP (fix last - depends on working tests)
+   └→ Run: go tool cover -html=coverage.out
+   └→ Add tests for uncovered lines
 ```
 
-### Development Cycle
-```bash
-# Write code
-vim internal/mypackage/feature.go
+**Key principle:** Each step depends on the previous. Don't add coverage tests for code that fails lint, and don't fix lint for code that won't compile.
 
-# Format frequently
-task format
+### Rollback and Recovery
 
-# Test your changes
-task test
+| Situation | Action |
+|-----------|--------|
+| Commit broke CI | `git revert HEAD` to undo, then fix on new commit |
+| `task format` mangled code | `git checkout -- <file>` to restore |
+| Bad dependency added | `go get pkg@none && go mod tidy` |
+| Need to abandon changes | `git stash` or `git checkout .` |
+| Stuck in bad state | `git status`, commit/stash work, `task check` on clean state |
 
-# Check for issues
-task lint
+### Emergency Procedures
 
-# Before committing
-task check                    # Run ALL checks
+**When you MUST ship but checks are failing:**
 
-# Commit with conventional format
-git add .
-git commit -m "feat: add new feature
+1. **Identify the blocker category** - Is it license, build, lint, test, or coverage?
 
-- Implemented XYZ functionality
-- Added tests with 90% coverage
-- Updated CHANGELOG.md"
+2. **Assess severity:**
+   - **License violation** - STOP. Never ship GPL-contaminated code. Find alternative or remove dep.
+   - **Build failure** - STOP. Can't ship what doesn't compile.
+   - **Lint/format** - Can proceed with user approval if purely cosmetic.
+   - **Test failure** - Assess: is the test wrong or the code? Flaky test can be skipped with justification.
+   - **Coverage drop** - Can proceed if drop is <2% and documented in PR.
 
-# Push
-git push -u origin <branch-name>
-```
+3. **Document the exception:**
+   ```bash
+   git commit -m "fix: emergency patch for X
 
-### Common Tasks Reference
+   - Skipping Y check because: [reason]
+   - Follow-up ticket: [link]
+   - Approved by: [user]"
+   ```
 
-| Task | When to Run | What It Does |
-|------|-------------|-------------|
-| `task check` | Before EVERY commit | Runs all quality checks |
-| `task format` | Multiple times during dev | Formats all Go code |
-| `task lint` | When check fails | Shows detailed lint issues |
-| `task test` | After code changes | Runs tests with coverage |
-| `task generate:config:key-constants` | After config registry changes | Regenerates config constants |
-| `task check:deps` | Weekly/monthly | Checks for dependency updates |
-| `task check:deps:checksum` | Supply chain verification | Verify go.sum against checksum DB |
-| `task check:vuln` | Before releases | Scans for vulnerabilities |
-| `task check:vuln:fast` | Pre-commit (automatic) | Fast cached vulnerability scan |
-| `task check:secrets` | In `task check` | Scan for hardcoded secrets (gitleaks) |
-| `task check:secrets:staged` | Pre-commit (automatic) | Scan staged changes for secrets |
-| `task check:sast` | In `task check` | Static analysis with semgrep |
-| `task check:sbom:vulns` | In `task check` | Scan SBOM for vulnerabilities (grype) |
-| `task check:license` | After `go get`, in CI | Checks dependency licenses (both source + binary) |
-| `task check:license:source` | After adding dependencies | Fast license check (~2-5s) |
-| `task check:license:binary` | Before releases | Accurate binary license check (~10-15s) |
-| `task generate:license` | Before releases | Generate all license artifacts |
-| `task generate:sbom` | Before releases | Generate SBOM (SPDX + CycloneDX) |
-| `task generate:sbom:spdx` | Compliance audits | Generate SPDX format only |
-| `task generate:sbom:cyclonedx` | Security audits | Generate CycloneDX format only |
-| `task check:release` | Before creating releases | Checks if GoReleaser is installed |
-| `task test:release` | Before tagging | Tests release build locally |
-| `task clean:release` | After testing releases | Cleans GoReleaser artifacts |
+4. **Create follow-up immediately** - Don't let tech debt accumulate.
+
+**When `--no-verify` is justified:**
+- Pre-commit hook is broken (not just failing - actually broken)
+- Emergency security patch where hook adds unacceptable delay
+- User has explicitly approved after reviewing the justification
+
+**Never justified:**
+- "I'll fix it later"
+- "The tests are flaky"
+- "It works on my machine"
 
 ## Getting Help
 
@@ -773,4 +845,3 @@ git push -u origin <branch-name>
 - **Taskfile.yml** - All available commands and their implementations
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage
-- never use --no-verify before asking my permission with a good deviation description

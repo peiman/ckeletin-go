@@ -707,6 +707,7 @@ This table shows how the ADRs interact to create the overall architecture:
 | **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure (no pkg/, all in internal/), complements layering rules (009) |
 | **[ADR-011](011-license-compliance.md)** | License compliance | ADR-000, 008 | Dual-tool checking (go-licenses + lichen) enforced via task orchestrator (000), integrated with release process (008) |
 | **[ADR-012](012-dev-commands-build-tags.md)** | Dev commands | ADR-000, 001, 008 | Dev-only commands (config, doctor) excluded from production via build tags, uses task orchestrator (000), follows command pattern (001), excluded from releases (008) |
+| **[ADR-013](013-structured-output-and-shadow-logging.md)** | Structured output | ADR-006 | Shadow logging pattern and checkmate library for beautiful terminal output, builds on logging standards (006) |
 
 ### Dependency Graph
 
