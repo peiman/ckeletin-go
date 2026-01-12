@@ -371,7 +371,7 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
 
       - name: Install Syft for SBOM generation
-        uses: anchore/sbom-action/download-syft@v0.20.10
+        uses: anchore/sbom-action/download-syft@v0.21.1
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
