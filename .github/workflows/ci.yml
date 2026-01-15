@@ -49,8 +49,10 @@ env:
   PINNED_TOOLS_VERSION: 'v1'  # Bump to invalidate cache when tool versions change
 
 jobs:
-  # Matrix testing across multiple OS and Go versions
-  # Only runs on main branch pushes and releases (expensive runners)
+  # ═══════════════════════════════════════════════════════════════════
+  # MULTI-OS TESTING (Main + Releases only - expensive runners)
+  # Tests across Ubuntu, macOS, and Windows to catch platform-specific issues
+  # ═══════════════════════════════════════════════════════════════════
   test-matrix:
     name: Test on ${{ matrix.os }}
     if: github.event_name != 'pull_request'
@@ -115,7 +117,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/go/bin
-          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
 
       - name: Add Go bin to PATH (Unix)
         if: runner.os != 'Windows'
@@ -144,8 +146,10 @@ jobs:
         if: runner.os == 'Windows'
         run: task test
 
-  # Test dev vs prod builds to ensure build tags work correctly
-  # Only runs on main branch pushes and releases (not needed for every PR)
+  # ═══════════════════════════════════════════════════════════════════
+  # BUILD TAG VERIFICATION (Main + Releases only)
+  # Ensures dev commands exist in dev builds and are hidden in prod builds
+  # ═══════════════════════════════════════════════════════════════════
   test-dev-prod:
     name: Test Dev/Prod Build Separation
     if: github.event_name != 'pull_request'
@@ -188,7 +192,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/go/bin
-          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
 
       - name: Add Go bin to PATH
         run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
@@ -237,9 +241,11 @@ jobs:
       - name: Run Tests without Dev Tag
         run: task test:prod
 
-  # Main build job with quality checks (Linux only)
+  # ═══════════════════════════════════════════════════════════════════
+  # QUALITY CHECKS (All triggers - fast for PRs, full for main)
   # PRs: Fast checks (format, lint, validate, unit tests) - ~2-3 min
   # Main/releases: Full checks (+ security, license, integration) - ~5-8 min
+  # ═══════════════════════════════════════════════════════════════════
   build:
     runs-on: ubuntu-latest
     permissions:
@@ -260,8 +266,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
+            ~/go/pkg/mod
             ~/.cache/go-build
-            /go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
 
       - name: Cache Task Binary
@@ -292,7 +298,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/go/bin
-          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version') }}-${{ env.PINNED_TOOLS_VERSION }}
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
 
       - name: Add Go bin to PATH
         run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
@@ -349,8 +355,12 @@ jobs:
           path: |
             reports/licenses.csv
             reports/license-errors.log
-          retention-days: 90
+          retention-days: 30
 
+  # ═══════════════════════════════════════════════════════════════════
+  # RELEASE (Tags only - requires test-matrix + build to pass)
+  # Creates GitHub releases with cross-platform binaries via GoReleaser
+  # ═══════════════════════════════════════════════════════════════════
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/') # Only run on tags
@@ -386,8 +396,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
+            ~/go/pkg/mod
             ~/.cache/go-build
-            /go/pkg/mod
           key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
 
       - name: Install Syft for SBOM generation
