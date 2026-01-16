@@ -17,6 +17,40 @@ import (
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
 
+// shouldUseTUI determines whether to use the interactive TUI or simple output.
+// Returns false for CI environments, piped output, or non-TTY contexts.
+func shouldUseTUI(w io.Writer) bool {
+	// Check common CI environment variables
+	ciEnvVars := []string{
+		"CI",
+		"GITHUB_ACTIONS",
+		"GITLAB_CI",
+		"JENKINS_URL",
+		"CIRCLECI",
+		"TRAVIS",
+		"BUILDKITE",
+		"TF_BUILD", // Azure DevOps
+	}
+	for _, env := range ciEnvVars {
+		if os.Getenv(env) != "" {
+			return false
+		}
+	}
+
+	// Check if NO_COLOR is set (standard for disabling colors)
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+
+	// Check if TERM is dumb (minimal terminal)
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+
+	// Check if output is a TTY
+	return checkmate.IsTerminal(w)
+}
+
 // checkTiming stores historical timing data for a check
 type checkTiming struct {
 	LastDuration time.Duration `json:"last_duration"`
@@ -30,7 +64,7 @@ type timingHistory struct {
 	mu     sync.RWMutex
 }
 
-// Executor runs checks with a Bubble Tea progress UI.
+// Executor runs checks with a Bubble Tea progress UI or simple output.
 type Executor struct {
 	cfg      Config
 	writer   io.Writer
@@ -38,6 +72,7 @@ type Executor struct {
 	program  *tea.Program   // Reference to the Bubble Tea program for sending messages
 	timings  *timingHistory // Historical timing data for progress estimation
 	coverage float64        // Code coverage percentage from test run
+	useTUI   bool           // Whether to use interactive TUI or simple output
 }
 
 type checkItem struct {
@@ -170,12 +205,13 @@ type categoryDef struct {
 	checks []checkItem
 }
 
-// NewExecutor creates a new TUI-based executor.
+// NewExecutor creates a new executor with TUI or simple output based on environment.
 func NewExecutor(cfg Config, writer io.Writer) *Executor {
 	e := &Executor{
 		cfg:     cfg,
 		writer:  writer,
 		timings: loadTimingHistory(),
+		useTUI:  shouldUseTUI(writer),
 	}
 
 	// Build the full check list from all categories
@@ -259,8 +295,8 @@ type allCheckResult struct {
 	remediation string
 }
 
-// Execute runs all checks with the TUI progress display.
-// Runs each category sequentially with its own progress display.
+// Execute runs all checks with TUI progress display or simple output.
+// Uses TUI for interactive terminals, simple output for CI/pipes.
 func (e *Executor) Execute(ctx context.Context) error {
 	methods := &checkMethods{cfg: e.cfg}
 	categories := e.buildCategories(methods)
@@ -280,7 +316,14 @@ func (e *Executor) Execute(ctx context.Context) error {
 			continue
 		}
 
-		results, err := e.runCategoryTUI(ctx, category)
+		// Choose execution mode based on environment
+		var results []allCheckResult
+		var err error
+		if e.useTUI {
+			results, err = e.runCategoryTUI(ctx, category)
+		} else {
+			results, err = e.runCategorySimple(ctx, category)
+		}
 		allResults = append(allResults, results...)
 
 		for _, r := range results {
@@ -427,6 +470,58 @@ func (e *Executor) runCategoryTUI(ctx context.Context, category categoryDef) ([]
 	return results, categoryErr
 }
 
+// runCategorySimple runs a single category with simple text output (no TUI).
+// Used in CI environments, piped output, or non-TTY contexts.
+func (e *Executor) runCategorySimple(ctx context.Context, category categoryDef) ([]allCheckResult, error) {
+	// Create a printer with CI-appropriate theme
+	printer := checkmate.New(
+		checkmate.WithWriter(e.writer),
+		checkmate.WithTheme(checkmate.CITheme()),
+	)
+
+	// Print category header
+	printer.CategoryHeader(category.name)
+
+	var results []allCheckResult
+	var categoryErr error
+
+	for _, check := range category.checks {
+		// Run the check
+		start := time.Now()
+		checkErr := check.fn(ctx)
+		duration := time.Since(start)
+
+		// Record timing for future runs
+		e.timings.recordDuration(check.name, duration)
+
+		// Build result
+		result := allCheckResult{
+			name:        check.name,
+			category:    category.name,
+			duration:    duration,
+			remediation: check.remediation,
+		}
+
+		// Print result line
+		if checkErr != nil {
+			result.passed = false
+			result.err = checkErr
+			categoryErr = checkErr
+			printer.CheckLine(check.name, checkmate.StatusFailure, duration)
+		} else {
+			result.passed = true
+			printer.CheckLine(check.name, checkmate.StatusSuccess, duration)
+		}
+		results = append(results, result)
+
+		if checkErr != nil && e.cfg.FailFast {
+			break
+		}
+	}
+
+	return results, categoryErr
+}
+
 // checkTest wraps the checkMethods' checkTest to send coverage updates to the TUI.
 func (e *Executor) checkTest(ctx context.Context) error {
 	methods := &checkMethods{
@@ -469,10 +564,15 @@ func (e *Executor) animateProgress(p *tea.Program, idx int, checkName string, do
 	}
 }
 
-// printFinalSummary prints the final summary box with all check results
+// printFinalSummary prints the final summary box with all check results.
+// Uses styled output for TTY, plain ASCII for CI/pipes.
 func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed int, totalDuration time.Duration) {
-	// Clear screen using lipgloss-compatible method
-	_, _ = fmt.Fprint(e.writer, "\033[2J\033[H")
+	// Only clear screen in TUI mode
+	if e.useTUI {
+		_, _ = fmt.Fprint(e.writer, "\033[2J\033[H")
+	} else {
+		_, _ = fmt.Fprintln(e.writer) // Just add a blank line in CI mode
+	}
 
 	allPassed := failed == 0
 
@@ -491,46 +591,80 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 		resultsByCategory[r.category] = append(resultsByCategory[r.category], r)
 	}
 
-	// Define styles using lipgloss (handles terminal compatibility automatically)
-	accentColor := lipgloss.Color("#78B0E7")
-	failColor := lipgloss.Color("#FF5555")
-	successColor := lipgloss.Color("#50FA7B")
-	dimColor := lipgloss.Color("#6272A4")
+	// Box characters - use ASCII for CI mode
+	var topLeft, topRight, bottomLeft, bottomRight, horizontal, vertical string
+	var catSeparator, treeConnector, treeLastConnector string
+	var successIcon, failIcon string
 
-	var borderColor lipgloss.Color
-	var titleStyle lipgloss.Style
-	if allPassed {
-		borderColor = accentColor
-		titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Background(accentColor).
-			Foreground(lipgloss.Color("#000000"))
+	if e.useTUI {
+		topLeft = "╭"
+		topRight = "╮"
+		bottomLeft = "╰"
+		bottomRight = "╯"
+		horizontal = "─"
+		vertical = "│"
+		catSeparator = "───"
+		treeConnector = "├──"
+		treeLastConnector = "└──"
+		successIcon = "✓"
+		failIcon = "✗"
 	} else {
-		borderColor = failColor
-		titleStyle = lipgloss.NewStyle().
-			Bold(true).
-			Background(failColor).
-			Foreground(lipgloss.Color("#000000"))
+		topLeft = "+"
+		topRight = "+"
+		bottomLeft = "+"
+		bottomRight = "+"
+		horizontal = "-"
+		vertical = "|"
+		catSeparator = "---"
+		treeConnector = "|--"
+		treeLastConnector = "`--"
+		successIcon = "[OK]"
+		failIcon = "[FAIL]"
 	}
-
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	dimStyle := lipgloss.NewStyle().Foreground(dimColor)
-	boldStyle := lipgloss.NewStyle().Bold(true)
-	successStyle := lipgloss.NewStyle().Foreground(successColor)
-	failStyle := lipgloss.NewStyle().Foreground(failColor)
-
-	// Box characters
-	topLeft := "╭"
-	topRight := "╮"
-	bottomLeft := "╰"
-	bottomRight := "╯"
-	horizontal := "─"
-	vertical := "│"
 
 	boxWidth := 60
 	contentWidth := boxWidth - 2
 
 	var sb strings.Builder
+
+	// Define styles - only use colors in TUI mode
+	var borderStyle, dimStyle, boldStyle, successStyle, failStyle, titleStyle lipgloss.Style
+
+	if e.useTUI {
+		accentColor := lipgloss.Color("#78B0E7")
+		failColor := lipgloss.Color("#FF5555")
+		successColor := lipgloss.Color("#50FA7B")
+		dimColor := lipgloss.Color("#6272A4")
+
+		var borderColor lipgloss.Color
+		if allPassed {
+			borderColor = accentColor
+			titleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Background(accentColor).
+				Foreground(lipgloss.Color("#000000"))
+		} else {
+			borderColor = failColor
+			titleStyle = lipgloss.NewStyle().
+				Bold(true).
+				Background(failColor).
+				Foreground(lipgloss.Color("#000000"))
+		}
+
+		borderStyle = lipgloss.NewStyle().Foreground(borderColor)
+		dimStyle = lipgloss.NewStyle().Foreground(dimColor)
+		boldStyle = lipgloss.NewStyle().Bold(true)
+		successStyle = lipgloss.NewStyle().Foreground(successColor)
+		failStyle = lipgloss.NewStyle().Foreground(failColor)
+	} else {
+		// No styling in CI mode
+		borderStyle = lipgloss.NewStyle()
+		dimStyle = lipgloss.NewStyle()
+		boldStyle = lipgloss.NewStyle()
+		successStyle = lipgloss.NewStyle()
+		failStyle = lipgloss.NewStyle()
+		titleStyle = lipgloss.NewStyle()
+	}
 
 	// Top border
 	sb.WriteString(borderStyle.Render(topLeft+strings.Repeat(horizontal, boxWidth-2)+topRight) + "\n")
@@ -541,15 +675,21 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 	// Title
 	var titleText string
 	if allPassed {
-		titleText = fmt.Sprintf(" ✓ All %d Checks Passed ", passed)
+		titleText = fmt.Sprintf(" %s All %d Checks Passed ", successIcon, passed)
 	} else {
-		titleText = fmt.Sprintf(" ✗ %d/%d Checks Failed ", failed, passed+failed)
+		titleText = fmt.Sprintf(" %s %d/%d Checks Failed ", failIcon, failed, passed+failed)
 	}
 	titleRendered := titleStyle.Render(titleText)
 	// Calculate padding (lipgloss.Width handles unicode properly)
 	titleWidth := lipgloss.Width(titleRendered)
 	leftPad := (contentWidth - titleWidth) / 2
 	rightPad := contentWidth - leftPad - titleWidth
+	if leftPad < 0 {
+		leftPad = 0
+	}
+	if rightPad < 0 {
+		rightPad = 0
+	}
 	sb.WriteString(borderStyle.Render(vertical))
 	sb.WriteString(strings.Repeat(" ", leftPad))
 	sb.WriteString(titleRendered)
@@ -567,8 +707,8 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 		}
 
 		// Category header
-		catHeader := "  " + dimStyle.Render("─── "+catName)
-		catHeaderWidth := 2 + 4 + len(catName) // "  " + "─── " + name
+		catHeader := "  " + dimStyle.Render(catSeparator+" "+catName)
+		catHeaderWidth := 2 + len(catSeparator) + 1 + len(catName) // "  " + separator + " " + name
 		padding := contentWidth - catHeaderWidth
 		sb.WriteString(borderStyle.Render(vertical) + catHeader)
 		if padding > 0 {
@@ -581,17 +721,17 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 			var iconStyle lipgloss.Style
 			var icon string
 			if r.passed {
-				icon = "✓"
+				icon = successIcon
 				iconStyle = successStyle
 			} else {
-				icon = "✗"
+				icon = failIcon
 				iconStyle = failStyle
 			}
 
 			// Tree connector
-			connector := "├──"
+			connector := treeConnector
 			if i == len(catResults)-1 {
-				connector = "└──"
+				connector = treeLastConnector
 			}
 
 			// Format duration
@@ -605,7 +745,7 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 
 			// Build line: "  ├── ✓ name              (duration)"
 			line := "  " + dimStyle.Render(connector) + " " + iconStyle.Render(icon) + " " + fmt.Sprintf("%-18s", r.name) + " " + durStr
-			visibleLen := 2 + 3 + 1 + 1 + 1 + 18 + 1 + durLen // spaces + connector + space + icon + space + name + space + dur
+			visibleLen := 2 + len(connector) + 1 + len(icon) + 1 + 18 + 1 + durLen
 			padding := contentWidth - visibleLen
 			sb.WriteString(borderStyle.Render(vertical) + line)
 			if padding > 0 {
@@ -653,7 +793,12 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 	// Print errors below the box if any
 	if !allPassed {
 		_, _ = fmt.Fprint(e.writer, "\n")
-		printer := checkmate.New(checkmate.WithWriter(e.writer))
+		var printer *checkmate.Printer
+		if e.useTUI {
+			printer = checkmate.New(checkmate.WithWriter(e.writer))
+		} else {
+			printer = checkmate.New(checkmate.WithWriter(e.writer), checkmate.WithTheme(checkmate.CITheme()))
+		}
 		for _, r := range results {
 			if !r.passed && r.err != nil {
 				printer.CheckFailure(r.name, r.err.Error(), r.remediation)

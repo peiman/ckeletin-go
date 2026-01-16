@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -253,4 +254,174 @@ func TestExecutor_ShouldRunCategory(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestShouldUseTUI(t *testing.T) {
+	// Helper to save and restore environment variables
+	saveEnv := func(keys []string) map[string]string {
+		saved := make(map[string]string)
+		for _, key := range keys {
+			saved[key] = os.Getenv(key)
+		}
+		return saved
+	}
+	restoreEnv := func(saved map[string]string) {
+		for key, val := range saved {
+			if val == "" {
+				os.Unsetenv(key)
+			} else {
+				os.Setenv(key, val)
+			}
+		}
+	}
+
+	// All CI-related environment variables to test
+	ciEnvVars := []string{
+		"CI", "GITHUB_ACTIONS", "GITLAB_CI", "JENKINS_URL",
+		"CIRCLECI", "TRAVIS", "BUILDKITE", "TF_BUILD",
+		"NO_COLOR", "TERM",
+	}
+
+	tests := []struct {
+		name    string
+		envVars map[string]string
+		want    bool
+	}{
+		{
+			name:    "CI environment variable set",
+			envVars: map[string]string{"CI": "true"},
+			want:    false,
+		},
+		{
+			name:    "GITHUB_ACTIONS set",
+			envVars: map[string]string{"GITHUB_ACTIONS": "true"},
+			want:    false,
+		},
+		{
+			name:    "GITLAB_CI set",
+			envVars: map[string]string{"GITLAB_CI": "true"},
+			want:    false,
+		},
+		{
+			name:    "JENKINS_URL set",
+			envVars: map[string]string{"JENKINS_URL": "http://jenkins"},
+			want:    false,
+		},
+		{
+			name:    "CIRCLECI set",
+			envVars: map[string]string{"CIRCLECI": "true"},
+			want:    false,
+		},
+		{
+			name:    "TRAVIS set",
+			envVars: map[string]string{"TRAVIS": "true"},
+			want:    false,
+		},
+		{
+			name:    "BUILDKITE set",
+			envVars: map[string]string{"BUILDKITE": "true"},
+			want:    false,
+		},
+		{
+			name:    "TF_BUILD set (Azure DevOps)",
+			envVars: map[string]string{"TF_BUILD": "True"},
+			want:    false,
+		},
+		{
+			name:    "NO_COLOR set",
+			envVars: map[string]string{"NO_COLOR": "1"},
+			want:    false,
+		},
+		{
+			name:    "TERM is dumb",
+			envVars: map[string]string{"TERM": "dumb"},
+			want:    false,
+		},
+		{
+			name:    "no CI environment (non-TTY buffer)",
+			envVars: map[string]string{},
+			want:    false, // bytes.Buffer is not a TTY
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save current environment
+			saved := saveEnv(ciEnvVars)
+			defer restoreEnv(saved)
+
+			// Clear all CI environment variables first
+			for _, key := range ciEnvVars {
+				os.Unsetenv(key)
+			}
+
+			// Set test-specific environment variables
+			for key, val := range tt.envVars {
+				os.Setenv(key, val)
+			}
+
+			// Test with a buffer (non-TTY)
+			var buf bytes.Buffer
+			got := shouldUseTUI(&buf)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestShouldUseTUI_MultipleEnvVars(t *testing.T) {
+	// Save and restore environment
+	ciEnvVars := []string{"CI", "GITHUB_ACTIONS", "NO_COLOR"}
+	saved := make(map[string]string)
+	for _, key := range ciEnvVars {
+		saved[key] = os.Getenv(key)
+		os.Unsetenv(key)
+	}
+	defer func() {
+		for key, val := range saved {
+			if val == "" {
+				os.Unsetenv(key)
+			} else {
+				os.Setenv(key, val)
+			}
+		}
+	}()
+
+	// Test that first matching CI var causes TUI to be disabled
+	os.Setenv("CI", "true")
+	os.Setenv("GITHUB_ACTIONS", "true")
+
+	var buf bytes.Buffer
+	got := shouldUseTUI(&buf)
+	assert.False(t, got, "should return false when multiple CI vars are set")
+}
+
+func TestExecutor_UseTUI(t *testing.T) {
+	// Save and restore environment
+	saved := os.Getenv("CI")
+	defer func() {
+		if saved == "" {
+			os.Unsetenv("CI")
+		} else {
+			os.Setenv("CI", saved)
+		}
+	}()
+
+	t.Run("useTUI is false in CI environment", func(t *testing.T) {
+		os.Setenv("CI", "true")
+
+		var buf bytes.Buffer
+		executor := NewExecutor(Config{}, &buf)
+
+		assert.False(t, executor.useTUI, "executor should have useTUI=false in CI")
+	})
+
+	t.Run("useTUI is false for non-TTY writer", func(t *testing.T) {
+		os.Unsetenv("CI")
+
+		var buf bytes.Buffer
+		executor := NewExecutor(Config{}, &buf)
+
+		// Buffer is not a TTY, so useTUI should be false
+		assert.False(t, executor.useTUI, "executor should have useTUI=false for non-TTY")
+	})
 }
