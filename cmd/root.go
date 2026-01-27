@@ -153,6 +153,13 @@ func init() {
 		binaryName = "ckeletin-go"
 	}
 
+	// Update RootCmd with the resolved binaryName
+	// Package-level var declarations capture binaryName="" before init() runs,
+	// so we need to set these after the fallback is applied
+	RootCmd.Use = binaryName
+	RootCmd.Long = fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
+It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName)
+
 	configPaths := ConfigPaths()
 
 	// Define all persistent flags (flag definitions only - bindings happen in bindFlags())
