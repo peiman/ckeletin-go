@@ -2,8 +2,11 @@ package check
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -423,5 +426,71 @@ func TestExecutor_UseTUI(t *testing.T) {
 
 		// Buffer is not a TTY, so useTUI should be false
 		assert.False(t, executor.useTUI, "executor should have useTUI=false for non-TTY")
+	})
+}
+
+func TestRunCategorySimple_ParallelExecution(t *testing.T) {
+	buildParallelSensitiveCategory := func() categoryDef {
+		started := make(chan struct{}, 2)
+		release := make(chan struct{})
+
+		go func() {
+			<-started
+			<-started
+			close(release)
+		}()
+
+		newCheck := func(name string) checkItem {
+			return checkItem{
+				name: name,
+				fn: func(ctx context.Context) error {
+					select {
+					case started <- struct{}{}:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+
+					select {
+					case <-release:
+						return nil
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-time.After(200 * time.Millisecond):
+						return fmt.Errorf("%s did not run in parallel", name)
+					}
+				},
+			}
+		}
+
+		return categoryDef{
+			name: "Parallel Test",
+			checks: []checkItem{
+				newCheck("check-1"),
+				newCheck("check-2"),
+			},
+		}
+	}
+
+	t.Run("parallel disabled", func(t *testing.T) {
+		var buf bytes.Buffer
+		executor := NewExecutor(Config{Parallel: false}, &buf)
+
+		results, err := executor.runCategorySimple(context.Background(), buildParallelSensitiveCategory())
+
+		require.Error(t, err)
+		require.Len(t, results, 2)
+		assert.False(t, results[0].passed)
+	})
+
+	t.Run("parallel enabled", func(t *testing.T) {
+		var buf bytes.Buffer
+		executor := NewExecutor(Config{Parallel: true}, &buf)
+
+		results, err := executor.runCategorySimple(context.Background(), buildParallelSensitiveCategory())
+
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		assert.True(t, results[0].passed)
+		assert.True(t, results[1].passed)
 	})
 }

@@ -316,10 +316,13 @@ func (e *Executor) Execute(ctx context.Context) error {
 			continue
 		}
 
-		// Choose execution mode based on environment
+		// Choose execution mode based on environment.
+		// Parallel mode runs in simple mode to keep check execution concurrent
+		// without conflicting with per-check TUI animation semantics.
 		var results []allCheckResult
 		var err error
-		if e.useTUI {
+		useTUI := e.useTUI && !e.cfg.Parallel
+		if useTUI {
 			results, err = e.runCategoryTUI(ctx, category)
 		} else {
 			results, err = e.runCategorySimple(ctx, category)
@@ -485,38 +488,113 @@ func (e *Executor) runCategorySimple(ctx context.Context, category categoryDef) 
 	var results []allCheckResult
 	var categoryErr error
 
-	for _, check := range category.checks {
-		// Run the check
-		start := time.Now()
-		checkErr := check.fn(ctx)
-		duration := time.Since(start)
+	// Sequential execution when parallel mode is disabled.
+	if !e.cfg.Parallel {
+		for _, check := range category.checks {
+			// Run the check
+			start := time.Now()
+			checkErr := check.fn(ctx)
+			duration := time.Since(start)
+
+			// Record timing for future runs
+			e.timings.recordDuration(check.name, duration)
+
+			// Build result
+			result := allCheckResult{
+				name:        check.name,
+				category:    category.name,
+				duration:    duration,
+				remediation: check.remediation,
+			}
+
+			// Print result line
+			if checkErr != nil {
+				result.passed = false
+				result.err = checkErr
+				categoryErr = checkErr
+				printer.CheckLine(check.name, checkmate.StatusFailure, duration)
+			} else {
+				result.passed = true
+				printer.CheckLine(check.name, checkmate.StatusSuccess, duration)
+			}
+			results = append(results, result)
+
+			if checkErr != nil && e.cfg.FailFast {
+				break
+			}
+		}
+
+		return results, categoryErr
+	}
+
+	// Parallel execution path.
+	type checkResult struct {
+		index    int
+		duration time.Duration
+		err      error
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	resultCh := make(chan checkResult, len(category.checks))
+	var wg sync.WaitGroup
+
+	for i, check := range category.checks {
+		wg.Add(1)
+		go func(idx int, item checkItem) {
+			defer wg.Done()
+			start := time.Now()
+			checkErr := item.fn(runCtx)
+			duration := time.Since(start)
+
+			if checkErr != nil && e.cfg.FailFast {
+				cancel()
+			}
+
+			resultCh <- checkResult{
+				index:    idx,
+				duration: duration,
+				err:      checkErr,
+			}
+		}(i, check)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	ordered := make([]checkResult, len(category.checks))
+	for r := range resultCh {
+		ordered[r.index] = r
+	}
+
+	for i, check := range category.checks {
+		r := ordered[i]
 
 		// Record timing for future runs
-		e.timings.recordDuration(check.name, duration)
+		e.timings.recordDuration(check.name, r.duration)
 
-		// Build result
 		result := allCheckResult{
 			name:        check.name,
 			category:    category.name,
-			duration:    duration,
+			duration:    r.duration,
 			remediation: check.remediation,
 		}
 
-		// Print result line
-		if checkErr != nil {
+		if r.err != nil {
 			result.passed = false
-			result.err = checkErr
-			categoryErr = checkErr
-			printer.CheckLine(check.name, checkmate.StatusFailure, duration)
+			result.err = r.err
+			if categoryErr == nil {
+				categoryErr = r.err
+			}
+			printer.CheckLine(check.name, checkmate.StatusFailure, r.duration)
 		} else {
 			result.passed = true
-			printer.CheckLine(check.name, checkmate.StatusSuccess, duration)
+			printer.CheckLine(check.name, checkmate.StatusSuccess, r.duration)
 		}
 		results = append(results, result)
-
-		if checkErr != nil && e.cfg.FailFast {
-			break
-		}
 	}
 
 	return results, categoryErr
