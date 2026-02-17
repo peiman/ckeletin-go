@@ -128,12 +128,12 @@ func (d *Doctor) FormatResults() string {
 	sb.WriteString(strings.Repeat("=", 80) + "\n\n")
 
 	for _, check := range d.checks {
-		sb.WriteString(fmt.Sprintf("%s %s\n", check.Status.String(), check.Name))
+		_, _ = fmt.Fprintf(&sb, "%s %s\n", check.Status.String(), check.Name)
 		if check.Message != "" {
-			sb.WriteString(fmt.Sprintf("  %s\n", check.Message))
+			_, _ = fmt.Fprintf(&sb, "  %s\n", check.Message)
 		}
 		if check.Details != "" {
-			sb.WriteString(fmt.Sprintf("  %s\n", detailStyle.Render(check.Details)))
+			_, _ = fmt.Fprintf(&sb, "  %s\n", detailStyle.Render(check.Details))
 		}
 		sb.WriteString("\n")
 	}
@@ -154,8 +154,8 @@ func (d *Doctor) FormatResults() string {
 	}
 
 	sb.WriteString(strings.Repeat("-", 80) + "\n")
-	sb.WriteString(fmt.Sprintf("Summary: %d passed, %d warnings, %d failed\n",
-		passed, warnings, failed))
+	_, _ = fmt.Fprintf(&sb, "Summary: %d passed, %d warnings, %d failed\n",
+		passed, warnings, failed)
 
 	if failed > 0 {
 		sb.WriteString("\n" + errorStyle.Render("❌ Environment has issues that need attention") + "\n")

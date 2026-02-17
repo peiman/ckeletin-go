@@ -46,6 +46,7 @@ rules:
       exclude:
         - scripts/  # Build/scaffold scripts operate on known paths
         - test/     # Test files use controlled paths
+        - internal/check/check_tui.go  # Uses os.UserConfigDir(), no user input
     message: "Potential path traversal. Validate and sanitize file paths."
     languages: [go]
     severity: WARNING

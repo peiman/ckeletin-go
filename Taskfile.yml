@@ -147,6 +147,14 @@ tasks:
     desc: Run integration tests
     cmds: [task: ckeletin:test:integration]
 
+  test:golden:
+    desc: Test CLI output against golden files
+    cmds: [task: ckeletin:test:golden]
+
+  test:golden:update:
+    desc: Update golden files (review changes before committing!)
+    cmds: [task: ckeletin:test:golden:update]
+
   build:dev:
     desc: Build the binary with dev commands
     cmds: [task: ckeletin:build:dev]

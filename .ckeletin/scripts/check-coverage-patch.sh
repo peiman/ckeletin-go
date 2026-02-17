@@ -14,13 +14,15 @@ if [ ! -f "$COVERAGE_FILE" ]; then
     exit 1
 fi
 
-# Get list of changed .go files (excluding _test.go, scripts/, and testutil/)
+# Get list of changed .go files (excluding _test.go, scripts/, testutil/, demo/, and _tui.go)
 # testutil is excluded because platform-specific skip helpers can't achieve 100% coverage on any single platform
+# demo is excluded because demo code is meant for documentation, not production
+# _tui.go files are excluded because TUI code requires interactive testing that's difficult to unit test
 if git rev-parse --verify "$BASE_BRANCH" &>/dev/null; then
-    changed_files=$(git diff "$BASE_BRANCH"...HEAD --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' | grep -v '^internal/testutil/' || true)
+    changed_files=$(git diff "$BASE_BRANCH"...HEAD --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' | grep -v '^internal/testutil/' | grep -v '/demo/' | grep -v '_tui\.go$' || true)
 else
     # Fallback to staged changes
-    changed_files=$(git diff --cached --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' | grep -v '^internal/testutil/' || true)
+    changed_files=$(git diff --cached --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' | grep -v '^internal/testutil/' | grep -v '/demo/' | grep -v '_tui\.go$' || true)
 fi
 
 if [ -z "$changed_files" ]; then

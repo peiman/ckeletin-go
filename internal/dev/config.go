@@ -94,7 +94,7 @@ func (ci *ConfigInspector) GetConfigSourceInfo(envPrefix string) *ConfigSources 
 func (ci *ConfigInspector) FormatAsTable() string {
 	var sb strings.Builder
 	sb.WriteString("Configuration Registry:\n\n")
-	sb.WriteString(fmt.Sprintf("%-30s %-15s %-20s %s\n", "KEY", "TYPE", "DEFAULT", "DESCRIPTION"))
+	_, _ = fmt.Fprintf(&sb, "%-30s %-15s %-20s %s\n", "KEY", "TYPE", "DEFAULT", "DESCRIPTION")
 	sb.WriteString(strings.Repeat("-", 100) + "\n")
 
 	for _, opt := range ci.ListAllOptions() {
@@ -107,15 +107,15 @@ func (ci *ConfigInspector) FormatAsTable() string {
 			description = description[:32] + "..."
 		}
 
-		sb.WriteString(fmt.Sprintf("%-30s %-15s %-20s %s\n",
+		_, _ = fmt.Fprintf(&sb, "%-30s %-15s %-20s %s\n",
 			opt.Key,
 			opt.Type,
 			defaultVal,
 			description,
-		))
+		)
 	}
 
-	sb.WriteString(fmt.Sprintf("\nTotal: %d configuration options\n", len(ci.registry)))
+	_, _ = fmt.Fprintf(&sb, "\nTotal: %d configuration options\n", len(ci.registry))
 	return sb.String()
 }
 
@@ -123,7 +123,7 @@ func (ci *ConfigInspector) FormatAsTable() string {
 func (ci *ConfigInspector) FormatEffectiveAsTable() string {
 	var sb strings.Builder
 	sb.WriteString("Effective Configuration:\n\n")
-	sb.WriteString(fmt.Sprintf("%-30s %-20s %s\n", "KEY", "VALUE", "SOURCE"))
+	_, _ = fmt.Fprintf(&sb, "%-30s %-20s %s\n", "KEY", "VALUE", "SOURCE")
 	sb.WriteString(strings.Repeat("-", 80) + "\n")
 
 	effective := ci.GetEffectiveConfig()
@@ -150,7 +150,7 @@ func (ci *ConfigInspector) FormatEffectiveAsTable() string {
 			}
 		}
 
-		sb.WriteString(fmt.Sprintf("%-30s %-20s %s\n", key, value, source))
+		_, _ = fmt.Fprintf(&sb, "%-30s %-20s %s\n", key, value, source)
 	}
 
 	return sb.String()

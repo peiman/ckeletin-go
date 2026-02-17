@@ -1,7 +1,7 @@
 # ADR-006: Structured Logging with Zerolog
 
 ## Status
-Accepted (Updated: 2025-10-29 - Added dual logging, log rotation, sampling, and runtime adjustment)
+Accepted (Updated: 2026-01-09 - Added logging best practices and level selection guidance)
 
 ## Context
 
@@ -100,6 +100,99 @@ app:
     file_level: debug          # File log level
     color_enabled: auto        # Console colors (auto/true/false)
 ```
+
+## Best Practices
+
+### The Golden Rule: Can You Return This Error?
+
+```
+Can you return this error?
+├── YES → log.Debug() and return error
+└── NO → Is this expected (bad input)?
+         ├── YES → Use user-facing output only, NOT log.Error()
+         └── NO (unexpected/bug) → log.Error() is appropriate
+```
+
+### Log Level Semantics for CLI Tools
+
+| Level | When to Use | Example |
+|-------|-------------|---------|
+| `log.Trace()` | Very detailed diagnostic info (loop iterations, internal state) | `log.Trace().Int("i", i).Msg("processing item")` |
+| `log.Debug()` | Diagnostic breadcrumbs for errors being returned | `log.Debug().Err(err).Msg("validation failed")` |
+| `log.Info()` | Major operation milestones (only shown with --verbose) | `log.Info().Msg("model compiled successfully")` |
+| `log.Warn()` | Degraded operation, but continuing | `log.Warn().Msg("using fallback value")` |
+| `log.Error()` | Unexpected failures at top level (bugs, system issues) | `log.Error().Err(err).Msg("unexpected panic recovered")` |
+| `log.Fatal()` | Unrecoverable errors causing immediate exit | Rarely used - prefer returning errors |
+
+### Two Output Channels
+
+CLI tools have TWO separate output channels:
+
+1. **User-facing output** (stdout/stderr formatted messages)
+   - The `✔ Success` and `✘ Errors:` formatted output
+   - This is THE primary way to communicate with users
+   - Use `cmd.Printf()` or dedicated output helpers
+
+2. **Diagnostic logging** (zerolog)
+   - For debugging and troubleshooting
+   - Hidden by default (console level = WARN)
+   - Shown with `--log-level debug`
+   - Always written to log file
+
+**Never duplicate the same message in both channels.**
+
+### Anti-Pattern: Log-and-Throw at ERROR Level
+
+```go
+// ❌ WRONG: Logging ERROR for a returnable error
+func processEntity(e Entity) error {
+    if err := validate(e); err != nil {
+        log.Error().Err(err).Msg("validation failed")  // BAD
+        return err
+    }
+}
+
+// ✅ CORRECT: Use DEBUG for diagnostic breadcrumb
+func processEntity(e Entity) error {
+    if err := validate(e); err != nil {
+        log.Debug().Err(err).Str("entity", e.ID).Msg("validation failed")
+        return err  // Caller will format and display to user
+    }
+}
+```
+
+### When log.Error() IS Appropriate
+
+```go
+// ✅ Top-level unexpected failure (can't return, not expected)
+func main() {
+    defer func() {
+        if r := recover(); r != nil {
+            log.Error().Interface("panic", r).Msg("unexpected panic")
+            os.Exit(1)
+        }
+    }()
+}
+
+// ✅ Background goroutine failure (can't return error)
+go func() {
+    if err := backgroundTask(); err != nil {
+        log.Error().Err(err).Msg("background task failed")
+    }
+}()
+```
+
+### Default Console Log Level Rationale
+
+The default console log level is WARN. This means:
+- Users see: Formatted output + warnings
+- Users don't see: DEBUG, INFO, or ERROR logs (unless --log-level set)
+- For debugging: `--log-level debug` shows everything
+
+This is intentional because:
+1. User input validation errors are expected behavior, not system errors
+2. The formatted output already communicates errors clearly
+3. Log noise distracts from actionable information
 
 ## Consequences
 

@@ -26,10 +26,9 @@ func TestValidate(t *testing.T) {
 			name: "Valid config file",
 			configContent: `app:
   log_level: debug
-  ping:
-    output_message: "Test Message"
-    output_color: green
-    ui: false
+  docs:
+    output_format: markdown
+    output_file: docs.md
 `,
 			permissions:    0600,
 			wantValid:      true,
@@ -135,8 +134,8 @@ func TestFindUnknownKeys(t *testing.T) {
 	t.Parallel()
 
 	knownKeys := map[string]bool{
-		"app.log_level":           true,
-		"app.ping.output_message": true,
+		"app.log_level":          true,
+		"app.docs.output_format": true,
 	}
 
 	tests := []struct {

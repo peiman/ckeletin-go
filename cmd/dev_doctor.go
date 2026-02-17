@@ -12,7 +12,6 @@ import (
 	"fmt"
 
 	"github.com/peiman/ckeletin-go/internal/dev"
-	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +51,4 @@ Example:
 func init() {
 	// Add to dev command
 	devCmd.AddCommand(devDoctorCmd)
-
-	// Log that dev doctor command was registered (debug level)
-	log.Debug().Msg("Dev doctor command registered")
 }

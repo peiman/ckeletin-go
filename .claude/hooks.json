@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/install_tools.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.ckeletin/scripts/install_tools.sh"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/scripts/check-commit-msg.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.ckeletin/scripts/check-commit-msg.sh"
           }
         ]
       }

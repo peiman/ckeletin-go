@@ -16,13 +16,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -62,53 +61,38 @@ func EnvPrefix() string {
 	return prefix
 }
 
-// ConfigPaths returns standard paths and filenames for config files based on the binary name
+// ConfigPaths returns configuration paths for the application.
+//
+// Config file search order (handled by viper):
+//  1. --config flag (explicit override)
+//  2. ./config.{yaml,yml,json,toml} (project-local config)
+//  3. $XDG_CONFIG_HOME/ckeletin-go/config.{yaml,yml,json,toml} (user config)
+//
+// Viper automatically detects the file format based on extension.
 func ConfigPaths() struct {
-	// Default config name with dot prefix (e.g. ".myapp")
-	DefaultName string
-	// Config file extension
-	Extension string
-	// Default full config name (e.g. ".myapp.yaml")
-	DefaultFullName string
-	// Default config file with home directory (e.g. "$HOME/.myapp.yaml")
-	DefaultPath string
-	// Default ignore pattern for gitignore (e.g. "myapp.yaml")
-	IgnorePattern string
+	// ConfigName is the base config name without extension (e.g. "config")
+	// Viper will search for config.yaml, config.yml, config.json, config.toml
+	ConfigName string
+	// XDGDir is the XDG config directory (e.g. "$XDG_CONFIG_HOME/myapp")
+	XDGDir string
 } {
-	ext := "yaml"
-	defaultName := fmt.Sprintf(".%s", binaryName)
-	defaultFullName := fmt.Sprintf("%s.%s", defaultName, ext)
-
-	home, err := os.UserHomeDir()
-	defaultPath := defaultFullName // Fallback if home dir not available
-	if err == nil {
-		defaultPath = filepath.Join(home, defaultFullName)
-	}
-
-	// Used for .gitignore - without leading dot
-	ignorePattern := fmt.Sprintf("%s.%s", binaryName, ext)
+	xdgDir, _ := xdg.ConfigDir()
 
 	return struct {
-		DefaultName     string
-		Extension       string
-		DefaultFullName string
-		DefaultPath     string
-		IgnorePattern   string
+		ConfigName string
+		XDGDir     string
 	}{
-		DefaultName:     defaultName,
-		Extension:       ext,
-		DefaultFullName: defaultFullName,
-		DefaultPath:     defaultPath,
-		IgnorePattern:   ignorePattern,
+		ConfigName: "config",
+		XDGDir:     xdgDir,
 	}
 }
 
 // Export RootCmd so that tests in other packages can manipulate it without getters/setters.
 var RootCmd = &cobra.Command{
-	Use:   binaryName,
-	Short: "A scaffold for building professional CLI applications in Go",
-	Long: fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
-It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName),
+	Use:           "",
+	Short:         "A scaffold for building professional CLI applications in Go",
+	Long:          "",
+	SilenceErrors: true, // Errors are handled by main.go, don't print twice
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Bind flags to viper first (must happen before initConfig)
 		if err := bindFlags(cmd); err != nil {
@@ -153,9 +137,12 @@ func init() {
 		binaryName = "ckeletin-go"
 	}
 
-	// Update RootCmd with the resolved binaryName
+	// Initialize XDG paths with app name (single source of truth)
+	xdg.SetAppName(binaryName)
+
+	// Update RootCmd with the resolved binaryName.
 	// Package-level var declarations capture binaryName="" before init() runs,
-	// so we need to set these after the fallback is applied
+	// so we need to set these after the fallback is applied.
 	RootCmd.Use = binaryName
 	RootCmd.Long = fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
 It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName)
@@ -163,7 +150,12 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 	configPaths := ConfigPaths()
 
 	// Define all persistent flags (flag definitions only - bindings happen in bindFlags())
-	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", fmt.Sprintf("Config file (default is %s)", configPaths.DefaultPath))
+	configHelp := "Config file (searches: ./config.yaml"
+	if configPaths.XDGDir != "" {
+		configHelp += ", " + configPaths.XDGDir + "/config.yaml"
+	}
+	configHelp += ")"
+	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
 
 	// Legacy log level flag (for backward compatibility)
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
@@ -230,44 +222,20 @@ func bindFlags(cmd *cobra.Command) error {
 func initConfig() error {
 	configPaths := ConfigPaths()
 
-	var configFilePath string
 	if cfgFile != "" {
-		configFilePath = cfgFile
+		// Explicit --config flag takes highest priority
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Add current directory first (highest priority after --config)
+		// Let viper search for config files in priority order
+		// Viper will look for config.yaml, config.yml, config.json, config.toml, etc.
+		viper.SetConfigName(configPaths.ConfigName)
+
+		// 1. Current directory (project-local config) - highest priority
 		viper.AddConfigPath(".")
 
-		// Add home directory with fallback for containerized environments
-		home, err := os.UserHomeDir()
-		if err == nil {
-			viper.AddConfigPath(home)
-		}
-		// Note: No error if HOME is unavailable - will search current dir only
-
-		viper.SetConfigName(configPaths.DefaultName)
-		viper.SetConfigType(configPaths.Extension)
-
-		// Try to determine which config will be used (for security validation)
-		// Check current directory first
-		currentDirConfig := configPaths.DefaultFullName
-		if _, err := os.Stat(currentDirConfig); err == nil {
-			configFilePath = currentDirConfig
-		} else if home != "" {
-			// Check home directory if current dir doesn't have config
-			homeConfig := filepath.Join(home, configPaths.DefaultFullName)
-			if _, err := os.Stat(homeConfig); err == nil {
-				configFilePath = homeConfig
-			}
-		}
-	}
-
-	// Security validation if config file path is known
-	if configFilePath != "" {
-		// Validate file security (size and permissions)
-		if err := config.ValidateConfigFileSecurity(configFilePath, config.MaxConfigFileSize); err != nil {
-			log.Error().Err(err).Str("path", configFilePath).Msg("Config file security validation failed")
-			return fmt.Errorf("config file security validation failed: %w", err)
+		// 2. XDG config directory (user config)
+		if configPaths.XDGDir != "" {
+			viper.AddConfigPath(configPaths.XDGDir)
 		}
 	}
 
@@ -307,6 +275,12 @@ func initConfig() error {
 	} else {
 		configFileStatus = "Using config file"
 		configFileUsed = viper.ConfigFileUsed()
+
+		// Security validation after viper finds and reads the config
+		if err := config.ValidateConfigFileSecurity(configFileUsed, config.MaxConfigFileSize); err != nil {
+			log.Error().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
+			return fmt.Errorf("config file security validation failed: %w", err)
+		}
 	}
 
 	return nil
