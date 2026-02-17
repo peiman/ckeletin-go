@@ -331,6 +331,12 @@ jobs:
         if: github.event_name != 'pull_request'
         run: task check
 
+      - name: Validate Task Check Output Structure (Full - main/releases)
+        if: github.event_name != 'pull_request'
+        env:
+          RUN_TASK_CHECK_TESTS: "1"
+        run: go test ./test/integration -v -count=1 -run '^TestTaskCheckOutputStructure$'
+
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v5
         if: env.CODECOV_TOKEN != ''
