@@ -272,6 +272,12 @@ func TestExecute_ErrorPropagation(t *testing.T) {
 	assert.Contains(t, err.Error(), "some error", "Error should contain 'some error'")
 }
 
+func TestRootCmdMetadataInitializedFromBinaryName(t *testing.T) {
+	assert.NotEmpty(t, binaryName, "binaryName fallback should be set during init")
+	assert.Equal(t, binaryName, RootCmd.Use, "RootCmd.Use should match binaryName")
+	assert.Contains(t, RootCmd.Long, binaryName, "RootCmd.Long should include binaryName")
+}
+
 // TestConfigPaths tests the ConfigPaths function that returns the configuration paths
 func TestConfigPaths(t *testing.T) {
 	// SETUP PHASE
