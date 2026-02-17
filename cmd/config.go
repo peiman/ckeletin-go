@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/validator"
 	"github.com/spf13/cobra"
@@ -66,10 +67,10 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		} else if cfgFile != "" {
 			configPath = cfgFile
 		} else {
-			// Default to XDG path for validation target
+			// Default to the selected user config directory for validation target
 			configPaths := ConfigPaths()
-			if configPaths.XDGDir != "" {
-				configPath = configPaths.XDGDir + "/config.yaml"
+			if defaultDir := defaultUserConfigDir(configPaths); defaultDir != "" {
+				configPath = filepath.Join(defaultDir, "config.yaml")
 			}
 		}
 	}

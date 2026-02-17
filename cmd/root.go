@@ -16,6 +16,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -24,11 +26,14 @@ import (
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
 var (
 	cfgFile          string
+	configPathMode   = ConfigPathModeHome
+	configPathFlag   *pflag.Flag
 	Version          = "dev"
 	Commit           = ""
 	Date             = ""
@@ -40,6 +45,15 @@ var (
 	// Compiled once at package initialization for better performance
 	nonAlphanumericRegex = regexp.MustCompile(`[^A-Z0-9]`)
 	onlyUnderscoresRegex = regexp.MustCompile(`^_+$`)
+)
+
+const (
+	// ConfigPathModeHome searches the user home config directory (default).
+	ConfigPathModeHome = "home"
+	// ConfigPathModeXDG searches only XDG/OS-native config directory.
+	ConfigPathModeXDG = "xdg"
+	// ConfigPathModeBoth searches both home and XDG directories.
+	ConfigPathModeBoth = "both"
 )
 
 // EnvPrefix returns a sanitized environment variable prefix based on the binary name
@@ -66,25 +80,105 @@ func EnvPrefix() string {
 // Config file search order (handled by viper):
 //  1. --config flag (explicit override)
 //  2. ./config.{yaml,yml,json,toml} (project-local config)
-//  3. $XDG_CONFIG_HOME/ckeletin-go/config.{yaml,yml,json,toml} (user config)
+//  3. User config directory based on path mode:
+//     - home (default): ~/.<binaryName>/config.{yaml,yml,json,toml}
+//     - xdg: $XDG_CONFIG_HOME/<binaryName>/config.{yaml,yml,json,toml}
+//     - both: home first, then XDG
 //
 // Viper automatically detects the file format based on extension.
-func ConfigPaths() struct {
+type ConfigPathInfo struct {
 	// ConfigName is the base config name without extension (e.g. "config")
 	// Viper will search for config.yaml, config.yml, config.json, config.toml
 	ConfigName string
+	// HomeDir is the home-based config directory (e.g. "~/.myapp")
+	HomeDir string
 	// XDGDir is the XDG config directory (e.g. "$XDG_CONFIG_HOME/myapp")
 	XDGDir string
-} {
-	xdgDir, _ := xdg.ConfigDir()
+	// Mode controls which user config directory is searched: home, xdg, or both.
+	Mode string
+	// SearchPaths lists all viper search paths in priority order.
+	SearchPaths []string
+}
 
-	return struct {
-		ConfigName string
-		XDGDir     string
-	}{
-		ConfigName: "config",
-		XDGDir:     xdgDir,
+func ConfigPaths() ConfigPathInfo {
+	xdgDir, _ := xdg.ConfigDir()
+	homeDir := ""
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		homeDir = filepath.Join(home, "."+binaryName)
 	}
+
+	mode := resolveConfigPathMode()
+	paths := ConfigPathInfo{
+		ConfigName: "config",
+		HomeDir:    homeDir,
+		XDGDir:     xdgDir,
+		Mode:       mode,
+	}
+	paths.SearchPaths = buildConfigSearchPaths(paths)
+	return paths
+}
+
+func resolveConfigPathMode() string {
+	mode := strings.ToLower(strings.TrimSpace(configPathMode))
+	if mode == "" {
+		mode = ConfigPathModeHome
+	}
+
+	flagChanged := configPathFlag != nil && configPathFlag.Changed
+	if !flagChanged {
+		envKey := EnvPrefix() + "_CONFIG_PATH_MODE"
+		if envMode := strings.ToLower(strings.TrimSpace(os.Getenv(envKey))); envMode != "" {
+			mode = envMode
+		}
+	}
+
+	switch mode {
+	case ConfigPathModeHome, ConfigPathModeXDG, ConfigPathModeBoth:
+		return mode
+	default:
+		log.Warn().
+			Str("config_path_mode", mode).
+			Str("fallback_mode", ConfigPathModeHome).
+			Msg("Invalid config path mode, falling back to default")
+		return ConfigPathModeHome
+	}
+}
+
+func buildConfigSearchPaths(paths ConfigPathInfo) []string {
+	searchPaths := []string{"."}
+
+	addUnique := func(path string) {
+		if path == "" {
+			return
+		}
+		for _, existing := range searchPaths {
+			if existing == path {
+				return
+			}
+		}
+		searchPaths = append(searchPaths, path)
+	}
+
+	switch paths.Mode {
+	case ConfigPathModeXDG:
+		addUnique(paths.XDGDir)
+	case ConfigPathModeBoth:
+		addUnique(paths.HomeDir)
+		addUnique(paths.XDGDir)
+	default: // home
+		addUnique(paths.HomeDir)
+	}
+
+	return searchPaths
+}
+
+func defaultUserConfigDir(paths ConfigPathInfo) string {
+	for _, path := range paths.SearchPaths {
+		if path != "." {
+			return path
+		}
+	}
+	return ""
 }
 
 // Export RootCmd so that tests in other packages can manipulate it without getters/setters.
@@ -150,12 +244,24 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 	configPaths := ConfigPaths()
 
 	// Define all persistent flags (flag definitions only - bindings happen in bindFlags())
-	configHelp := "Config file (searches: ./config.yaml"
-	if configPaths.XDGDir != "" {
-		configHelp += ", " + configPaths.XDGDir + "/config.yaml"
+	searchTargets := make([]string, 0, len(configPaths.SearchPaths))
+	for _, path := range configPaths.SearchPaths {
+		if path == "." {
+			searchTargets = append(searchTargets, "./config.yaml")
+			continue
+		}
+		searchTargets = append(searchTargets, filepath.Join(path, "config.yaml"))
+	}
+
+	configHelp := "Config file (searches: " + strings.Join(searchTargets, ", ")
+	if configHelp == "Config file (searches: " {
+		configHelp += "./config.yaml"
 	}
 	configHelp += ")"
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
+	RootCmd.PersistentFlags().StringVar(&configPathMode, "config-path-mode", ConfigPathModeHome,
+		"Config path mode when --config is not set (home, xdg, both)")
+	configPathFlag = RootCmd.PersistentFlags().Lookup("config-path-mode")
 
 	// Legacy log level flag (for backward compatibility)
 	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
@@ -230,12 +336,9 @@ func initConfig() error {
 		// Viper will look for config.yaml, config.yml, config.json, config.toml, etc.
 		viper.SetConfigName(configPaths.ConfigName)
 
-		// 1. Current directory (project-local config) - highest priority
-		viper.AddConfigPath(".")
-
-		// 2. XDG config directory (user config)
-		if configPaths.XDGDir != "" {
-			viper.AddConfigPath(configPaths.XDGDir)
+		// Search paths based on configured path mode.
+		for _, searchPath := range configPaths.SearchPaths {
+			viper.AddConfigPath(searchPath)
 		}
 	}
 

@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands"
 	"github.com/peiman/ckeletin-go/internal/docs"
@@ -43,8 +45,8 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 
 	// Set config paths
 	paths := ConfigPaths()
-	if paths.XDGDir != "" {
-		appInfo.ConfigPaths.DefaultPath = paths.XDGDir + "/config.yaml"
+	if defaultDir := defaultUserConfigDir(paths); defaultDir != "" {
+		appInfo.ConfigPaths.DefaultPath = filepath.Join(defaultDir, "config.yaml")
 	}
 	appInfo.ConfigPaths.DefaultFullName = "config.yaml" // local project config
 

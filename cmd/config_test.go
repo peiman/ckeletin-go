@@ -136,6 +136,45 @@ func TestRunConfigValidate_NonexistentFile(t *testing.T) {
 		"Error should mention validation failed")
 }
 
+func TestRunConfigValidate_DefaultHomePath(t *testing.T) {
+	// Reset global state
+	viper.Reset()
+	validateConfigFile = ""
+	origCfgFile := cfgFile
+	origConfigFileUsed := configFileUsed
+	origBinaryName := binaryName
+	defer func() {
+		cfgFile = origCfgFile
+		configFileUsed = origConfigFileUsed
+		binaryName = origBinaryName
+		validateConfigFile = ""
+	}()
+
+	binaryName = "ckeletin-go"
+	configFileUsed = ""
+	cfgFile = ""
+
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	configDir := filepath.Join(homeDir, "."+binaryName)
+	require.NoError(t, os.MkdirAll(configDir, 0700))
+
+	configFile := filepath.Join(configDir, "config.yaml")
+	configContent := []byte("app:\n  log_level: info\n")
+	require.NoError(t, os.WriteFile(configFile, configContent, 0600))
+
+	t.Setenv("HOME", homeDir)
+	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeHome)
+
+	cmd := &cobra.Command{}
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+
+	err := runConfigValidate(cmd, []string{})
+	require.NoError(t, err, "Expected default home config validation to succeed")
+	assert.Contains(t, output.String(), "Configuration is valid")
+}
+
 // TestConfigCommandRegistered tests that the config command is properly registered
 func TestConfigCommandRegistered(t *testing.T) {
 	// SETUP & EXECUTION PHASE
