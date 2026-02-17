@@ -242,7 +242,7 @@ func (m ProgressModel) View() string {
 				Render(fmt.Sprintf(" %s", check.Duration.Round(time.Millisecond)))
 		}
 
-		b.WriteString(fmt.Sprintf("  %s %s %s%s\n", name, bar, status, dur))
+		_, _ = fmt.Fprintf(&b, "  %s %s %s%s\n", name, bar, status, dur)
 
 		// Show error summary if failed (first line only, details in summary box)
 		if check.Status == CheckFailed && check.Error != nil {
@@ -423,7 +423,7 @@ func (m ProgressModel) renderSummaryBox() string {
 				Render(fmt.Sprintf(" (%s)", check.Duration.Round(time.Millisecond)))
 		}
 
-		content.WriteString(fmt.Sprintf("  %s %s%s\n", style, name, dur))
+		_, _ = fmt.Fprintf(&content, "  %s %s%s\n", style, name, dur)
 	}
 
 	// Error details section for failed checks
@@ -486,12 +486,12 @@ func (m ProgressModel) renderSummaryBox() string {
 			coverageColor = lipgloss.Color("196") // Red
 		}
 		bar := m.renderProgressBar(coveragePercent, coverageColor)
-		content.WriteString(fmt.Sprintf("  Coverage: %s", bar))
+		_, _ = fmt.Fprintf(&content, "  Coverage: %s", bar)
 	}
 
 	// Duration
 	duration := time.Since(m.startTime).Round(time.Millisecond)
-	content.WriteString(fmt.Sprintf("\n  Duration: %s", duration))
+	_, _ = fmt.Fprintf(&content, "\n  Duration: %s", duration)
 
 	return box.Render(content.String())
 }

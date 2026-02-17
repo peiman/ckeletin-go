@@ -333,9 +333,9 @@ func filterTestOutput(output string) string {
 
 	// Summary line
 	if isCompileError {
-		sb.WriteString(fmt.Sprintf("%d package(s) failed to compile\n\n", len(failedPackages)))
+		_, _ = fmt.Fprintf(&sb, "%d package(s) failed to compile\n\n", len(failedPackages))
 	} else if len(failedTests) > 0 {
-		sb.WriteString(fmt.Sprintf("%d test(s) failed in %d package(s)\n\n", len(failedTests), len(failedPackages)))
+		_, _ = fmt.Fprintf(&sb, "%d test(s) failed in %d package(s)\n\n", len(failedTests), len(failedPackages))
 	}
 
 	if len(failedPackages) > 0 && !isCompileError {
