@@ -136,7 +136,7 @@ func TestRunConfigValidate_NonexistentFile(t *testing.T) {
 		"Error should mention validation failed")
 }
 
-func TestRunConfigValidate_DefaultHomePath(t *testing.T) {
+func TestRunConfigValidate_DefaultXDGPath(t *testing.T) {
 	// Reset global state
 	viper.Reset()
 	validateConfigFile = ""
@@ -156,7 +156,8 @@ func TestRunConfigValidate_DefaultHomePath(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	homeDir := filepath.Join(tmpDir, "home")
-	configDir := filepath.Join(homeDir, "."+binaryName)
+	xdgConfigHome := filepath.Join(homeDir, ".config")
+	configDir := filepath.Join(xdgConfigHome, binaryName)
 	require.NoError(t, os.MkdirAll(configDir, 0700))
 
 	configFile := filepath.Join(configDir, "config.yaml")
@@ -164,14 +165,15 @@ func TestRunConfigValidate_DefaultHomePath(t *testing.T) {
 	require.NoError(t, os.WriteFile(configFile, configContent, 0600))
 
 	t.Setenv("HOME", homeDir)
-	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeHome)
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
+	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeXDG)
 
 	cmd := &cobra.Command{}
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 
 	err := runConfigValidate(cmd, []string{})
-	require.NoError(t, err, "Expected default home config validation to succeed")
+	require.NoError(t, err, "Expected default XDG config validation to succeed")
 	assert.Contains(t, output.String(), "Configuration is valid")
 }
 

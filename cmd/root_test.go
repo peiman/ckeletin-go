@@ -294,7 +294,7 @@ func TestConfigPaths(t *testing.T) {
 	// Set test binary name and XDG app name
 	binaryName = "testapp"
 	xdg.SetAppName("testapp")
-	configPathMode = ConfigPathModeHome
+	configPathMode = ConfigPathModeXDG
 
 	// EXECUTION PHASE
 	paths := ConfigPaths()
@@ -302,16 +302,16 @@ func TestConfigPaths(t *testing.T) {
 	// ASSERTION PHASE
 	// ConfigName is always "config" (viper will search for config.yaml, config.json, etc.)
 	assert.Equal(t, "config", paths.ConfigName, "ConfigPaths().ConfigName should be 'config'")
-	assert.Equal(t, ConfigPathModeHome, paths.Mode, "default config path mode should be home")
-
-	// HomeDir should contain hidden app dir in home
-	if paths.HomeDir != "" {
-		assert.Contains(t, paths.HomeDir, ".testapp", "ConfigPaths().HomeDir should contain hidden app dir")
-	}
+	assert.Equal(t, ConfigPathModeXDG, paths.Mode, "default config path mode should be xdg")
 
 	// XDGDir should contain the app name
 	if paths.XDGDir != "" {
 		assert.Contains(t, paths.XDGDir, "testapp", "ConfigPaths().XDGDir should contain app name")
+	}
+
+	// NativeDir should contain the app name
+	if paths.NativeDir != "" {
+		assert.Contains(t, paths.NativeDir, "testapp", "ConfigPaths().NativeDir should contain app name")
 	}
 
 	// Search paths should always start with current directory
@@ -344,24 +344,24 @@ func TestResolveConfigPathModePrecedence(t *testing.T) {
 	}{
 		{
 			name:        "env override applies when flag not changed",
-			flagValue:   ConfigPathModeHome,
+			flagValue:   ConfigPathModeXDG,
 			flagChanged: false,
-			envValue:    ConfigPathModeXDG,
-			expected:    ConfigPathModeXDG,
+			envValue:    ConfigPathModeNative,
+			expected:    ConfigPathModeNative,
 		},
 		{
 			name:        "explicit flag beats env",
-			flagValue:   ConfigPathModeHome,
+			flagValue:   ConfigPathModeXDG,
 			flagChanged: true,
-			envValue:    ConfigPathModeXDG,
-			expected:    ConfigPathModeHome,
+			envValue:    ConfigPathModeNative,
+			expected:    ConfigPathModeXDG,
 		},
 		{
-			name:        "invalid mode falls back to default home",
+			name:        "invalid mode falls back to default xdg",
 			flagValue:   "invalid",
 			flagChanged: true,
 			envValue:    "",
-			expected:    ConfigPathModeHome,
+			expected:    ConfigPathModeXDG,
 		},
 	}
 
@@ -1096,13 +1096,8 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(currentDir, 0755)
 
-	// Create XDG config directory structure based on OS
-	var xdgConfigDir string
-	if runtime.GOOS == "darwin" {
-		xdgConfigDir = filepath.Join(homeDir, "Library", "Application Support", "ckeletin-go")
-	} else {
-		xdgConfigDir = filepath.Join(homeDir, ".config", "ckeletin-go")
-	}
+	xdgConfigHome := filepath.Join(homeDir, ".config")
+	xdgConfigDir := filepath.Join(xdgConfigHome, "ckeletin-go")
 	os.MkdirAll(xdgConfigDir, 0700)
 
 	// Write config to XDG directory with "info" level
@@ -1137,6 +1132,7 @@ func TestConfigPriorityCurrentDirFirst(t *testing.T) {
 
 	// Set HOME to home directory and change to current directory
 	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	os.Chdir(currentDir)
 
 	// Setup logger
@@ -1177,13 +1173,8 @@ func TestConfigFromXDGDirectory(t *testing.T) {
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(currentDir, 0755)
 
-	// Create XDG config directory structure based on OS
-	var xdgConfigDir string
-	if runtime.GOOS == "darwin" {
-		xdgConfigDir = filepath.Join(homeDir, "Library", "Application Support", "ckeletin-go")
-	} else {
-		xdgConfigDir = filepath.Join(homeDir, ".config", "ckeletin-go")
-	}
+	xdgConfigHome := filepath.Join(homeDir, ".config")
+	xdgConfigDir := filepath.Join(xdgConfigHome, "ckeletin-go")
 	os.MkdirAll(xdgConfigDir, 0700)
 
 	// Write config to XDG directory (not current directory)
@@ -1212,6 +1203,7 @@ func TestConfigFromXDGDirectory(t *testing.T) {
 
 	// Set HOME to home directory and change to empty current directory
 	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeXDG)
 	os.Chdir(currentDir)
 
@@ -1229,16 +1221,16 @@ func TestConfigFromXDGDirectory(t *testing.T) {
 	logLevel := viper.GetString("app.log_level")
 	assert.Equal(t, "warn", logLevel, "Expected log_level='warn' from XDG dir")
 
-	// Config file path should be from home directory
+	// Config file path should be from the XDG directory
 	if configFileUsed != "" {
-		assert.Contains(t, configFileUsed, homeDir, "Expected config from home dir")
+		assert.Contains(t, configFileUsed, xdgConfigDir, "Expected config from XDG dir")
 	}
 }
 
-// TestConfigFromHomeDirectoryDefault tests config discovery from home directory in default mode.
-func TestConfigFromHomeDirectoryDefault(t *testing.T) {
+// TestConfigFromXDGDirectoryDefault tests config discovery from XDG directory in default mode.
+func TestConfigFromXDGDirectoryDefault(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Skipping home directory config test on Windows")
+		t.Skip("Skipping XDG directory config test on Windows")
 	}
 
 	// SETUP PHASE
@@ -1251,13 +1243,14 @@ func TestConfigFromHomeDirectoryDefault(t *testing.T) {
 	os.MkdirAll(homeDir, 0755)
 	os.MkdirAll(currentDir, 0755)
 
-	homeConfigDir := filepath.Join(homeDir, "."+binaryName)
-	os.MkdirAll(homeConfigDir, 0700)
+	xdgConfigHome := filepath.Join(homeDir, ".config")
+	xdgConfigDir := filepath.Join(xdgConfigHome, binaryName)
+	os.MkdirAll(xdgConfigDir, 0700)
 
-	homeConfigContent := []byte("app:\n  log_level: error\n")
-	homeConfigPath := filepath.Join(homeConfigDir, "config.yaml")
-	err := os.WriteFile(homeConfigPath, homeConfigContent, 0600)
-	require.NoError(t, err, "Failed to write home config")
+	xdgConfigContent := []byte("app:\n  log_level: error\n")
+	xdgConfigPath := filepath.Join(xdgConfigDir, "config.yaml")
+	err := os.WriteFile(xdgConfigPath, xdgConfigContent, 0600)
+	require.NoError(t, err, "Failed to write XDG config")
 
 	origCfgFile := cfgFile
 	origStatus := configFileStatus
@@ -1273,10 +1266,11 @@ func TestConfigFromHomeDirectoryDefault(t *testing.T) {
 	viper.Reset()
 	cfgFile = ""
 	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", xdgConfigHome)
 	os.Chdir(currentDir)
 
-	// Ensure default mode is home.
-	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeHome)
+	// Ensure default mode is xdg.
+	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeXDG)
 
 	buf := new(bytes.Buffer)
 	log.Logger = zerolog.New(buf)
@@ -1285,10 +1279,66 @@ func TestConfigFromHomeDirectoryDefault(t *testing.T) {
 	err = initConfig()
 
 	// ASSERTION PHASE
-	require.NoError(t, err, "initConfig should succeed with home directory config")
-	assert.Equal(t, "error", viper.GetString("app.log_level"), "Expected log_level='error' from home dir config")
+	require.NoError(t, err, "initConfig should succeed with XDG directory config")
+	assert.Equal(t, "error", viper.GetString("app.log_level"), "Expected log_level='error' from XDG dir config")
 
 	if configFileUsed != "" {
-		assert.Contains(t, configFileUsed, homeConfigDir, "Expected config from home dir")
+		assert.Contains(t, configFileUsed, xdgConfigDir, "Expected config from XDG dir")
+	}
+}
+
+// TestConfigFromNativeDirectoryOnDarwin tests macOS native config discovery when mode is native.
+func TestConfigFromNativeDirectoryOnDarwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("Skipping native macOS config test on non-darwin platforms")
+	}
+
+	// SETUP PHASE
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	tempDir := t.TempDir()
+	homeDir := filepath.Join(tempDir, "home")
+	currentDir := filepath.Join(tempDir, "current")
+	os.MkdirAll(homeDir, 0755)
+	os.MkdirAll(currentDir, 0755)
+
+	nativeConfigDir := filepath.Join(homeDir, "Library", "Application Support", binaryName)
+	os.MkdirAll(nativeConfigDir, 0700)
+
+	nativeConfigContent := []byte("app:\n  log_level: fatal\n")
+	nativeConfigPath := filepath.Join(nativeConfigDir, "config.yaml")
+	err := os.WriteFile(nativeConfigPath, nativeConfigContent, 0600)
+	require.NoError(t, err, "Failed to write native macOS config")
+
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	oldWd, _ := os.Getwd()
+	defer func() {
+		cfgFile = origCfgFile
+		configFileStatus = origStatus
+		configFileUsed = origUsed
+		os.Chdir(oldWd)
+	}()
+
+	viper.Reset()
+	cfgFile = ""
+	t.Setenv("HOME", homeDir)
+	t.Setenv(EnvPrefix()+"_CONFIG_PATH_MODE", ConfigPathModeNative)
+	os.Chdir(currentDir)
+
+	buf := new(bytes.Buffer)
+	log.Logger = zerolog.New(buf)
+
+	// EXECUTION PHASE
+	err = initConfig()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "initConfig should succeed with native macOS config")
+	assert.Equal(t, "fatal", viper.GetString("app.log_level"), "Expected log_level='fatal' from native config")
+
+	if configFileUsed != "" {
+		assert.Contains(t, configFileUsed, nativeConfigDir, "Expected config from native macOS dir")
 	}
 }

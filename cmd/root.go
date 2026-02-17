@@ -32,7 +32,7 @@ import (
 
 var (
 	cfgFile          string
-	configPathMode   = ConfigPathModeHome
+	configPathMode   = ConfigPathModeXDG
 	configPathFlag   *pflag.Flag
 	Version          = "dev"
 	Commit           = ""
@@ -48,11 +48,13 @@ var (
 )
 
 const (
-	// ConfigPathModeHome searches the user home config directory (default).
-	ConfigPathModeHome = "home"
-	// ConfigPathModeXDG searches only XDG/OS-native config directory.
+	// ConfigPathModeXDG searches XDG-style config directory (default).
+	// On macOS, this means ~/.config/<app> unless XDG_CONFIG_HOME is set.
 	ConfigPathModeXDG = "xdg"
-	// ConfigPathModeBoth searches both home and XDG directories.
+	// ConfigPathModeNative searches the OS-native config directory.
+	// On macOS, this means ~/Library/Application Support/<app>.
+	ConfigPathModeNative = "native"
+	// ConfigPathModeBoth searches both XDG and native directories.
 	ConfigPathModeBoth = "both"
 )
 
@@ -81,47 +83,64 @@ func EnvPrefix() string {
 //  1. --config flag (explicit override)
 //  2. ./config.{yaml,yml,json,toml} (project-local config)
 //  3. User config directory based on path mode:
-//     - home (default): ~/.<binaryName>/config.{yaml,yml,json,toml}
-//     - xdg: $XDG_CONFIG_HOME/<binaryName>/config.{yaml,yml,json,toml}
-//     - both: home first, then XDG
+//     - xdg (default): $XDG_CONFIG_HOME/<binaryName> or ~/.config/<binaryName>
+//     - native: OS-native config path (macOS: ~/Library/Application Support/<binaryName>)
+//     - both: xdg first, then native
 //
 // Viper automatically detects the file format based on extension.
 type ConfigPathInfo struct {
 	// ConfigName is the base config name without extension (e.g. "config")
 	// Viper will search for config.yaml, config.yml, config.json, config.toml
 	ConfigName string
-	// HomeDir is the home-based config directory (e.g. "~/.myapp")
-	HomeDir string
-	// XDGDir is the XDG config directory (e.g. "$XDG_CONFIG_HOME/myapp")
+	// XDGDir is the XDG-style config directory (e.g. "$XDG_CONFIG_HOME/myapp" or "~/.config/myapp")
 	XDGDir string
-	// Mode controls which user config directory is searched: home, xdg, or both.
+	// NativeDir is the OS-native config directory (e.g. macOS "~/Library/Application Support/myapp").
+	NativeDir string
+	// Mode controls which user config directory is searched: xdg, native, or both.
 	Mode string
 	// SearchPaths lists all viper search paths in priority order.
 	SearchPaths []string
 }
 
 func ConfigPaths() ConfigPathInfo {
-	xdgDir, _ := xdg.ConfigDir()
-	homeDir := ""
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		homeDir = filepath.Join(home, "."+binaryName)
-	}
+	xdgDir := resolveXDGConfigDir()
+	nativeDir, _ := xdg.ConfigDir()
 
 	mode := resolveConfigPathMode()
 	paths := ConfigPathInfo{
 		ConfigName: "config",
-		HomeDir:    homeDir,
 		XDGDir:     xdgDir,
+		NativeDir:  nativeDir,
 		Mode:       mode,
 	}
 	paths.SearchPaths = buildConfigSearchPaths(paths)
 	return paths
 }
 
+func resolveXDGConfigDir() string {
+	name := binaryName
+	if name == "" {
+		name = xdg.GetAppName()
+	}
+
+	xdgConfigHome := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
+	if xdgConfigHome != "" {
+		return filepath.Join(xdgConfigHome, name)
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		fallback, _ := xdg.ConfigDir()
+		return fallback
+	}
+
+	return filepath.Join(home, ".config", name)
+}
+
 func resolveConfigPathMode() string {
 	mode := strings.ToLower(strings.TrimSpace(configPathMode))
 	if mode == "" {
-		mode = ConfigPathModeHome
+		mode = ConfigPathModeXDG
 	}
 
 	flagChanged := configPathFlag != nil && configPathFlag.Changed
@@ -133,14 +152,14 @@ func resolveConfigPathMode() string {
 	}
 
 	switch mode {
-	case ConfigPathModeHome, ConfigPathModeXDG, ConfigPathModeBoth:
+	case ConfigPathModeXDG, ConfigPathModeNative, ConfigPathModeBoth:
 		return mode
 	default:
 		log.Warn().
 			Str("config_path_mode", mode).
-			Str("fallback_mode", ConfigPathModeHome).
+			Str("fallback_mode", ConfigPathModeXDG).
 			Msg("Invalid config path mode, falling back to default")
-		return ConfigPathModeHome
+		return ConfigPathModeXDG
 	}
 }
 
@@ -162,11 +181,13 @@ func buildConfigSearchPaths(paths ConfigPathInfo) []string {
 	switch paths.Mode {
 	case ConfigPathModeXDG:
 		addUnique(paths.XDGDir)
+	case ConfigPathModeNative:
+		addUnique(paths.NativeDir)
 	case ConfigPathModeBoth:
-		addUnique(paths.HomeDir)
 		addUnique(paths.XDGDir)
-	default: // home
-		addUnique(paths.HomeDir)
+		addUnique(paths.NativeDir)
+	default: // xdg
+		addUnique(paths.XDGDir)
 	}
 
 	return searchPaths
@@ -259,8 +280,8 @@ It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framew
 	}
 	configHelp += ")"
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", configHelp)
-	RootCmd.PersistentFlags().StringVar(&configPathMode, "config-path-mode", ConfigPathModeHome,
-		"Config path mode when --config is not set (home, xdg, both)")
+	RootCmd.PersistentFlags().StringVar(&configPathMode, "config-path-mode", ConfigPathModeXDG,
+		"Config path mode when --config is not set (xdg, native, both)")
 	configPathFlag = RootCmd.PersistentFlags().Lookup("config-path-mode")
 
 	// Legacy log level flag (for backward compatibility)
