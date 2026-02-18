@@ -101,7 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **go.mod minimum**: Lowered from `go 1.25` to `go 1.24` (actual minimum required by dependencies)
+- **Go toolchain patch level**: Bumped `.go-version` from `1.25.5` to `1.25.7` to include Go stdlib security fixes detected in CI vulnerability scanning
 - **Pre-push hooks**: Combined `coverage-patch` and `coverage-project` into single `coverage` hook (faster)
+- **Config path mode and defaults**:
+  - Default user config path is now XDG-style: `$XDG_CONFIG_HOME/<app>/config.yaml` (fallback: `~/.config/<app>/config.yaml`)
+  - macOS native path remains available as an explicit option: `~/Library/Application Support/<app>/config.yaml`
+  - `--config-path-mode` now uses `xdg` (default), `native`, or `both`
+  - Removed `home` mode (`~/.<app>/config.yaml`) from supported options
 - **BREAKING: `task build` now defaults to dev builds**:
   - `task build` creates dev builds with `-tags dev` (includes dev commands)
   - Use `task build:prod` for production builds (previous behavior)
