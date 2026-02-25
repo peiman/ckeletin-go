@@ -48,7 +48,33 @@ env:
   # Pinned tool versions for cache key (must match .ckeletin/Taskfile.yml)
   PINNED_TOOLS_VERSION: 'v1'  # Bump to invalidate cache when tool versions change
 
+# Default to no permissions; each job grants only what it needs
+permissions: {}
+
 jobs:
+  # ═══════════════════════════════════════════════════════════════════
+  # DEPENDENCY REVIEW (PRs only)
+  # Catches new vulnerabilities and license violations before merge
+  # ═══════════════════════════════════════════════════════════════════
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Review Dependencies
+        uses: actions/dependency-review-action@05fe4576374b728f0c523d6a13d64c25081e0803  # v4.8.3
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-2.0-only, GPL-3.0-only, AGPL-3.0-only
+
   # ═══════════════════════════════════════════════════════════════════
   # MULTI-OS TESTING (Main + Releases only - expensive runners)
   # Tests across Ubuntu, macOS, and Windows to catch platform-specific issues
@@ -57,6 +83,7 @@ jobs:
     name: Test on ${{ matrix.os }}
     if: github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -67,23 +94,13 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5  # v6.2.0
         with:
           go-version-file: '.go-version'  # SSOT for Go version
-
-      - name: Cache Go Modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-
-            ${{ runner.os }}-go-
+          cache-dependency-path: 'go.sum'
 
       - name: Download Dependencies
         run: go mod download
@@ -114,7 +131,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@v5
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
@@ -154,28 +171,19 @@ jobs:
     name: Test Dev/Prod Build Separation
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5  # v6.2.0
         with:
           go-version-file: '.go-version'  # SSOT for Go version
-
-      - name: Cache Go Modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-devprod-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-devprod-${{ hashFiles('.go-version') }}-
-            ${{ runner.os }}-go-
+          cache-dependency-path: 'go.sum'
 
       - name: Download Dependencies
         run: go mod download
@@ -189,7 +197,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@v5
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
@@ -248,6 +256,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read # Only need read access for checkout and build
       pull-requests: write # Needed for codecov comment
@@ -255,24 +264,17 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5  # v6.2.0
         with:
           go-version-file: '.go-version'  # SSOT for Go version
-
-      - name: Cache Go Modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
+          cache-dependency-path: 'go.sum'
 
       - name: Cache Task Binary
         id: cache-task
-        uses: actions/cache@v5
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.local/bin/task
           key: ${{ runner.os }}-task-${{ env.TASK_VERSION }}
@@ -295,7 +297,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@v5
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
@@ -338,7 +340,7 @@ jobs:
         run: go test ./test/integration -v -count=1 -run '^TestTaskCheckOutputStructure$'
 
       - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de  # v5.5.2
         if: env.CODECOV_TOKEN != ''
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -355,7 +357,7 @@ jobs:
 
       - name: Upload License Report
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
         with:
           name: license-report
           path: |
@@ -369,6 +371,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: startsWith(github.ref, 'refs/tags/') # Only run on tags
     needs: [test-matrix, build] # Ensure all tests pass before release
     permissions:
@@ -377,7 +380,7 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
         with:
           fetch-depth: 0 # GoReleaser needs full git history
 
@@ -394,23 +397,16 @@ jobs:
           echo "✅ Valid SEMVER tag: $TAG_NAME"
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5  # v6.2.0
         with:
           go-version-file: '.go-version'  # SSOT for Go version
-
-      - name: Cache Go Modules
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-go-${{ hashFiles('.go-version') }}-${{ hashFiles('**/go.sum', 'Taskfile.yml') }}
+          cache-dependency-path: 'go.sum'
 
       - name: Install Syft for SBOM generation
-        uses: anchore/sbom-action/download-syft@v0.22.2
+        uses: anchore/sbom-action/download-syft@28d71544de8eaf1b958d335707167c5f783590ad  # v0.22.2
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a  # v6.4.0
         with:
           distribution: goreleaser
           version: '~> v2'

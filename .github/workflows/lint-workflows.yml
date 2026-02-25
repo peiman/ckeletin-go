@@ -9,16 +9,20 @@ on:
     paths:
       - .github/workflows/**
 
+# Default to no permissions; each job grants only what it needs
+permissions: {}
+
 jobs:
   lint:
     name: Lint workflows yaml
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read  # Only need read access to checkout workflow files
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
       - name: Download actionlint
         id: get_actionlint
         run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)

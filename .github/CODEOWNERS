@@ -1,0 +1,7 @@
+# Default owner
+*                           @peiman
+
+# CI/CD and security (extra protection)
+.github/                    @peiman
+.goreleaser.yml             @peiman
+.semgrep.yml                @peiman

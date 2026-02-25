@@ -11,10 +11,14 @@ on:
     # Run weekly on Monday at 10:00 UTC
     - cron: '0 10 * * 1'
 
+# Default to no permissions; each job grants only what it needs
+permissions: {}
+
 jobs:
   trivy-scan:
     name: Trivy Vulnerability Scanner
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
       security-events: write # Required for uploading SARIF results
@@ -22,10 +26,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Run Trivy Vulnerability Scanner in Repo Mode
-        uses: aquasecurity/trivy-action@0.34.0
+        uses: aquasecurity/trivy-action@c1824fd6edce30d7ab345a9989de00bbd46ef284  # 0.34.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -39,7 +43,7 @@ jobs:
           scanners: 'vuln,misconfig,secret'
 
       - name: Upload Trivy Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e  # v4.32.4
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'
