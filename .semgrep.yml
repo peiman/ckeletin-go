@@ -101,6 +101,10 @@ rules:
           for ... {
             ...
           }
+      - pattern-not-inside: |
+          go func(...) {
+            ...
+          }(...)
       - pattern: defer $FUNC(...)
     message: "Defer inside loop may cause resource leaks. Consider moving outside."
     languages: [go]
