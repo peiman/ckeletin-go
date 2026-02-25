@@ -728,6 +728,19 @@ task generate:license          # All artifacts
 
 Use `log.Error()` only for unrecoverable system failures. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
 
+### Code Quality & Linting
+
+| ❌ Don't | ✅ Do | Why |
+|----------|-------|-----|
+| Delete unused variables without investigation | Investigate if they represent missing functionality first | May be planned code that wasn't wired up yet |
+| Assume lint warnings are just cleanup | Check surrounding code, intent, and TODOs for context | Unused vars often signal forgotten implementations |
+
+**When lint finds unused variables:**
+1. **Investigate first** — Is this variable meant to be used somewhere that hasn't been implemented yet?
+2. **Check context** — Look at surrounding code, function signatures, and commit history for clues
+3. **Flag to user** — If it looks like missing functionality, ask before removing
+4. **Only then remove** — Delete only after confirming it's truly dead code, not an incomplete implementation
+
 ## Troubleshooting
 
 ### Common Errors and Solutions
