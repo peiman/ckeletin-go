@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 )
@@ -268,6 +269,128 @@ func TestValidateConfigWithRequiredFields(t *testing.T) {
 		// this would produce an error. Either way, the validation runs successfully.
 		t.Logf("Validation completed with %d errors", len(errors))
 	})
+}
+
+func TestValidateConfig_RequiredFieldMissing(t *testing.T) {
+	// Test the Required field validation path directly
+	// by constructing a ConfigInspector with a custom registry
+	ci := &ConfigInspector{
+		registry: []config.ConfigOption{
+			{
+				Key:          "test.required.field",
+				DefaultValue: "",
+				Description:  "A required field",
+				Type:         "string",
+				Required:     true,
+			},
+			{
+				Key:          "test.optional.field",
+				DefaultValue: "default",
+				Description:  "An optional field",
+				Type:         "string",
+				Required:     false,
+			},
+		},
+	}
+
+	viper.Reset()
+	// Don't set the required field — should produce a validation error
+
+	errors := ci.ValidateConfig()
+	assert.NotEmpty(t, errors, "Should have validation error for missing required field")
+	assert.Len(t, errors, 1, "Should have exactly one error")
+	assert.Contains(t, errors[0].Error(), "test.required.field",
+		"Error should reference the required key")
+}
+
+func TestValidateConfig_RequiredFieldPresent(t *testing.T) {
+	ci := &ConfigInspector{
+		registry: []config.ConfigOption{
+			{
+				Key:          "test.required.field",
+				DefaultValue: "",
+				Description:  "A required field",
+				Type:         "string",
+				Required:     true,
+			},
+		},
+	}
+
+	viper.Reset()
+	viper.Set("test.required.field", "some-value")
+
+	errors := ci.ValidateConfig()
+	assert.Empty(t, errors, "Should have no errors when required field is set")
+}
+
+func TestValidateConfig_RequiredFieldNilValue(t *testing.T) {
+	ci := &ConfigInspector{
+		registry: []config.ConfigOption{
+			{
+				Key:          "test.nil.field",
+				DefaultValue: nil,
+				Description:  "A required field with nil default",
+				Type:         "string",
+				Required:     true,
+			},
+		},
+	}
+
+	viper.Reset()
+	// Not setting value means viper.Get returns nil
+
+	errors := ci.ValidateConfig()
+	assert.NotEmpty(t, errors, "Should have error for nil required field")
+}
+
+func TestGetConfigSourceInfo_NonDefaultValue(t *testing.T) {
+	// Test the branch where value differs from default and is detected as file source
+	ci := &ConfigInspector{
+		registry: []config.ConfigOption{
+			{
+				Key:          "app.test.value",
+				DefaultValue: "original",
+				Description:  "Test option",
+				Type:         "string",
+			},
+		},
+	}
+
+	viper.Reset()
+	viper.Set("app.test.value", "changed")
+
+	sources := ci.GetConfigSourceInfo("CKELETIN")
+
+	assert.Equal(t, "original", sources.Defaults["app.test.value"])
+	assert.Equal(t, "changed", sources.Effective["app.test.value"])
+	// Since there's no env var set, this should be detected as file source
+	assert.Equal(t, "changed", sources.File["app.test.value"],
+		"Non-default value without env var should be detected as file source")
+	assert.Empty(t, sources.Environment, "No env vars should be detected")
+}
+
+func TestGetConfigSourceInfo_DefaultValueUnchanged(t *testing.T) {
+	ci := &ConfigInspector{
+		registry: []config.ConfigOption{
+			{
+				Key:          "app.test.value",
+				DefaultValue: "default",
+				Description:  "Test option",
+				Type:         "string",
+			},
+		},
+	}
+
+	viper.Reset()
+	viper.Set("app.test.value", "default") // Same as default
+
+	sources := ci.GetConfigSourceInfo("CKELETIN")
+
+	assert.Equal(t, "default", sources.Defaults["app.test.value"])
+	assert.Equal(t, "default", sources.Effective["app.test.value"])
+	// Value matches default, so should NOT appear in File or Environment
+	assert.Empty(t, sources.File, "Default value should not appear as file source")
+	assert.Empty(t, sources.Environment, "Default value should not appear as env source")
 }
 
 func TestGetConfigByPrefix(t *testing.T) {

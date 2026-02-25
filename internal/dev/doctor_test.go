@@ -408,8 +408,17 @@ func TestCheckGitStatusLogic(t *testing.T) {
 
 func TestCheckDependenciesLogic(t *testing.T) {
 	// Test the logic of checkDependencies by calling it directly
-	// This test assumes go.mod exists
+	// Must run from project root where go.mod exists
 	doctor := NewDoctor()
+
+	// Save current dir and change to project root
+	currentDir, err := os.Getwd()
+	assert.NoError(t, err)
+	defer os.Chdir(currentDir)
+
+	// Navigate to project root (internal/dev -> project root)
+	err = os.Chdir("../..")
+	assert.NoError(t, err)
 
 	// EXECUTION PHASE
 	doctor.checkDependencies()
@@ -419,7 +428,112 @@ func TestCheckDependenciesLogic(t *testing.T) {
 	assert.Len(t, results, 1, "Should have one check result")
 	assert.Equal(t, "Dependencies", results[0].Name,
 		"Should check dependencies")
-	// Status depends on go.mod state
+	// When run from project root with valid deps, should pass or warn
+	assert.NotEqual(t, CheckFailed, results[0].Status,
+		"Dependencies should not fail when run from project root with valid go.mod")
+}
+
+func TestCheckStatusUnknown(t *testing.T) {
+	// Test the default case in CheckStatus.String()
+	unknown := CheckStatus(99)
+	str := unknown.String()
+	assert.Equal(t, "?", str, "Unknown status should return '?'")
+}
+
+func TestCheckGoVersionFromProjectRoot(t *testing.T) {
+	// Run checkGoVersion from the project root to exercise the full path
+	doctor := NewDoctor()
+
+	currentDir, err := os.Getwd()
+	assert.NoError(t, err)
+	defer os.Chdir(currentDir)
+
+	err = os.Chdir("../..")
+	assert.NoError(t, err)
+
+	doctor.checkGoVersion()
+
+	results := doctor.GetResults()
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Go version", results[0].Name)
+	// With Go 1.26, this should pass
+	assert.Equal(t, CheckPassed, results[0].Status,
+		"Go version check should pass with current Go")
+	assert.Contains(t, results[0].Message, "meets requirements")
+}
+
+func TestCheckProjectStructureInEmptyDir(t *testing.T) {
+	doctor := NewDoctor()
+
+	currentDir, err := os.Getwd()
+	assert.NoError(t, err)
+	defer os.Chdir(currentDir)
+
+	tmpDir := t.TempDir()
+	err = os.Chdir(tmpDir)
+	assert.NoError(t, err)
+
+	doctor.checkProjectStructure()
+
+	results := doctor.GetResults()
+	assert.Len(t, results, 1)
+	assert.Equal(t, CheckFailed, results[0].Status,
+		"Should fail when required dirs/files missing")
+	assert.Contains(t, results[0].Message, "Required directories or files missing")
+	assert.Contains(t, results[0].Details, "Missing dirs")
+	assert.Contains(t, results[0].Details, "Missing files")
+}
+
+func TestCheckProjectStructurePartialDirs(t *testing.T) {
+	doctor := NewDoctor()
+
+	currentDir, err := os.Getwd()
+	assert.NoError(t, err)
+	defer os.Chdir(currentDir)
+
+	tmpDir := t.TempDir()
+	err = os.Chdir(tmpDir)
+	assert.NoError(t, err)
+
+	// Create dirs but not files
+	os.MkdirAll("cmd", 0o755)
+	os.MkdirAll("internal", 0o755)
+	os.MkdirAll("docs/adr", 0o755)
+	os.MkdirAll("test/integration", 0o755)
+
+	doctor.checkProjectStructure()
+
+	results := doctor.GetResults()
+	assert.Len(t, results, 1)
+	assert.Equal(t, CheckFailed, results[0].Status)
+	// Dirs exist but files are missing
+	assert.Contains(t, results[0].Details, "Missing files")
+}
+
+func TestCheckGitStatusInNonGitDir(t *testing.T) {
+	doctor := NewDoctor()
+
+	currentDir, err := os.Getwd()
+	assert.NoError(t, err)
+	defer os.Chdir(currentDir)
+
+	tmpDir := t.TempDir()
+	err = os.Chdir(tmpDir)
+	assert.NoError(t, err)
+
+	doctor.checkGitStatus()
+
+	results := doctor.GetResults()
+	assert.Len(t, results, 1)
+	assert.Equal(t, CheckFailed, results[0].Status,
+		"Should fail when not in a git repo")
+	assert.Contains(t, results[0].Message, "Not a git repository")
+}
+
+func TestGetToolVersionUnknownTool(t *testing.T) {
+	doctor := NewDoctor()
+	version := doctor.getToolVersion("unknown-tool")
+	assert.Equal(t, "", version, "Unknown tool should return empty string")
 }
 
 func TestCheckDependenciesInNonGoDirectory(t *testing.T) {

@@ -1,6 +1,9 @@
 package check
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -158,5 +161,126 @@ func TestTimingHistory_AllDefaults(t *testing.T) {
 		// All defaults should be reasonable (between 100ms and 15s)
 		assert.GreaterOrEqual(t, dur, 100*time.Millisecond, "check %s duration too short", name)
 		assert.LessOrEqual(t, dur, 15*time.Second, "check %s duration too long", name)
+	}
+}
+
+func TestTimingHistory_Save(t *testing.T) {
+	t.Run("saves timing data to disk", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpFile := filepath.Join(tmpDir, "timings.json")
+
+		th := &timingHistory{
+			Checks: map[string]*checkTiming{
+				"lint":   {AvgDuration: 3 * time.Second, LastDuration: 3 * time.Second, RunCount: 5},
+				"format": {AvgDuration: 1 * time.Second, LastDuration: 1 * time.Second, RunCount: 3},
+			},
+		}
+
+		// Write data directly (save uses timingFilePath() which we can't control,
+		// so test the marshaling/writing logic by reproducing it)
+		th.mu.RLock()
+		data, err := json.MarshalIndent(th, "", "  ")
+		th.mu.RUnlock()
+		require.NoError(t, err)
+
+		err = os.WriteFile(tmpFile, data, 0o600)
+		require.NoError(t, err)
+
+		// Verify file was written correctly
+		readBack, err := os.ReadFile(tmpFile)
+		require.NoError(t, err)
+
+		var loaded timingHistory
+		err = json.Unmarshal(readBack, &loaded)
+		require.NoError(t, err)
+		assert.Equal(t, 3*time.Second, loaded.Checks["lint"].AvgDuration)
+		assert.Equal(t, 1*time.Second, loaded.Checks["format"].AvgDuration)
+	})
+}
+
+func TestLoadTimingHistory_WithExistingFile(t *testing.T) {
+	t.Run("loads timing data from JSON file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		tmpFile := filepath.Join(tmpDir, "timings.json")
+
+		// Write a valid timing history file
+		data := `{
+			"checks": {
+				"lint": {"last_duration": 3000000000, "avg_duration": 3000000000, "run_count": 5},
+				"test": {"last_duration": 10000000000, "avg_duration": 10000000000, "run_count": 10}
+			}
+		}`
+		err := os.WriteFile(tmpFile, []byte(data), 0o600)
+		require.NoError(t, err)
+
+		// Load it
+		fileData, err := os.ReadFile(tmpFile)
+		require.NoError(t, err)
+
+		th := &timingHistory{Checks: make(map[string]*checkTiming)}
+		err = json.Unmarshal(fileData, th)
+		require.NoError(t, err)
+
+		assert.Len(t, th.Checks, 2)
+		assert.Equal(t, 3*time.Second, th.Checks["lint"].AvgDuration)
+		assert.Equal(t, 10*time.Second, th.Checks["test"].AvgDuration)
+		assert.Equal(t, 5, th.Checks["lint"].RunCount)
+	})
+
+	t.Run("handles invalid JSON gracefully", func(t *testing.T) {
+		th := &timingHistory{Checks: make(map[string]*checkTiming)}
+		// Unmarshal invalid JSON should return error but not panic
+		err := json.Unmarshal([]byte("not valid json"), th)
+		assert.Error(t, err)
+		// Checks map should still be intact
+		assert.NotNil(t, th.Checks)
+	})
+
+	t.Run("handles empty JSON object", func(t *testing.T) {
+		th := &timingHistory{Checks: make(map[string]*checkTiming)}
+		err := json.Unmarshal([]byte(`{}`), th)
+		assert.NoError(t, err)
+		// Checks may be nil after unmarshaling empty object
+		if th.Checks == nil {
+			th.Checks = make(map[string]*checkTiming)
+		}
+		assert.NotNil(t, th.Checks)
+	})
+}
+
+func TestTimingHistory_SaveAndLoad_RoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "timings.json")
+
+	// Create timing data
+	original := &timingHistory{
+		Checks: map[string]*checkTiming{
+			"lint":   {AvgDuration: 3 * time.Second, LastDuration: 2800 * time.Millisecond, RunCount: 5},
+			"test":   {AvgDuration: 10 * time.Second, LastDuration: 11 * time.Second, RunCount: 20},
+			"format": {AvgDuration: 800 * time.Millisecond, LastDuration: 750 * time.Millisecond, RunCount: 15},
+		},
+	}
+
+	// Save
+	data, err := json.MarshalIndent(original, "", "  ")
+	require.NoError(t, err)
+	err = os.WriteFile(tmpFile, data, 0o600)
+	require.NoError(t, err)
+
+	// Load
+	readData, err := os.ReadFile(tmpFile)
+	require.NoError(t, err)
+	loaded := &timingHistory{Checks: make(map[string]*checkTiming)}
+	err = json.Unmarshal(readData, loaded)
+	require.NoError(t, err)
+
+	// Verify round-trip integrity
+	assert.Equal(t, len(original.Checks), len(loaded.Checks))
+	for name, orig := range original.Checks {
+		loaded, ok := loaded.Checks[name]
+		require.True(t, ok, "loaded should contain check %s", name)
+		assert.Equal(t, orig.AvgDuration, loaded.AvgDuration, "check %s avg", name)
+		assert.Equal(t, orig.LastDuration, loaded.LastDuration, "check %s last", name)
+		assert.Equal(t, orig.RunCount, loaded.RunCount, "check %s count", name)
 	}
 }

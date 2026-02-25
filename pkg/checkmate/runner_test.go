@@ -704,6 +704,43 @@ func TestRunner_Run_Parallel_MaintainsOrder(t *testing.T) {
 	assert.Equal(t, "third", result.Checks[2].Name)
 }
 
+func TestNewRunner_WithShowTiming(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithShowTiming())
+
+	require.NotNil(t, runner)
+	assert.True(t, runner.showTiming)
+}
+
+func TestRunner_Run_WithShowTiming(t *testing.T) {
+	mock := NewMockPrinter()
+	runner := NewRunner(mock, WithShowTiming(), WithCategory("Timed"))
+
+	runner.
+		AddFunc("pass", func(ctx context.Context) error {
+			time.Sleep(5 * time.Millisecond)
+			return nil
+		}).
+		AddFunc("fail", func(ctx context.Context) error {
+			return errors.New("failed")
+		})
+
+	result := runner.Run(context.Background())
+
+	assert.Equal(t, 1, result.Passed)
+	assert.Equal(t, 1, result.Failed)
+
+	// Verify success message includes timing
+	successCalls := mock.GetCalls("CheckSuccess")
+	require.Len(t, successCalls, 1)
+	assert.Regexp(t, `pass passed \(\d+`, successCalls[0][0], "Success message should include timing")
+
+	// Verify failure message includes timing
+	failCalls := mock.GetCalls("CheckFailure")
+	require.Len(t, failCalls, 1)
+	assert.Regexp(t, `fail failed \(\d+`, failCalls[0][0], "Failure message should include timing")
+}
+
 func TestRunCheckSafe(t *testing.T) {
 	tests := []struct {
 		name        string
