@@ -64,9 +64,81 @@ tasks:
     desc: Run fast quality checks
     cmds: [task: ckeletin:check:fast]
 
+  check:deps:
+    desc: Run all dependency checks
+    cmds: [task: ckeletin:check:deps]
+
+  check:deps:checksum:
+    desc: Verify go.sum checksums against checksum database
+    cmds: [task: ckeletin:check:deps:checksum]
+
+  check:deps:outdated:
+    desc: Check for outdated dependencies
+    cmds: [task: ckeletin:check:deps:outdated]
+
+  check:license:
+    desc: Check all license compliance
+    cmds: [task: ckeletin:check:license]
+
+  check:license:source:
+    desc: Check dependency licenses from source (fast, for development)
+    cmds: [task: ckeletin:check:license:source]
+
+  check:license:binary:
+    desc: Check licenses in compiled binary (accurate, for releases)
+    cmds: [task: ckeletin:check:license:binary]
+
+  check:release:
+    desc: Check if GoReleaser is installed
+    cmds: [task: ckeletin:check:release]
+
+  check:sast:
+    desc: Run static analysis (SAST) with semgrep
+    cmds: [task: ckeletin:check:sast]
+
+  check:sast:full:
+    desc: Run full SAST with registry rules (requires network)
+    cmds: [task: ckeletin:check:sast:full]
+
+  check:sbom:vulns:
+    desc: Scan SBOM for vulnerabilities using grype
+    cmds: [task: ckeletin:check:sbom:vulns]
+
+  check:secrets:
+    desc: Scan for hardcoded secrets (full repository scan)
+    cmds: [task: ckeletin:check:secrets]
+
+  check:tools:installed:
+    desc: Check that required development tools are installed
+    cmds: [task: ckeletin:check:tools:installed]
+
+  check:vuln:
+    desc: Check for vulnerabilities
+    cmds: [task: ckeletin:check:vuln]
+
+  tidy:
+    desc: Ensure go.mod and go.sum are up to date
+    cmds: [task: ckeletin:tidy]
+
+  run:
+    desc: Run the application
+    cmds: [task: ckeletin:run]
+
+  install:
+    desc: Install the application
+    cmds: [task: ckeletin:install]
+
   clean:
     desc: Clean all artifacts
     cmds: [task: ckeletin:clean]
+
+  clean:local:
+    desc: Clean local build artifacts
+    cmds: [task: ckeletin:clean:local]
+
+  clean:release:
+    desc: Clean GoReleaser artifacts
+    cmds: [task: ckeletin:clean:release]
 
   # === Validate Aliases ===
 
@@ -155,6 +227,26 @@ tasks:
     desc: Update golden files (review changes before committing!)
     cmds: [task: ckeletin:test:golden:update]
 
+  test:full:
+    desc: Run all tests with both race detection and coverage
+    cmds: [task: ckeletin:test:full]
+
+  test:watch:
+    desc: Run tests in watch mode
+    cmds: [task: ckeletin:test:watch]
+
+  test:fuzz:
+    desc: Run all fuzz tests (default 10s per function)
+    cmds: [task: ckeletin:test:fuzz]
+
+  test:release:
+    desc: Test GoReleaser configuration (snapshot build, no release)
+    cmds: [task: ckeletin:test:release]
+
+  test:coverage:html:
+    desc: Generate HTML coverage report and open in browser
+    cmds: [task: ckeletin:test:coverage:html]
+
   build:dev:
     desc: Build the binary with dev commands
     cmds: [task: ckeletin:build:dev]
@@ -163,15 +255,41 @@ tasks:
     desc: Build production binary without dev commands
     cmds: [task: ckeletin:build:prod]
 
+  build:release:
+    desc: Build release artifacts locally (requires git tag)
+    cmds: [task: ckeletin:build:release]
+
+  # === Bench Aliases ===
+
+  bench:
+    desc: Run all benchmarks
+    cmds: [task: ckeletin:bench]
+
   # === Generate Aliases ===
 
   generate:config:key-constants:
     desc: Generate type-safe config key constants
     cmds: [task: ckeletin:generate:config:key-constants]
 
+  generate:license:
+    desc: Generate all license artifacts
+    cmds: [task: ckeletin:generate:license]
+
   generate:license:report:
     desc: Generate license report (CSV format)
     cmds: [task: ckeletin:generate:license:report]
+
+  generate:license:files:
+    desc: Save license files to third_party/ for distribution
+    cmds: [task: ckeletin:generate:license:files]
+
+  generate:attribution:
+    desc: Generate NOTICE file with attribution
+    cmds: [task: ckeletin:generate:attribution]
+
+  generate:sbom:
+    desc: Generate SBOM in both SPDX and CycloneDX formats
+    cmds: [task: ckeletin:generate:sbom]
 
   # === Project-Specific Tasks ===
 
