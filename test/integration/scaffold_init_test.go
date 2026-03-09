@@ -12,9 +12,11 @@
 package integration
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -348,4 +350,272 @@ func getCurrentModule(t *testing.T) string {
 	}
 
 	return strings.TrimPrefix(firstLine, "module ")
+}
+
+// TestFrameworkUpdate tests the framework update workflow.
+// It simulates a downstream project receiving a .ckeletin/ update from upstream
+// and verifies that the project still builds, has no stale module references,
+// and that all task aliases resolve to existing framework tasks.
+func TestFrameworkUpdate(t *testing.T) {
+	// Skip in derived projects - this test only makes sense in the upstream repo
+	currentModule := getCurrentModule(t)
+	if currentModule != upstreamModule {
+		t.Skipf("Framework update test only runs in upstream repo (current: %s, upstream: %s)", currentModule, upstreamModule)
+	}
+
+	_, taskErr := exec.LookPath("task")
+	useTaskFallback := taskErr != nil
+	if useTaskFallback {
+		t.Log("task command not found, using direct script execution as fallback")
+	}
+
+	// Create temp directory for test
+	tmpDir := t.TempDir()
+
+	// Step 1: Copy project to temp dir and set up git
+	t.Log("Copying project to temp directory")
+	err := copyProjectFiles(tmpDir)
+	require.NoError(t, err, "failed to copy project files")
+
+	runGit(t, tmpDir, "init")
+	runGit(t, tmpDir, "config", "user.email", "test@ckeletin-go.example")
+	runGit(t, tmpDir, "config", "user.name", "Test User")
+	runGit(t, tmpDir, "add", ".")
+	runGit(t, tmpDir, "commit", "-m", "Initial commit")
+
+	// Step 2: Run scaffold init to simulate a downstream project
+	testName := "updatetest"
+	testModule := "github.com/test/updatetest"
+	oldModule := upstreamModule // Use constant to avoid replacement by scaffold-init
+	oldName := "ckeletin-go"
+
+	if useTaskFallback {
+		t.Log("Running scaffold-init.go directly")
+		cmd := exec.Command("go", "run", ".ckeletin/scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))
+
+		tidyCmd := exec.Command("go", "mod", "tidy")
+		tidyCmd.Dir = tmpDir
+		tidyOutput, err := tidyCmd.CombinedOutput()
+		require.NoError(t, err, "go mod tidy failed\nOutput: %s", string(tidyOutput))
+	} else {
+		t.Logf("Running: task init name=%s module=%s", testName, testModule)
+		cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "task init failed\nOutput: %s", string(output))
+	}
+
+	// Commit the initialized state
+	runGit(t, tmpDir, "add", ".")
+	runGit(t, tmpDir, "commit", "-m", "Initialize as downstream project")
+
+	// Step 3: Simulate framework update by re-copying .ckeletin/ from source
+	projectRoot := getProjectRoot(t)
+	srcCkeletin := filepath.Join(projectRoot, ".ckeletin")
+	dstCkeletin := filepath.Join(tmpDir, ".ckeletin")
+
+	// Remove existing .ckeletin/ and re-copy from source (simulates git checkout upstream -- .ckeletin/)
+	err = os.RemoveAll(dstCkeletin)
+	require.NoError(t, err, "failed to remove .ckeletin")
+
+	err = copyDir(srcCkeletin, dstCkeletin)
+	require.NoError(t, err, "failed to copy .ckeletin from source")
+
+	// Replace upstream module references with downstream module in .ckeletin/*.go
+	err = filepath.Walk(dstCkeletin, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
+			return walkErr
+		}
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+		updated := strings.ReplaceAll(string(content), upstreamModule, testModule)
+		if updated != string(content) {
+			return os.WriteFile(path, []byte(updated), info.Mode())
+		}
+		return nil
+	})
+	require.NoError(t, err, "failed to replace module paths in .ckeletin")
+
+	// Run go mod tidy after update
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = tmpDir
+	tidyOutput, err := tidyCmd.CombinedOutput()
+	require.NoError(t, err, "go mod tidy after update failed\nOutput: %s", string(tidyOutput))
+
+	// Subtests
+	t.Run("build succeeds after update", func(t *testing.T) {
+		cmd := exec.Command("go", "build", "./...")
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		assert.NoError(t, err, "go build failed after framework update\nOutput: %s", string(output))
+	})
+
+	t.Run("no stale module references", func(t *testing.T) {
+		var filesWithStaleRefs []string
+		err := filepath.Walk(filepath.Join(tmpDir, ".ckeletin"), func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
+				return walkErr
+			}
+			content, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			if strings.Contains(string(content), upstreamModule) {
+				relPath, _ := filepath.Rel(tmpDir, path)
+				filesWithStaleRefs = append(filesWithStaleRefs, relPath)
+			}
+			return nil
+		})
+		require.NoError(t, err, "failed to walk .ckeletin")
+		assert.Empty(t, filesWithStaleRefs,
+			"found stale upstream module references after update:\n%s",
+			strings.Join(filesWithStaleRefs, "\n"))
+	})
+
+	t.Run("task aliases resolve", func(t *testing.T) {
+		projectTaskfile := filepath.Join(tmpDir, "Taskfile.yml")
+		frameworkTaskfile := filepath.Join(tmpDir, ".ckeletin", "Taskfile.yml")
+
+		aliasTargets := parseTaskAliasTargets(t, projectTaskfile)
+		frameworkTasks := parseFrameworkTaskNames(t, frameworkTaskfile)
+
+		require.NotEmpty(t, aliasTargets, "no alias targets found in project Taskfile")
+		require.NotEmpty(t, frameworkTasks, "no tasks found in framework Taskfile")
+
+		// Build a set of framework task names for fast lookup
+		taskSet := make(map[string]bool)
+		for _, name := range frameworkTasks {
+			taskSet[name] = true
+		}
+
+		var unresolved []string
+		for _, target := range aliasTargets {
+			// target is like "ckeletin:check" — strip the "ckeletin:" prefix
+			// to get the task name in .ckeletin/Taskfile.yml
+			parts := strings.SplitN(target, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			taskName := parts[1]
+			if !taskSet[taskName] {
+				unresolved = append(unresolved, target+" (task '"+taskName+"' not found in framework)")
+			}
+		}
+
+		assert.Empty(t, unresolved,
+			"alias targets in Taskfile.yml point to missing framework tasks:\n%s",
+			strings.Join(unresolved, "\n"))
+	})
+}
+
+// runGit executes a git command in the given directory and requires it to succeed.
+func runGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "git %s failed\nOutput: %s", strings.Join(args, " "), string(output))
+}
+
+// getProjectRoot returns the absolute path to the project root (two levels up from test/integration).
+func getProjectRoot(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err, "failed to get project root")
+	return root
+}
+
+// copyDir recursively copies a directory tree from src to dst.
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+			return err
+		}
+
+		srcFile, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer srcFile.Close()
+
+		dstFile, err := os.Create(dstPath)
+		if err != nil {
+			return err
+		}
+		defer dstFile.Close()
+
+		if _, err := io.Copy(dstFile, srcFile); err != nil {
+			return err
+		}
+
+		return os.Chmod(dstPath, info.Mode())
+	})
+}
+
+// parseTaskAliasTargets extracts all ckeletin: alias targets from a project Taskfile.
+// It finds patterns like [task: ckeletin:X] and returns the full target strings.
+func parseTaskAliasTargets(t *testing.T, path string) []string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read %s", path)
+
+	re := regexp.MustCompile(`\[task:\s*(ckeletin:\S+)\]`)
+	matches := re.FindAllStringSubmatch(string(content), -1)
+
+	var targets []string
+	for _, m := range matches {
+		targets = append(targets, m[1])
+	}
+	return targets
+}
+
+// parseFrameworkTaskNames extracts all task names from a .ckeletin/Taskfile.yml.
+// It parses top-level keys under the "tasks:" section.
+func parseFrameworkTaskNames(t *testing.T, path string) []string {
+	t.Helper()
+	content, err := os.ReadFile(path)
+	require.NoError(t, err, "failed to read %s", path)
+
+	var names []string
+	inTasks := false
+	// Match lines with exactly 2-space indent followed by a task name and colon
+	re := regexp.MustCompile(`^  ([a-zA-Z0-9][a-zA-Z0-9:._-]*):\s*$`)
+
+	for _, line := range strings.Split(string(content), "\n") {
+		if strings.TrimSpace(line) == "tasks:" {
+			inTasks = true
+			continue
+		}
+		if !inTasks {
+			continue
+		}
+		// Stop if we hit a non-indented, non-comment line (outside tasks section)
+		if len(line) > 0 && line[0] != ' ' && line[0] != '#' {
+			break
+		}
+		if m := re.FindStringSubmatch(line); m != nil {
+			names = append(names, m[1])
+		}
+	}
+	return names
 }
