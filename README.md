@@ -32,7 +32,7 @@
 ckeletin-go gives you production-ready infrastructure so you can focus on YOUR feature, not learning Cobra.
 
 - **Read the code in 5 minutes** - Ultra-thin commands (~20 lines each). No framework magic to decode.
-- **Ship with >80% test coverage** - Hundreds of real tests. Integration + unit. You won't break production.
+- **Ship with ≥85% test coverage** - Hundreds of real tests. Integration + unit. You won't break production.
 - **One command setup** - `task init name=myapp module=...` updates 40+ files. Start coding in 2 minutes.
 - **Learn as you build** - ADRs explain every decision. Level up while shipping.
 - **Production-ready logging** - Debug issues without SSH-ing into servers.
@@ -85,6 +85,8 @@ Now add your feature and look like a senior engineer.
       - [Usage](#usage)
       - [Flags](#flags)
       - [Examples](#examples)
+    - [`check` Command (Dev Build Only)](#check-command-dev-build-only)
+    - [`dev` Command Group (Dev Build Only)](#dev-command-group-dev-build-only)
   - [Development Workflow](#development-workflow)
     - [Essential Task Commands](#essential-task-commands)
     - [Development Tools \& Reproducibility](#development-tools--reproducibility)
@@ -127,7 +129,7 @@ Each command manages its own configuration and defaults, promoting modularity an
 ## Key Highlights
 
 - **Readable Architecture**: Ultra-thin commands (~20 lines each) mean you can understand and modify code in minutes, not days
-- **Production-Ready Testing**: >80% test coverage enforced. Integration + unit tests. CI fails if quality drops
+- **Production-Ready Testing**: ≥85% test coverage enforced. Integration + unit tests. CI fails if quality drops
 - **One-Command Customization**: `task init` updates 40+ files automatically. No find/replace hell
 - **Learn While You Build**: Comprehensive ADRs document every architectural decision. Level up your Go skills
 - **Enterprise License Compliance**: Automated GPL/AGPL blocking prevents legal contamination. Build proprietary products worry-free
@@ -180,7 +182,8 @@ Each command manages its own configuration and defaults, promoting modularity an
   - **Customizable policy**: Override allowed licenses via environment or `.lichen.yaml`
   - See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md) for details
 - **Task Automation**: One Taskfile to define all build, test, and lint tasks.
-- **High Test Coverage & Quality Checks**: >80% coverage enforced by CI. Hundreds of real tests ensure a robust codebase that meets production standards.
+- **High Test Coverage & Quality Checks**: ≥85% coverage enforced by CI. Hundreds of real tests ensure a robust codebase that meets production standards.
+- **Beautiful Check Output**: The `pkg/checkmate` library provides thread-safe, TTY-aware terminal output for CLI check results with automatic color detection.
 
 ---
 
@@ -201,6 +204,9 @@ All architectural decisions are documented in **[Architecture Decision Records (
 - Centralized configuration registry with type-safe constants ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md))
 - Dependency injection over mocking for testability ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
 - Dual-tool license compliance checking (source + binary) ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
+- Dev-only commands via build tags for development tooling ([ADR-012](.ckeletin/docs/adr/012-dev-commands-build-tags.md))
+- Structured output with shadow logging and checkmate patterns ([ADR-013](.ckeletin/docs/adr/013-structured-output-patterns.md))
+- Every ADR enforced by automation ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md))
 - Automated validation prevents architectural drift (`task validate:layering`)
 
 ---
@@ -218,8 +224,15 @@ myapp/
 │   └── docs/adr/           # Framework ADRs (000-099)
 │
 ├── Taskfile.yml            # PROJECT - your task aliases + custom tasks
-├── cmd/                    # Your commands (ping is an example)
-├── internal/               # Your business logic + UI
+├── cmd/                    # Your commands (ping, check, dev)
+├── internal/               # Your business logic
+│   ├── check/              # Quality check executor and timing
+│   ├── dev/                # Dev command logic
+│   ├── ping/               # Ping command logic
+│   ├── ui/                 # Bubble Tea UI components
+│   └── ...                 # Other internal packages
+├── pkg/                    # Public reusable libraries
+│   └── checkmate/          # Beautiful terminal check output
 ├── docs/adr/               # Your ADRs (100+)
 └── .golangci.yml           # Your tool configs (customize freely)
 ```
@@ -521,6 +534,46 @@ Validate configuration files for correctness, security, and completeness.
 
 **Security features:** File size limits, permission checks, value validation.
 
+### `check` Command (Dev Build Only)
+
+Run comprehensive quality checks with beautiful TUI output. Available only in dev builds (`go build -tags dev`).
+
+#### Usage
+
+```bash
+# Run all checks
+./myapp check
+
+# Run specific category
+./myapp check --category quality
+./myapp check --category dependencies
+
+# Additional options
+./myapp check --fail-fast --verbose
+```
+
+#### Categories
+
+- **Development Environment** - Tool versions, Go installation
+- **Code Quality** - Format, lint
+- **Architecture Validation** - Command patterns, layering, constants
+- **Dependencies** - Verification, vulnerabilities, licenses
+- **Tests** - Unit, integration, race detection
+
+Output uses the `pkg/checkmate` library for beautiful, TTY-aware terminal rendering with timing history and progress indicators.
+
+### `dev` Command Group (Dev Build Only)
+
+Development tools available only in dev builds (`go build -tags dev`).
+
+```bash
+./myapp dev config          # Inspect configuration (list, show, export, validate)
+./myapp dev doctor          # Check environment health
+./myapp dev progress        # Show development progress
+```
+
+See [ADR-012](.ckeletin/docs/adr/012-dev-commands-build-tags.md) for the build tag separation strategy.
+
 ---
 
 ## Development Workflow
@@ -557,14 +610,17 @@ task check:tools:version       # Strict version verification (CI workflow)
 task check:tools:updates       # Discover available tool updates
 ```
 
-**Pinned Tools** (defined in `Taskfile.yml`):
+**Pinned Tools** (defined in `.ckeletin/Taskfile.yml`):
 - **goimports** v0.28.0 - Code formatting
 - **golangci-lint** v2.3.0 - Comprehensive linting
-- **gotestsum** latest - Test runner (Go 1.25.x compatible)
-- **govulncheck** latest - Security vulnerability scanning (Go 1.25.x compatible)
+- **gotestsum** latest - Test runner
+- **govulncheck** latest - Security vulnerability scanning
 - **lefthook** v1.7.18 - Git hooks management
 - **go-licenses** v2.0.1 - Source-based license compliance (CRITICAL: pinned for reproducibility)
 - **lichen** v0.1.7 - Binary-based license compliance (CRITICAL: pinned for reproducibility)
+- **syft** v1.18.1 - SBOM generation
+- **gitleaks** latest - Secret detection
+- **grype** latest - Container vulnerability scanning
 
 **License Compliance Tasks:**
 ```bash
