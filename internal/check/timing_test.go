@@ -266,9 +266,12 @@ func TestTimingHistory_Save(t *testing.T) {
 		require.NoError(t, err)
 
 		// File should be readable/writable only by owner (0600)
-		perm := info.Mode().Perm()
-		assert.Equal(t, os.FileMode(0o600), perm,
-			"file should have 0600 permissions, got %o", perm)
+		// Windows doesn't support Unix file permissions
+		if runtime.GOOS != "windows" {
+			perm := info.Mode().Perm()
+			assert.Equal(t, os.FileMode(0o600), perm,
+				"file should have 0600 permissions, got %o", perm)
+		}
 	})
 
 	t.Run("saves empty checks map without error", func(t *testing.T) {
