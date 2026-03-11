@@ -2,7 +2,7 @@
 # Check if patch/diff coverage meets minimum threshold
 # Similar to codecov/patch check - only checks coverage of changed lines
 
-set -e
+set -eo pipefail
 
 COVERAGE_FILE="${COVERAGE_FILE:-coverage.txt}"
 MIN_PATCH_COVERAGE="${MIN_PATCH_COVERAGE:-80.0}"
@@ -104,6 +104,6 @@ else
     echo "💡 Tips:"
     echo "   - Add tests for new functions"
     echo "   - Cover error paths and edge cases"  
-    echo "   - Run 'task test:coverage-html' to see uncovered lines"
+    echo "   - Run 'task test:coverage:html' to see uncovered lines"
     exit 1
 fi

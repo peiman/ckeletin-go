@@ -402,7 +402,7 @@ When adding a new command (e.g., `analyze`):
 ```
 [ ] Create cmd/analyze.go (≤30 lines, wiring only)
 [ ] Create internal/analyze/ package for business logic
-[ ] Add config options to internal/config/registry.go
+[ ] Add config options to .ckeletin/pkg/config/registry.go
 [ ] Run: task generate:config:key-constants
 [ ] Write unit tests in internal/analyze/*_test.go
 [ ] Add integration test in test/integration/ (if needed)
@@ -453,7 +453,7 @@ When adding a new command (e.g., `analyze`):
 
 **How ckeletin-go handles configuration:**
 
-1. **Define in Registry** (`internal/config/registry.go`)
+1. **Define in Registry** (`.ckeletin/pkg/config/registry.go`)
    ```go
    {
        Key:          "app.feature.enabled",
@@ -466,12 +466,12 @@ When adding a new command (e.g., `analyze`):
 2. **Generate Constants**
    ```bash
    task generate:config:key-constants
-   # Creates internal/config/keys_generated.go
+   # Creates .ckeletin/pkg/config/keys_generated.go
    ```
 
 3. **Use Type-Safe Retrieval**
    ```go
-   import "github.com/peiman/ckeletin-go/internal/config"
+   import "github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 
    enabled := viper.GetBool(config.KeyAppFeatureEnabled)
    ```

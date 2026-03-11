@@ -6,7 +6,7 @@
 #   fix   - Format files in place (default)
 #   check - Check if files are formatted, fail if not (CI mode)
 
-set -e
+set -eo pipefail
 
 # Source standard output functions (only for check mode)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

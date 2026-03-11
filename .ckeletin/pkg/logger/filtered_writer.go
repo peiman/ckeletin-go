@@ -1,4 +1,4 @@
-// internal/logger/filtered_writer.go
+// .ckeletin/pkg/logger/filtered_writer.go
 //
 // FilteredWriter provides level-based filtering for zerolog outputs.
 // This allows different log levels to be sent to different destinations

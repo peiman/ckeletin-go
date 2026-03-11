@@ -461,6 +461,12 @@ tasks:
     cmds:
       - '{{.SCRIPTS_DIR}}/validate-task-naming.sh'
 
+  validate:dev-build-tags:
+    desc: Validate dev command files have //go:build dev tag (enforces ADR-012)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-dev-build-tags.sh'
+
   # --- Testing ---
 
   test:
@@ -496,13 +502,13 @@ tasks:
   test:race:
     desc: Run tests with race detection
     cmd: |
-      gotestsum --format standard-verbose --jsonfile {{.TEST_OUTPUT_JSON}} -- -v -race ./...
+      gotestsum --format standard-verbose --jsonfile {{.TEST_OUTPUT_JSON}} -- -v -race -tags dev ./...
 
   test:full:
     desc: Run all tests with both race detection and coverage
     silent: true
     cmd: |
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -729,6 +735,7 @@ tasks:
       - task: validate:config-consumption
       - task: validate:output
       - task: validate:security
+      - task: validate:dev-build-tags
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Security Scanning"
@@ -787,6 +794,7 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
+      - task: validate:dev-build-tags
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Tests (Unit Only)"

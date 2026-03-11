@@ -1,4 +1,4 @@
-// internal/config/command_metadata.go
+// .ckeletin/pkg/config/command_metadata.go
 //
 // This file defines the CommandMetadata type used for command metadata.
 // Command metadata provides all the information needed to create a Cobra command

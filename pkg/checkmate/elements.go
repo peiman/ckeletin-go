@@ -119,17 +119,14 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 	}
 
 	// Style the box based on status
-	var boxStyle, iconStyled, titleStyled string
+	var iconStyled, titleStyled string
 	if status == StatusSuccess {
-		boxStyle = p.style(p.theme.SuccessStyle, "")
 		iconStyled = p.style(p.theme.SuccessStyle, p.theme.IconSuccess)
 		titleStyled = p.style(p.theme.SuccessStyle, title)
 	} else {
-		boxStyle = p.style(p.theme.FailureStyle, "")
 		iconStyled = p.style(p.theme.FailureStyle, p.theme.IconFailure)
 		titleStyled = p.style(p.theme.FailureStyle, title)
 	}
-	_ = boxStyle // Used for color reference
 
 	// Build the box
 	horizontalLine := strings.Repeat(horizontal, width-2)

@@ -380,9 +380,9 @@ func initConfig() error {
 	// Validate default values to ensure they don't exceed limits
 	// This catches programming errors in default value definitions
 	if errs := config.ValidateAllConfigValues(viper.AllSettings()); len(errs) > 0 {
-		log.Error().Int("error_count", len(errs)).Msg("Invalid default configuration values detected")
+		log.Debug().Int("error_count", len(errs)).Msg("Invalid default configuration values detected")
 		for i, err := range errs {
-			log.Error().Int("error_num", i+1).Err(err).Msg("Default validation error")
+			log.Debug().Int("error_num", i+1).Err(err).Msg("Default validation error")
 		}
 		return fmt.Errorf("configuration has %d invalid default value(s) - this is a programming error", len(errs))
 	}
@@ -393,7 +393,7 @@ func initConfig() error {
 			configFileStatus = "No config file found, using defaults and environment variables"
 		} else {
 			// This error needs to be reported immediately
-			log.Error().Err(err).Msg("Failed to read config file")
+			log.Debug().Err(err).Msg("Failed to read config file")
 			return fmt.Errorf("failed to read config file: %w", err)
 		}
 	} else {
@@ -402,7 +402,7 @@ func initConfig() error {
 
 		// Security validation after viper finds and reads the config
 		if err := config.ValidateConfigFileSecurity(configFileUsed, config.MaxConfigFileSize); err != nil {
-			log.Error().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
+			log.Debug().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
 			return fmt.Errorf("config file security validation failed: %w", err)
 		}
 	}

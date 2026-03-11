@@ -7,7 +7,7 @@ set -e
 echo "Setting up development environment for ckeletin-go..."
 
 # Add go/bin to PATH if not already there
-export PATH="/root/go/bin:$PATH"
+export PATH="${HOME}/go/bin:$PATH"
 
 # Function to check if a command exists
 command_exists() {
@@ -35,7 +35,7 @@ install_tool "task" "github.com/go-task/task/v3/cmd/task@latest"
 install_tool "goimports" "golang.org/x/tools/cmd/goimports@latest"
 install_tool "govulncheck" "golang.org/x/vuln/cmd/govulncheck@latest"
 install_tool "gotestsum" "gotest.tools/gotestsum@latest"
-install_tool "golangci-lint" "github.com/golangci/golangci-lint/cmd/golangci-lint@latest"
+install_tool "golangci-lint" "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.3.0"
 install_tool "go-mod-outdated" "github.com/psampaz/go-mod-outdated@latest"
 
 # Optional: lefthook (may fail due to network/version issues, not critical)
@@ -46,7 +46,7 @@ fi
 
 echo ""
 echo "✅ Development environment ready!"
-echo "   All essential tools installed in /root/go/bin"
+echo "   All essential tools installed in ${HOME}/go/bin"
 echo ""
 echo "   You can now use task commands:"
 echo "   - task format     # Format code"

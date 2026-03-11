@@ -20,7 +20,6 @@ func PrintColoredMessage(out io.Writer, message, col string) error {
 
 	colorStyle, err := GetLipglossColor(col)
 	if err != nil {
-		log.Error().Err(err).Str("component", "ui").Str("color", col).Msg("Invalid color")
 		return fmt.Errorf("invalid color: %w", err)
 	}
 
@@ -29,7 +28,7 @@ func PrintColoredMessage(out io.Writer, message, col string) error {
 	log.Debug().Str("component", "ui").Msg("Attempting to write styled message")
 	_, err = fmt.Fprintln(out, style.Render(message))
 	if err != nil {
-		log.Error().
+		log.Debug().
 			Err(err).
 			Str("component", "ui").
 			Str("message", message).

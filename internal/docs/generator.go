@@ -72,7 +72,7 @@ func (g *Generator) Generate() error {
 		file = nil // Mark as closed so defer doesn't try again
 
 		if closeErr != nil {
-			log.Error().Err(closeErr).Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
+			log.Debug().Err(closeErr).Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Failed to close output file")
 			// Handle both generation and close errors
 			if err != nil {
 				// Both errors occurred - join them properly using errors.Join

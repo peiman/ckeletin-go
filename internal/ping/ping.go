@@ -76,7 +76,7 @@ func (e *Executor) Execute() error {
 
 	// Validate color before proceeding (Business Rule)
 	if _, err := ui.GetLipglossColor(e.cfg.Color); err != nil {
-		log.Error().Err(err).Str("color", e.cfg.Color).Msg("Invalid color configuration")
+		log.Debug().Err(err).Str("color", e.cfg.Color).Msg("Invalid color configuration")
 		return fmt.Errorf("invalid color: %w", err)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/mattn/go-isatty"
@@ -16,6 +17,9 @@ import (
 )
 
 var (
+	// loggerMu protects mutable package-level state for thread safety.
+	// In practice, Cobra is sequential, but this is correct for a public API.
+	loggerMu sync.Mutex
 	// logFile holds the open log file handle for cleanup
 	logFile io.Closer
 	// currentConsoleLevel holds the current console log level for runtime adjustment
@@ -150,6 +154,8 @@ func Init(out io.Writer) error {
 // Cleanup closes any open log files and performs cleanup.
 // Should be called with defer after Init().
 func Cleanup() {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	if logFile != nil {
 		if err := logFile.Close(); err != nil {
 			// Can't use logger here as it might be cleaning up
@@ -318,8 +324,10 @@ func rebuildLogger() {
 // SetConsoleLevel dynamically changes the console log level at runtime.
 // This allows adjusting verbosity without restarting the application.
 func SetConsoleLevel(level zerolog.Level) {
+	loggerMu.Lock()
 	currentConsoleLevel = level
 	rebuildLogger()
+	loggerMu.Unlock()
 	log.Info().
 		Str("level", level.String()).
 		Msg("Console log level changed")
@@ -328,8 +336,10 @@ func SetConsoleLevel(level zerolog.Level) {
 // SetFileLevel dynamically changes the file log level at runtime.
 // This allows adjusting file log verbosity without restarting the application.
 func SetFileLevel(level zerolog.Level) {
+	loggerMu.Lock()
 	currentFileLevel = level
 	rebuildLogger()
+	loggerMu.Unlock()
 	log.Info().
 		Str("level", level.String()).
 		Msg("File log level changed")
@@ -337,11 +347,15 @@ func SetFileLevel(level zerolog.Level) {
 
 // GetConsoleLevel returns the current console log level.
 func GetConsoleLevel() zerolog.Level {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	return currentConsoleLevel
 }
 
 // GetFileLevel returns the current file log level.
 func GetFileLevel() zerolog.Level {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	return currentFileLevel
 }
 

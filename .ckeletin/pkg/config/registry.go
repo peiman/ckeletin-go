@@ -1,4 +1,4 @@
-// internal/config/registry.go
+// .ckeletin/pkg/config/registry.go
 //
 // Centralized configuration registry.
 //

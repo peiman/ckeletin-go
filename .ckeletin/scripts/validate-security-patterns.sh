@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # scripts/validate-security-patterns.sh
 # Enforces ADR-004: Security Validation in Configuration

@@ -1,4 +1,4 @@
-// internal/logger/sanitize.go
+// .ckeletin/pkg/logger/sanitize.go
 //
 // Sanitization functions for log output to prevent log injection and information leakage
 

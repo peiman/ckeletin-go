@@ -6,7 +6,7 @@
 # - _tui.go files (TUI code requires interactive testing)
 # - /demo/ directories (demo code is for documentation)
 
-set -e
+set -eo pipefail
 
 COVERAGE_FILE="${COVERAGE_FILE:-coverage.txt}"
 MIN_COVERAGE="${MIN_COVERAGE:-85.0}"

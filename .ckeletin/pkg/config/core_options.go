@@ -1,4 +1,4 @@
-// internal/config/core_options.go
+// .ckeletin/pkg/config/core_options.go
 //
 // Core application configuration options
 //

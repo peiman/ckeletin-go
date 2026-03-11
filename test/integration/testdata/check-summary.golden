@@ -2,7 +2,6 @@
 ✅ All checks passed (20/20)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ Development tools installed
 ✅ Code formatting
 ✅ Linting
 ✅ ADR-001: Ultra-thin command pattern
@@ -10,18 +9,19 @@
 ✅ ADR-002: Type-safe config consumption
 ✅ ADR-004: Security patterns
 ✅ ADR-005: Config constants in sync
+✅ ADR-000: Task naming
 ✅ ADR-008: Architecture SSOT
 ✅ ADR-009: Layered architecture
 ✅ ADR-010: Package organization
-✅ ADR-012: Output patterns
+✅ ADR-013: Output patterns
+✅ ADR-012: Dev build tags
 ✅ No hardcoded secrets (gitleaks)
 ✅ Static analysis passed (semgrep)
 ✅ Dependency integrity
-✅ No security vulnerabilities
 ✅ License compliance (source)
 ✅ License compliance (binary)
 ✅ SBOM vulnerability scan
-✅ All tests passing
+✅ All tests passing (unit + integration + race)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚀 Ready to commit!

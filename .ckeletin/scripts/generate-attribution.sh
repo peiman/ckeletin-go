@@ -3,8 +3,9 @@
 # Required for Apache-2.0 dependencies and binary distributions
 # See: ADR-011 License Compliance Strategy
 
-set -e
+set -eo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUTPUT="NOTICE"
 CSV_REPORT="reports/licenses.csv"
 
@@ -17,7 +18,7 @@ echo ""
 if [ ! -f "$CSV_REPORT" ]; then
     echo "⚠️  License report not found, generating..."
     echo ""
-    if ! ./scripts/generate-license-report.sh; then
+    if ! "${SCRIPT_DIR}/generate-license-report.sh"; then
         echo "❌ Failed to generate license report"
         exit 1
     fi

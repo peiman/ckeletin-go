@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # scripts/validate-output-patterns.sh
 # Enforces ADR-012: Structured Output and Shadow Logging

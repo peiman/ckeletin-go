@@ -1,4 +1,4 @@
-// internal/config/security.go
+// .ckeletin/pkg/config/security.go
 //
 // Security validation functions for configuration files
 

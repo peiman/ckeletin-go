@@ -186,39 +186,37 @@ func NewMockRunner() *MockRunner {
 	return &MockRunner{}
 }
 
-// Add records the check.
-func (m *MockRunner) Add(check Check) *Runner {
+// Add records the check. Returns the mock for chaining.
+func (m *MockRunner) Add(check Check) RunnerInterface {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.checks = append(m.checks, check)
-	// Return nil - this is a mock, chaining is not supported
-	return nil
+	return m
 }
 
-// AddFunc records the check.
-func (m *MockRunner) AddFunc(name string, fn func(ctx context.Context) error) *Runner {
-	m.Add(Check{Name: name, Fn: fn})
-	return nil
+// AddFunc records the check. Returns the mock for chaining.
+func (m *MockRunner) AddFunc(name string, fn func(ctx context.Context) error) RunnerInterface {
+	return m.Add(Check{Name: name, Fn: fn})
 }
 
-// WithRemediation sets remediation for the last check.
-func (m *MockRunner) WithRemediation(text string) *Runner {
+// WithRemediation sets remediation for the last check. Returns the mock for chaining.
+func (m *MockRunner) WithRemediation(text string) RunnerInterface {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.checks) > 0 {
 		m.checks[len(m.checks)-1].Remediation = text
 	}
-	return nil
+	return m
 }
 
-// WithDetails sets details for the last check.
-func (m *MockRunner) WithDetails(text string) *Runner {
+// WithDetails sets details for the last check. Returns the mock for chaining.
+func (m *MockRunner) WithDetails(text string) RunnerInterface {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.checks) > 0 {
 		m.checks[len(m.checks)-1].Details = text
 	}
-	return nil
+	return m
 }
 
 // Run records the call and returns a configurable result.

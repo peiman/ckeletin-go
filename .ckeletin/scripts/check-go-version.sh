@@ -6,7 +6,7 @@
 #   ./scripts/check-go-version.sh         # Strict match (for CI)
 #   ./scripts/check-go-version.sh --minor # Minor version match (for dev)
 
-set -e
+set -eo pipefail
 
 GO_VERSION_FILE=".go-version"
 GO_MOD_FILE="go.mod"

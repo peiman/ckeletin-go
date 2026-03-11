@@ -128,7 +128,7 @@ func NewRunner(printer PrinterInterface, opts ...RunnerOption) *Runner {
 //	    Fn:          checkSecurity,
 //	    Remediation: "Run: task check:vuln",
 //	})
-func (r *Runner) Add(check Check) *Runner {
+func (r *Runner) Add(check Check) RunnerInterface {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.checks = append(r.checks, check)
@@ -141,7 +141,7 @@ func (r *Runner) Add(check Check) *Runner {
 // Example:
 //
 //	runner.AddFunc("format", checkFormat).AddFunc("lint", checkLint)
-func (r *Runner) AddFunc(name string, fn func(ctx context.Context) error) *Runner {
+func (r *Runner) AddFunc(name string, fn func(ctx context.Context) error) RunnerInterface {
 	return r.Add(Check{Name: name, Fn: fn})
 }
 
@@ -151,7 +151,7 @@ func (r *Runner) AddFunc(name string, fn func(ctx context.Context) error) *Runne
 // Example:
 //
 //	runner.AddFunc("format", checkFormat).WithRemediation("Run: task format")
-func (r *Runner) WithRemediation(text string) *Runner {
+func (r *Runner) WithRemediation(text string) RunnerInterface {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.checks) > 0 {
@@ -166,7 +166,7 @@ func (r *Runner) WithRemediation(text string) *Runner {
 // Example:
 //
 //	runner.AddFunc("security", checkSecurity).WithDetails("Uses govulncheck")
-func (r *Runner) WithDetails(text string) *Runner {
+func (r *Runner) WithDetails(text string) RunnerInterface {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.checks) > 0 {

@@ -1,4 +1,4 @@
-// internal/config/options.go
+// .ckeletin/pkg/config/command_options.go
 //
 // ConfigOption type definition and related methods
 //

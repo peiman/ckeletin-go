@@ -69,16 +69,16 @@ type PrinterInterface interface {
 // allowing easy substitution of MockRunner in tests.
 type RunnerInterface interface {
 	// Add adds a check to the runner. Returns the runner for chaining.
-	Add(check Check) *Runner
+	Add(check Check) RunnerInterface
 
 	// AddFunc is a convenience for adding simple checks.
-	AddFunc(name string, fn func(ctx context.Context) error) *Runner
+	AddFunc(name string, fn func(ctx context.Context) error) RunnerInterface
 
 	// WithRemediation sets remediation text for the last added check.
-	WithRemediation(text string) *Runner
+	WithRemediation(text string) RunnerInterface
 
 	// WithDetails sets details text for the last added check.
-	WithDetails(text string) *Runner
+	WithDetails(text string) RunnerInterface
 
 	// Run executes all checks and returns results.
 	Run(ctx context.Context) RunResult

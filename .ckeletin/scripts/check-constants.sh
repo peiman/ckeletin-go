@@ -2,7 +2,7 @@
 # Check if config constants are up-to-date with the registry
 # This script ensures that internal/config/keys_generated.go is in sync with the config registry
 
-set -e
+set -eo pipefail
 
 # Source standard output functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

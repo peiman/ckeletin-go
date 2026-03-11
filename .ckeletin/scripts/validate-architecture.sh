@@ -9,7 +9,7 @@
 #
 # This prevents documentation drift and duplication
 
-set -e
+set -eo pipefail
 
 # Source standard output functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

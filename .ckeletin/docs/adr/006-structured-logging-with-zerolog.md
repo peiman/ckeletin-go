@@ -180,6 +180,12 @@ go func() {
         log.Error().Err(err).Msg("background task failed")
     }
 }()
+
+// ✅ Function returns fallback value, not error (programming error signal)
+func boolDefault(v interface{}) bool {
+    log.Error().Interface("value", v).Msg("Invalid type for bool default, using false")
+    return false  // Can't return error — log.Error() is the only signal
+}
 ```
 
 ### Default Console Log Level Rationale
