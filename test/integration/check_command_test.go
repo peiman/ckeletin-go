@@ -110,6 +110,9 @@ func TestCheckCommand_DepsCategory(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping check command integration test in short mode")
 	}
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping deps category test on Windows (license tools not available)")
+	}
 
 	binary := buildDevBinary(t)
 	root := projectRoot(t)
