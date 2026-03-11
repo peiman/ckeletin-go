@@ -7,10 +7,26 @@
 1. **`task check` before every commit** - Non-negotiable, runs all quality checks
 2. **Commands ≤30 lines** - `cmd/*.go` files wire things together; logic goes in `internal/`
 3. **Use `config.Key*` constants** - Never hardcode config strings; run `task generate:config:key-constants` after registry changes
-4. **Never reduce test coverage** - 80% minimum overall, use `testify/assert`
+4. **Never reduce test coverage** - 85% minimum overall, use `testify/assert`
 5. **Check licenses after `go get`** - Run `task check:license:source` immediately
 6. **Never `--no-verify`** - Ask user permission first with justification
-7. **Task for workflows, Go for debugging** - `task test` for full suite, `go test -v -run TestName` for debugging
+7. **ALWAYS use `task` commands** - NEVER run `go test ./...`, `go build`, `golangci-lint`, or `goimports` directly. Use `task test`, `task build`, `task lint`, `task format`. Only exception: `go test -v -run TestName ./path/...` for debugging a single test.
+
+### Command Translation (MANDATORY)
+
+**STOP — use the task equivalent, not the raw command:**
+
+| Instead of (NEVER use) | Use (ALWAYS) | Why |
+|------------------------|--------------|-----|
+| `go test ./...` | `task test` | Runs coverage, gotestsum, correct flags |
+| `go build ./...` or `go build` | `task build` | Correct build tags and flags |
+| `golangci-lint run` | `task lint` | Correct timeout and config |
+| `goimports -w .` or `gofmt` | `task format` | Handles all formatting consistently |
+| `go vet ./...` | `task lint` | Included in lint task |
+| `go mod tidy` | `task tidy` | Ensures consistency |
+| Running multiple checks manually | `task check` | Runs ALL checks in correct order |
+
+**The ONLY acceptable raw `go` command:** `go test -v -run TestName ./path/...` for debugging a specific test.
 
 ## Quick Decision Trees
 
@@ -119,7 +135,7 @@ After tools install, verify your environment:
 ```bash
 task --list          # Should show all available tasks
 go build ./...       # Should compile cleanly
-task test            # Should pass with ≥80% coverage
+task test            # Should pass with ≥85% coverage
 ```
 
 If any fail, run `task setup` to rebuild tools, then retry.
@@ -177,7 +193,7 @@ Trivial changes:    task check:fast (docs, comments, typos only)
 Code Quality        → format, lint
 Architecture        → validate:defaults, commands, constants, task-naming,
                       architecture, layering, package-organization,
-                      config-consumption, output, security
+                      config-consumption, output, security, dev-build-tags
 Security Scanning   → check:secrets, check:sast
 Dependencies        → check:deps, check:license, check:sbom:vulns
 Tests               → test:full (unit + integration + race detection)
@@ -329,17 +345,18 @@ Use descriptive branch names with conventional prefixes:
 
 | Package Type | Minimum Coverage | Target Coverage |
 |-------------|------------------|-----------------|
-| Overall | 80% | 85%+ |
+| Overall | 85% | 90%+ |
 | `cmd/*` | 80% | 90%+ |
-| `internal/config` | 80% | 90%+ |
-| `internal/logger` | 80% | 90%+ |
+| `.ckeletin/pkg/config` | 80% | 90%+ |
+| `.ckeletin/pkg/logger` | 80% | 90%+ |
 | Other packages | 70% | 80%+ |
 
 **How coverage is enforced:**
 - Each package must meet its category minimum (70-80% depending on type)
-- The overall project must meet 80%
+- The overall project must meet 85%
 - **Both conditions must pass.** A package at 65% fails even if overall is 85%.
 - **Enforcement:** CI runs `.ckeletin/scripts/check-coverage-project.sh` which fails the build if thresholds aren't met. This is automated, not honor system.
+- **Exclusions:** TUI code (`*_tui.go`, `internal/check/executor.go`, `internal/check/summary.go`) and `/demo/` directories are excluded from coverage calculation (require interactive testing).
 
 **Rules:**
 - **Maintain coverage thresholds in every PR.** During refactoring, temporary drops up to 2% are acceptable if restored before the PR merges.
@@ -353,28 +370,37 @@ Use descriptive branch names with conventional prefixes:
 ```
 ckeletin-go/
 ├── .claude/               # Claude Code config (hooks.json for auto-setup)
-├── cmd/                    # Commands (ultra-thin, ≤30 lines each)
+├── .ckeletin/             # Framework layer (upstream template)
+│   ├── docs/adr/          # Framework ADRs (000-014)
+│   ├── pkg/config/        # Config registry, constants, validation
+│   │   ├── registry.go    # Config option definitions
+│   │   └── keys_generated.go  # Auto-generated constants
+│   ├── pkg/logger/        # Logging infrastructure (Zerolog)
+│   ├── scripts/           # Build, validation, and utility scripts
+│   └── Taskfile.yml       # Framework task definitions
+├── cmd/                   # Commands (ultra-thin, ≤30 lines each)
 │   ├── root.go            # Root command setup
 │   └── *.go               # Feature commands
 ├── internal/              # Private application code
-│   ├── config/            # Configuration management
-│   │   ├── registry.go    # Config option definitions
-│   │   └── keys_generated.go  # Auto-generated constants
-│   ├── logger/            # Logging infrastructure
+│   ├── check/             # Check command (executor, timing, checks)
+│   ├── dev/               # Dev command logic
+│   ├── ping/              # Ping command logic
 │   └── */                 # Other internal packages
 ├── pkg/                   # Public reusable libraries (importable by others)
 │   └── checkmate/         # Beautiful terminal output for check results
 ├── test/
 │   └── integration/       # Integration tests
 ├── docs/
-│   └── adr/              # Architecture Decision Records
-└── scripts/              # Build and utility scripts
+│   └── adr/              # Project-specific Architecture Decision Records
+├── Taskfile.yml           # Project tasks (aliases to .ckeletin/Taskfile.yml)
+└── CLAUDE.md              # This file
 ```
 
 **Key Principles:**
 1. **Ultra-thin commands**: Commands in `cmd/` should be ≤30 lines
 2. **Business logic in `internal/`**: Keep implementation details internal
-3. **Follow ADRs**: Framework decisions in `.ckeletin/docs/adr/`, project decisions in `docs/adr/`
+3. **Framework code in `.ckeletin/`**: Config registry, logger, scripts, validators, and framework Taskfile live here
+4. **Follow ADRs**: Framework decisions in `.ckeletin/docs/adr/`, project decisions in `docs/adr/`
 
 **30-line guidance:** Target ≤30 lines. Commands at 31-35 lines are acceptable if refactoring would reduce clarity. Beyond 35 lines requires refactoring to `internal/`. If you must exceed, add a comment explaining why.
 
@@ -430,6 +456,7 @@ When adding a new command (e.g., `analyze`):
 | ADR-011 | License Compliance | Dual-tool license checking |
 | ADR-012 | Dev Commands | Build tags for dev-only commands |
 | ADR-013 | Structured Output | Shadow logging and checkmate patterns |
+| ADR-014 | Enforcement Policy | Every ADR must have automated enforcement |
 
 **Quick ADR lookup - "I'm working on..."**
 | Task | Read |
@@ -440,12 +467,14 @@ When adding a new command (e.g., `analyze`):
 | Adding logging | ADR-006 |
 | Adding dependency | ADR-011 |
 | Creating UI | ADR-007 |
+| Adding/modifying an ADR | ADR-014 |
 
 **When to Update ADRs:**
 - Making architectural changes
 - Changing fundamental patterns
 - Introducing new core technologies
 - Modifying build/deployment processes
+- **Every ADR must have an `## Enforcement` section** ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md))
 
 ## Project-Specific Conventions
 
@@ -705,7 +734,7 @@ task generate:license          # All artifacts
 
 | ❌ Don't | ✅ Do | Why |
 |----------|-------|-----|
-| Skip tests for "simple" code | Write tests anyway | 80% coverage is mandatory |
+| Skip tests for "simple" code | Write tests anyway | 85% coverage is mandatory |
 | Mock everything | Use dependency injection | Simpler, more maintainable ([ADR-003](.ckeletin/docs/adr/003-testing-strategy.md)) |
 | Only run unit tests | Run `task test:integration` too | Integration tests catch real issues |
 
@@ -726,7 +755,7 @@ task generate:license          # All artifacts
 | `log.Error()` for returnable errors | `log.Debug()` + `return err` |
 | `log.Error()` for user input errors | Formatted output only (no log) |
 
-Use `log.Error()` only for unrecoverable system failures. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
+Use `log.Error()` only for unrecoverable system failures or programming errors where no error can be returned (e.g., `cmd/flags.go` type assertion fallbacks). Semgrep rule `ckeletin-log-error-and-return` enforces this. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
 
 ### Code Quality & Linting
 
@@ -749,7 +778,7 @@ Use `log.Error()` only for unrecoverable system failures. See [ADR-006](.ckeleti
 |-------|-------|----------|
 | `task: command not found` | Task not installed | Run `bash .ckeletin/scripts/install_tools.sh` or `go install github.com/go-task/task/v3/cmd/task@latest` |
 | `go-licenses: package does not have module info` | Tools built with old Go version | Run `task setup` to rebuild tools |
-| Coverage below 80% | Missing tests | Run `go tool cover -html=coverage.out` to see uncovered lines |
+| Coverage below 85% | Missing tests | Run `go tool cover -html=coverage.out` to see uncovered lines |
 | License check fails | Copyleft dependency added | Remove dep with `go get pkg@none && go mod tidy`, find MIT alternative |
 | `golangci-lint` timeout | Large codebase or slow machine | Run `task lint` (has proper timeout settings) |
 | Validate commands fails | Command file too long | Move logic to `internal/` package, keep cmd file ≤30 lines |
@@ -855,6 +884,7 @@ When one fix causes another failure, follow this triage order.
 ### Key Resources
 - **.ckeletin/docs/adr/ARCHITECTURE.md** - System structure (WHAT the system is: components, flows, interactions)
 - **.ckeletin/docs/adr/*.md** - Architectural decisions (WHY it's this way: rationale, alternatives, consequences)
+- **.semgrep.yml** - Custom SAST rules enforcing security and project conventions
 - **Taskfile.yml** - All available commands and their implementations
 - **CHANGELOG.md** - History of changes
 - **README.md** - Project overview and usage

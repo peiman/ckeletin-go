@@ -19,12 +19,20 @@ fi
 
 # Calculate coverage ourselves, excluding TUI and demo code
 # Format: file:line.col,line.col numStatements numHits
+#
+# Exclusions:
+#   - *_tui.go: Legacy TUI file naming convention
+#   - internal/check/executor.go: TUI executor (split from check_tui.go)
+#   - internal/check/summary.go: TUI summary rendering (split from check_tui.go)
+#   - /demo/: Demo code for documentation
 total_statements=0
 covered_statements=0
 
 while IFS= read -r line; do
-    # Skip lines containing _tui.go or /demo/
-    if [[ "$line" == *"_tui.go"* ]] || [[ "$line" == *"/demo/"* ]]; then
+    # Skip TUI and demo code (requires interactive testing)
+    if [[ "$line" == *"_tui.go"* ]] || [[ "$line" == *"/demo/"* ]] \
+       || [[ "$line" == *"internal/check/executor.go"* ]] \
+       || [[ "$line" == *"internal/check/summary.go"* ]]; then
         continue
     fi
 
