@@ -346,7 +346,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage.txt
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' }}
+          fail_ci_if_error: false  # Coverage enforced by check-coverage-project.sh
           verbose: true
           flags: unittests
           name: codecov-${{ steps.binary-name.outputs.name }}
