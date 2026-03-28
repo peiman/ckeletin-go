@@ -297,3 +297,35 @@ Note: After `task init`, `binaryName` will be the user's app name, so the descri
 - **README rewrite is large** — risk of losing valuable content. Mitigation: content moves to CONTRIBUTING, not deleted. Run content completeness audit after rewrite.
 - **cmd/root.go change affects tests** — unit tests may reference the Short/Long text. Mitigation: search for "scaffold project" in test files and update if found.
 - **SEO impact** — removing "skeleton" may affect discoverability. Mitigation: keep "scaffold" which serves the same search intent.
+
+## Related Engineering Change: pkg/ Cleanup on Scaffold Init
+
+**This is a separate implementation task, not part of the docs overhaul, but documented here because it emerged from the same analysis.**
+
+### Problem
+
+When `task init name=myapp` scaffolds a new project, `pkg/checkmate/` is inherited under the new module path. But checkmate is a ckeletin-go library — it shouldn't live in derived projects as if they authored it.
+
+### Design
+
+1. **Keep `pkg/checkmate/` in ckeletin-go** as a public library at `github.com/peiman/ckeletin-go/pkg/checkmate`
+2. **Change `internal/check/` imports** to reference checkmate from the official ckeletin-go module, not a local copy
+3. **Modify `scaffold-init.go`** to:
+   - NOT replace `github.com/peiman/ckeletin-go/pkg/checkmate` import paths (add to skip list)
+   - Clean out `pkg/` directory after init (remove ckeletin-go's packages)
+   - Ensure `go.mod` includes `github.com/peiman/ckeletin-go` as a dependency
+4. **Derived projects** get a clean `pkg/` directory and import checkmate as an external dependency
+
+### Files Affected
+
+- `.ckeletin/scripts/scaffold-init.go` — Add pkg/ cleanup step, skip checkmate imports
+- `internal/check/*.go` — Change checkmate import path to absolute `github.com/peiman/ckeletin-go/pkg/checkmate`
+- Any other files that import from `pkg/checkmate/`
+- `go.mod` — Will need ckeletin-go as a dependency after init
+
+### Implications
+
+- Derived projects depend on ckeletin-go module (for checkmate). This is acceptable — the framework relationship is explicit.
+- checkmate versioning now matters: derived projects pin to a ckeletin-go version
+- The validate-package-organization script may need updates to handle external pkg/ imports
+- Tests in `internal/check/` need verification after import path change
