@@ -153,21 +153,59 @@ CLAUDE.md points to AGENTS.md for project description. No direct identity claim 
    - "Adding New Configuration Options"
 6. **Update "read the architecture documentation" list** (line 55-58): Add AGENTS.md
 
-### 5. ADR-010 — Revise Identity Framing
+### 5. ADR-010 — Substantial Revision (Identity + pkg/ Reality)
 
-**Current problem:** Line 24 says "ckeletin-go is a CLI application skeleton, not a library."
+ADR-010 has an internal contradiction: the Context says "not a library" while the Decision says "with optional public packages" — and `pkg/checkmate/` IS a real public importable library. The ADR needs revision across multiple sections.
 
-**The nuance:** ckeletin-go is not a library you `go get` and import. But `.ckeletin/pkg/` IS framework infrastructure that projects build against. The "not a library" claim is technically correct (you don't import ckeletin-go as a dependency) but misleading (the framework layer IS reusable infrastructure).
+**Section: Context (lines 22-34)**
 
-**Proposed change:**
+Current: "ckeletin-go is a CLI application skeleton, not a library"
+
+Proposed:
 ```markdown
-**ckeletin-go is a CLI application scaffold with an updatable framework layer**, not a standalone library.
-The `.ckeletin/` directory provides reusable infrastructure (config, logging, validation) that is
-updated independently of project code. However, external projects do not import ckeletin-go as a
-Go dependency — they fork it and keep the framework layer in sync via `task ckeletin:update`.
+**ckeletin-go is a production-ready Go CLI scaffold powered by an updatable framework layer.**
+It is primarily a CLI tool, but it also hosts public reusable packages in `pkg/` (e.g., `checkmate`).
+This dual nature should be:
+1. **Visible** — Structure shows "CLI-first, with optional public packages"
+2. **Enforced** — `pkg/` packages must be standalone (no `internal/` imports)
+3. **Documented** — Clear criteria for what belongs in `pkg/`
+4. **Validated** — Automated checks enforce boundaries
 ```
 
-This preserves the "not a library" intent while acknowledging the framework reality.
+Also revise lines 30-34 ("Without clear organization"):
+```markdown
+Without clear organization:
+- Business logic might leak into root directory
+- `pkg/` packages might depend on `internal/`, breaking standalone reusability
+- Framework code (`.ckeletin/`) might get mixed with project code
+- New developers won't know where code belongs
+```
+
+**Section: Alternative 1 (line 47)**
+
+Current: "Why not: We're explicitly NOT a library"
+
+Proposed: "Why chosen: We adopt this traditional layout — ckeletin-go is CLI-first but also provides public packages (e.g., `pkg/checkmate/`)"
+
+(This changes Alternative 1 from "rejected" to "chosen with modifications", which is what actually happened.)
+
+**Section: Consequences — Positive (lines 193-207)**
+
+Current line 195: "No confusion about whether to import as library"
+Proposed: "Clear intent — CLI is the product, `pkg/` packages are bonus reusable components"
+
+Current lines 204-207 ("Prevents Scope Creep"):
+```markdown
+**3. Intentional Public API**
+- `pkg/` packages require conscious decision and criteria checklist
+- Forces quality commitment: docs, tests, API stability
+- Maintains focus on CLI while allowing reusable components
+```
+
+**Section: Consequences — Negative (line 221)**
+
+Current: "API Maintenance Burden (if using `pkg/`)"
+Add note: "This is a real cost — `pkg/checkmate/` is actively maintained as a public package. This is an intentional trade-off."
 
 ### 6. ARCHITECTURE.md — Terminology Fix (~3 lines)
 
