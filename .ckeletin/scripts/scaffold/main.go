@@ -1,22 +1,19 @@
-// scripts/scaffold-init.go
-//
 // Scaffold initialization script for ckeletin-go
-
-//go:build ignore
-
 //
 // This script automates the process of customizing the scaffold by:
 // - Updating module path in go.mod
 // - Replacing import statements in all Go files
 // - Updating binary name in Taskfile.yml and .goreleaser.yml
 // - Updating template files with new module path
+// - Removing pkg/ directory (libraries available as external dependencies)
 //
 // Usage:
-//   go run scripts/scaffold-init.go <old_module> <new_module> <old_name> <new_name>
+//
+//	go run ./.ckeletin/scripts/scaffold/ <old_module> <new_module> <old_name> <new_name>
 //
 // Example:
-//   go run scripts/scaffold-init.go github.com/peiman/ckeletin-go github.com/myuser/myapp ckeletin-go myapp
-
+//
+//	go run ./.ckeletin/scripts/scaffold/ github.com/peiman/ckeletin-go github.com/myuser/myapp ckeletin-go myapp
 package main
 
 import (

@@ -318,7 +318,7 @@ tasks:
         msg: "Module path must be different from {{.OLD_MODULE}}"
     cmds:
       - echo "🚀 Initializing scaffold..."
-      - go run .ckeletin/scripts/scaffold-init.go "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
+      - go run ./.ckeletin/scripts/scaffold/ "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
       - go mod tidy
       - |
         # Create initial version tag for clean --version output

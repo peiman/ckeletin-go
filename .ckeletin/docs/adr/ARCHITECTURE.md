@@ -245,7 +245,7 @@ ckeletin-go/
     ├── format-go.sh           # Code formatting
     ├── validate-*.sh          # Pattern enforcement (ADR validation)
     ├── check-*.sh             # Coverage/quality checks
-    └── scaffold-init.go       # Scaffold customization
+    └── scaffold/              # Scaffold customization (go run ./.ckeletin/scripts/scaffold/)
 ```
 
 ### Component Interactions

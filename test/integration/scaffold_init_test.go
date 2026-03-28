@@ -90,13 +90,13 @@ func TestScaffoldInit(t *testing.T) {
 	oldName := "ckeletin-go"
 
 	if useTaskFallback {
-		// Fallback: run scaffold-init.go directly
-		t.Logf("Running: go run .ckeletin/scripts/scaffold-init.go %s %s %s %s", oldModule, testModule, oldName, testName)
-		cmd := exec.Command("go", "run", ".ckeletin/scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		// Fallback: run scaffold script directly
+		t.Logf("Running: go run ./.ckeletin/scripts/scaffold/ %s %s %s %s", oldModule, testModule, oldName, testName)
+		cmd := exec.Command("go", "run", "./.ckeletin/scripts/scaffold/", oldModule, testModule, oldName, testName)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
-		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))
-		t.Logf("scaffold-init.go output:\n%s", string(output))
+		require.NoError(t, err, "scaffold init failed\nOutput: %s", string(output))
+		t.Logf("scaffold init output:\n%s", string(output))
 
 		// Run go mod tidy
 		t.Logf("Running: go mod tidy")
@@ -390,11 +390,11 @@ func TestFrameworkUpdate(t *testing.T) {
 	oldName := "ckeletin-go"
 
 	if useTaskFallback {
-		t.Log("Running scaffold-init.go directly")
-		cmd := exec.Command("go", "run", ".ckeletin/scripts/scaffold-init.go", oldModule, testModule, oldName, testName)
+		t.Log("Running scaffold script directly")
+		cmd := exec.Command("go", "run", "./.ckeletin/scripts/scaffold/", oldModule, testModule, oldName, testName)
 		cmd.Dir = tmpDir
 		output, err := cmd.CombinedOutput()
-		require.NoError(t, err, "scaffold-init.go failed\nOutput: %s", string(output))
+		require.NoError(t, err, "scaffold init failed\nOutput: %s", string(output))
 
 		tidyCmd := exec.Command("go", "mod", "tidy")
 		tidyCmd.Dir = tmpDir
