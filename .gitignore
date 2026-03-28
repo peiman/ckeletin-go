@@ -31,9 +31,10 @@ go.work
 *.swo
 *~
 
-# Claude Code (keep hooks.json, ignore local state)
+# Claude Code (keep hooks.json and rules/, ignore local state)
 .claude/*
 !.claude/hooks.json
+!.claude/rules/
 
 # OS generated files
 .DS_Store
