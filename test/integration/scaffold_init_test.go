@@ -12,6 +12,7 @@
 package integration
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -89,6 +90,10 @@ func TestScaffoldInit(t *testing.T) {
 	oldModule := upstreamModule // Use constant to avoid replacement by scaffold-init
 	oldName := "ckeletin-go"
 
+	// Get project root for replace directive (needed so go mod tidy can resolve
+	// external pkg/ imports from local source before a release is published)
+	projectRoot := getProjectRoot(t)
+
 	if useTaskFallback {
 		// Fallback: run scaffold script directly
 		t.Logf("Running: go run ./.ckeletin/scripts/scaffold/ %s %s %s %s", oldModule, testModule, oldName, testName)
@@ -98,6 +103,10 @@ func TestScaffoldInit(t *testing.T) {
 		require.NoError(t, err, "scaffold init failed\nOutput: %s", string(output))
 		t.Logf("scaffold init output:\n%s", string(output))
 
+		// Add replace directive so go mod tidy can resolve ckeletin-go/pkg/checkmate
+		// from local source (before a published release includes pkg/)
+		addReplaceDirective(t, tmpDir, oldModule, projectRoot)
+
 		// Run go mod tidy
 		t.Logf("Running: go mod tidy")
 		tidyCmd := exec.Command("go", "mod", "tidy")
@@ -105,6 +114,14 @@ func TestScaffoldInit(t *testing.T) {
 		tidyOutput, err := tidyCmd.CombinedOutput()
 		require.NoError(t, err, "go mod tidy failed\nOutput: %s", string(tidyOutput))
 	} else {
+		// Add replace directive BEFORE task init (task init runs go mod tidy internally)
+		// We need to add it to go.mod before the module path gets changed by scaffold-init
+		// Actually, we add it after scaffold-init but before go mod tidy.
+		// Since task init runs both, we use the fallback path for this test instead.
+		// For now, inject the directive into go.mod pre-emptively — scaffold-init
+		// only replaces the module line and import statements, not replace directives.
+		addReplaceDirective(t, tmpDir, oldModule, projectRoot)
+
 		// Use task command
 		t.Logf("Running: task init name=%s module=%s", testName, testModule)
 		cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
@@ -144,9 +161,10 @@ func TestScaffoldInit(t *testing.T) {
 			".goreleaser.yml should contain new project name")
 	})
 
-	// Verify: No old module references remain in Go files
-	t.Run("no old module references", func(t *testing.T) {
-		var filesWithOldRefs []string
+	// Verify: No old module references remain in Go files (except pkg/ imports)
+	t.Run("no old module references except pkg/ imports", func(t *testing.T) {
+		pkgPrefix := upstreamModule + "/pkg/"
+		var staleRefs []string
 
 		err := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -169,9 +187,16 @@ func TestScaffoldInit(t *testing.T) {
 					return err
 				}
 
-				if strings.Contains(string(content), upstreamModule) {
-					relPath, _ := filepath.Rel(tmpDir, path)
-					filesWithOldRefs = append(filesWithOldRefs, relPath)
+				lines := strings.Split(string(content), "\n")
+				for lineNum, line := range lines {
+					if strings.Contains(line, upstreamModule) {
+						// pkg/ imports are allowed — they reference ckeletin-go as external dep
+						if strings.Contains(line, pkgPrefix) {
+							continue
+						}
+						relPath, _ := filepath.Rel(tmpDir, path)
+						staleRefs = append(staleRefs, fmt.Sprintf("%s:%d: %s", relPath, lineNum+1, strings.TrimSpace(line)))
+					}
 				}
 			}
 
@@ -180,9 +205,45 @@ func TestScaffoldInit(t *testing.T) {
 
 		require.NoError(t, err, "failed to walk directory")
 
-		assert.Empty(t, filesWithOldRefs,
-			"found old module references in files:\n%s",
-			strings.Join(filesWithOldRefs, "\n"))
+		assert.Empty(t, staleRefs,
+			"found stale module references (pkg/ imports are allowed):\n%s",
+			strings.Join(staleRefs, "\n"))
+	})
+
+	// Verify: pkg/ directory was removed by scaffold init
+	t.Run("pkg/ directory removed", func(t *testing.T) {
+		pkgDir := filepath.Join(tmpDir, "pkg")
+		_, err := os.Stat(pkgDir)
+		assert.True(t, os.IsNotExist(err), "pkg/ should be removed after scaffold init")
+	})
+
+	// Verify: checkmate imports reference the original ckeletin-go module (external dep)
+	t.Run("checkmate imported as external dependency", func(t *testing.T) {
+		checkFiles := []string{
+			filepath.Join(tmpDir, "internal", "check", "executor.go"),
+			filepath.Join(tmpDir, "internal", "check", "summary.go"),
+			filepath.Join(tmpDir, "internal", "ui", "check.go"),
+			filepath.Join(tmpDir, "internal", "ui", "check_test.go"),
+		}
+		for _, f := range checkFiles {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				t.Logf("Skipping %s (not found): %v", filepath.Base(f), err)
+				continue
+			}
+			assert.Contains(t, string(content), oldModule+"/pkg/checkmate",
+				"%s should import checkmate from original ckeletin-go module", filepath.Base(f))
+			assert.NotContains(t, string(content), testModule+"/pkg/checkmate",
+				"%s should NOT import checkmate from derived module", filepath.Base(f))
+		}
+	})
+
+	// Verify: go.mod references the original ckeletin-go module (for external pkg/ deps)
+	t.Run("go.mod has ckeletin-go dependency", func(t *testing.T) {
+		goModContent, err := os.ReadFile(filepath.Join(tmpDir, "go.mod"))
+		require.NoError(t, err)
+		assert.Contains(t, string(goModContent), oldModule,
+			"go.mod should reference the original ckeletin-go module for external pkg/ imports")
 	})
 
 	// Skip quality checks in integration test - they're validated in the main CI build job
@@ -389,6 +450,9 @@ func TestFrameworkUpdate(t *testing.T) {
 	oldModule := upstreamModule // Use constant to avoid replacement by scaffold-init
 	oldName := "ckeletin-go"
 
+	// Get project root for replace directive
+	projectRoot := getProjectRoot(t)
+
 	if useTaskFallback {
 		t.Log("Running scaffold script directly")
 		cmd := exec.Command("go", "run", "./.ckeletin/scripts/scaffold/", oldModule, testModule, oldName, testName)
@@ -396,11 +460,17 @@ func TestFrameworkUpdate(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, "scaffold init failed\nOutput: %s", string(output))
 
+		// Add replace directive for external pkg/ imports
+		addReplaceDirective(t, tmpDir, oldModule, projectRoot)
+
 		tidyCmd := exec.Command("go", "mod", "tidy")
 		tidyCmd.Dir = tmpDir
 		tidyOutput, err := tidyCmd.CombinedOutput()
 		require.NoError(t, err, "go mod tidy failed\nOutput: %s", string(tidyOutput))
 	} else {
+		// Add replace directive before task init (which runs go mod tidy internally)
+		addReplaceDirective(t, tmpDir, oldModule, projectRoot)
+
 		t.Logf("Running: task init name=%s module=%s", testName, testModule)
 		cmd := exec.Command("task", "init", "name="+testName, "module="+testModule)
 		cmd.Dir = tmpDir
@@ -413,7 +483,6 @@ func TestFrameworkUpdate(t *testing.T) {
 	runGit(t, tmpDir, "commit", "-m", "Initialize as downstream project")
 
 	// Step 3: Simulate framework update by re-copying .ckeletin/ from source
-	projectRoot := getProjectRoot(t)
 	srcCkeletin := filepath.Join(projectRoot, ".ckeletin")
 	dstCkeletin := filepath.Join(tmpDir, ".ckeletin")
 
@@ -528,6 +597,21 @@ func getProjectRoot(t *testing.T) string {
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err, "failed to get project root")
 	return root
+}
+
+// addReplaceDirective appends a replace directive to go.mod in the given directory.
+// This allows go mod tidy to resolve external pkg/ imports from the local project root
+// before a published release includes those packages.
+func addReplaceDirective(t *testing.T, dir, module, localPath string) {
+	t.Helper()
+	goModPath := filepath.Join(dir, "go.mod")
+	content, err := os.ReadFile(goModPath)
+	require.NoError(t, err, "failed to read go.mod for replace directive")
+
+	directive := fmt.Sprintf("\nreplace %s => %s\n", module, localPath)
+	err = os.WriteFile(goModPath, append(content, []byte(directive)...), 0600)
+	require.NoError(t, err, "failed to write replace directive to go.mod")
+	t.Logf("Added replace directive: %s => %s", module, localPath)
 }
 
 // copyDir recursively copies a directory tree from src to dst.
