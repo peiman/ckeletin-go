@@ -54,8 +54,29 @@ Be respectful, professional, and constructive in all interactions. This project 
 
 4. **Read the architecture documentation:**
    - `README.md` - Project overview
-   - `CLAUDE.md` - Development guidelines
-   - `docs/adr/*.md` - Architecture Decision Records (ADRs)
+   - `AGENTS.md` - Comprehensive project guide (commands, conventions, architecture)
+   - `CLAUDE.md` - Claude Code-specific development guidelines
+   - `.ckeletin/docs/adr/*.md` - Framework ADRs (000-099)
+   - `docs/adr/*.md` - Project ADRs (100+)
+
+## Framework vs Project Code
+
+ckeletin-go separates **framework code** (reusable infrastructure) from **project code** (your custom CLI):
+
+| Directory | Owner | What Lives Here |
+|-----------|-------|-----------------|
+| `.ckeletin/` | **Framework** — updated via `task ckeletin:update` | Taskfile, pkg/ (config, logger, testutil), scripts, ADRs 000-099 |
+| `cmd/` | **Project** — yours to edit | Ultra-thin CLI commands (≤30 lines) |
+| `internal/` | **Project** — yours to edit | Business logic packages |
+| `pkg/` | **Project** — yours to edit | Public reusable packages (standalone, no `internal/` imports) |
+| `docs/adr/` | **Project** — yours to edit | Your ADRs (100+) |
+| `Taskfile.yml` | **Project** | Your task aliases + custom tasks |
+
+**Do not edit `.ckeletin/` directly** — your changes will be overwritten by framework updates. If you need to customize framework behavior, open an issue upstream.
+
+**Two-tier ADR system:**
+- Framework ADRs (000-099) in `.ckeletin/docs/adr/` — decisions about the framework itself
+- Project ADRs (100+) in `docs/adr/` — your project-specific decisions
 
 ## Development Workflow
 
@@ -69,17 +90,28 @@ Be respectful, professional, and constructive in all interactions. This project 
 2. **Understand the codebase structure:**
    ```
    ckeletin-go/
-   ├── cmd/                    # Ultra-thin CLI commands (~20-30 lines)
-   ├── internal/config/        # Centralized configuration registry
-   ├── internal/logger/        # Logging infrastructure
-   ├── internal/<feature>/     # Feature business logic
-   └── docs/adr/              # Architecture decisions
+   ├── .ckeletin/              # FRAMEWORK (updated via task ckeletin:update)
+   │   ├── pkg/config/         # Configuration registry, constants, validation
+   │   ├── pkg/logger/         # Logging infrastructure (Zerolog)
+   │   ├── scripts/            # Validation and build scripts
+   │   ├── docs/adr/           # Framework ADRs (000-099)
+   │   └── Taskfile.yml        # Framework task definitions
+   ├── cmd/                    # YOUR ultra-thin CLI commands (~20-30 lines)
+   ├── internal/               # YOUR business logic
+   │   ├── <feature>/          # Feature packages
+   │   ├── config/commands/    # Command configuration metadata
+   │   └── ui/                 # UI components
+   ├── pkg/                    # YOUR public reusable packages
+   ├── docs/adr/               # YOUR project ADRs (100+)
+   └── Taskfile.yml            # YOUR task aliases + custom tasks
    ```
 
 3. **Review relevant ADRs:**
    - [ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md) - Command structure
    - [ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md) - Configuration
    - [ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md) - Testing approach
+   - [ADR-009](.ckeletin/docs/adr/009-layered-architecture-pattern.md) - Layered architecture
+   - [ADR-010](.ckeletin/docs/adr/010-package-organization-strategy.md) - Package organization
 
 ### During Development
 
@@ -382,7 +414,7 @@ Add test cases covering the new option.
 
 | Package Type | Minimum Coverage | Target Coverage |
 |-------------|------------------|-----------------|
-| Overall | 80% | 85%+ |
+| Overall | 85% | 90%+ |
 | `cmd/*` | 80% | 90%+ |
 | `internal/config` | 80% | 90%+ |
 | `internal/logger` | 80% | 90%+ |

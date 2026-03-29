@@ -26,7 +26,7 @@
 
 ## Overview
 
-**ckeletin-go** is a production-ready Go CLI application scaffold that demonstrates modern Go development practices. It provides a complete foundation for building command-line tools with:
+**ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer. It provides a complete foundation for building command-line tools with:
 
 - **Ultra-thin command layer** (20-30 lines per command)
 - **Centralized configuration** with type-safe access

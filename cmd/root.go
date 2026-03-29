@@ -205,7 +205,7 @@ func defaultUserConfigDir(paths ConfigPathInfo) string {
 // Export RootCmd so that tests in other packages can manipulate it without getters/setters.
 var RootCmd = &cobra.Command{
 	Use:           "",
-	Short:         "A scaffold for building professional CLI applications in Go",
+	Short:         "A production-ready Go CLI application",
 	Long:          "",
 	SilenceErrors: true, // Errors are handled by main.go, don't print twice
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -259,8 +259,8 @@ func init() {
 	// Package-level var declarations capture binaryName="" before init() runs,
 	// so we need to set these after the fallback is applied.
 	RootCmd.Use = binaryName
-	RootCmd.Long = fmt.Sprintf(`%s is a scaffold project that helps you kickstart your Go CLI applications.
-It integrates Cobra, Viper, Zerolog, and Bubble Tea, along with a testing framework.`, binaryName)
+	RootCmd.Long = fmt.Sprintf(`%s is a production-ready Go CLI application built with ckeletin-go.
+Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patterns.`, binaryName)
 
 	configPaths := ConfigPaths()
 

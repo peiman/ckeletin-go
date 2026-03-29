@@ -2,13 +2,18 @@
 
 ## About This Project
 
-**ckeletin-go** is a Go CLI skeleton/template generator. Key characteristics:
+**ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer.
+
+The `.ckeletin/` directory contains the **framework** — config registry, logging, validation scripts, task definitions, and ADRs (000-099). Your code lives in `cmd/`, `internal/`, `pkg/`. Framework updates via `task ckeletin:update` without touching your code.
+
+Key characteristics:
 - Ultra-thin command pattern (commands ≤30 lines, logic in `internal/`)
 - Centralized configuration registry with auto-generated constants
 - Structured logging with Zerolog (dual console + file output)
 - Bubble Tea for interactive UIs
 - Dependency injection over mocking
 - 85% minimum test coverage, enforced by CI
+- Public reusable packages in `pkg/` (e.g., `checkmate` for beautiful CLI output)
 
 **Platform:** macOS and Linux. Windows is not officially supported.
 

@@ -21,17 +21,17 @@ This flexibility creates questions:
 
 ### Why This Matters for ckeletin-go
 
-**ckeletin-go is a CLI application skeleton**, not a library. This fundamental identity should be:
-1. **Visible** - Structure immediately shows "this is a CLI tool"
-2. **Enforced** - Prevents accidental library creation
-3. **Documented** - Clear rationale for future maintainers
-4. **Validated** - Automated checks prevent drift
+**ckeletin-go is a production-ready Go CLI scaffold powered by an updatable framework layer.** It is primarily a CLI tool, but it also hosts public reusable packages in `pkg/` (e.g., `checkmate` for beautiful terminal output). This dual nature should be:
+1. **Visible** - Structure shows "CLI-first, with optional public packages"
+2. **Enforced** - `pkg/` packages must be standalone (no `internal/` imports)
+3. **Documented** - Clear criteria for what belongs in `pkg/`
+4. **Validated** - Automated checks enforce boundaries
 
 Without clear organization:
-- Developers might create `pkg/` packages "for reusability"
 - Business logic might leak into root directory
-- Project identity becomes ambiguous (CLI tool or library?)
-- Accidental public API surface creates maintenance burden
+- `pkg/` packages might depend on `internal/`, breaking standalone reusability
+- Framework code (`.ckeletin/`) might get mixed with project code
+- New developers won't know where code belongs
 
 ### Alternatives Considered
 
@@ -43,8 +43,8 @@ project/
 └── internal/      # Private implementation
 ```
 - **Pros**: Well-known pattern, supports both CLI and library
-- **Cons**: Suggests dual purpose, maintenance burden for public API
-- **Why not**: We're explicitly NOT a library
+- **Cons**: Maintenance burden for public API packages
+- **Why chosen**: ckeletin-go is CLI-first but also provides public packages (e.g., `pkg/checkmate/`). This layout matches our actual use case.
 
 **2. Library-First Layout (pkg/, cmd/ optional)**
 ```
@@ -191,20 +191,19 @@ task check  # Includes package organization validation
 ### Positive
 
 **1. Clear Project Identity**
-- File structure immediately shows "this is a CLI tool"
-- No confusion about whether to import as library
+- File structure immediately shows "CLI-first, with optional public packages"
+- Clear intent: CLI is the product, `pkg/` packages are bonus reusable components
 - Onboarding faster (no question about where code goes)
 
 **2. Internal Freedom**
 - Can refactor `internal/` without breaking external consumers
-- No semantic versioning burden
-- No API compatibility concerns
+- No semantic versioning burden for internal APIs
 - Rapid iteration without fear
 
-**3. Prevents Scope Creep**
-- Absence of `pkg/` prevents "let's make this a library"
-- Forces conscious decision if we want to expose APIs
-- Maintains focus on CLI excellence
+**3. Intentional Public API**
+- `pkg/` packages require conscious decision and criteria checklist
+- Forces quality commitment: docs, tests, API stability
+- Maintains focus on CLI while allowing reusable components (e.g., `checkmate`)
 
 **4. Enforcement Automation**
 - `task validate:package-organization` catches violations
@@ -218,10 +217,10 @@ task check  # Includes package organization validation
 
 ### Negative
 
-**1. API Maintenance Burden (if using `pkg/`)**
-- Packages in `pkg/` require API stability commitment
+**1. API Maintenance Burden (active cost)**
+- Packages in `pkg/` require API stability commitment (e.g., `checkmate` is actively maintained)
 - Semantic versioning applies to public packages
-- Must maintain backwards compatibility
+- Must maintain backwards compatibility — this is an intentional trade-off
 
 **2. Strict Structure**
 - Cannot "just add a package at root"
