@@ -105,6 +105,12 @@ func main() {
 		fmt.Printf("    Updated %d template files\n", templateCount)
 	}
 
+	fmt.Println("  ✓ Cleaning pkg/ directory (libraries available as external dependencies)")
+	if err := removePkgDirectory("."); err != nil {
+		fmt.Fprintf(os.Stderr, "Error removing pkg/ directory: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("  ✓ Running go mod tidy")
 
 	fmt.Println("  ✓ Formatting code")
@@ -209,8 +215,10 @@ func updateGoFiles(oldModule, newModule string) (int, error) {
 			return nil
 		}
 
-		// Replace old module with new module
-		updated := strings.ReplaceAll(string(content), oldModule, newModule)
+		// Replace old module with new module, preserving pkg/ references.
+		// Lines referencing oldModule/pkg/ are kept intact so derived projects
+		// import those packages as external dependencies from the original module.
+		updated := replaceModulePreservingPkg(string(content), oldModule, newModule)
 
 		// Write back
 		if err := os.WriteFile(path, []byte(updated), info.Mode()); err != nil {
