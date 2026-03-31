@@ -131,7 +131,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
@@ -197,7 +197,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
@@ -274,7 +274,7 @@ jobs:
 
       - name: Cache Task Binary
         id: cache-task
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/.local/bin/task
           key: ${{ runner.os }}-task-${{ env.TASK_VERSION }}
@@ -297,7 +297,7 @@ jobs:
 
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/go/bin
           key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
