@@ -295,6 +295,12 @@ tasks:
     desc: Generate SBOM in both SPDX and CycloneDX formats
     cmds: [task: ckeletin:generate:sbom]
 
+  # === Framework Update ===
+
+  ckeletin-update-dry-run:
+    desc: Preview framework update without applying
+    cmds: [task: ckeletin:update:dry-run]
+
   # === Project-Specific Tasks ===
 
   init:
