@@ -27,24 +27,20 @@
 
 ## TL;DR
 
-**Your boss needs a CLI tool by next sprint. You've never built one.**
+ckeletin-go gives you production-ready CLI infrastructure — clean architecture, enforced patterns, and an updatable framework — so you can focus on your feature.
 
-ckeletin-go gives you production-ready infrastructure so you can focus on YOUR feature, not learning Cobra.
-
-- **Read the code in 5 minutes** - Ultra-thin commands (~20 lines each). No framework magic to decode.
-- **Ship with ≥85% test coverage** - Hundreds of real tests. Integration + unit. You won't break production.
-- **One command setup** - `task init name=myapp module=...` updates 40+ files. Start coding in 2 minutes.
-- **Keep the framework updated** - `task ckeletin:update` pulls improvements without touching your code.
-- **Learn as you build** - ADRs explain every decision. Level up while shipping.
+- **Built for humans and AI agents** — `AGENTS.md`, `CLAUDE.md`, hooks, and automated enforcement mean AI coding agents produce correct, well-structured code from day one
+- **Updatable framework** — `.ckeletin/` updates independently via `task ckeletin:update`. Your code is never touched. AI agent infrastructure improves automatically
+- **Read the code in 5 minutes** — Ultra-thin commands (~20 lines each). No framework magic to decode
+- **Ship with ≥85% test coverage** — Hundreds of real tests. Integration + unit. Every rule is machine-checkable
+- **One command setup** — `task init name=myapp module=...` updates 40+ files. Start coding in 2 minutes
 
 **Quickstart:**
 ```bash
 git clone https://github.com/peiman/ckeletin-go.git && cd ckeletin-go
 task setup && task init name=myapp module=github.com/you/myapp
-task build && ./myapp ping  # All tests passed
+task build && ./myapp ping
 ```
-
-You just built a CLI with better architecture than most production codebases.
 
 **Bonus:** Automatic GPL/AGPL blocking prevents license contamination.
 
@@ -73,6 +69,8 @@ myapp/
 **The scaffold** gets you started: clone, `task init`, customize `cmd/` and `internal/`, ship.
 
 **The framework** keeps working: enforced architecture, validated patterns, type-safe config, structured logging — all updated independently of your code via `task ckeletin:update`.
+
+**AI agents work here too.** The framework includes layered AI configuration — `AGENTS.md` for any AI assistant, `CLAUDE.md` for Claude Code, automated hooks, and behavioral rules — so coding agents follow the same enforced patterns you do. When the framework updates, your AI agent's effectiveness improves with it.
 
 ---
 
