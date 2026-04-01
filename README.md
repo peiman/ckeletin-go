@@ -76,14 +76,14 @@ myapp/
 
 ## Key Highlights
 
-- **Readable Architecture**: Ultra-thin commands (~20 lines each) — understand and modify code in minutes
-- **Production-Ready Testing**: ≥85% test coverage enforced. Integration + unit tests. CI fails if quality drops
-- **One-Command Customization**: `task init` updates 40+ files automatically
-- **Updatable Framework**: `.ckeletin/` layer updates independently — your code is never affected
+- **Agent-Ready Architecture**: Layered AI configuration (`AGENTS.md` → `CLAUDE.md` → hooks → enforcement) means coding agents produce correct code within your architecture — not despite it
+- **Updatable Framework**: `.ckeletin/` updates independently of your code. Patterns, tooling, and AI agent infrastructure evolve together
+- **Readable Code**: Ultra-thin commands (~20 lines each) — understand and modify in minutes
+- **Enforced Quality**: ≥85% test coverage, automated architecture validation, pre-commit hooks. Every rule is machine-checkable
 - **Enterprise License Compliance**: Automated GPL/AGPL blocking prevents legal contamination
-- **Reproducible Builds**: Pinned tool versions ensure identical results across dev/CI
-- **Task-Based Workflow**: Single source of truth for all commands ([ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md))
-- **Learn While You Build**: 14 ADRs explain every architectural decision
+- **Task-Based Workflow**: Single source of truth for all commands — local, CI, and AI agents use the same interface ([ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md))
+- **Reproducible Builds**: Pinned tool versions ensure identical results everywhere
+- **Crafted to Learn From**: 14 ADRs explain every architectural decision. The codebase isn't just functional — it's reasoned
 
 ---
 
