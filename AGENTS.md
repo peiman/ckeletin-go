@@ -1,10 +1,16 @@
 # ckeletin-go — Project Guide for AI Agents
 
+> **This file is a reference implementation.** The pattern — structured project
+> guide, behavioral rules, automated hooks, machine-checkable enforcement — works
+> in any codebase. See the README for how the pieces fit together.
+
 ## About This Project
 
-**ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer.
+**ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer — built for humans and AI agents alike.
 
 The `.ckeletin/` directory contains the **framework** — config registry, logging, validation scripts, task definitions, and ADRs (000-099). Your code lives in `cmd/`, `internal/`, `pkg/`. Framework updates via `task ckeletin:update` without touching your code.
+
+Every architectural rule in this project is machine-checkable. `task check` is the single gateway — run it before every commit. If it passes, the code is correct regardless of who wrote it.
 
 Key characteristics:
 - Ultra-thin command pattern (commands ≤30 lines, logic in `internal/`)
