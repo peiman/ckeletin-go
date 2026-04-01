@@ -87,6 +87,43 @@ myapp/
 
 ---
 
+## Agent-Ready Architecture
+
+Most scaffolds produce code that AI agents can write *in* but not write *well in*. Agents guess at conventions, misconfigure flags, and drift from intended patterns. ckeletin-go solves this with **enforcement by automation** — every architectural rule is machine-checkable, so violations are caught whether the code comes from a human or an AI.
+
+### The AI Configuration Stack
+
+```
+AGENTS.md          → Universal project guide (any AI assistant)
+CLAUDE.md          → Claude Code-specific behavioral rules
+.claude/rules/     → Granular rules loaded automatically
+.claude/hooks.json → Auto-installs tools, validates commits
+task check         → Single gateway that catches all violations
+```
+
+**`AGENTS.md`** gives any AI agent complete project context: architecture, commands, conventions, testing thresholds, and decision trees. It's structured as a specification, not prose — designed for machine consumption.
+
+**`CLAUDE.md`** adds Claude Code-specific rules: mandatory task commands, code placement decision trees, priority cascade (Security → License → Correctness → Coverage → Style).
+
+**Hooks and enforcement** close the loop. SessionStart hooks auto-install tools. Pre-commit hooks validate changes. `task check` runs the same quality gates regardless of who wrote the code.
+
+### Why This Matters
+
+- **Determinism**: `task test` always runs the right flags. Agents don't guess `go test -race -coverprofile=... -count=1 ./...`
+- **Architectural memory**: ADRs explain *why* patterns exist, preventing agents from optimizing away guardrails they don't understand
+- **Automated enforcement**: 14 ADRs, each with machine-checkable validation. No honor system
+- **Framework evolution**: `task ckeletin:update` improves the AI configuration alongside everything else
+
+### Using With AI Agents
+
+**Claude Code**: Reads `CLAUDE.md` and `.claude/rules/` automatically. Hooks fire on session start. No configuration needed.
+
+**Cursor / Copilot / Codex**: Point your agent at `AGENTS.md` for full project context. The task-based workflow and automated enforcement work with any tool.
+
+**The pattern is reusable.** The `AGENTS.md` → rules → hooks → enforcement approach works in any codebase. ckeletin-go is a reference implementation.
+
+---
+
 ## Quick Start
 
 1. **Clone and set up tools:**
