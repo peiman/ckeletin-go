@@ -164,6 +164,15 @@ tasks:
           echo "   No changes needed."
         else
           git commit --no-verify -m "chore: update ckeletin framework"
+          echo "🔍 Verifying project builds after update..."
+          if ! go build ./...; then
+            echo "❌ Build failed after framework update!"
+            echo "The update may have introduced breaking changes."
+            echo "Check .ckeletin/CHANGELOG.md and fix compilation errors."
+            echo "To rollback: git revert HEAD"
+            exit 1
+          fi
+          echo "✅ Build verified successfully"
           echo ""
           echo "✅ Framework updated successfully!"
           echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"

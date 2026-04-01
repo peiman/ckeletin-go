@@ -350,44 +350,11 @@ tasks:
       - echo "  5. Test binary{{":"}} ./{{.NAME}} --version"
 
   generate:command:
-    desc: Scaffold a new ultra-thin command with metadata and options
-    vars:
-      NAME: "{{.name}}"
-      CMD_FILE: "cmd/{{.NAME}}.go"
-      CFG_FILE: "internal/config/commands/{{.NAME}}_config.go"
+    desc: Generate a new command with full pattern (cmd + internal + tests + config)
     cmds:
-      - |
-        if [ -z "{{.NAME}}" ]; then
-          echo "Usage: task generate:command name=<command_name>" >&2; exit 1; fi
-      - |
-        cp cmd/template_command.go.example {{.CMD_FILE}}
-        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          sed -i '' "s/template/{{.NAME}}/g" {{.CMD_FILE}}
-          sed -i '' "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
-        else
-          sed -i "s/template/{{.NAME}}/g" {{.CMD_FILE}}
-          sed -i "s/Template/{{.NAME | title}}/g" {{.CMD_FILE}}
-        fi
-      - |
-        cp internal/config/commands/template_config.go.example {{.CFG_FILE}}
-        # Cross-platform sed: macOS requires '' after -i, Linux doesn't
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          sed -i '' "s/template/{{.NAME}}/g" {{.CFG_FILE}}
-          sed -i '' "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
-        else
-          sed -i "s/template/{{.NAME}}/g" {{.CFG_FILE}}
-          sed -i "s/Template/{{.NAME | title}}/g" {{.CFG_FILE}}
-        fi
-      - echo "✅ Scaffolded ultra-thin command"
-      - echo "   Command {{.CMD_FILE}}"
-      - echo "   Config {{.CFG_FILE}}"
-      - echo ""
-      - echo "Next steps"
-      - echo "1. Create business logic in internal/{{.NAME}}/"
-      - echo "2. Update metadata and options in {{.CFG_FILE}}"
-      - echo "3. Update runTemplate function in {{.CMD_FILE}}"
-      - echo "4. Run task ckeletin:validate:commands to verify pattern"
+      - go run ./.ckeletin/scripts/generate-command/ {{.CLI_ARGS}}
+      - task: generate:config:key-constants
+      - task: format
 
   generate:docs:config:
     desc: Generate configuration documentation
