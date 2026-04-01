@@ -314,8 +314,7 @@ jobs:
           task setup:latest
           lefthook install
 
-      - name: Install semgrep (full checks only)
-        if: github.event_name != 'pull_request'
+      - name: Install semgrep
         run: pip3 install --user semgrep
 
       - name: Get Binary Name from SSOT
@@ -328,6 +327,10 @@ jobs:
       - name: Run Quality Checks (Fast - PRs only)
         if: github.event_name == 'pull_request'
         run: task check:fast
+
+      - name: Run SAST Checks (PRs only)
+        if: github.event_name == 'pull_request'
+        run: task check:sast
 
       - name: Run Quality Checks (Full - main/releases)
         if: github.event_name != 'pull_request'
