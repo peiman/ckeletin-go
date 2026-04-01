@@ -40,6 +40,10 @@ tasks:
     desc: Check development environment
     cmds: [task: ckeletin:doctor]
 
+  ckeletin-version:
+    desc: Show ckeletin framework version
+    cmds: [task: ckeletin:version]
+
   format:
     desc: Format all Go code
     cmds: [task: ckeletin:format]

@@ -170,6 +170,37 @@ tasks:
           echo "   Review changes with: git diff HEAD~1"
         fi
 
+  update:dry-run:
+    desc: Preview framework update without applying
+    cmds:
+      - |
+        set -e
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
+          echo "❌ Cannot run dry-run on the upstream repository itself"
+          exit 1
+        fi
+
+        # Set up remote if needed
+        if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
+          git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
+        fi
+        git fetch ckeletin-upstream
+
+        # Show what would change
+        echo "📋 Preview of framework update:"
+        echo ""
+
+        DIFF_STAT=$(git diff --stat HEAD ckeletin-upstream/main -- .ckeletin/)
+        if [ -z "$DIFF_STAT" ]; then
+          echo "✅ Framework is already up-to-date"
+        else
+          echo "$DIFF_STAT"
+          echo ""
+          echo "Run 'task ckeletin:update' to apply these changes."
+        fi
+
   doctor:
     desc: Check development environment and tool installation
     silent: true
@@ -212,6 +243,11 @@ tasks:
         done
         echo ""
         echo "💡 If any tools are missing, run: task ckeletin:setup"
+
+  version:
+    desc: Show framework version
+    cmds:
+      - echo "ckeletin framework v$(cat .ckeletin/VERSION)"
 
   tidy:
     desc: Ensure go.mod and go.sum are up to date
