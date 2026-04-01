@@ -359,7 +359,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `NewDefaultUIRunner` and `NewTestUIRunner` factory functions
   - Added special test mode to `RunUI` to simulate successful execution
   - Improved UI test coverage with comprehensive test cases
-- Added ckeletin-go specific conventions to CONVENSIONS.md:
+- Added ckeletin-go specific conventions to CONVENTIONS.md:
   - Documented separation of concerns between commands and business logic
   - Clarified centralized configuration patterns
   - Added guidelines for Options Pattern and Interface Abstractions
@@ -446,7 +446,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added conventions documentation (CONVENSIONS.md)
+- Added conventions documentation (CONVENTIONS.md)
 - Enhanced test coverage for ping command
 
 ### Changed
