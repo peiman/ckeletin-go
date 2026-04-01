@@ -1,10 +1,29 @@
 package check
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestShellCheck_NonExistentScript(t *testing.T) {
+	methods := &checkMethods{cfg: Config{}}
+	// Create a shell check pointing to a non-existent script
+	fn := methods.shellCheck("nonexistent-script-xyz.sh")
+
+	err := fn(context.Background())
+	assert.Error(t, err, "shell check with non-existent script should fail")
+}
+
+func TestShellCheck_ScriptWithArgs(t *testing.T) {
+	methods := &checkMethods{cfg: Config{}}
+	// Create a shell check with args pointing to a non-existent script
+	fn := methods.shellCheck("nonexistent-script-xyz.sh", "--check")
+
+	err := fn(context.Background())
+	assert.Error(t, err, "shell check with non-existent script and args should fail")
+}
 
 func TestExtractShellError(t *testing.T) {
 	tests := []struct {
@@ -110,6 +129,16 @@ func TestFilterTestOutput(t *testing.T) {
 			"compile error captured",
 			"# github.com/example/pkg\n./main.go:10:5: undefined: foo\nFAIL\tgithub.com/example/pkg [build failed]",
 			[]string{"failed to compile", "# github.com/example/pkg", "./main.go:10:5: undefined: foo"},
+		},
+		{
+			"coverage lines filtered out",
+			"coverage: 80.0% of statements\n--- FAIL: TestBad (0.00s)\nFAIL\tgithub.com/example/pkg\t1.0s",
+			[]string{"1 test(s) failed", "TestBad"},
+		},
+		{
+			"exit status lines filtered out",
+			"--- FAIL: TestBad (0.01s)\nexit status 1\nFAIL\tgithub.com/example/pkg\t0.5s",
+			[]string{"1 test(s) failed", "TestBad"},
 		},
 	}
 
