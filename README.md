@@ -157,7 +157,7 @@ ckeletin-go follows a principled architecture with automated enforcement:
 - **Dependency injection** — Over mocking, for testability ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
 - **Dual-tool license compliance** — Source + binary analysis ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
 - **Dev-only commands** — Via build tags ([ADR-012](.ckeletin/docs/adr/012-dev-commands-build-tags.md))
-- **Every ADR enforced** — By automation, not code review alone ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md))
+- **Enforcement by automation** — Every ADR has machine-checkable validation, catching violations from humans and AI agents alike ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md))
 
 All architectural decisions are documented in **[Architecture Decision Records](docs/adr/)**.
 
@@ -418,36 +418,19 @@ task ckeletin:update    # Pull latest framework improvements
 
 ---
 
-## Customization
+## Who Is This For?
 
-### Changing the Program Name
+**Your boss needs a CLI tool by next sprint. You've never built one.**
+Clone, `task init`, and you have production-ready infrastructure in 2 minutes. The ADRs teach you the patterns as you build.
 
-In `Taskfile.yml`:
-```yaml
-vars:
-  BINARY_NAME: myapp
-```
+**You're a senior dev who's tired of rebuilding the same scaffolding.**
+The updatable framework means you set up once and receive improvements over time. The enforced patterns mean your code stays clean even as the team grows.
 
-Then: `task build && ./myapp ping`
+**You use AI coding agents and need them to produce correct code.**
+The layered AI configuration — `AGENTS.md`, `CLAUDE.md`, hooks, enforcement — means agents work within your architecture, not around it. This is what "agent-ready" looks like.
 
-### Adding New Commands
-
-```bash
-task generate:command name=hello
-```
-
-Creates `cmd/hello.go` (ultra-thin wrapper) and `internal/config/commands/hello_config.go` (config metadata). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full step-by-step guide.
-
-### AI Integration
-
-This project includes `AGENTS.md` (universal AI agent guide) and `CLAUDE.md` (Claude Code-specific rules):
-
-- Task-based workflow commands
-- Architecture and ADR references
-- Code quality standards and coverage requirements
-- Testing conventions and git workflow
-
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) reads `CLAUDE.md` automatically. Other AI assistants (Cursor, Copilot, Codex) can use `AGENTS.md`.
+**You want to make your own codebase agent-ready.**
+Study the pattern: `AGENTS.md` → behavioral rules → automated hooks → machine-checkable enforcement. It works in any project.
 
 ---
 
