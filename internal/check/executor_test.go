@@ -99,6 +99,7 @@ func TestRunCategorySimple_SequentialExecution(t *testing.T) {
 			executor := &Executor{
 				cfg:     Config{FailFast: tt.failFast},
 				writer:  &buf,
+				runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 				timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 				useTUI:  false,
 			}
@@ -138,6 +139,7 @@ func TestRunCategorySimple_ResultMetadata(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -178,6 +180,7 @@ func TestRunCategorySimple_RecordsTiming(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{},
 		writer:  &buf,
+		runner:  NewRunner(timings),
 		timings: timings,
 		useTUI:  false,
 	}
@@ -203,6 +206,7 @@ func TestRunCategorySimple_ContextCancellation(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -230,6 +234,7 @@ func TestRunCategorySimple_ParallelFailFast(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Parallel: true, FailFast: true},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -262,6 +267,7 @@ func TestRunCategorySimple_ParallelAllPass(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Parallel: true},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -288,6 +294,7 @@ func TestRunCategorySimple_ParallelMixedResults(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Parallel: true},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -320,6 +327,7 @@ func TestRunCategorySimple_ParallelRecordsTiming(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Parallel: true},
 		writer:  &buf,
+		runner:  NewRunner(timings),
 		timings: timings,
 		useTUI:  false,
 	}
@@ -349,6 +357,7 @@ func TestExecute_WithMockChecks(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{},
 			writer:  &buf,
+			runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 			timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 			useTUI:  false,
 		}
@@ -378,6 +387,7 @@ func TestExecutor_CheckTest(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{},
 			writer:  &buf,
+			runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 			timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 			useTUI:  false,
 		}
@@ -458,6 +468,7 @@ func TestBuildCategories_CheckMetadata(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -502,8 +513,8 @@ func TestBuildCategories_CheckMetadata(t *testing.T) {
 	})
 }
 
-func TestShouldRunCategory_AllMappings(t *testing.T) {
-	// Verify the complete mapping from display names to filter names
+func TestFilterCategories_ViaRunner_AllMappings(t *testing.T) {
+	runner := NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)})
 	tests := []struct {
 		displayName string
 		filterName  string
@@ -518,41 +529,33 @@ func TestShouldRunCategory_AllMappings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.displayName, func(t *testing.T) {
-			var buf bytes.Buffer
-			executor := &Executor{
-				cfg:     Config{Categories: []string{tt.filterName}},
-				writer:  &buf,
-				timings: &timingHistory{Checks: make(map[string]*checkTiming)},
-				useTUI:  false,
-			}
+			cats := []categoryDef{{name: tt.displayName, checks: []checkItem{{name: "c"}}}}
+			result := runner.FilterCategories(cats, []string{tt.filterName})
+			require.Len(t, result, 1)
 
-			assert.True(t, executor.shouldRunCategory(tt.displayName),
-				"category %q should match filter %q", tt.displayName, tt.filterName)
-
-			// Verify it doesn't match other categories
 			for _, other := range tests {
 				if other.filterName != tt.filterName {
-					assert.False(t, executor.shouldRunCategory(other.displayName),
-						"category %q should NOT match filter %q", other.displayName, tt.filterName)
+					otherCats := []categoryDef{{name: other.displayName, checks: []checkItem{{name: "c"}}}}
+					otherResult := runner.FilterCategories(otherCats, []string{tt.filterName})
+					assert.Empty(t, otherResult)
 				}
 			}
 		})
 	}
 }
 
-func TestShouldRunCategory_MultipleFilters(t *testing.T) {
-	var buf bytes.Buffer
-	executor := &Executor{
-		cfg:     Config{Categories: []string{"quality", "tests"}},
-		writer:  &buf,
-		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
-		useTUI:  false,
+func TestFilterCategories_ViaRunner_MultipleFilters(t *testing.T) {
+	runner := NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)})
+	categories := []categoryDef{
+		{name: "Code Quality", checks: []checkItem{{name: "format"}}},
+		{name: "Tests", checks: []checkItem{{name: "test"}}},
+		{name: "Dependencies", checks: []checkItem{{name: "deps"}}},
+		{name: "Development Environment", checks: []checkItem{{name: "go-version"}}},
 	}
-
-	assert.True(t, executor.shouldRunCategory("Code Quality"))
-	assert.True(t, executor.shouldRunCategory("Tests"))
-	assert.False(t, executor.shouldRunCategory("Dependencies"))
-	assert.False(t, executor.shouldRunCategory("Development Environment"))
+	result := runner.FilterCategories(categories, []string{"quality", "tests"})
+	require.Len(t, result, 2)
+	assert.Equal(t, "Code Quality", result[0].name)
+	assert.Equal(t, "Tests", result[1].name)
 }
 
 func TestExecute_CategoryFiltering(t *testing.T) {
@@ -564,6 +567,7 @@ func TestExecute_CategoryFiltering(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{Categories: []string{"nonexistent"}},
 			writer:  &buf,
+			runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 			timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 			useTUI:  false,
 		}
@@ -583,6 +587,7 @@ func TestExecute_IntegrationWithRunCategorySimple(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{},
 			writer:  &buf,
+			runner:  NewRunner(timings),
 			timings: timings,
 			useTUI:  false,
 		}
@@ -626,6 +631,7 @@ func TestExecute_IntegrationWithRunCategorySimple(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{FailFast: true},
 			writer:  &buf,
+			runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 			timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 			useTUI:  false,
 		}
@@ -687,6 +693,7 @@ func TestExecute_EmptyCategoryFilter(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Categories: []string{"nonexistent-category-xyz"}},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -705,6 +712,7 @@ func TestExecute_FailFastWithFilteredCategory(t *testing.T) {
 	executor := &Executor{
 		cfg:     Config{Categories: []string{"nonexistent"}, FailFast: true},
 		writer:  &buf,
+		runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 		timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 		useTUI:  false,
 	}
@@ -719,6 +727,7 @@ func TestExecutor_CheckTestCoverageCallback(t *testing.T) {
 		executor := &Executor{
 			cfg:     Config{},
 			writer:  &buf,
+			runner:  NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)}),
 			timings: &timingHistory{Checks: make(map[string]*checkTiming)},
 			useTUI:  false,
 		}

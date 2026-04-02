@@ -193,68 +193,33 @@ func TestExecutor_BuildCategories(t *testing.T) {
 	assert.Equal(t, 23, total, "should have 23 total checks")
 }
 
-func TestExecutor_ShouldRunCategory(t *testing.T) {
-	var buf bytes.Buffer
+func TestRunner_FilterCategories(t *testing.T) {
+	runner := NewRunner(&timingHistory{Checks: make(map[string]*checkTiming)})
 
 	tests := []struct {
 		name         string
-		categories   []string
+		filters      []string
 		categoryName string
-		want         bool
+		wantIncluded bool
 	}{
-		{
-			// Note: When categories is nil, Execute() doesn't call shouldRunCategory
-			// so this returns false (no match), but the caller handles this case
-			name:         "no filter returns false (caller handles this)",
-			categories:   nil,
-			categoryName: "Development Environment",
-			want:         false,
-		},
-		{
-			name:         "filter matches environment",
-			categories:   []string{"environment"},
-			categoryName: "Development Environment",
-			want:         true,
-		},
-		{
-			name:         "filter doesn't match",
-			categories:   []string{"security"},
-			categoryName: "Development Environment",
-			want:         false,
-		},
-		{
-			name:         "filter matches quality",
-			categories:   []string{"quality"},
-			categoryName: "Code Quality",
-			want:         true,
-		},
-		{
-			name:         "filter matches architecture",
-			categories:   []string{"architecture"},
-			categoryName: "Architecture Validation",
-			want:         true,
-		},
-		{
-			name:         "case insensitive filter",
-			categories:   []string{"SECURITY"},
-			categoryName: "Security Scanning",
-			want:         true,
-		},
-		{
-			name:         "unknown category returns true",
-			categories:   []string{"security"},
-			categoryName: "Unknown Category",
-			want:         true,
-		},
+		{name: "no filter includes all", filters: nil, categoryName: "Development Environment", wantIncluded: true},
+		{name: "filter matches environment", filters: []string{"environment"}, categoryName: "Development Environment", wantIncluded: true},
+		{name: "filter does not match", filters: []string{"security"}, categoryName: "Development Environment", wantIncluded: false},
+		{name: "filter matches quality", filters: []string{"quality"}, categoryName: "Code Quality", wantIncluded: true},
+		{name: "filter matches architecture", filters: []string{"architecture"}, categoryName: "Architecture Validation", wantIncluded: true},
+		{name: "case insensitive filter", filters: []string{"SECURITY"}, categoryName: "Security Scanning", wantIncluded: true},
+		{name: "unknown category included", filters: []string{"security"}, categoryName: "Unknown Category", wantIncluded: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := Config{Categories: tt.categories}
-			executor := NewExecutor(cfg, &buf)
-
-			got := executor.shouldRunCategory(tt.categoryName)
-			assert.Equal(t, tt.want, got)
+			cats := []categoryDef{{name: tt.categoryName, checks: []checkItem{{name: "c"}}}}
+			result := runner.FilterCategories(cats, tt.filters)
+			if tt.wantIncluded {
+				assert.Len(t, result, 1)
+			} else {
+				assert.Empty(t, result)
+			}
 		})
 	}
 }
