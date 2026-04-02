@@ -65,12 +65,9 @@ docs/adr/
 
 ## Project ADR Index
 
-*(Add your project ADRs here as you create them)*
+- [ADR-100](100-plugin-architecture.md) - Plugin/Extension Architecture (Deferred)
 
-<!-- Example:
-- [ADR-100](100-database-selection.md) - Database Selection (PostgreSQL)
-- [ADR-101](101-api-versioning.md) - API Versioning Strategy
--->
+<!-- Add new project ADRs above this line -->
 
 ## ADR Format
 

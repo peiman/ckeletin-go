@@ -71,9 +71,20 @@ func (th *timingHistory) save() {
 		return
 	}
 
-	// Write atomically with secure permissions
-	if err := os.WriteFile(timingFilePath(), data, 0o600); err != nil {
-		log.Debug().Err(err).Msg("Failed to write timing history")
+	// Atomic write: write to temp file in same directory, then rename.
+	// os.Rename is atomic on most filesystems, so readers will either see
+	// the old complete file or the new complete file, never a partial write.
+	path := timingFilePath()
+	tmpFile := path + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
+		log.Debug().Err(err).Msg("Failed to write temp timing file")
+		return
+	}
+	if err := os.Rename(tmpFile, path); err != nil {
+		if removeErr := os.Remove(tmpFile); removeErr != nil {
+			log.Debug().Err(removeErr).Str("file", tmpFile).Msg("Failed to clean up temp timing file")
+		}
+		log.Debug().Err(err).Msg("Failed to rename timing file")
 	}
 }
 
