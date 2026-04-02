@@ -417,3 +417,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Scan release artifacts for vulnerabilities
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: anchore/scan-action@2c901b3a564f71f9e21d1fa3de6bff3bffabc9ca  # v6.2.0
+        with:
+          path: "dist/"
+          fail-build: true
+          severity-cutoff: high
+          output-format: table

@@ -297,6 +297,10 @@ tasks:
 
   # === Framework Update ===
 
+  ckeletin-health:
+    desc: Check framework health and update status
+    cmds: [task: ckeletin:health]
+
   ckeletin-update-dry-run:
     desc: Preview framework update without applying
     cmds: [task: ckeletin:update:dry-run]

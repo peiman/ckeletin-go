@@ -29,8 +29,16 @@ extends:
   - .ckeletin/configs/lefthook.base.yml
 
 # Project-specific hooks (add below)
-# Example: Add a commit-msg hook
-# commit-msg:
-#   commands:
-#     validate:
-#       run: scripts/validate-commit-msg.sh {1}
+commit-msg:
+  commands:
+    conventional-commit:
+      run: |
+        MSG=$(head -1 {1})
+        if ! echo "$MSG" | grep -qE '^(feat|fix|docs|test|refactor|style|perf|build|ci|chore)(\(.+\))?: .+'; then
+          echo "❌ Commit message must follow Conventional Commits format:"
+          echo "   <type>[optional scope]: <description>"
+          echo ""
+          echo "   Types: feat, fix, docs, test, refactor, style, perf, build, ci, chore"
+          echo "   Your message: $MSG"
+          exit 1
+        fi

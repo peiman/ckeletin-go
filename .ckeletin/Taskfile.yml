@@ -258,6 +258,63 @@ tasks:
     cmds:
       - echo "ckeletin framework v$(cat .ckeletin/VERSION)"
 
+  health:
+    desc: Check framework health and update status
+    cmds:
+      - |
+        set -e
+        echo "🔍 Framework Health Check"
+        echo ""
+
+        # Version
+        VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
+        echo "📦 Framework version: v$VERSION"
+
+        # Local modifications
+        if git diff --quiet -- .ckeletin/; then
+          echo "✅ No local modifications to .ckeletin/"
+        else
+          echo "⚠️  Local modifications detected in .ckeletin/"
+          git diff --stat -- .ckeletin/
+        fi
+
+        # Update check
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
+          echo "ℹ️  This is the upstream repository"
+        else
+          if git remote get-url ckeletin-upstream >/dev/null 2>&1; then
+            git fetch ckeletin-upstream --quiet 2>/dev/null || true
+            BEHIND=$(git rev-list HEAD..ckeletin-upstream/main -- .ckeletin/ 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$BEHIND" = "0" ]; then
+              echo "✅ Framework is up-to-date"
+            else
+              echo "⚠️  Framework is $BEHIND commit(s) behind upstream"
+              echo "   Run: task ckeletin:update:dry-run"
+            fi
+          else
+            echo "ℹ️  No upstream remote configured (run task ckeletin:update to set up)"
+          fi
+        fi
+
+        # Import consistency
+        echo ""
+        echo "🔗 Import consistency:"
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        if [ "$CURRENT_MODULE" != "$UPSTREAM_MODULE" ]; then
+          INCONSISTENT=$(grep -rn "$UPSTREAM_MODULE" --include="*.go" cmd/ internal/ 2>/dev/null | grep -v "_test.go" || true)
+          if [ -z "$INCONSISTENT" ]; then
+            echo "✅ All imports are consistent"
+          else
+            echo "⚠️  Found references to upstream module in project code:"
+            echo "$INCONSISTENT"
+          fi
+        else
+          echo "✅ Upstream repository — imports are canonical"
+        fi
+
   tidy:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
