@@ -2,6 +2,7 @@ package check
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -74,8 +75,9 @@ func (th *timingHistory) save() {
 	// Atomic write: write to temp file in same directory, then rename.
 	// os.Rename is atomic on most filesystems, so readers will either see
 	// the old complete file or the new complete file, never a partial write.
+	// Use a unique temp name to avoid Windows file locking on concurrent writes.
 	path := timingFilePath()
-	tmpFile := path + ".tmp"
+	tmpFile := fmt.Sprintf("%s.tmp.%d", path, time.Now().UnixNano())
 	if err := os.WriteFile(tmpFile, data, 0o600); err != nil {
 		log.Debug().Err(err).Msg("Failed to write temp timing file")
 		return
