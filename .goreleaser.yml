@@ -118,6 +118,18 @@ checksum:
   name_template: 'checksums.txt'
   algorithm: sha256
 
+# Sign release checksums with cosign (keyless via OIDC)
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    output: true
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+
 # Generate SBOM (Software Bill of Materials) for security compliance
 sboms:
   - id: default

@@ -380,6 +380,7 @@ jobs:
     permissions:
       contents: write # Need write access to create releases
       packages: read # For package access if needed
+      id-token: write # For keyless cosign signing via OIDC
 
     steps:
       - name: Checkout Code
@@ -404,6 +405,9 @@ jobs:
         with:
           go-version-file: '.go-version'  # SSOT for Go version
           cache-dependency-path: 'go.sum'
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd1d5ad67616c4d  # v3.8.0
 
       - name: Install Syft for SBOM generation
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610  # v0.24.0
