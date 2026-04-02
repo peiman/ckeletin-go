@@ -761,3 +761,52 @@ func TestTimingHistory_Save_ErrorOnReadOnlyDir(t *testing.T) {
 		th.save()
 	})
 }
+
+func TestTimingHistory_Save_AtomicWrite(t *testing.T) {
+	t.Run("temp file does not persist after successful write", func(t *testing.T) {
+		setupTimingTestEnv(t)
+
+		th := &timingHistory{
+			Checks: map[string]*checkTiming{
+				"lint": {AvgDuration: 2 * time.Second, LastDuration: 2 * time.Second, RunCount: 3},
+			},
+		}
+
+		th.save()
+
+		// The final file should exist
+		path := timingFilePath()
+		_, err := os.Stat(path)
+		require.NoError(t, err, "timing file should exist after save")
+
+		// The temp file should NOT persist
+		tmpFile := path + ".tmp"
+		_, err = os.Stat(tmpFile)
+		assert.True(t, os.IsNotExist(err),
+			"temp file %s should not exist after successful atomic write", tmpFile)
+	})
+
+	t.Run("data is correctly written via atomic pattern", func(t *testing.T) {
+		setupTimingTestEnv(t)
+
+		th := &timingHistory{
+			Checks: map[string]*checkTiming{
+				"test":   {AvgDuration: 10 * time.Second, LastDuration: 9 * time.Second, RunCount: 7},
+				"format": {AvgDuration: 500 * time.Millisecond, LastDuration: 450 * time.Millisecond, RunCount: 4},
+			},
+		}
+
+		th.save()
+
+		// Load back and verify integrity
+		loaded := loadTimingHistory()
+		require.NotNil(t, loaded)
+		require.Contains(t, loaded.Checks, "test")
+		require.Contains(t, loaded.Checks, "format")
+		assert.Equal(t, 10*time.Second, loaded.Checks["test"].AvgDuration)
+		assert.Equal(t, 9*time.Second, loaded.Checks["test"].LastDuration)
+		assert.Equal(t, 7, loaded.Checks["test"].RunCount)
+		assert.Equal(t, 500*time.Millisecond, loaded.Checks["format"].AvgDuration)
+		assert.Equal(t, 4, loaded.Checks["format"].RunCount)
+	})
+}
