@@ -1,0 +1,39 @@
+name: SLSA Provenance
+
+on:
+  release:
+    types: [created]
+
+# Default to no permissions; each job grants only what it needs
+permissions: {}
+
+jobs:
+  provenance:
+    name: Generate Provenance Attestations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write      # To upload provenance to release
+      id-token: write      # For OIDC signing
+      attestations: write  # To create attestations
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" -D dist/
+
+      - name: Generate attestations
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          for f in dist/*.tar.gz dist/*.zip dist/checksums.txt; do
+            [ -f "$f" ] && gh attestation create "$f" --repo "$REPO"
+          done
