@@ -21,7 +21,7 @@ Key characteristics:
 - 85% minimum test coverage, enforced by CI
 - Public reusable packages in `pkg/` (e.g., `checkmate` for beautiful CLI output)
 
-**Platform:** macOS and Linux. Windows is not officially supported.
+**Platform:** macOS and Linux (primary). Windows is supported for core functionality; interactive features (TUI, colored output) may have limitations.
 
 ## Commands
 
