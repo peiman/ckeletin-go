@@ -161,10 +161,15 @@ func TestScaffoldInit(t *testing.T) {
 			".goreleaser.yml should contain new project name")
 	})
 
-	// Verify: No old module references remain in Go files (except pkg/ imports)
+	// Verify: No old module references remain in Go import statements (except pkg/ imports).
+	// The AST-based import rewriter only modifies actual import paths — comments and
+	// string constants are intentionally left unchanged (they don't affect compilation).
 	t.Run("no old module references except pkg/ imports", func(t *testing.T) {
 		pkgPrefix := upstreamModule + "/pkg/"
 		var staleRefs []string
+
+		// importLineRe matches Go import lines: optional name, then quoted path
+		importLineRe := regexp.MustCompile(`^\s*(\w+\s+)?"[^"]*"`)
 
 		err := filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
@@ -176,8 +181,19 @@ func TestScaffoldInit(t *testing.T) {
 				return nil
 			}
 
-			// Skip the test file itself - it intentionally keeps upstream module reference
+			// Skip test files that intentionally keep upstream module references
 			if strings.HasSuffix(path, "scaffold_init_test.go") {
+				return nil
+			}
+
+			// Skip rewrite-imports test fixtures — they contain upstream module
+			// references as test data (string constants, not actual imports)
+			if strings.Contains(path, "rewrite-imports") {
+				return nil
+			}
+
+			// Skip scaffold helpers test fixtures for the same reason
+			if strings.Contains(path, filepath.Join("scripts", "scaffold")) && strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
 
@@ -187,9 +203,33 @@ func TestScaffoldInit(t *testing.T) {
 					return err
 				}
 
+				// Only check lines that are import statements, not comments or strings.
+				// The AST-based rewriter correctly targets only import paths.
+				inImportBlock := false
 				lines := strings.Split(string(content), "\n")
 				for lineNum, line := range lines {
-					if strings.Contains(line, upstreamModule) {
+					trimmed := strings.TrimSpace(line)
+
+					// Track import block boundaries
+					if strings.HasPrefix(trimmed, "import (") {
+						inImportBlock = true
+						continue
+					}
+					if inImportBlock && trimmed == ")" {
+						inImportBlock = false
+						continue
+					}
+
+					// Check single-line imports and lines within import blocks
+					isImportLine := false
+					if strings.HasPrefix(trimmed, "import \"") || strings.HasPrefix(trimmed, "import\t\"") {
+						isImportLine = true
+					}
+					if inImportBlock && importLineRe.MatchString(trimmed) {
+						isImportLine = true
+					}
+
+					if isImportLine && strings.Contains(line, upstreamModule) {
 						// pkg/ imports are allowed — they reference ckeletin-go as external dep
 						if strings.Contains(line, pkgPrefix) {
 							continue
@@ -206,7 +246,7 @@ func TestScaffoldInit(t *testing.T) {
 		require.NoError(t, err, "failed to walk directory")
 
 		assert.Empty(t, staleRefs,
-			"found stale module references (pkg/ imports are allowed):\n%s",
+			"found stale module references in import statements (pkg/ imports are allowed):\n%s",
 			strings.Join(staleRefs, "\n"))
 	})
 

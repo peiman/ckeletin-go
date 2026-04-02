@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"go/format"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -167,69 +168,34 @@ func updateGoMod(newModule string) error {
 	return os.WriteFile("go.mod", []byte(updated), 0600)
 }
 
-// updateGoFiles updates import statements in all Go files
+// updateGoFiles updates import statements in all Go files using the AST-based
+// import rewriter. This only modifies actual import paths — never comments,
+// string constants, or partial matches. The -preserve-pkg flag keeps
+// oldModule/pkg/* imports unchanged so derived projects consume those as
+// external dependencies from the original module.
 func updateGoFiles(oldModule, newModule string) (int, error) {
-	count := 0
-
-	// Files to skip - these contain upstream module references that should be preserved
-	// (e.g., scaffold tests that need to detect if they're running in derived projects)
-	skipFiles := map[string]bool{
-		"test/integration/scaffold_init_test.go": true,
+	// Use the AST-based import rewriter as a subprocess.
+	// The rewriter handles directory walking, skipping vendor/.git/dist/.task,
+	// and only rewrites actual import paths in Go files.
+	cmd := exec.Command("go", "run", "./.ckeletin/scripts/rewrite-imports/",
+		"-old", oldModule,
+		"-new", newModule,
+		"-dir", ".",
+		"-preserve-pkg",
+	)
+	cmd.Stderr = os.Stderr
+	output, err := cmd.Output()
+	if err != nil {
+		return 0, fmt.Errorf("running import rewriter: %w", err)
 	}
 
-	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip directories we don't want to process
-		if info.IsDir() {
-			name := info.Name()
-			if name == ".git" || name == "vendor" || name == "dist" || name == ".task" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Only process .go files
-		if !strings.HasSuffix(path, ".go") {
-			return nil
-		}
-
-		// Skip files that should preserve upstream module references
-		// Normalize path to forward slashes for cross-platform compatibility
-		normalizedPath := filepath.ToSlash(path)
-		if skipFiles[normalizedPath] {
-			return nil
-		}
-
-		// Read file
-		// #nosec G304 - path is controlled by filepath.Walk, not user input
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		// Check if file contains old module
-		if !strings.Contains(string(content), oldModule) {
-			return nil
-		}
-
-		// Replace old module with new module, preserving pkg/ references.
-		// Lines referencing oldModule/pkg/ are kept intact so derived projects
-		// import those packages as external dependencies from the original module.
-		updated := replaceModulePreservingPkg(string(content), oldModule, newModule)
-
-		// Write back
-		if err := os.WriteFile(path, []byte(updated), info.Mode()); err != nil {
-			return err
-		}
-
-		count++
-		return nil
-	})
-
-	return count, err
+	// Parse the count from rewriter output: "Rewrote imports in N files"
+	var count int
+	if _, scanErr := fmt.Sscanf(string(output), "Rewrote imports in %d files", &count); scanErr != nil {
+		// If we can't parse, return 0 but don't fail
+		return 0, nil
+	}
+	return count, nil
 }
 
 // updateTaskfile updates BINARY_NAME in Taskfile.yml
