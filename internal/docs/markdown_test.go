@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestGenerateMarkdownDocs tests the basic structure of generated markdown documentation
@@ -34,16 +36,12 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 	err := generator.GenerateMarkdownDocs(&buf, appInfo)
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("GenerateMarkdownDocs failed: %v", err)
-	}
+	require.NoError(t, err, "GenerateMarkdownDocs failed")
 
 	output := buf.String()
 
 	// Check header
-	if !strings.Contains(output, "# testapp Configuration") {
-		t.Errorf("Missing header in output")
-	}
+	assert.True(t, strings.Contains(output, "# testapp Configuration"), "Missing header in output")
 
 	// Check sections
 	expectedSections := []string{
@@ -55,36 +53,26 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 	}
 
 	for _, section := range expectedSections {
-		if !strings.Contains(output, section) {
-			t.Errorf("Missing section: %s", section)
-		}
+		assert.True(t, strings.Contains(output, section), "Missing section: %s", section)
 	}
 
 	// Check configuration sources
-	if !strings.Contains(output, "Environment variables (with prefix `TESTAPP_`)") {
-		t.Errorf("Missing environment variable prefix")
-	}
+	assert.True(t, strings.Contains(output, "Environment variables (with prefix `TESTAPP_`)"),
+		"Missing environment variable prefix")
 
 	// Path should be sanitized to use ~ instead of /home/user
-	if !strings.Contains(output, "Configuration file (~/.testapp.yaml)") {
-		t.Errorf("Missing sanitized config file path")
-	}
+	assert.True(t, strings.Contains(output, "Configuration file (~/.testapp.yaml)"),
+		"Missing sanitized config file path")
 
 	// Check table headers and basic structure
 	tableHeaders := "| Key | Type | Default | Environment Variable | Description |"
-	if !strings.Contains(output, tableHeaders) {
-		t.Errorf("Missing table headers")
-	}
+	assert.True(t, strings.Contains(output, tableHeaders), "Missing table headers")
 
 	// Check YAML section existence
-	if !strings.Contains(output, "```yaml") {
-		t.Errorf("Missing YAML code block")
-	}
+	assert.True(t, strings.Contains(output, "```yaml"), "Missing YAML code block")
 
 	// Check environment variables section
-	if !strings.Contains(output, "```bash") {
-		t.Errorf("Missing bash code block for environment variables")
-	}
+	assert.True(t, strings.Contains(output, "```bash"), "Missing bash code block for environment variables")
 }
 
 // TestGenerateMarkdownDocs_YAMLError tests how markdown generation handles YAML errors
@@ -121,13 +109,9 @@ func TestGenerateMarkdownDocs_YAMLError(t *testing.T) {
 	err := generator.GenerateMarkdownDocs(&buf, appInfo)
 
 	// ASSERTION PHASE
-	if err == nil {
-		t.Errorf("Expected error for YAML generation, got nil")
-	}
-
-	if !strings.Contains(err.Error(), expectedErr.Error()) {
-		t.Errorf("Expected error to contain %q, got %q", expectedErr, err.Error())
-	}
+	require.Error(t, err, "Expected error for YAML generation, got nil")
+	assert.True(t, strings.Contains(err.Error(), expectedErr.Error()),
+		"Expected error to contain %q, got %q", expectedErr, err.Error())
 }
 
 // TestGenerateMarkdownDocs_EmptyRegistry tests how the markdown generator handles an empty registry
@@ -159,9 +143,7 @@ func TestGenerateMarkdownDocs_EmptyRegistry(t *testing.T) {
 	err := generator.GenerateMarkdownDocs(&buf, appInfo)
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("GenerateMarkdownDocs failed with empty registry: %v", err)
-	}
+	require.NoError(t, err, "GenerateMarkdownDocs failed with empty registry")
 
 	output := buf.String()
 
@@ -176,21 +158,16 @@ func TestGenerateMarkdownDocs_EmptyRegistry(t *testing.T) {
 	}
 
 	for _, section := range expectedSections {
-		if !strings.Contains(output, section) {
-			t.Errorf("Missing section with empty registry: %s", section)
-		}
+		assert.True(t, strings.Contains(output, section), "Missing section with empty registry: %s", section)
 	}
 
 	// Check table headers still exist
 	tableHeaders := "| Key | Type | Default | Environment Variable | Description |"
-	if !strings.Contains(output, tableHeaders) {
-		t.Errorf("Missing table headers with empty registry")
-	}
+	assert.True(t, strings.Contains(output, tableHeaders), "Missing table headers with empty registry")
 
 	// Check that the blocks are properly closed
-	if !strings.Contains(output, "```yaml") || !strings.Contains(output, "```bash") {
-		t.Errorf("Missing code blocks with empty registry")
-	}
+	assert.True(t, strings.Contains(output, "```yaml") && strings.Contains(output, "```bash"),
+		"Missing code blocks with empty registry")
 }
 
 // TestMarkdownGenerationNoUserPaths tests that generated docs don't contain user-specific paths
@@ -219,22 +196,17 @@ func TestMarkdownGenerationNoUserPaths(t *testing.T) {
 	err := gen.GenerateMarkdownDocs(&buf, appInfo)
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("GenerateMarkdownDocs failed: %v", err)
-	}
+	require.NoError(t, err, "GenerateMarkdownDocs failed")
 
 	output := buf.String()
 
 	// Should NOT contain user-specific paths
-	if strings.Contains(output, "/Users/") {
-		t.Error("Generated markdown should not contain /Users/ paths")
-	}
-	if strings.Contains(output, "someuser") {
-		t.Error("Generated markdown should not contain usernames")
-	}
+	assert.False(t, strings.Contains(output, "/Users/"),
+		"Generated markdown should not contain /Users/ paths")
+	assert.False(t, strings.Contains(output, "someuser"),
+		"Generated markdown should not contain usernames")
 
 	// SHOULD contain generic placeholder
-	if !strings.Contains(output, "$HOME") && !strings.Contains(output, "~") {
-		t.Error("Generated markdown should use $HOME or ~ for home directory")
-	}
+	assert.True(t, strings.Contains(output, "$HOME") || strings.Contains(output, "~"),
+		"Generated markdown should use $HOME or ~ for home directory")
 }

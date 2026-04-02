@@ -7,6 +7,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatResult(t *testing.T) {
@@ -99,16 +102,14 @@ func TestFormatResult(t *testing.T) {
 
 			// Check for expected content
 			for _, want := range tt.wantContains {
-				if !strings.Contains(output, want) {
-					t.Errorf("FormatResult() output missing expected content %q\nGot: %s", want, output)
-				}
+				assert.True(t, strings.Contains(output, want),
+					"FormatResult() output missing expected content %q\nGot: %s", want, output)
 			}
 
 			// Check for unexpected content
 			for _, notWant := range tt.wantNotContains {
-				if strings.Contains(output, notWant) {
-					t.Errorf("FormatResult() output contains unexpected content %q\nGot: %s", notWant, output)
-				}
+				assert.False(t, strings.Contains(output, notWant),
+					"FormatResult() output contains unexpected content %q\nGot: %s", notWant, output)
 			}
 		})
 	}
@@ -166,14 +167,13 @@ func TestExitCodeForResult(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := ExitCodeForResult(tt.result)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ExitCodeForResult() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if tt.wantErr && err != nil && tt.errMsg != "" {
-				if err.Error() != tt.errMsg {
-					t.Errorf("ExitCodeForResult() error message = %q, want %q", err.Error(), tt.errMsg)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Equal(t, tt.errMsg, err.Error())
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

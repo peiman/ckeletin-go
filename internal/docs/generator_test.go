@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockWriteCloser is a simple implementation of io.WriteCloser for testing
@@ -43,9 +45,7 @@ func TestNewGenerator(t *testing.T) {
 	generator := NewGenerator(cfg)
 
 	// ASSERTION PHASE
-	if generator.cfg.Writer != writer {
-		t.Errorf("Generator did not store the config correctly")
-	}
+	assert.Equal(t, writer, generator.cfg.Writer, "Generator did not store the config correctly")
 }
 
 func TestSetAppInfo(t *testing.T) {
@@ -65,16 +65,9 @@ func TestSetAppInfo(t *testing.T) {
 	generator.SetAppInfo(appInfo)
 
 	// ASSERTION PHASE
-	if generator.appInfo.BinaryName != "test-app" {
-		t.Errorf("Expected BinaryName to be 'test-app', got %s", generator.appInfo.BinaryName)
-	}
-	if generator.appInfo.EnvPrefix != "TEST_APP" {
-		t.Errorf("Expected EnvPrefix to be 'TEST_APP', got %s", generator.appInfo.EnvPrefix)
-	}
-	if generator.appInfo.ConfigPaths.DefaultPath != "/path/to/config" {
-		t.Errorf("Expected DefaultPath to be '/path/to/config', got %s",
-			generator.appInfo.ConfigPaths.DefaultPath)
-	}
+	assert.Equal(t, "test-app", generator.appInfo.BinaryName)
+	assert.Equal(t, "TEST_APP", generator.appInfo.EnvPrefix)
+	assert.Equal(t, "/path/to/config", generator.appInfo.ConfigPaths.DefaultPath)
 }
 
 func TestGenerate_UnsupportedFormat(t *testing.T) {
@@ -87,12 +80,9 @@ func TestGenerate_UnsupportedFormat(t *testing.T) {
 	err := generator.Generate()
 
 	// ASSERTION PHASE
-	if err == nil {
-		t.Errorf("Expected error for unsupported format, got nil")
-	}
-	if !strings.Contains(err.Error(), "unsupported format") {
-		t.Errorf("Expected error to contain 'unsupported format', got %s", err.Error())
-	}
+	require.Error(t, err, "Expected error for unsupported format, got nil")
+	assert.True(t, strings.Contains(err.Error(), "unsupported format"),
+		"Expected error to contain 'unsupported format', got %s", err.Error())
 }
 
 func TestGenerate_FileError(t *testing.T) {
@@ -115,12 +105,9 @@ func TestGenerate_FileError(t *testing.T) {
 	err := generator.Generate()
 
 	// ASSERTION PHASE
-	if err == nil {
-		t.Errorf("Expected error when file cannot be opened, got nil")
-	}
-	if !strings.Contains(err.Error(), "failed to create output file") {
-		t.Errorf("Expected 'failed to create output file' in error, got %s", err.Error())
-	}
+	require.Error(t, err, "Expected error when file cannot be opened, got nil")
+	assert.True(t, strings.Contains(err.Error(), "failed to create output file"),
+		"Expected 'failed to create output file' in error, got %s", err.Error())
 }
 
 func TestGenerate_CloseError(t *testing.T) {
@@ -163,24 +150,20 @@ func TestGenerate_CloseError(t *testing.T) {
 
 	// ASSERTION PHASE
 	// Verify that Close was called
-	if !closeWasCalled {
-		t.Fatalf("Close was not called on the file - defer didn't run")
-	}
+	require.True(t, closeWasCalled, "Close was not called on the file - defer didn't run")
 
 	// CRITICAL: Verify the close error is propagated to caller
 	// This will FAIL with the current buggy implementation because closeErr
 	// is checked before the deferred function assigns it
-	if err == nil {
-		t.Fatalf("Expected close error to be propagated, got nil\n" +
-			"This indicates the close-error aggregation bug:\n" +
-			"The defer sets closeErr AFTER the function returns, so checks for\n" +
+	require.Error(t, err,
+		"Expected close error to be propagated, got nil\n"+
+			"This indicates the close-error aggregation bug:\n"+
+			"The defer sets closeErr AFTER the function returns, so checks for\n"+
 			"'if closeErr != nil' in the function body always see nil",
-		)
-	}
+	)
 
-	if !strings.Contains(err.Error(), "close") {
-		t.Errorf("Expected error message to mention 'close', got: %v", err)
-	}
+	assert.True(t, strings.Contains(err.Error(), "close"),
+		"Expected error message to mention 'close', got: %v", err)
 }
 
 func TestGenerate_BothGenerationAndCloseErrors(t *testing.T) {
@@ -216,19 +199,15 @@ func TestGenerate_BothGenerationAndCloseErrors(t *testing.T) {
 	err := generator.Generate()
 
 	// ASSERTION PHASE
-	if err == nil {
-		t.Fatal("Expected both generation and close errors to be returned")
-	}
+	require.Error(t, err, "Expected both generation and close errors to be returned")
 
 	// Verify error message contains both errors
 	// With errors.Join, both errors are included in the multi-error
 	errMsg := err.Error()
-	if !strings.Contains(errMsg, "generation failed") {
-		t.Errorf("Expected error to mention 'generation failed', got: %v", errMsg)
-	}
-	if !strings.Contains(errMsg, "file close failed") {
-		t.Errorf("Expected error to mention file close failure, got: %v", errMsg)
-	}
+	assert.True(t, strings.Contains(errMsg, "generation failed"),
+		"Expected error to mention 'generation failed', got: %v", errMsg)
+	assert.True(t, strings.Contains(errMsg, "file close failed"),
+		"Expected error to mention file close failure, got: %v", errMsg)
 }
 
 // TestGenerateMarkdownConvenience tests the convenience function for generating markdown
@@ -255,18 +234,14 @@ func TestGenerateMarkdownConvenience(t *testing.T) {
 	err := GenerateMarkdown(&buf, appInfo)
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("GenerateMarkdown failed: %v", err)
-	}
+	require.NoError(t, err, "GenerateMarkdown failed")
 
 	output := buf.String()
-	if !strings.Contains(output, "# test Configuration") {
-		t.Error("Expected markdown output to contain app name")
-	}
+	assert.True(t, strings.Contains(output, "# test Configuration"),
+		"Expected markdown output to contain app name")
 
-	if !strings.Contains(output, "TEST_YAML_CONTENT_FOR_CONVENIENCE_TEST") {
-		t.Error("Expected YAML content function to be called")
-	}
+	assert.True(t, strings.Contains(output, "TEST_YAML_CONTENT_FOR_CONVENIENCE_TEST"),
+		"Expected YAML content function to be called")
 }
 
 // TestGenerateYAMLConvenience tests the convenience function for generating YAML
@@ -292,12 +267,9 @@ func TestGenerateYAMLConvenience(t *testing.T) {
 	err := GenerateYAML(&buf)
 
 	// ASSERTION PHASE
-	if err != nil {
-		t.Fatalf("GenerateYAML failed: %v", err)
-	}
+	require.NoError(t, err, "GenerateYAML failed")
 
 	output := buf.String()
-	if !strings.Contains(output, "TEST_YAML_CONTENT_FOR_CONVENIENCE_TEST") {
-		t.Error("Expected YAML content function to be called")
-	}
+	assert.True(t, strings.Contains(output, "TEST_YAML_CONTENT_FOR_CONVENIENCE_TEST"),
+		"Expected YAML content function to be called")
 }

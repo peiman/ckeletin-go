@@ -142,7 +142,7 @@ func verifyDefaultValue(t *testing.T, opt config.ConfigOption, flagName string) 
 			opt.Key, flagName)
 
 	default:
-		t.Errorf("Unknown type %q for option %s", opt.Type, opt.Key)
+		assert.Failf(t, "unknown type", "Unknown type %q for option %s", opt.Type, opt.Key)
 	}
 }
 

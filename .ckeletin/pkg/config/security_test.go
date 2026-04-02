@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateConfigFilePermissions(t *testing.T) {
@@ -62,27 +64,24 @@ func TestValidateConfigFilePermissions(t *testing.T) {
 			tmpDir := t.TempDir()
 			tmpFile := filepath.Join(tmpDir, "config.yaml")
 
-			if err := os.WriteFile(tmpFile, []byte("test: value\n"), tt.permissions); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			require.NoError(t,
+				os.WriteFile(tmpFile, []byte("test: value\n"), tt.permissions),
+				"Failed to create test file")
 
 			// Explicitly set permissions to overcome umask
-			if err := os.Chmod(tmpFile, tt.permissions); err != nil {
-				t.Fatalf("Failed to chmod test file: %v", err)
-			}
+			require.NoError(t, os.Chmod(tmpFile, tt.permissions), "Failed to chmod test file")
 
 			// Validate permissions
 			err := ValidateConfigFilePermissions(tmpFile)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigFilePermissions() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateConfigFilePermissions() error = %v, should contain %q", err, tt.errContains)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"ValidateConfigFilePermissions() error = %v, should contain %q", err, tt.errContains)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -93,12 +92,9 @@ func TestValidateConfigFilePermissions_NonexistentFile(t *testing.T) {
 	testutil.SkipOnWindowsWithReason(t, "permission tests require Unix file permissions")
 
 	err := ValidateConfigFilePermissions("/nonexistent/path/config.yaml")
-	if err == nil {
-		t.Error("ValidateConfigFilePermissions() should error for nonexistent file")
-	}
-	if !strings.Contains(err.Error(), "failed to stat") {
-		t.Errorf("Error should mention stat failure, got: %v", err)
-	}
+	require.Error(t, err, "ValidateConfigFilePermissions() should error for nonexistent file")
+	assert.True(t, strings.Contains(err.Error(), "failed to stat"),
+		"Error should mention stat failure, got: %v", err)
 }
 
 func TestValidateConfigFilePermissions_Windows(t *testing.T) {
@@ -108,14 +104,12 @@ func TestValidateConfigFilePermissions_Windows(t *testing.T) {
 	tmpDir := t.TempDir()
 	tmpFile := filepath.Join(tmpDir, "config.yaml")
 
-	if err := os.WriteFile(tmpFile, []byte("test: value\n"), 0666); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	require.NoError(t,
+		os.WriteFile(tmpFile, []byte("test: value\n"), 0666),
+		"Failed to create test file")
 
 	err := ValidateConfigFilePermissions(tmpFile)
-	if err != nil {
-		t.Errorf("ValidateConfigFilePermissions() on Windows should return nil, got: %v", err)
-	}
+	assert.NoError(t, err, "ValidateConfigFilePermissions() on Windows should return nil")
 }
 
 func TestValidateConfigFileSize(t *testing.T) {
@@ -170,22 +164,21 @@ func TestValidateConfigFileSize(t *testing.T) {
 
 			// Create file of specific size
 			content := make([]byte, tt.fileSize)
-			if err := os.WriteFile(tmpFile, content, 0600); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			require.NoError(t,
+				os.WriteFile(tmpFile, content, 0600),
+				"Failed to create test file")
 
 			// Validate size
 			err := ValidateConfigFileSize(tmpFile, tt.maxSize)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigFileSize() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateConfigFileSize() error = %v, should contain %q", err, tt.errContains)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"ValidateConfigFileSize() error = %v, should contain %q", err, tt.errContains)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -194,12 +187,9 @@ func TestValidateConfigFileSize(t *testing.T) {
 func TestValidateConfigFileSize_NonexistentFile(t *testing.T) {
 	t.Parallel()
 	err := ValidateConfigFileSize("/nonexistent/path/config.yaml", 1000)
-	if err == nil {
-		t.Error("ValidateConfigFileSize() should error for nonexistent file")
-	}
-	if !strings.Contains(err.Error(), "failed to stat") {
-		t.Errorf("Error should mention stat failure, got: %v", err)
-	}
+	require.Error(t, err, "ValidateConfigFileSize() should error for nonexistent file")
+	assert.True(t, strings.Contains(err.Error(), "failed to stat"),
+		"Error should mention stat failure, got: %v", err)
 }
 
 func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
@@ -208,9 +198,9 @@ func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
 	tmpFile := filepath.Join(tmpDir, "config.yaml")
 
 	// Create a 1-byte file
-	if err := os.WriteFile(tmpFile, []byte("x"), 0600); err != nil {
-		t.Fatalf("Failed to create test file: %v", err)
-	}
+	require.NoError(t,
+		os.WriteFile(tmpFile, []byte("x"), 0600),
+		"Failed to create test file")
 
 	// Test with various max sizes
 	testCases := []struct {
@@ -225,8 +215,10 @@ func TestValidateConfigFileSize_EdgeCases(t *testing.T) {
 
 	for _, tc := range testCases {
 		err := ValidateConfigFileSize(tmpFile, tc.maxSize)
-		if (err != nil) != tc.wantErr {
-			t.Errorf("ValidateConfigFileSize(maxSize=%d) error = %v, wantErr %v", tc.maxSize, err, tc.wantErr)
+		if tc.wantErr {
+			assert.Error(t, err, "ValidateConfigFileSize(maxSize=%d) should error", tc.maxSize)
+		} else {
+			assert.NoError(t, err, "ValidateConfigFileSize(maxSize=%d) should not error", tc.maxSize)
 		}
 	}
 }
@@ -286,28 +278,25 @@ func TestValidateConfigFileSecurity(t *testing.T) {
 			for i := range content {
 				content[i] = 'a'
 			}
-			if err := os.WriteFile(tmpFile, content, 0600); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			require.NoError(t,
+				os.WriteFile(tmpFile, content, 0600),
+				"Failed to create test file")
 
 			// Set the exact permissions we want (avoiding umask issues)
-			if err := os.Chmod(tmpFile, tt.permissions); err != nil {
-				t.Fatalf("Failed to set file permissions: %v", err)
-			}
+			require.NoError(t, os.Chmod(tmpFile, tt.permissions), "Failed to set file permissions")
 
 			// Run validation
 			err := ValidateConfigFileSecurity(tmpFile, tt.maxSize)
 
 			// Check error expectation
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigFileSecurity() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			// Check error message
-			if tt.wantErr && err != nil {
-				if !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateConfigFileSecurity() error = %v, should contain %q", err, tt.errContains)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"ValidateConfigFileSecurity() error = %v, should contain %q", err, tt.errContains)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -315,10 +304,7 @@ func TestValidateConfigFileSecurity(t *testing.T) {
 
 func TestValidateConfigFileSecurity_NonexistentFile(t *testing.T) {
 	err := ValidateConfigFileSecurity("/nonexistent/path/config.yaml", 1000)
-	if err == nil {
-		t.Error("ValidateConfigFileSecurity() should error for nonexistent file")
-	}
-	if !strings.Contains(err.Error(), "failed to stat") {
-		t.Errorf("Expected error message to contain 'failed to stat', got: %v", err)
-	}
+	require.Error(t, err, "ValidateConfigFileSecurity() should error for nonexistent file")
+	assert.True(t, strings.Contains(err.Error(), "failed to stat"),
+		"Expected error message to contain 'failed to stat', got: %v", err)
 }

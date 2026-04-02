@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/testutil"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidate(t *testing.T) {
@@ -85,38 +87,30 @@ func TestValidate(t *testing.T) {
 			tmpDir := t.TempDir()
 			configFile := filepath.Join(tmpDir, "config.yaml")
 
-			if err := os.WriteFile(configFile, []byte(tt.configContent), tt.permissions); err != nil {
-				t.Fatalf("Failed to create test file: %v", err)
-			}
+			require.NoError(t,
+				os.WriteFile(configFile, []byte(tt.configContent), tt.permissions),
+				"Failed to create test file")
 
 			// Set permissions explicitly (overcomes umask)
-			if err := os.Chmod(configFile, tt.permissions); err != nil {
-				t.Fatalf("Failed to chmod test file: %v", err)
-			}
+			require.NoError(t, os.Chmod(configFile, tt.permissions), "Failed to chmod test file")
 
 			// Validate
 			result, err := Validate(configFile)
-			if err != nil {
-				t.Fatalf("Validate() unexpected error: %v", err)
-			}
+			require.NoError(t, err, "Validate() unexpected error")
 
-			if result.Valid != tt.wantValid {
-				t.Errorf("Validate() valid = %v, want %v", result.Valid, tt.wantValid)
-			}
+			assert.Equal(t, tt.wantValid, result.Valid,
+				"Validate() valid = %v, want %v", result.Valid, tt.wantValid)
 
-			if len(result.Errors) != tt.wantErrorCount {
-				t.Errorf("Validate() error count = %d, want %d. Errors: %v",
-					len(result.Errors), tt.wantErrorCount, result.Errors)
-			}
+			assert.Len(t, result.Errors, tt.wantErrorCount,
+				"Validate() error count = %d, want %d. Errors: %v",
+				len(result.Errors), tt.wantErrorCount, result.Errors)
 
-			if len(result.Warnings) != tt.wantWarnings {
-				t.Errorf("Validate() warning count = %d, want %d. Warnings: %v",
-					len(result.Warnings), tt.wantWarnings, result.Warnings)
-			}
+			assert.Len(t, result.Warnings, tt.wantWarnings,
+				"Validate() warning count = %d, want %d. Warnings: %v",
+				len(result.Warnings), tt.wantWarnings, result.Warnings)
 
-			if result.ConfigFile != configFile {
-				t.Errorf("Validate() config file = %v, want %v", result.ConfigFile, configFile)
-			}
+			assert.Equal(t, configFile, result.ConfigFile,
+				"Validate() config file = %v, want %v", result.ConfigFile, configFile)
 		})
 	}
 }
@@ -125,9 +119,7 @@ func TestValidate_NonexistentFile(t *testing.T) {
 	t.Parallel()
 
 	_, err := Validate("/nonexistent/config.yaml")
-	if err == nil {
-		t.Error("Validate() should error for nonexistent file")
-	}
+	assert.Error(t, err, "Validate() should error for nonexistent file")
 }
 
 func TestFindUnknownKeys(t *testing.T) {
@@ -183,10 +175,9 @@ func TestFindUnknownKeys(t *testing.T) {
 			t.Parallel()
 
 			unknown := findUnknownKeys(tt.settings, tt.prefix, knownKeys)
-			if len(unknown) != tt.wantCount {
-				t.Errorf("findUnknownKeys() found %d unknown keys, want %d. Keys: %v",
-					len(unknown), tt.wantCount, unknown)
-			}
+			assert.Len(t, unknown, tt.wantCount,
+				"findUnknownKeys() found %d unknown keys, want %d. Keys: %v",
+				len(unknown), tt.wantCount, unknown)
 		})
 	}
 }
@@ -222,18 +213,17 @@ func FuzzValidate(f *testing.F) {
 		}
 
 		// Result should always have a ConfigFile set
-		if result.ConfigFile != configFile {
-			t.Errorf("Validate() ConfigFile = %v, want %v", result.ConfigFile, configFile)
-		}
+		assert.Equal(t, configFile, result.ConfigFile,
+			"Validate() ConfigFile = %v, want %v", result.ConfigFile, configFile)
 
 		// If there are errors, Valid should be false
-		if len(result.Errors) > 0 && result.Valid {
-			t.Errorf("Validate() has errors but Valid=true: %v", result.Errors)
+		if len(result.Errors) > 0 {
+			assert.False(t, result.Valid, "Validate() has errors but Valid=true: %v", result.Errors)
 		}
 
 		// If Valid is true, there should be no errors
-		if result.Valid && len(result.Errors) > 0 {
-			t.Errorf("Validate() Valid=true but has errors: %v", result.Errors)
+		if result.Valid {
+			assert.Empty(t, result.Errors, "Validate() Valid=true but has errors: %v", result.Errors)
 		}
 	})
 }

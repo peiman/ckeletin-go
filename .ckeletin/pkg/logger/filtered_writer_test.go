@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFilteredWriter_WriteLevel(t *testing.T) {
@@ -111,25 +113,18 @@ func TestFilteredWriter_WriteLevel(t *testing.T) {
 			n, err := writer.WriteLevel(tt.writeLevel, message)
 
 			// Check for errors
-			if err != nil {
-				t.Errorf("WriteLevel() returned error: %v", err)
-			}
+			require.NoError(t, err, "WriteLevel() returned error")
 
 			// Check return value (should always return message length)
-			if n != len(message) {
-				t.Errorf("WriteLevel() returned n = %d, want %d", n, len(message))
-			}
+			assert.Equal(t, len(message), n, "WriteLevel() returned n = %d, want %d", n, len(message))
 
 			// Check if message was written or filtered
 			written := buf.String()
 			if tt.shouldWrite {
-				if written != tt.message {
-					t.Errorf("Expected message to be written, got: %q, want: %q", written, tt.message)
-				}
+				assert.Equal(t, tt.message, written,
+					"Expected message to be written, got: %q, want: %q", written, tt.message)
 			} else {
-				if written != "" {
-					t.Errorf("Expected message to be filtered, but got: %q", written)
-				}
+				assert.Empty(t, written, "Expected message to be filtered, but got: %q", written)
 			}
 		})
 	}
@@ -146,17 +141,10 @@ func TestFilteredWriter_Write(t *testing.T) {
 	message := []byte("test message")
 	n, err := writer.Write(message)
 
-	if err != nil {
-		t.Errorf("Write() returned error: %v", err)
-	}
-
-	if n != len(message) {
-		t.Errorf("Write() returned n = %d, want %d", n, len(message))
-	}
-
-	if buf.String() != string(message) {
-		t.Errorf("Write() wrote %q, want %q", buf.String(), string(message))
-	}
+	require.NoError(t, err, "Write() returned error")
+	assert.Equal(t, len(message), n, "Write() returned n = %d, want %d", n, len(message))
+	assert.Equal(t, string(message), buf.String(),
+		"Write() wrote %q, want %q", buf.String(), string(message))
 }
 
 func TestFilteredWriter_WithZerolog(t *testing.T) {
@@ -189,39 +177,19 @@ func TestFilteredWriter_WithZerolog(t *testing.T) {
 
 	// Check console output (should have info, warn, error)
 	consoleOutput := consoleBuf.String()
-	if !strings.Contains(consoleOutput, "info message") {
-		t.Error("Console should contain 'info message'")
-	}
-	if !strings.Contains(consoleOutput, "warn message") {
-		t.Error("Console should contain 'warn message'")
-	}
-	if !strings.Contains(consoleOutput, "error message") {
-		t.Error("Console should contain 'error message'")
-	}
-	if strings.Contains(consoleOutput, "trace message") {
-		t.Error("Console should NOT contain 'trace message'")
-	}
-	if strings.Contains(consoleOutput, "debug message") {
-		t.Error("Console should NOT contain 'debug message'")
-	}
+	assert.True(t, strings.Contains(consoleOutput, "info message"), "Console should contain 'info message'")
+	assert.True(t, strings.Contains(consoleOutput, "warn message"), "Console should contain 'warn message'")
+	assert.True(t, strings.Contains(consoleOutput, "error message"), "Console should contain 'error message'")
+	assert.False(t, strings.Contains(consoleOutput, "trace message"), "Console should NOT contain 'trace message'")
+	assert.False(t, strings.Contains(consoleOutput, "debug message"), "Console should NOT contain 'debug message'")
 
 	// Check file output (should have debug, info, warn, error)
 	fileOutput := fileBuf.String()
-	if !strings.Contains(fileOutput, "debug message") {
-		t.Error("File should contain 'debug message'")
-	}
-	if !strings.Contains(fileOutput, "info message") {
-		t.Error("File should contain 'info message'")
-	}
-	if !strings.Contains(fileOutput, "warn message") {
-		t.Error("File should contain 'warn message'")
-	}
-	if !strings.Contains(fileOutput, "error message") {
-		t.Error("File should contain 'error message'")
-	}
-	if strings.Contains(fileOutput, "trace message") {
-		t.Error("File should NOT contain 'trace message'")
-	}
+	assert.True(t, strings.Contains(fileOutput, "debug message"), "File should contain 'debug message'")
+	assert.True(t, strings.Contains(fileOutput, "info message"), "File should contain 'info message'")
+	assert.True(t, strings.Contains(fileOutput, "warn message"), "File should contain 'warn message'")
+	assert.True(t, strings.Contains(fileOutput, "error message"), "File should contain 'error message'")
+	assert.False(t, strings.Contains(fileOutput, "trace message"), "File should NOT contain 'trace message'")
 }
 
 func TestFilteredWriter_LevelComparison(t *testing.T) {
@@ -246,16 +214,8 @@ func TestFilteredWriter_LevelComparison(t *testing.T) {
 	}
 
 	// Verify comparison logic: higher numeric values = higher severity
-	if !(zerolog.ErrorLevel > zerolog.WarnLevel) {
-		t.Error("Expected ErrorLevel > WarnLevel (higher severity)")
-	}
-	if !(zerolog.WarnLevel > zerolog.InfoLevel) {
-		t.Error("Expected WarnLevel > InfoLevel (higher severity)")
-	}
-	if !(zerolog.InfoLevel > zerolog.DebugLevel) {
-		t.Error("Expected InfoLevel > DebugLevel (higher severity)")
-	}
-	if !(zerolog.DebugLevel > zerolog.TraceLevel) {
-		t.Error("Expected DebugLevel > TraceLevel (higher severity)")
-	}
+	assert.True(t, zerolog.ErrorLevel > zerolog.WarnLevel, "Expected ErrorLevel > WarnLevel (higher severity)")
+	assert.True(t, zerolog.WarnLevel > zerolog.InfoLevel, "Expected WarnLevel > InfoLevel (higher severity)")
+	assert.True(t, zerolog.InfoLevel > zerolog.DebugLevel, "Expected InfoLevel > DebugLevel (higher severity)")
+	assert.True(t, zerolog.DebugLevel > zerolog.TraceLevel, "Expected DebugLevel > TraceLevel (higher severity)")
 }

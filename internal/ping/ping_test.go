@@ -11,6 +11,8 @@ import (
 	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // errorWriter always returns an error on Write
@@ -78,15 +80,9 @@ func TestConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if tt.cfg.Message != tt.expected.Message {
-				t.Errorf("Message = %v, want %v", tt.cfg.Message, tt.expected.Message)
-			}
-			if tt.cfg.Color != tt.expected.Color {
-				t.Errorf("Color = %v, want %v", tt.cfg.Color, tt.expected.Color)
-			}
-			if tt.cfg.UI != tt.expected.UI {
-				t.Errorf("UI = %v, want %v", tt.cfg.UI, tt.expected.UI)
-			}
+			assert.Equal(t, tt.expected.Message, tt.cfg.Message)
+			assert.Equal(t, tt.expected.Color, tt.cfg.Color)
+			assert.Equal(t, tt.expected.UI, tt.cfg.UI)
 		})
 	}
 }
@@ -136,20 +132,18 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 			err := executor.Execute()
 
 			// ASSERTION PHASE: Check results
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				require.Error(t, err)
 				return
 			}
+			require.NoError(t, err)
 
 			got := outBuf.String()
-			if got != tt.wantOutput {
-				t.Errorf("Execute() output = %q, want %q", got, tt.wantOutput)
-			}
+			assert.Equal(t, tt.wantOutput, got)
 
 			// Verify UI runner was not called
-			if mockRunner.CalledWithMessage != "" || mockRunner.CalledWithColor != "" {
-				t.Error("UI runner should not be called in non-UI mode")
-			}
+			assert.Empty(t, mockRunner.CalledWithMessage, "UI runner should not be called in non-UI mode")
+			assert.Empty(t, mockRunner.CalledWithColor, "UI runner should not be called in non-UI mode")
 		})
 	}
 }
@@ -205,22 +199,19 @@ func TestExecutor_Execute_UIMode(t *testing.T) {
 			err := executor.Execute()
 
 			// ASSERTION PHASE: Check results
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 
 			// Verify UI runner was called with correct parameters
-			if mockRunner.CalledWithMessage != tt.wantUIMessage {
-				t.Errorf("UI runner called with message = %q, want %q", mockRunner.CalledWithMessage, tt.wantUIMessage)
-			}
-			if mockRunner.CalledWithColor != tt.wantUIColor {
-				t.Errorf("UI runner called with color = %q, want %q", mockRunner.CalledWithColor, tt.wantUIColor)
-			}
+			assert.Equal(t, tt.wantUIMessage, mockRunner.CalledWithMessage)
+			assert.Equal(t, tt.wantUIColor, mockRunner.CalledWithColor)
 
 			// Verify nothing was written to output in UI mode (UNLESS there was an error)
-			if !tt.wantErr && outBuf.Len() > 0 {
-				t.Errorf("Output buffer should be empty in UI mode, got: %q", outBuf.String())
+			if !tt.wantErr {
+				assert.Empty(t, outBuf.String(), "Output buffer should be empty in UI mode")
 			}
 		})
 	}
@@ -241,13 +232,9 @@ func TestExecutor_Execute_WriteError(t *testing.T) {
 	err := executor.Execute()
 
 	// ASSERTION PHASE: Check for expected error
-	if err == nil {
-		t.Error("Execute() expected error, got nil")
-		return
-	}
-	if !strings.Contains(err.Error(), "failed to write output") {
-		t.Errorf("Execute() error = %v, expected to contain 'failed to write output'", err)
-	}
+	require.Error(t, err, "Execute() expected error, got nil")
+	assert.True(t, strings.Contains(err.Error(), "failed to write output"),
+		"Execute() error = %v, expected to contain 'failed to write output'", err)
 }
 
 func TestExecutor_Execute_InvalidColor(t *testing.T) {
@@ -265,11 +252,7 @@ func TestExecutor_Execute_InvalidColor(t *testing.T) {
 	err := executor.Execute()
 
 	// ASSERTION PHASE: Check for expected error
-	if err == nil {
-		t.Error("Execute() expected error for invalid color, got nil")
-		return
-	}
-	if !strings.Contains(err.Error(), "invalid color") {
-		t.Errorf("Execute() error = %v, expected to contain 'invalid color'", err)
-	}
+	require.Error(t, err, "Execute() expected error for invalid color, got nil")
+	assert.True(t, strings.Contains(err.Error(), "invalid color"),
+		"Execute() error = %v, expected to contain 'invalid color'", err)
 }

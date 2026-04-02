@@ -5,6 +5,9 @@ package config
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateConfigValue_Strings(t *testing.T) {
@@ -55,15 +58,14 @@ func TestValidateConfigValue_Strings(t *testing.T) {
 			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Error should contain %q, got: %v", tt.errContains, err)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"Error should contain %q, got: %v", tt.errContains, err)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -127,15 +129,14 @@ func TestValidateConfigValue_StringSlices(t *testing.T) {
 			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Error should contain %q, got: %v", tt.errContains, err)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"Error should contain %q, got: %v", tt.errContains, err)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -177,15 +178,14 @@ func TestValidateConfigValue_InterfaceSlices(t *testing.T) {
 			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Error should contain %q, got: %v", tt.errContains, err)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"Error should contain %q, got: %v", tt.errContains, err)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -237,15 +237,14 @@ func TestValidateConfigValue_NestedMaps(t *testing.T) {
 			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfigValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-
-			if tt.wantErr && err != nil {
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("Error should contain %q, got: %v", tt.errContains, err)
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"Error should contain %q, got: %v", tt.errContains, err)
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -277,9 +276,7 @@ func TestValidateConfigValue_NumericTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := ValidateConfigValue(tt.key, tt.value)
-			if err != nil {
-				t.Errorf("ValidateConfigValue() for numeric type should not error, got: %v", err)
-			}
+			assert.NoError(t, err, "ValidateConfigValue() for numeric type should not error")
 		})
 	}
 }
@@ -287,9 +284,7 @@ func TestValidateConfigValue_NumericTypes(t *testing.T) {
 func TestValidateConfigValue_NilValue(t *testing.T) {
 	t.Parallel()
 	err := ValidateConfigValue("test.key", nil)
-	if err != nil {
-		t.Errorf("ValidateConfigValue() for nil value should not error, got: %v", err)
-	}
+	assert.NoError(t, err, "ValidateConfigValue() for nil value should not error")
 }
 
 func TestValidateAllConfigValues(t *testing.T) {
@@ -335,14 +330,9 @@ func TestValidateAllConfigValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			errors := ValidateAllConfigValues(tt.values)
-
-			if len(errors) != tt.wantCount {
-				t.Errorf("ValidateAllConfigValues() returned %d errors, want %d", len(errors), tt.wantCount)
-				for i, err := range errors {
-					t.Logf("Error %d: %v", i, err)
-				}
-			}
+			errs := ValidateAllConfigValues(tt.values)
+			assert.Len(t, errs, tt.wantCount,
+				"ValidateAllConfigValues() returned %d errors, want %d", len(errs), tt.wantCount)
 		})
 	}
 }
@@ -369,14 +359,10 @@ func FuzzValidateConfigValue(f *testing.F) {
 
 		// We expect an error only if the string exceeds MaxStringValueLength
 		if len(value) > MaxStringValueLength {
-			if err == nil {
-				t.Errorf("Expected error for string length %d (max %d), got nil", len(value), MaxStringValueLength)
-			}
+			assert.Error(t, err, "Expected error for string length %d (max %d), got nil", len(value), MaxStringValueLength)
 		} else {
 			// Valid length strings should not error
-			if err != nil {
-				t.Errorf("Unexpected error for valid string length %d: %v", len(value), err)
-			}
+			assert.NoError(t, err, "Unexpected error for valid string length %d: %v", len(value), err)
 		}
 
 		// Test with nested map structure
@@ -388,9 +374,7 @@ func FuzzValidateConfigValue(f *testing.F) {
 
 		// Same validation: nested string value should follow same rules
 		if len(value) > MaxStringValueLength {
-			if err == nil {
-				t.Errorf("Expected error for nested string length %d (max %d), got nil", len(value), MaxStringValueLength)
-			}
+			assert.Error(t, err, "Expected error for nested string length %d (max %d), got nil", len(value), MaxStringValueLength)
 		}
 
 		// Test with slice containing the value
@@ -399,9 +383,7 @@ func FuzzValidateConfigValue(f *testing.F) {
 
 		// Validate slice based on string length rules
 		if len(value) > MaxStringValueLength {
-			if err == nil {
-				t.Errorf("Expected error for string in slice with length %d (max %d), got nil", len(value), MaxStringValueLength)
-			}
+			assert.Error(t, err, "Expected error for string in slice with length %d (max %d), got nil", len(value), MaxStringValueLength)
 		}
 	})
 }

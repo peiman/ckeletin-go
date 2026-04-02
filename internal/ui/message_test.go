@@ -5,6 +5,8 @@ package ui
 import (
 	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestPrintColoredMessage(t *testing.T) {
@@ -55,16 +57,16 @@ func TestPrintColoredMessage(t *testing.T) {
 			err := PrintColoredMessage(buf, tt.message, tt.color)
 
 			// ASSERTION PHASE
-			if (err != nil) != tt.wantErr {
-				t.Errorf("PrintColoredMessage() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
+			assert.NoError(t, err)
 
-			if !tt.wantErr && tt.wantContain != "" {
+			if tt.wantContain != "" {
 				output := buf.String()
-				if !bytes.Contains([]byte(output), []byte(tt.wantContain)) {
-					t.Errorf("Expected output to contain %q, got %q", tt.wantContain, output)
-				}
+				assert.True(t, bytes.Contains([]byte(output), []byte(tt.wantContain)),
+					"Expected output to contain %q, got %q", tt.wantContain, output)
 			}
 		})
 	}

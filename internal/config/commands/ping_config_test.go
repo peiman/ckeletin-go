@@ -7,50 +7,32 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPingMetadata(t *testing.T) {
 	t.Run("Required fields populated", func(t *testing.T) {
-		if PingMetadata.Use == "" {
-			t.Error("PingMetadata.Use is empty")
-		}
-		if PingMetadata.Short == "" {
-			t.Error("PingMetadata.Short is empty")
-		}
-		if PingMetadata.Long == "" {
-			t.Error("PingMetadata.Long is empty")
-		}
-		if PingMetadata.ConfigPrefix == "" {
-			t.Error("PingMetadata.ConfigPrefix is empty")
-		}
+		assert.NotEmpty(t, PingMetadata.Use, "PingMetadata.Use is empty")
+		assert.NotEmpty(t, PingMetadata.Short, "PingMetadata.Short is empty")
+		assert.NotEmpty(t, PingMetadata.Long, "PingMetadata.Long is empty")
+		assert.NotEmpty(t, PingMetadata.ConfigPrefix, "PingMetadata.ConfigPrefix is empty")
 	})
 
 	t.Run("Use command name matches convention", func(t *testing.T) {
-		expected := "ping"
-		if PingMetadata.Use != expected {
-			t.Errorf("PingMetadata.Use = %q, want %q", PingMetadata.Use, expected)
-		}
+		assert.Equal(t, "ping", PingMetadata.Use)
 	})
 
 	t.Run("ConfigPrefix matches expected pattern", func(t *testing.T) {
-		expected := "app.ping"
-		if PingMetadata.ConfigPrefix != expected {
-			t.Errorf("PingMetadata.ConfigPrefix = %q, want %q", PingMetadata.ConfigPrefix, expected)
-		}
+		assert.Equal(t, "app.ping", PingMetadata.ConfigPrefix)
 	})
 
 	t.Run("Examples are valid", func(t *testing.T) {
-		if len(PingMetadata.Examples) == 0 {
-			t.Error("PingMetadata.Examples is empty")
-		}
+		assert.NotEmpty(t, PingMetadata.Examples, "PingMetadata.Examples is empty")
 		for i, example := range PingMetadata.Examples {
-			if example == "" {
-				t.Errorf("PingMetadata.Examples[%d] is empty", i)
-			}
-			// Examples should start with command name
-			if !strings.HasPrefix(example, "ping") {
-				t.Errorf("PingMetadata.Examples[%d] = %q, should start with 'ping'", i, example)
-			}
+			assert.NotEmpty(t, example, "PingMetadata.Examples[%d] is empty", i)
+			assert.True(t, strings.HasPrefix(example, "ping"),
+				"PingMetadata.Examples[%d] = %q, should start with 'ping'", i, example)
 		}
 	})
 
@@ -62,20 +44,10 @@ func TestPingMetadata(t *testing.T) {
 		}
 
 		for configKey, flagName := range PingMetadata.FlagOverrides {
-			// Verify the config key exists in PingOptions
-			if !configKeys[configKey] {
-				t.Errorf("FlagOverride key %q not found in PingOptions", configKey)
-			}
-
-			// Verify flag name is not empty
-			if flagName == "" {
-				t.Errorf("FlagOverride for %q has empty flag name", configKey)
-			}
-
-			// Verify flag name uses kebab-case convention
-			if strings.Contains(flagName, "_") {
-				t.Errorf("Flag name %q should use kebab-case, not snake_case", flagName)
-			}
+			assert.True(t, configKeys[configKey], "FlagOverride key %q not found in PingOptions", configKey)
+			assert.NotEmpty(t, flagName, "FlagOverride for %q has empty flag name", configKey)
+			assert.False(t, strings.Contains(flagName, "_"),
+				"Flag name %q should use kebab-case, not snake_case", flagName)
 		}
 	})
 }
@@ -84,31 +56,22 @@ func TestPingOptions(t *testing.T) {
 	opts := PingOptions()
 
 	t.Run("Returns non-empty options", func(t *testing.T) {
-		if len(opts) == 0 {
-			t.Fatal("PingOptions() returned empty slice")
-		}
+		require.NotEmpty(t, opts, "PingOptions() returned empty slice")
 	})
 
 	t.Run("All options have app.ping prefix", func(t *testing.T) {
 		prefix := "app.ping."
 		for i, opt := range opts {
-			if !strings.HasPrefix(opt.Key, prefix) {
-				t.Errorf("Option[%d].Key = %q, should start with %q", i, opt.Key, prefix)
-			}
+			assert.True(t, strings.HasPrefix(opt.Key, prefix),
+				"Option[%d].Key = %q, should start with %q", i, opt.Key, prefix)
 		}
 	})
 
 	t.Run("All required fields populated", func(t *testing.T) {
 		for i, opt := range opts {
-			if opt.Key == "" {
-				t.Errorf("Option[%d].Key is empty", i)
-			}
-			if opt.Description == "" {
-				t.Errorf("Option[%d].Description is empty for key %q", i, opt.Key)
-			}
-			if opt.Type == "" {
-				t.Errorf("Option[%d].Type is empty for key %q", i, opt.Key)
-			}
+			assert.NotEmpty(t, opt.Key, "Option[%d].Key is empty", i)
+			assert.NotEmpty(t, opt.Description, "Option[%d].Description is empty for key %q", i, opt.Key)
+			assert.NotEmpty(t, opt.Type, "Option[%d].Type is empty for key %q", i, opt.Key)
 			// DefaultValue can be nil/empty, but let's check it exists
 			// (even if it's the zero value)
 		}
@@ -124,9 +87,8 @@ func TestPingOptions(t *testing.T) {
 		}
 
 		for i, opt := range opts {
-			if !validTypes[opt.Type] {
-				t.Errorf("Option[%d] (%s) has invalid type %q", i, opt.Key, opt.Type)
-			}
+			assert.True(t, validTypes[opt.Type],
+				"Option[%d] (%s) has invalid type %q", i, opt.Key, opt.Type)
 		}
 	})
 
@@ -139,19 +101,10 @@ func TestPingOptions(t *testing.T) {
 			}
 		}
 
-		if found == nil {
-			t.Fatal("app.ping.output_message not found in options")
-		}
-
-		if found.Type != "string" {
-			t.Errorf("output_message.Type = %q, want %q", found.Type, "string")
-		}
-		if found.DefaultValue != "Pong" {
-			t.Errorf("output_message.DefaultValue = %q, want %q", found.DefaultValue, "Pong")
-		}
-		if found.Required {
-			t.Error("output_message should not be required")
-		}
+		require.NotNil(t, found, "app.ping.output_message not found in options")
+		assert.Equal(t, "string", found.Type, "output_message.Type mismatch")
+		assert.Equal(t, "Pong", found.DefaultValue, "output_message.DefaultValue mismatch")
+		assert.False(t, found.Required, "output_message should not be required")
 	})
 
 	t.Run("Specific option: output_color", func(t *testing.T) {
@@ -163,16 +116,9 @@ func TestPingOptions(t *testing.T) {
 			}
 		}
 
-		if found == nil {
-			t.Fatal("app.ping.output_color not found in options")
-		}
-
-		if found.Type != "string" {
-			t.Errorf("output_color.Type = %q, want %q", found.Type, "string")
-		}
-		if found.DefaultValue != "white" {
-			t.Errorf("output_color.DefaultValue = %q, want %q", found.DefaultValue, "white")
-		}
+		require.NotNil(t, found, "app.ping.output_color not found in options")
+		assert.Equal(t, "string", found.Type, "output_color.Type mismatch")
+		assert.Equal(t, "white", found.DefaultValue, "output_color.DefaultValue mismatch")
 	})
 
 	t.Run("Specific option: ui", func(t *testing.T) {
@@ -184,16 +130,9 @@ func TestPingOptions(t *testing.T) {
 			}
 		}
 
-		if found == nil {
-			t.Fatal("app.ping.ui not found in options")
-		}
-
-		if found.Type != "bool" {
-			t.Errorf("ui.Type = %q, want %q", found.Type, "bool")
-		}
-		if found.DefaultValue != false {
-			t.Errorf("ui.DefaultValue = %v, want %v", found.DefaultValue, false)
-		}
+		require.NotNil(t, found, "app.ping.ui not found in options")
+		assert.Equal(t, "bool", found.Type, "ui.Type mismatch")
+		assert.Equal(t, false, found.DefaultValue, "ui.DefaultValue mismatch")
 	})
 }
 
@@ -217,9 +156,7 @@ func TestPingOptionsRegistered(t *testing.T) {
 
 		// Verify all ping keys were found
 		for key, found := range pingKeys {
-			if !found {
-				t.Errorf("Config key %q not found in registry", key)
-			}
+			assert.True(t, found, "Config key %q not found in registry", key)
 		}
 	})
 }

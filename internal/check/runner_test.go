@@ -65,7 +65,7 @@ func TestRunChecks_SequentialFailFast(t *testing.T) {
 	cat := categoryDef{name: "T", checks: []checkItem{
 		{name: "c1", fn: func(ctx context.Context) error { return nil }},
 		{name: "c2", fn: func(ctx context.Context) error { return errors.New("fail") }},
-		{name: "c3", fn: func(ctx context.Context) error { t.Fatal("should not run"); return nil }},
+		{name: "c3", fn: func(ctx context.Context) error { assert.Fail(t, "should not run"); return nil }},
 	}}
 	results, err := runner.RunChecks(context.Background(), cat, RunOptions{FailFast: true}, nil)
 	assert.Error(t, err)

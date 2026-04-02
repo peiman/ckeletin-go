@@ -504,7 +504,7 @@ func TestBuildCategories_CheckMetadata(t *testing.T) {
 		for _, cat := range categories {
 			for _, check := range cat.checks {
 				if existingCat, exists := seen[check.name]; exists {
-					t.Errorf("duplicate check name %q: found in both %q and %q",
+					assert.Failf(t, "duplicate check name", "duplicate check name %q: found in both %q and %q",
 						check.name, existingCat, cat.name)
 				}
 				seen[check.name] = cat.name
@@ -649,7 +649,7 @@ func TestExecute_IntegrationWithRunCategorySimple(t *testing.T) {
 			name: "Second Category",
 			checks: []checkItem{
 				{name: "should-not-run", fn: func(ctx context.Context) error {
-					t.Fatal("should not have been called due to fail-fast")
+					assert.Fail(t, "should not have been called due to fail-fast")
 					return nil
 				}, remediation: "n/a"},
 			},

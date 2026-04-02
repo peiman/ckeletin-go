@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConfig(t *testing.T) {
@@ -69,15 +70,9 @@ func TestConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// ASSERTION PHASE
-			if tt.cfg.OutputFormat != tt.wantFormat {
-				t.Errorf("Expected format %s, got %s", tt.wantFormat, tt.cfg.OutputFormat)
-			}
-			if tt.cfg.OutputFile != tt.wantOutputFile {
-				t.Errorf("Expected output file %s, got %s", tt.wantOutputFile, tt.cfg.OutputFile)
-			}
-			if tt.cfg.Writer != writer {
-				t.Errorf("Expected writer to be set correctly")
-			}
+			assert.Equal(t, tt.wantFormat, tt.cfg.OutputFormat)
+			assert.Equal(t, tt.wantOutputFile, tt.cfg.OutputFile)
+			assert.Equal(t, writer, tt.cfg.Writer)
 		})
 	}
 }

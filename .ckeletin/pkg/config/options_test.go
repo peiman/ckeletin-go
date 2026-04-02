@@ -4,6 +4,8 @@ package config
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOptionEnvVarName(t *testing.T) {
@@ -49,9 +51,7 @@ func TestOptionEnvVarName(t *testing.T) {
 			got := tt.opt.EnvVarName(tt.prefix)
 
 			// ASSERTION PHASE
-			if got != tt.want {
-				t.Errorf("EnvVarName() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -102,9 +102,7 @@ func TestOptionDefaultValueString(t *testing.T) {
 			got := tt.opt.DefaultValueString()
 
 			// ASSERTION PHASE
-			if got != tt.want {
-				t.Errorf("DefaultValueString() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -143,9 +141,7 @@ func TestOptionExampleValueString(t *testing.T) {
 			got := tt.opt.ExampleValueString()
 
 			// ASSERTION PHASE
-			if got != tt.want {
-				t.Errorf("ExampleValueString() = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

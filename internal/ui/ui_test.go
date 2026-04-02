@@ -8,6 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetLipglossColor(t *testing.T) {
@@ -23,17 +25,14 @@ func TestGetLipglossColor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.colorName, func(t *testing.T) {
 			color, err := GetLipglossColor(tt.colorName)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetLipglossColor() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err == nil {
-				if _, ok := ColorMap[tt.colorName]; !ok {
-					t.Errorf("Color %s should be valid", tt.colorName)
-				}
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				_, ok := ColorMap[tt.colorName]
+				assert.True(t, ok, "Color %s should be valid", tt.colorName)
 				expectedColor := ColorMap[tt.colorName]
-				if color != expectedColor {
-					t.Errorf("Expected color %v, got %v", expectedColor, color)
-				}
+				assert.Equal(t, expectedColor, color)
 			}
 		})
 	}
@@ -84,14 +83,16 @@ func TestRunUIWithMock(t *testing.T) {
 			err := mockRunner.RunUI(tt.message, tt.color)
 
 			// Check if RunUI was called
-			if (mockRunner.CalledWithMessage != tt.message || mockRunner.CalledWithColor != tt.color) && tt.wantCalled {
-				t.Errorf("RunUI() was not called with expected arguments. Got message=%q, color=%q, want message=%q, color=%q",
-					mockRunner.CalledWithMessage, mockRunner.CalledWithColor, tt.message, tt.color)
+			if tt.wantCalled {
+				assert.Equal(t, tt.message, mockRunner.CalledWithMessage, "RunUI() message argument mismatch")
+				assert.Equal(t, tt.color, mockRunner.CalledWithColor, "RunUI() color argument mismatch")
 			}
 
 			// Validate the error returned
-			if (err != nil) != tt.wantErr {
-				t.Errorf("RunUI() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -105,9 +106,7 @@ func TestModelView(t *testing.T) {
 
 	expectedOutput := "Test Message\n\nPress 'q' or 'CTRL-C' to exit."
 
-	if got := m.View(); got != expectedOutput {
-		t.Errorf("View() = %q, want %q", got, expectedOutput)
-	}
+	assert.Equal(t, expectedOutput, m.View())
 }
 
 func TestModelUpdate(t *testing.T) {
@@ -144,9 +143,7 @@ func TestModelUpdate(t *testing.T) {
 			_, cmd := m.Update(tt.msg)
 
 			// Check if a command was returned
-			if (cmd != nil) != tt.wantCmd {
-				t.Errorf("Update() cmd returned = %v, want %v", cmd != nil, tt.wantCmd)
-			}
+			assert.Equal(t, tt.wantCmd, cmd != nil, "Update() cmd presence mismatch")
 		})
 	}
 }
@@ -161,9 +158,7 @@ func TestModelInit(t *testing.T) {
 	// Init should return nil as it's a no-op in this implementation
 	cmd := m.Init()
 
-	if cmd != nil {
-		t.Errorf("Init() = %v, want nil", cmd)
-	}
+	assert.Nil(t, cmd, "Init() should return nil")
 }
 
 // TestRunUI tests the basic error path of RunUI
@@ -188,8 +183,10 @@ func TestRunUI(t *testing.T) {
 			runner := NewDefaultUIRunner()
 			err := runner.RunUI(tt.message, tt.color)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("RunUI() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -204,29 +201,19 @@ func TestRunUISuccessPath(t *testing.T) {
 	err := runner.RunUI("Test Message", "blue")
 
 	// Should not return an error
-	if err != nil {
-		t.Errorf("RunUI() error = %v, want nil", err)
-	}
+	assert.NoError(t, err)
 }
 
 // TestDefaultUIRunnerCreation tests creating a DefaultUIRunner
 func TestDefaultUIRunnerCreation(t *testing.T) {
 	runner := NewDefaultUIRunner()
-	if runner == nil {
-		t.Fatalf("NewDefaultUIRunner() returned nil")
-	}
-	if runner.newProgram == nil {
-		t.Errorf("NewDefaultUIRunner() returned a runner with nil newProgram")
-	}
+	require.NotNil(t, runner, "NewDefaultUIRunner() returned nil")
+	assert.NotNil(t, runner.newProgram, "NewDefaultUIRunner() returned a runner with nil newProgram")
 }
 
 // TestNewTestUIRunner tests creating a test UI runner
 func TestNewTestUIRunner(t *testing.T) {
 	runner := NewTestUIRunner()
-	if runner == nil {
-		t.Fatalf("NewTestUIRunner() returned nil")
-	}
-	if runner.newProgram != nil {
-		t.Errorf("NewTestUIRunner() returned a runner with non-nil newProgram")
-	}
+	require.NotNil(t, runner, "NewTestUIRunner() returned nil")
+	assert.Nil(t, runner.newProgram, "NewTestUIRunner() returned a runner with non-nil newProgram")
 }

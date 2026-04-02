@@ -6,6 +6,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSanitizeLogString(t *testing.T) {
@@ -66,9 +68,7 @@ func TestSanitizeLogString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := SanitizeLogString(tt.input)
-			if got != tt.expected {
-				t.Errorf("SanitizeLogString() = %q, want %q", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -115,9 +115,7 @@ func TestSanitizePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := SanitizePath(tt.input)
-			if got != tt.expected {
-				t.Errorf("SanitizePath() = %q, want %q", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -155,9 +153,7 @@ func TestSanitizeError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := SanitizeError(tt.err)
-			if got != tt.expected {
-				t.Errorf("SanitizeError() = %q, want %q", got, tt.expected)
-			}
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -198,14 +194,12 @@ func TestSetMaxLogLength(t *testing.T) {
 			SetMaxLogLength(tt.length)
 
 			if tt.wantApply {
-				if maxLogStringLength != tt.length {
-					t.Errorf("SetMaxLogLength(%d) did not apply, got %d", tt.length, maxLogStringLength)
-				}
+				assert.Equal(t, tt.length, maxLogStringLength,
+					"SetMaxLogLength(%d) did not apply, got %d", tt.length, maxLogStringLength)
 			} else {
-				if maxLogStringLength != original {
-					t.Errorf("SetMaxLogLength(%d) should not apply, but changed from %d to %d",
-						tt.length, original, maxLogStringLength)
-				}
+				assert.Equal(t, original, maxLogStringLength,
+					"SetMaxLogLength(%d) should not apply, but changed from %d to %d",
+					tt.length, original, maxLogStringLength)
 			}
 		})
 	}
@@ -223,9 +217,7 @@ func TestSanitizeLogString_Truncation(t *testing.T) {
 	expected := strings.Repeat("x", 50) + "...[truncated]"
 
 	got := SanitizeLogString(input)
-	if got != expected {
-		t.Errorf("SanitizeLogString() with custom length = %q, want %q", got, expected)
-	}
+	assert.Equal(t, expected, got)
 }
 
 func TestInitMaxLogLength(t *testing.T) {
@@ -283,9 +275,8 @@ func TestInitMaxLogLength(t *testing.T) {
 			got := initMaxLogLength()
 
 			// Verify result
-			if got != tt.expectedLen {
-				t.Errorf("initMaxLogLength() = %d, want %d", got, tt.expectedLen)
-			}
+			assert.Equal(t, tt.expectedLen, got,
+				"initMaxLogLength() = %d, want %d", got, tt.expectedLen)
 		})
 	}
 }

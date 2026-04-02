@@ -8,6 +8,8 @@ import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	_ "github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands" // Import to trigger init() registration
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegistryHasExpectedKeys(t *testing.T) {
@@ -23,9 +25,8 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 
 	// ASSERTION PHASE
 	// Check that the registry has the expected minimum number of entries
-	if len(registry) < 2 {
-		t.Errorf("Registry() returned %d entries, expected at least 2", len(registry))
-	}
+	require.GreaterOrEqual(t, len(registry), 2,
+		"Registry() returned %d entries, expected at least 2", len(registry))
 
 	// Check for essential keys
 	for _, key := range requiredKeys {
@@ -36,9 +37,7 @@ func TestRegistryHasExpectedKeys(t *testing.T) {
 				break
 			}
 		}
-		if !found {
-			t.Errorf("Registry() missing required key %q", key)
-		}
+		assert.True(t, found, "Registry() missing required key %q", key)
 	}
 }
 
@@ -62,9 +61,7 @@ func TestSetDefaults(t *testing.T) {
 
 		// GetString works for all types in viper since everything is stored as strings internally
 		got := viper.Get(opt.Key)
-		if got != opt.DefaultValue {
-			t.Errorf("Default for %q = %v, want %v", opt.Key, got, opt.DefaultValue)
-		}
+		assert.Equal(t, opt.DefaultValue, got, "Default for %q = %v, want %v", opt.Key, got, opt.DefaultValue)
 	}
 }
 
@@ -97,15 +94,11 @@ func TestRegistryIncludesCommandOptions(t *testing.T) {
 
 	// Check that all docs keys were found
 	for key, found := range docsKeys {
-		if !found {
-			t.Errorf("Registry() missing docs key %q", key)
-		}
+		assert.True(t, found, "Registry() missing docs key %q", key)
 	}
 
 	// Check that all core keys were found
 	for key, found := range coreKeys {
-		if !found {
-			t.Errorf("Registry() missing core key %q", key)
-		}
+		assert.True(t, found, "Registry() missing core key %q", key)
 	}
 }

@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInit(t *testing.T) {
@@ -89,9 +91,7 @@ func TestInit(t *testing.T) {
 				// Create a pipe to capture os.Stderr
 				var err error
 				r, w, err = os.Pipe()
-				if err != nil {
-					t.Fatalf("Failed to create pipe: %v", err)
-				}
+				require.NoError(t, err, "Failed to create pipe")
 
 				// Redirect os.Stderr to the write end of the pipe
 				os.Stderr = w
@@ -107,9 +107,7 @@ func TestInit(t *testing.T) {
 					// Read the captured output from the read end of the pipe
 					if r != nil {
 						_, err = io.Copy(capturedOutput, r)
-						if err != nil {
-							t.Fatalf("Failed to read from pipe: %v", err)
-						}
+						require.NoError(t, err, "Failed to read from pipe")
 						r.Close()
 					}
 				}()
@@ -135,8 +133,10 @@ func TestInit(t *testing.T) {
 
 			// ASSERTION PHASE
 			// Check for expected error
-			if (err != nil) != tt.expectedError {
-				t.Errorf("Init() error = %v, expectedError %v", err, tt.expectedError)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			// Check for expected messages in output
@@ -144,10 +144,12 @@ func TestInit(t *testing.T) {
 				output := capturedOutput.String()
 
 				for msg, shouldBePresent := range tt.testMessages {
-					if shouldBePresent && !bytes.Contains([]byte(output), []byte(msg)) {
-						t.Errorf("Expected message %q in output, but it was not found", msg)
-					} else if !shouldBePresent && bytes.Contains([]byte(output), []byte(msg)) {
-						t.Errorf("Message %q should not be in output, but it was found", msg)
+					if shouldBePresent {
+						assert.True(t, bytes.Contains([]byte(output), []byte(msg)),
+							"Expected message %q in output, but it was not found", msg)
+					} else {
+						assert.False(t, bytes.Contains([]byte(output), []byte(msg)),
+							"Message %q should not be in output, but it was found", msg)
 					}
 				}
 			}
@@ -170,9 +172,8 @@ func TestSaveAndRestoreLoggerState(t *testing.T) {
 	savedLogger, savedLevel := SaveLoggerState()
 
 	// Verify saved state matches what we set
-	if savedLevel != testLevel {
-		t.Errorf("SaveLoggerState() saved level = %v, want %v", savedLevel, testLevel)
-	}
+	assert.Equal(t, testLevel, savedLevel,
+		"SaveLoggerState() saved level = %v, want %v", savedLevel, testLevel)
 
 	// EXECUTION PHASE
 	// Modify the logger and level
@@ -184,27 +185,23 @@ func TestSaveAndRestoreLoggerState(t *testing.T) {
 	zerolog.SetGlobalLevel(newLevel)
 
 	// Verify state was changed
-	if zerolog.GlobalLevel() != newLevel {
-		t.Errorf("Failed to modify global level, got %v, want %v", zerolog.GlobalLevel(), newLevel)
-	}
+	assert.Equal(t, newLevel, zerolog.GlobalLevel(),
+		"Failed to modify global level, got %v, want %v", zerolog.GlobalLevel(), newLevel)
 
 	// Restore the original state
 	RestoreLoggerState(savedLogger, savedLevel)
 
 	// ASSERTION PHASE
 	// Verify the logger and level were restored
-	if zerolog.GlobalLevel() != testLevel {
-		t.Errorf("RestoreLoggerState() level = %v, want %v", zerolog.GlobalLevel(), testLevel)
-	}
+	assert.Equal(t, testLevel, zerolog.GlobalLevel(),
+		"RestoreLoggerState() level = %v, want %v", zerolog.GlobalLevel(), testLevel)
 
 	// Test that the logger is writing to the original buffer
 	log.Info().Msg("test message")
-	if !bytes.Contains(testBuf.Bytes(), []byte("test message")) {
-		t.Errorf("Restored logger is not writing to original buffer")
-	}
-	if bytes.Contains(newBuf.Bytes(), []byte("test message")) {
-		t.Errorf("Restored logger is still writing to new buffer")
-	}
+	assert.True(t, bytes.Contains(testBuf.Bytes(), []byte("test message")),
+		"Restored logger is not writing to original buffer")
+	assert.False(t, bytes.Contains(newBuf.Bytes(), []byte("test message")),
+		"Restored logger is still writing to new buffer")
 }
 
 func TestInitWithFileLogging(t *testing.T) {
@@ -273,8 +270,10 @@ func TestInitWithFileLogging(t *testing.T) {
 			err := Init(consoleBuf)
 
 			// ASSERT
-			if (err != nil) != tt.expectedError {
-				t.Errorf("Init() error = %v, expectedError %v", err, tt.expectedError)
+			if tt.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
 
 			// Log test messages
@@ -286,33 +285,27 @@ func TestInitWithFileLogging(t *testing.T) {
 
 			// Check console output
 			consoleOutput := consoleBuf.String()
-			if !bytes.Contains([]byte(consoleOutput), []byte("Info message")) {
-				t.Errorf("Console should contain Info message")
-			}
-			if bytes.Contains([]byte(consoleOutput), []byte("Debug message")) {
-				t.Errorf("Console should NOT contain Debug message (console level is info)")
-			}
+			assert.True(t, bytes.Contains([]byte(consoleOutput), []byte("Info message")),
+				"Console should contain Info message")
+			assert.False(t, bytes.Contains([]byte(consoleOutput), []byte("Debug message")),
+				"Console should NOT contain Debug message (console level is info)")
 
 			// Check file output if enabled
 			if tt.expectFileLog {
 				if _, err := os.Stat(tt.filePath); os.IsNotExist(err) {
-					t.Errorf("Expected log file to be created at %s", tt.filePath)
+					assert.Fail(t, "Expected log file to be created at %s", tt.filePath)
 				} else {
 					fileContent, err := os.ReadFile(tt.filePath)
-					if err != nil {
-						t.Errorf("Failed to read log file: %v", err)
-					}
+					require.NoError(t, err, "Failed to read log file")
 					fileOutput := string(fileContent)
-					if !bytes.Contains(fileContent, []byte("Debug message")) {
-						t.Errorf("File should contain Debug message, got: %s", fileOutput)
-					}
-					if !bytes.Contains(fileContent, []byte("Info message")) {
-						t.Errorf("File should contain Info message")
-					}
+					assert.True(t, bytes.Contains(fileContent, []byte("Debug message")),
+						"File should contain Debug message, got: %s", fileOutput)
+					assert.True(t, bytes.Contains(fileContent, []byte("Info message")),
+						"File should contain Info message")
 				}
 			} else {
 				if _, err := os.Stat(tt.filePath); !os.IsNotExist(err) {
-					t.Errorf("Log file should not be created when file logging is disabled")
+					assert.Fail(t, "Log file should not be created when file logging is disabled")
 				}
 			}
 		})
@@ -333,9 +326,7 @@ func TestRuntimeLevelAdjustment(t *testing.T) {
 	viper.Set("app.log.sampling_enabled", false)
 
 	err := Init(buf)
-	if err != nil {
-		t.Fatalf("Init failed: %v", err)
-	}
+	require.NoError(t, err, "Init failed")
 
 	// Test 1: Debug messages filtered at INFO level
 	buf.Reset()
@@ -343,12 +334,10 @@ func TestRuntimeLevelAdjustment(t *testing.T) {
 	log.Info().Msg("info_before_change")
 
 	output := buf.String()
-	if strings.Contains(output, "debug_before_change") {
-		t.Error("Debug message should be filtered at INFO level")
-	}
-	if !strings.Contains(output, "info_before_change") {
-		t.Error("Info message should appear at INFO level")
-	}
+	assert.False(t, strings.Contains(output, "debug_before_change"),
+		"Debug message should be filtered at INFO level")
+	assert.True(t, strings.Contains(output, "info_before_change"),
+		"Info message should appear at INFO level")
 
 	// Test 2: Change level to DEBUG
 	buf.Reset()
@@ -360,17 +349,14 @@ func TestRuntimeLevelAdjustment(t *testing.T) {
 	log.Info().Msg("info_after_change")
 
 	output = buf.String()
-	if !strings.Contains(output, "debug_after_change") {
-		t.Error("Debug message should appear after SetConsoleLevel(DEBUG)")
-	}
-	if !strings.Contains(output, "info_after_change") {
-		t.Error("Info message should still appear after level change")
-	}
+	assert.True(t, strings.Contains(output, "debug_after_change"),
+		"Debug message should appear after SetConsoleLevel(DEBUG)")
+	assert.True(t, strings.Contains(output, "info_after_change"),
+		"Info message should still appear after level change")
 
 	// Test 4: Getter reflects new level
-	if GetConsoleLevel() != zerolog.DebugLevel {
-		t.Errorf("GetConsoleLevel() = %v, want %v", GetConsoleLevel(), zerolog.DebugLevel)
-	}
+	assert.Equal(t, zerolog.DebugLevel, GetConsoleLevel(),
+		"GetConsoleLevel() = %v, want %v", GetConsoleLevel(), zerolog.DebugLevel)
 
 	// Test 5: Change back to WARN
 	buf.Reset()
@@ -381,12 +367,10 @@ func TestRuntimeLevelAdjustment(t *testing.T) {
 	log.Warn().Msg("warn_at_warn")
 
 	output = buf.String()
-	if strings.Contains(output, "info_at_warn") {
-		t.Error("Info message should be filtered at WARN level")
-	}
-	if !strings.Contains(output, "warn_at_warn") {
-		t.Error("Warn message should appear at WARN level")
-	}
+	assert.False(t, strings.Contains(output, "info_at_warn"),
+		"Info message should be filtered at WARN level")
+	assert.True(t, strings.Contains(output, "warn_at_warn"),
+		"Warn message should appear at WARN level")
 }
 
 // TestRuntimeFileLevelAdjustment tests runtime adjustment for file logging
@@ -408,9 +392,7 @@ func TestRuntimeFileLevelAdjustment(t *testing.T) {
 
 	consoleBuf := &bytes.Buffer{}
 	err := Init(consoleBuf)
-	if err != nil {
-		t.Fatalf("Init failed: %v", err)
-	}
+	require.NoError(t, err, "Init failed")
 	defer Cleanup()
 
 	// Debug filtered in both initially
@@ -424,22 +406,17 @@ func TestRuntimeFileLevelAdjustment(t *testing.T) {
 	Cleanup() // Ensure file is flushed
 
 	fileContent, err := os.ReadFile(logFile)
-	if err != nil {
-		t.Fatalf("Failed to read log file: %v", err)
-	}
+	require.NoError(t, err, "Failed to read log file")
 	output := string(fileContent)
 
-	if strings.Contains(output, "debug_initial") {
-		t.Error("Initial debug should be filtered")
-	}
-	if !strings.Contains(output, "debug_after_file_change") {
-		t.Error("Debug should appear in file after SetFileLevel(DEBUG)")
-	}
+	assert.False(t, strings.Contains(output, "debug_initial"),
+		"Initial debug should be filtered")
+	assert.True(t, strings.Contains(output, "debug_after_file_change"),
+		"Debug should appear in file after SetFileLevel(DEBUG)")
 
 	// Verify console still filters (at ERROR level)
-	if strings.Contains(consoleBuf.String(), "debug") {
-		t.Error("Console should still filter debug messages")
-	}
+	assert.False(t, strings.Contains(consoleBuf.String(), "debug"),
+		"Console should still filter debug messages")
 }
 
 func TestLogSampling(t *testing.T) {
@@ -461,9 +438,7 @@ func TestLogSampling(t *testing.T) {
 
 	// EXECUTE
 	err := Init(consoleBuf)
-	if err != nil {
-		t.Fatalf("Init() failed: %v", err)
-	}
+	require.NoError(t, err, "Init() failed")
 
 	// Log many messages - with sampling enabled, not all should appear
 	for i := 0; i < 20; i++ {
@@ -476,9 +451,8 @@ func TestLogSampling(t *testing.T) {
 	// ASSERT
 	// We can't assert exact counts due to sampling behavior,
 	// but we can verify the file was created and contains some logs
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
-		t.Errorf("Expected log file to be created")
-	}
+	_, err = os.Stat(logFile)
+	assert.False(t, os.IsNotExist(err), "Expected log file to be created")
 }
 
 func TestCleanup(t *testing.T) {
@@ -497,9 +471,7 @@ func TestCleanup(t *testing.T) {
 	consoleBuf := &bytes.Buffer{}
 
 	err := Init(consoleBuf)
-	if err != nil {
-		t.Fatalf("Init() failed: %v", err)
-	}
+	require.NoError(t, err, "Init() failed")
 
 	// Log a message to ensure file is created and written to
 	log.Info().Msg("Test message before cleanup")
@@ -513,9 +485,8 @@ func TestCleanup(t *testing.T) {
 	Cleanup() // Should not panic
 
 	// File should exist and contain the logged message
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
-		t.Errorf("Log file should exist after cleanup")
-	}
+	_, err = os.Stat(logFile)
+	assert.False(t, os.IsNotExist(err), "Log file should exist after cleanup")
 }
 
 func TestIsColorEnabled(t *testing.T) {
@@ -574,9 +545,8 @@ func TestIsColorEnabled(t *testing.T) {
 			result := isColorEnabled(tt.output)
 
 			// ASSERT
-			if result != tt.expectedResult {
-				t.Errorf("isColorEnabled() = %v, want %v", result, tt.expectedResult)
-			}
+			assert.Equal(t, tt.expectedResult, result,
+				"isColorEnabled() = %v, want %v", result, tt.expectedResult)
 		})
 	}
 }
@@ -623,9 +593,8 @@ func TestGetFileLogLevel(t *testing.T) {
 			result := getFileLogLevel()
 
 			// ASSERT
-			if result != tt.expectedLevel {
-				t.Errorf("getFileLogLevel() = %v, want %v", result, tt.expectedLevel)
-			}
+			assert.Equal(t, tt.expectedLevel, result,
+				"getFileLogLevel() = %v, want %v", result, tt.expectedLevel)
 		})
 	}
 }
@@ -660,11 +629,10 @@ func TestOpenLogFileWithRotation(t *testing.T) {
 			writer, err := openLogFileWithRotation(tt.path)
 
 			// ASSERT
-			if tt.expectError && err == nil {
-				t.Errorf("Expected error but got none")
-			}
-			if !tt.expectError && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+			if tt.expectError {
+				assert.Error(t, err, "Expected error but got none")
+			} else {
+				assert.NoError(t, err, "Unexpected error: %v", err)
 			}
 			if writer != nil {
 				writer.Close()
@@ -673,9 +641,8 @@ func TestOpenLogFileWithRotation(t *testing.T) {
 			// Verify directory was created
 			if !tt.expectError {
 				dir := filepath.Dir(tt.path)
-				if _, err := os.Stat(dir); os.IsNotExist(err) {
-					t.Errorf("Expected directory %s to be created", dir)
-				}
+				_, statErr := os.Stat(dir)
+				assert.False(t, os.IsNotExist(statErr), "Expected directory %s to be created", dir)
 			}
 		})
 	}
