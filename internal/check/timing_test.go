@@ -33,6 +33,12 @@ func setupTimingTestEnv(t *testing.T) string {
 	// Set HOME so that xdg.homeDir() returns our temp dir
 	t.Setenv("HOME", tmpDir)
 
+	// On Windows, set LOCALAPPDATA and USERPROFILE for XDG path resolution
+	if runtime.GOOS == "windows" {
+		t.Setenv("LOCALAPPDATA", filepath.Join(tmpDir, "AppData", "Local"))
+		t.Setenv("USERPROFILE", tmpDir)
+	}
+
 	// On Linux, also set XDG_CACHE_HOME for explicit control
 	if runtime.GOOS == "linux" {
 		cacheDir := filepath.Join(tmpDir, ".cache")
