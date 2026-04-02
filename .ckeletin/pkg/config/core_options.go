@@ -21,6 +21,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
+			Validation:   ValidateLogLevel(false),
 		},
 
 		// Dual logging configuration options
@@ -31,6 +32,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "info",
+			Validation:   ValidateLogLevel(true),
 		},
 		{
 			Key:          "app.log.file_enabled",
@@ -55,6 +57,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
+			Validation:   ValidateLogLevel(false),
 		},
 		{
 			Key:          "app.log.color_enabled",

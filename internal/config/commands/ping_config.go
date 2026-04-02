@@ -68,6 +68,9 @@ func PingOptions() []config.ConfigOption {
 			ShortFlag:    "c", // Enables: -c green (shorthand for --color)
 			Required:     false,
 			Example:      "green",
+			Validation: config.ValidateColor([]string{
+				"black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+			}),
 		},
 		{
 			Key:          "app.ping.ui",

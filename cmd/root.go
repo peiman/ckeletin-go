@@ -407,6 +407,14 @@ func initConfig() error {
 		}
 	}
 
+	// Validate registered config options (colors, log levels, etc.)
+	if errs := config.ValidateRegisteredOptions(); len(errs) > 0 {
+		for _, err := range errs {
+			log.Debug().Err(err).Msg("Config validation error")
+		}
+		return fmt.Errorf("configuration validation failed: %w", errs[0])
+	}
+
 	return nil
 }
 

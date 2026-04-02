@@ -175,13 +175,13 @@ func TestInvalidFlagValues(t *testing.T) {
 			name:               "Invalid color name",
 			args:               []string{"ping", "--color", "invalid-color"},
 			wantExitCode:       1,
-			wantStderrContains: "invalid color",
+			wantStderrContains: "invalid value \"invalid-color\"",
 		},
 		{
 			name:               "Invalid log level",
 			args:               []string{"--log-level", "invalid-level", "ping"},
-			wantExitCode:       0, // Logs warning but continues
-			wantStderrContains: "Invalid console log level",
+			wantExitCode:       1, // Now caught at config-time validation
+			wantStderrContains: "invalid value \"invalid-level\"",
 		},
 		{
 			name:               "Unknown flag",

@@ -41,6 +41,11 @@ type ConfigOption struct {
 
 	// EnvVar is the corresponding environment variable name (computed automatically)
 	EnvVar string
+
+	// Validation is an optional function that validates the config value at load time.
+	// It receives the current value from Viper and returns an error if invalid.
+	// Leave nil to skip validation for this option.
+	Validation func(value interface{}) error `json:"-"`
 }
 
 // EnvVarName returns the full environment variable name for this option,
