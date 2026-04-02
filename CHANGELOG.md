@@ -7,128 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-02
+
 ### Added
 
-- **XDG Base Directory Specification compliance** (`internal/xdg`):
-  - Platform-aware path helpers for config, data, cache, and state directories
-  - Linux/Unix: follows XDG spec (`$XDG_CONFIG_HOME`, `$XDG_CACHE_HOME`, etc.)
-  - macOS: uses Apple conventions (`~/Library/Application Support`, `~/Library/Caches`)
-  - Windows: uses standard paths (`%AppData%`, `%LocalAppData%`)
-  - Single source of truth pattern via `xdg.SetAppName()` initialized from `binaryName`
-  - Check timing data now stored in XDG cache directory
-
-- **Simplified config file discovery** (uses viper's native search):
-  - `./config.yaml` - project-local config (highest priority)
-  - `$XDG_CONFIG_HOME/appname/config.yaml` - user config via XDG
-  - Supports multiple formats: yaml, yml, json, toml (auto-detected by viper)
-  - Removed legacy `~/.appname.yaml` home directory config
-
-- **Parallel check execution** (`pkg/checkmate`):
-  - `WithParallel()` option runs all checks concurrently
-  - `WithWorkers(n)` limits concurrent checks to n workers
-  - Results maintain original order despite completion order
-  - Fail-fast cancels remaining checks on first failure
-  - Significant speedup for independent checks (e.g., 5x faster for 5 parallel checks)
-
-- **Hybrid Go check command** (`ckeletin-go check`):
-  - Now runs all 22 checks across 6 categories (up from 5)
-  - Categories: Development Environment, Code Quality, Architecture Validation,
-    Security Scanning, Dependencies, Tests
-  - Shell delegators wrap existing bash scripts for consistent output
-  - `--parallel` / `-p` flag enables parallel execution within categories
-  - `--fail-fast` / `-f` stops on first failure
-  - Uses checkmate library for beautiful terminal output
-
-- **Scaffold workflow commands**:
-  - `task init name=myapp module=github.com/user/myapp` - Initialize new project from scaffold
-  - `task ckeletin:update` - Pull framework updates from upstream without affecting project code
-- **Two-tier ADR system**: Framework ADRs (000-099) in `.ckeletin/docs/adr/`, project ADRs (100+) in `docs/adr/`
-- **Dev tools caching tasks**: `setup:pinned` (cacheable tools), `setup:latest` (security tools always fresh)
-
-- **Go version management**: `.go-version` file as SSOT for build toolchain version
-  - `task check:go-version` validates system Go matches pinned version
-  - `task doctor` shows version comparison (minimum, expected, installed)
-  - CI workflows now read from `.go-version` instead of hardcoded values
-- **Development-only commands with build tags (ADR-012)**:
-  - Added `dev` command tree (only available in dev builds with `-tags dev`)
-  - `dev config` - Configuration inspector:
-    - List all config options from registry
-    - Show effective configuration values
-    - Export config to JSON format
-    - Validate current configuration
-    - Search config by prefix
-  - `dev doctor` - Environment health checker:
-    - Verify required tools installed (task, golangci-lint, etc.)
-    - Check Go version compatibility
-    - Validate project structure
-    - Check git repository status
-    - Verify dependencies in sync
-  - New Task commands:
-    - `task build` - Now defaults to dev builds (BREAKING CHANGE)
-    - `task build:dev` - Explicit dev build
-    - `task build:prod` - Production build (previous `task build` behavior)
-    - `task test` - Now defaults to testing with dev commands
-    - `task test:dev` - Explicit dev testing
-    - `task test:prod` - Production testing (no dev commands)
-  - CI job `test-dev-prod` verifies build tag separation
-  - Production releases automatically exclude dev commands
-  - Colorized output via lipgloss (existing dependency)
-
-- **Golden file testing infrastructure**:
-  - Added golden file testing for CLI output validation using [goldie/v2](https://github.com/sebdah/goldie)
-  - Created output normalization utilities to ensure deterministic test results:
-    - `NormalizePaths()` - Converts absolute paths to relative paths
-    - `NormalizeTimings()` - Replaces timing values (1.23s → X.XXs)
-    - `NormalizeTempPaths()` - Normalizes temporary directory paths across platforms
-  - Added structure validation tests to verify task check output organization
-  - New task commands:
-    - `task test:golden` - Run golden file tests (~1 second)
-    - `task test:golden:update` - Update golden files with review reminder
-    - `task test:unit` - Run unit tests only (skips integration tests)
-    - `task test:full` - Run tests with both race detection and coverage (optimized for CI)
-    - `task check:fast` - Fast quality checks for rapid iteration (skips race detection, integration tests, and slow checks)
-  - Comprehensive testing documentation in `docs/testing.md`:
-    - Golden file testing workflow and best practices
-    - Structure validation testing approach
-    - Output normalization strategies
-    - Testing pyramid explanation
-    - Troubleshooting guide and FAQ
-  - Enhanced check summary script with fast mode support
-  - Recursion prevention for integration tests with `INSIDE_TASK_CHECK` environment variable
-  - 100% test coverage for new integration test utilities
-  - Golden file tests complement structure validation for defense-in-depth testing
+- **Agent-ready architecture**: Layered AI configuration stack (`AGENTS.md` → `CLAUDE.md` → `.claude/rules/` → hooks → `task check`) enables AI coding agents to produce correct, well-structured code within enforced architectural patterns
+- **Framework versioning**: `.ckeletin/VERSION` tracks framework version; `task ckeletin:version` displays it
+- **Framework update dry-run**: `task ckeletin:update:dry-run` previews framework changes without applying them
+- **Framework health check**: `task ckeletin:health` shows version, local modifications, update availability, and import consistency
+- **Pre-update compatibility check**: `task ckeletin:update:check-compatibility` tests latest framework against your code before committing
+- **Improved command generator**: `task generate:command name=<name>` now scaffolds the full pattern — `cmd/`, `internal/`, tests, and config — in one command (was 8 manual steps)
+- **Config-time validation**: Invalid config values (colors, log levels) are now caught at startup with clear error messages, not during command execution
+- **AST-based import rewriting**: Framework updates and scaffold init now use `go/ast` for import path rewriting instead of `sed`, eliminating corruption of comments and string constants
+- **XDG Base Directory compliance**: Platform-aware config, cache, and data paths (Linux XDG spec, macOS conventions, Windows standard paths)
+- **Parallel check execution**: `--parallel` flag for `ckeletin-go check` runs checks concurrently within categories
+- **Hybrid Go check command**: 23 checks across 6 categories with `--fail-fast` support and beautiful terminal output via `pkg/checkmate`
+- **Scaffold workflow**: `task init name=myapp module=...` initializes a new project; `task ckeletin:update` pulls framework improvements
+- **Development-only commands** (build tag `dev`):
+  - `dev config` — configuration inspector (list, show, export, validate, search)
+  - `dev doctor` — environment health checker
+  - `dev progress` — development progress display
+- **Golden file testing**: `task test:golden` for CLI output snapshot testing with cross-platform normalization
+- **Fast quality checks**: `task check:fast` for rapid iteration (~2-3 min vs ~5-8 min)
+- **Conventional commit enforcement**: Lefthook `commit-msg` hook validates commit message format
+- **Binary signing**: Releases signed with keyless cosign via OIDC for supply chain verification
+- **SBOM vulnerability scanning**: Release artifacts scanned with grype before publishing
+- **SLSA provenance**: Cryptographic attestation of build environment for releases
+- **Weekly fuzz testing**: Automated CI workflow runs fuzz tests every Sunday
 
 ### Changed
 
-- **go.mod minimum**: Lowered from `go 1.25` to `go 1.24` (actual minimum required by dependencies)
-- **Go toolchain patch level**: Bumped `.go-version` from `1.25.5` to `1.25.7` to include Go stdlib security fixes detected in CI vulnerability scanning
-- **Pre-push hooks**: Combined `coverage-patch` and `coverage-project` into single `coverage` hook (faster)
-- **Config path mode and defaults**:
-  - Default user config path is now XDG-style: `$XDG_CONFIG_HOME/<app>/config.yaml` (fallback: `~/.config/<app>/config.yaml`)
-  - macOS native path remains available as an explicit option: `~/Library/Application Support/<app>/config.yaml`
-  - `--config-path-mode` now uses `xdg` (default), `native`, or `both`
-  - Removed `home` mode (`~/.<app>/config.yaml`) from supported options
-- **BREAKING: `task build` now defaults to dev builds**:
-  - `task build` creates dev builds with `-tags dev` (includes dev commands)
-  - Use `task build:prod` for production builds (previous behavior)
-  - Rationale: Developers need dev tools during local work; production builds are intentional
-  - **Migration**: Update scripts using `task build` for production to use `task build:prod`
-- **`task test` now includes dev command tests by default**:
-  - Tests run with `-tags dev` to test dev commands
-  - Use `task test:prod` to test without dev commands
-- **Framework/project separation**: Framework code moved to `.ckeletin/` directory
-  - Import paths changed to `.ckeletin/pkg/*` (config, logger, testutil)
-  - Taskfile uses `includes:` to import framework tasks from `.ckeletin/Taskfile.yml`
-  - Framework tasks namespaced as `ckeletin:*` with convenience aliases
-  - Lefthook configuration extends `.ckeletin/configs/lefthook.base.yml`
-- **CI workflow optimization**:
-  - PRs now run `task check:fast` (~2-3 min) instead of full checks (~5-8 min)
-  - Cross-platform matrix and dev/prod tests only run on main branch and tags
-  - Trivy action pinned to `@0.28.0` for reproducibility
+- **README restructured**: Leads with Smart + AI-agent readiness; new "Agent-Ready Architecture" and "Who Is This For?" sections; framework story integrated throughout
+- **AGENTS.md reframed**: Positioned as a reusable reference implementation pattern for agent-ready codebases
+- **`task build` defaults to dev builds**: Use `task build:prod` for production (previous behavior)
+- **`task test` includes dev command tests**: Use `task test:prod` for production-only testing
+- **Framework/project separation**: Framework code in `.ckeletin/`, tasks namespaced as `ckeletin:*`
+- **Config path defaults**: XDG-style paths (`$XDG_CONFIG_HOME/<app>/config.yaml`) replace legacy `~/.<app>.yaml`
+- **Go version**: Updated to 1.26.1
+- **Windows support clarified**: Core functionality supported; interactive features may have limitations
+
+### Security
+
+- **Cosign binary signing** for release verification
+- **SBOM scanning** at release time catches high-severity vulnerabilities
+- **SLSA provenance** enables cryptographic build verification
+- **Semgrep SAST** now runs on pull requests (previously main-only)
+- **Atomic timing writes** prevent data corruption on concurrent check runs
 
 ### Removed
 
-- **`.cursor/rules/` directory**: Consolidated into `CLAUDE.md` for AI assistant instructions
+- **`.cursor/rules/` directory**: Consolidated into `CLAUDE.md`
+- **Legacy `~/.<app>.yaml` config path**: Replaced by XDG-style paths
 
 ## [0.8.0] - 2025-11-15
 
@@ -522,7 +451,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/peiman/ckeletin-go/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/peiman/ckeletin-go/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/peiman/ckeletin-go/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/peiman/ckeletin-go/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/peiman/ckeletin-go/compare/v0.4.0...v0.5.0
