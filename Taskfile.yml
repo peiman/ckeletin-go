@@ -305,6 +305,10 @@ tasks:
     desc: Preview framework update without applying
     cmds: [task: ckeletin:update:dry-run]
 
+  ckeletin-update-check:
+    desc: Check if latest framework update is compatible
+    cmds: [task: ckeletin:update:check-compatibility]
+
   # === Project-Specific Tasks ===
 
   init:

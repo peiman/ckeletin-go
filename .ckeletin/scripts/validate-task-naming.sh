@@ -45,6 +45,7 @@ ALLOWED_STANDALONE=(
     ckeletin-version          # Framework version alias (ckeletin: prefix reserved for includes)
     ckeletin-health           # Framework health check alias (ckeletin: prefix reserved for includes)
     ckeletin-update-dry-run   # Framework update dry-run alias (ckeletin: prefix reserved for includes)
+    ckeletin-update-check     # Framework compatibility check alias (ckeletin: prefix reserved for includes)
 )
 
 # Allowed action prefixes beyond the standard ADR-000 actions

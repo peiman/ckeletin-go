@@ -144,10 +144,8 @@ tasks:
         echo "   Applying framework update..."
         git checkout ckeletin-upstream/main -- .ckeletin/
 
-        echo "   Updating module paths..."
-        # Cross-platform sed: use backup extension then delete (works on macOS and Linux)
-        find .ckeletin -name "*.go" -exec sed -i.bak "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
-        find .ckeletin -name "*.go.bak" -delete 2>/dev/null || true
+        echo "   Updating module paths (AST-based import rewriting)..."
+        go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
 
         echo "   Regenerating config constants..."
         task ckeletin:generate:config:key-constants 2>/dev/null || true
@@ -208,6 +206,71 @@ tasks:
           echo "$DIFF_STAT"
           echo ""
           echo "Run 'task ckeletin:update' to apply these changes."
+        fi
+
+  update:check-compatibility:
+    desc: Check if latest framework update is compatible with your code
+    cmds:
+      - |
+        set -e
+        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
+        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+
+        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
+          echo "ℹ️  This is the upstream repository — compatibility check not applicable"
+          exit 0
+        fi
+
+        # Fetch latest
+        if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
+          git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
+        fi
+        git fetch ckeletin-upstream
+
+        # Check if there are changes
+        DIFF_STAT=$(git diff --stat HEAD ckeletin-upstream/main -- .ckeletin/)
+        if [ -z "$DIFF_STAT" ]; then
+          echo "✅ Framework is already up-to-date — nothing to check"
+          exit 0
+        fi
+
+        # Stash current changes
+        STASH_MSG="ckeletin-compat-check-$$"
+        git stash push -m "$STASH_MSG" --include-untracked -- .ckeletin/ 2>/dev/null || true
+
+        # Apply update temporarily
+        git checkout ckeletin-upstream/main -- .ckeletin/ 2>/dev/null
+
+        # Rewrite imports
+        if [ -f ".ckeletin/scripts/rewrite-imports/main.go" ]; then
+          go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
+        else
+          find .ckeletin -name "*.go" -exec sed -i.bak "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
+          find .ckeletin -name "*.bak" -delete
+        fi
+
+        # Test build
+        echo "🔍 Checking compatibility with latest framework..."
+        BUILD_OUTPUT=$(go build ./... 2>&1)
+        BUILD_RESULT=$?
+
+        # Restore original
+        git checkout -- .ckeletin/
+        git stash pop --index 2>/dev/null || true
+
+        if [ $BUILD_RESULT -eq 0 ]; then
+          echo "✅ Compatible — safe to update"
+          echo ""
+          echo "Changes available:"
+          echo "$DIFF_STAT"
+          echo ""
+          echo "Run 'task ckeletin:update' to apply"
+        else
+          echo "❌ Incompatible — build errors detected:"
+          echo "$BUILD_OUTPUT"
+          echo ""
+          echo "Review the errors above before running task ckeletin:update"
+          exit 1
         fi
 
   doctor:
