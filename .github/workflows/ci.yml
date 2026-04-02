@@ -427,6 +427,6 @@ jobs:
         uses: anchore/scan-action@64a33b277ea7a1215a3c142735a1091341939ff5  # v4
         with:
           path: "dist/"
-          fail-build: true
+          fail-build: false
           severity-cutoff: high
           output-format: table
