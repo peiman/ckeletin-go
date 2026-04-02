@@ -1,0 +1,38 @@
+name: Fuzz Testing
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly, Sunday 3am UTC
+  workflow_dispatch:       # Manual trigger
+
+permissions: {}
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417  # v6.3.0
+        with:
+          go-version-file: '.go-version'
+
+      - name: Install Task
+        uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611  # v2.0.0
+        with:
+          version: '3.39.2'
+
+      - name: Run fuzz tests
+        run: task test:fuzz FUZZTIME=60s
+        timeout-minutes: 10
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: fuzz-crashes
+          path: '**/testdata/fuzz/**'
