@@ -30,10 +30,9 @@ jobs:
           gh release download "$RELEASE_TAG" -D dist/
 
       - name: Generate attestations
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-        run: |
-          for f in dist/*.tar.gz dist/*.zip dist/checksums.txt; do
-            [ -f "$f" ] && gh attestation create "$f" --repo "$REPO"
-          done
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
