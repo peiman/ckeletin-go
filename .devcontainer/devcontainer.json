@@ -1,0 +1,18 @@
+{
+  "name": "ckeletin-go",
+  "image": "mcr.microsoft.com/devcontainers/go:1-1.26",
+  "postCreateCommand": "go install github.com/go-task/task/v3/cmd/task@latest && task setup",
+  "customizations": {
+    "vscode": {
+      "extensions": ["golang.go"],
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.testFlags": ["-count=1"]
+      }
+    }
+  },
+  "remoteEnv": {
+    "OPENAI_API_KEY": "${localEnv:OPENAI_API_KEY}",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
+  }
+}

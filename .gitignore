@@ -76,6 +76,8 @@ bench-new.txt
 
 # Research and planning files
 research/
+docs/research/
+docs/superpowers/
 
 # License compliance outputs (generated artifacts)
 reports/licenses.csv

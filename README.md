@@ -2,7 +2,7 @@
 
 ![ckeletin-go](logo/ckeletin-go-banner.png)
 
-**A production-ready Go CLI scaffold powered by an updatable framework layer.**
+**AI-first Go development framework. Ship production CLIs that AI agents build correctly.**
 
 <!-- Row 1: Build Quality & Security -->
 [![Build Status](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml/badge.svg)](https://github.com/peiman/ckeletin-go/actions/workflows/ci.yml)
@@ -27,63 +27,37 @@
 
 ## TL;DR
 
-ckeletin-go gives you production-ready CLI infrastructure — clean architecture, enforced patterns, and an updatable framework — so you can focus on your feature.
+ckeletin-go is an AI-first Go CLI framework — every architectural rule is machine-checkable, so AI coding agents produce correct, well-structured code from day one. You get production-ready infrastructure with an updatable framework layer, so you can focus on your feature.
 
-- **Built for humans and AI agents** — `AGENTS.md`, `CLAUDE.md`, hooks, and automated enforcement mean AI coding agents produce correct, well-structured code from day one
+- **AI agents build correctly here** — `AGENTS.md`, `CLAUDE.md`, hooks, and automated enforcement mean agents follow your architecture, not fight it
 - **Updatable framework** — `.ckeletin/` updates independently via `task ckeletin:update`. Your code is never touched. AI agent infrastructure improves automatically
 - **Read the code in 5 minutes** — Ultra-thin commands (~20 lines each). No framework magic to decode
-- **Ship with ≥85% test coverage** — Hundreds of real tests. Integration + unit. Every rule is machine-checkable
+- **Ship with confidence** — ≥85% test coverage, automated architecture validation, GPL/AGPL blocking. Every rule is machine-checkable
 - **One command setup** — `task init name=myapp module=...` updates 40+ files. Start coding in 2 minutes
 
-**Quickstart:**
 ```bash
 git clone https://github.com/peiman/ckeletin-go.git && cd ckeletin-go
 task setup && task init name=myapp module=github.com/you/myapp
 task build && ./myapp ping
 ```
 
-**Bonus:** Automatic GPL/AGPL blocking prevents license contamination.
+Or [open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&repo=peiman/ckeletin-go) for a pre-configured environment with all tools installed.
 
 ---
 
-## What You Get
+## Who Is This For?
 
-ckeletin-go is both a **scaffold** (fork, customize, ship) and a **framework** (updatable infrastructure that keeps working for you):
+**You use AI coding agents and need them to produce correct code.**
+The layered AI configuration — `AGENTS.md`, `CLAUDE.md`, hooks, enforcement — means agents work within your architecture, not around it. This is what "agent-ready" actually looks like.
 
-```
-myapp/
-├── .ckeletin/              # FRAMEWORK — updated via `task ckeletin:update`
-│   ├── Taskfile.yml        # Quality checks, build tasks, validation
-│   ├── pkg/                # Config registry, logger, testutil packages
-│   ├── scripts/            # Enforcement scripts (architecture, patterns, security)
-│   └── docs/adr/           # Framework ADRs (000-099)
-│
-├── cmd/                    # YOUR commands (ultra-thin, ≤30 lines)
-├── internal/               # YOUR business logic
-├── pkg/                    # YOUR public reusable packages
-├── docs/adr/               # YOUR ADRs (100+)
-├── Taskfile.yml            # YOUR task aliases + custom tasks
-└── .golangci.yml           # YOUR tool configs (customize freely)
-```
+**You want to make your own codebase agent-ready.**
+Study the pattern: `AGENTS.md` → behavioral rules → automated hooks → machine-checkable enforcement. It works in any project.
 
-**The scaffold** gets you started: clone, `task init`, customize `cmd/` and `internal/`, ship.
+**Your boss needs a CLI tool by next sprint. You've never built one.**
+Clone, `task init`, and you have production-ready infrastructure in 2 minutes. The ADRs teach you the patterns as you build.
 
-**The framework** keeps working: enforced architecture, validated patterns, type-safe config, structured logging — all updated independently of your code via `task ckeletin:update`.
-
-**AI agents work here too.** The framework includes layered AI configuration — `AGENTS.md` for any AI assistant, `CLAUDE.md` for Claude Code, automated hooks, and behavioral rules — so coding agents follow the same enforced patterns you do. When the framework updates, your AI agent's effectiveness improves with it.
-
----
-
-## Key Highlights
-
-- **Agent-Ready Architecture**: Layered AI configuration (`AGENTS.md` → `CLAUDE.md` → hooks → enforcement) means coding agents produce correct code within your architecture — not despite it
-- **Updatable Framework**: `.ckeletin/` updates independently of your code. Patterns, tooling, and AI agent infrastructure evolve together
-- **Readable Code**: Ultra-thin commands (~20 lines each) — understand and modify in minutes
-- **Enforced Quality**: ≥85% test coverage, automated architecture validation, pre-commit hooks. Every rule is machine-checkable
-- **Enterprise License Compliance**: Automated GPL/AGPL blocking prevents legal contamination
-- **Task-Based Workflow**: Single source of truth for all commands — local, CI, and AI agents use the same interface ([ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md))
-- **Reproducible Builds**: Pinned tool versions ensure identical results everywhere
-- **Crafted to Learn From**: 14 ADRs explain every architectural decision. The codebase isn't just functional — it's reasoned
+**You're a senior dev who's tired of rebuilding the same scaffolding.**
+The updatable framework means you set up once and receive improvements over time. The enforced patterns mean your code stays clean even as the team grows.
 
 ---
 
@@ -124,6 +98,34 @@ task check         → Single gateway that catches all violations
 
 ---
 
+## What You Get
+
+ckeletin-go is both a **scaffold** (fork, customize, ship) and a **framework** (updatable infrastructure that keeps working for you):
+
+```
+myapp/
+├── .ckeletin/              # FRAMEWORK — updated via `task ckeletin:update`
+│   ├── Taskfile.yml        # Quality checks, build tasks, validation
+│   ├── pkg/                # Config registry, logger, testutil packages
+│   ├── scripts/            # Enforcement scripts (architecture, patterns, security)
+│   └── docs/adr/           # Framework ADRs (000-099)
+│
+├── cmd/                    # YOUR commands (ultra-thin, ≤30 lines)
+├── internal/               # YOUR business logic
+├── pkg/                    # YOUR public reusable packages
+├── docs/adr/               # YOUR ADRs (100+)
+├── Taskfile.yml            # YOUR task aliases + custom tasks
+└── .golangci.yml           # YOUR tool configs (customize freely)
+```
+
+**The scaffold** gets you started: clone, `task init`, customize `cmd/` and `internal/`, ship.
+
+**The framework** keeps working: enforced architecture, validated patterns, type-safe config, structured logging — all updated independently of your code via `task ckeletin:update`.
+
+**AI agents improve with the framework.** When `.ckeletin/` updates, the AI configuration stack — validation scripts, enforcement rules, task definitions — evolves with it. Your agent gets more effective over time without you changing anything.
+
+---
+
 ## Quick Start
 
 1. **Clone and set up tools:**
@@ -145,6 +147,8 @@ task check         → Single gateway that catches all violations
    ./myapp ping
    ```
 
+**Alternative:** [Open in GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&repo=peiman/ckeletin-go) — all tools pre-installed, ready to go.
+
 ---
 
 ## Architecture
@@ -163,17 +167,14 @@ All architectural decisions are documented in **[Architecture Decision Records](
 
 ---
 
-## Features
+## Key Features
 
 - **Modular Command Structure**: Add, remove, or update commands without breaking the rest
 - **Layered Architecture**: Enforced 4-layer pattern with automated validation to prevent drift
 - **Structured Logging**: Zerolog dual output (console + file) for debugging and production
 - **Bubble Tea UI**: Optional interactive terminal UIs
 - **Single-Source Configuration**: Defaults in config files, overrides via env vars and flags
-- **Enterprise License Compliance**:
-  - Dual-tool checking: go-licenses (source, ~2-5s) + lichen (binary, ~10-15s)
-  - Automatic GPL/AGPL blocking — default permissive-only policy (MIT, Apache-2.0, BSD)
-  - See [ADR-011](.ckeletin/docs/adr/011-license-compliance.md) and [docs/licenses.md](docs/licenses.md)
+- **Enterprise License Compliance**: Dual-tool checking with automatic GPL/AGPL blocking ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
 - **Task Automation**: One Taskfile for all build, test, and lint commands
 - **High Test Coverage**: ≥85% enforced by CI. Hundreds of real tests
 - **Beautiful Check Output**: `pkg/checkmate` — thread-safe, TTY-aware terminal output library
@@ -184,29 +185,11 @@ All architectural decisions are documented in **[Architecture Decision Records](
 
 ### Prerequisites
 
-- **Go**: Version specified in `go.mod`
+- **Go**: Version specified in `.go-version` (currently 1.26.1)
 - **Task**: Install from [taskfile.dev](https://taskfile.dev/#/installation)
 - **Git**: For version control
 
-### Installation
-
-#### Download Pre-built Binary
-
-```bash
-# Example for Linux amd64
-curl -L https://github.com/peiman/ckeletin-go/releases/latest/download/ckeletin-go_linux_amd64.tar.gz | tar xz
-sudo mv ckeletin-go /usr/local/bin/
-```
-
-#### Homebrew (macOS/Linux)
-
-```bash
-brew install peiman/tap/ckeletin-go
-```
-
-**Note**: Homebrew tap is optional and must be explicitly enabled by the project maintainer.
-
-#### Build from Source
+### Build from Source
 
 ```bash
 git clone https://github.com/peiman/ckeletin-go.git
@@ -220,13 +203,8 @@ task setup && task build
 task init name=myapp module=github.com/myuser/myapp
 ```
 
-This single command:
-- Updates module path in `go.mod` and all imports (40+ files)
-- Updates binary name in `Taskfile.yml` and `.goreleaser.yml`
-- Cleans `pkg/` (ckeletin-go libraries become external dependencies)
-- Formats code and runs `go mod tidy`
+This single command updates module path, imports (40+ files), binary name, and config. Then:
 
-Then build and test:
 ```bash
 task check    # Run quality checks
 task build    # Build your binary
@@ -237,160 +215,52 @@ task build    # Build your binary
 
 ## Configuration
 
-Viper-based configuration with a centralized registry ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md)):
-
-### Configuration Precedence
-
-1. Command-line flags (highest priority)
-2. Environment variables
-3. Configuration file
-4. Default values (lowest priority)
-
-### Configuration File
-
-Default: `$HOME/.ckeletin-go.yaml` (or `myapp.yaml` if renamed).
+Viper-based configuration with a centralized registry ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md)). Precedence (highest to lowest): command-line flags → environment variables → config file → defaults.
 
 ```yaml
+# ~/.config/myapp/config.yaml
 app:
   log_level: "debug"
   ping:
     output_message: "Hello World!"
-    output_color: "green"
-    ui: true
 ```
-
-### Environment Variables
-
-Override any config with automatic prefix based on binary name:
 
 ```bash
-export MYAPP_APP_LOG_LEVEL="debug"
-export MYAPP_APP_PING_OUTPUT_MESSAGE="Hello, World!"
+export MYAPP_APP_LOG_LEVEL="debug"           # Environment override
+./myapp ping --message "Hi there!" --color yellow  # Flag override
 ```
 
-### Command-Line Flags
-
-```bash
-./myapp ping --message "Hi there!" --color yellow --ui
-```
-
-### Auto-generated Documentation
-
-```bash
-task generate:docs:config      # Generate docs/configuration.md
-task generate:config:template  # Generate config template
-```
-
-**Rule:** Never use `viper.SetDefault()` directly — the `task validate:defaults` check enforces this.
+See [Configuration Reference](docs/configuration.md) for all options, auto-generated docs, and config templates.
 
 ---
 
 ## Commands
 
-### `ping` Command
-
-Sample command demonstrating Cobra, Viper, Zerolog, and Bubble Tea integration:
+Built-in commands: `ping` (demo), `config validate`, `check` (quality gates), `dev` (dev-only tools), and `doctor` (environment health).
 
 ```bash
-./myapp ping
 ./myapp ping --message "Hello!" --color cyan
-./myapp ping --ui
-```
-
-### `doctor` Command
-
-Check your development environment:
-```bash
+./myapp config validate
 task doctor
 ```
 
-### `config validate` Command
-
-Validate configuration files:
-```bash
-./myapp config validate
-./myapp config validate --file /path/to/config.yaml
-```
-
-### `check` Command (Dev Build Only)
-
-Run comprehensive quality checks with beautiful TUI output:
-```bash
-./myapp check
-./myapp check --category quality
-./myapp check --fail-fast --verbose
-```
-
-Categories: Development Environment, Code Quality, Architecture Validation, Dependencies, Tests.
-
-### `dev` Command Group (Dev Build Only)
-
-```bash
-./myapp dev config    # Inspect configuration
-./myapp dev doctor    # Check environment health
-./myapp dev progress  # Show development progress
-```
-
-See [ADR-012](.ckeletin/docs/adr/012-dev-commands-build-tags.md) for build tag separation.
+Add new commands with `task generate:command name=mycommand`. See [Command Reference](docs/commands.md) for details.
 
 ---
 
 ## Development Workflow
 
-All commands defined in `Taskfile.yml` — used identically in local dev, pre-commit hooks, and CI. See [ADR-000](.ckeletin/docs/adr/000-task-based-single-source-of-truth.md).
-
-### Essential Commands
+All commands defined in `Taskfile.yml` — used identically in local dev, pre-commit hooks, and CI:
 
 ```bash
-task doctor    # Check your development environment
 task check     # Run all quality checks (mandatory before commits)
-task format    # Format all Go code
 task test      # Run tests with coverage
 task build     # Build the binary
+task format    # Format all Go code
+task doctor    # Check environment health
 ```
 
-Run `task --list` for the complete reference.
-
-### Development Tools
-
-Pinned tool versions for reproducible builds:
-
-```bash
-task doctor                    # Check environment and tool versions
-task check:tools:installed     # Fast existence check
-task check:tools:version       # Strict version verification (CI)
-task check:tools:updates       # Discover available updates
-```
-
-### License Compliance
-
-```bash
-task check:license:source      # Fast check during development (~2-5s)
-task check:license:binary      # Accurate check before releases (~10-15s)
-task generate:license          # Generate all license artifacts
-```
-
-### Pre-Commit Hooks
-
-`task setup` installs Lefthook hooks that run format, lint, and test on commit.
-
-### Continuous Integration
-
-GitHub Actions runs `task check` on each commit or PR.
-
-### Creating Releases
-
-Uses [GoReleaser](https://goreleaser.com/) for automated multi-platform releases:
-
-```bash
-task check                     # Ensure quality
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0         # CI builds binaries, creates GitHub release
-```
-
-**Supported platforms:** Linux (amd64, arm64), macOS (Intel, Apple Silicon), Windows (amd64).
-
-See [ADR-008](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md) for details.
+See [Development Workflow](docs/development-workflow.md) for the full reference including tools, license compliance, CI, and releases.
 
 ---
 
@@ -399,14 +269,10 @@ See [ADR-008](.ckeletin/docs/adr/008-release-automation-with-goreleaser.md) for 
 Your project code and the framework layer are independent:
 
 ```bash
-task ckeletin:update    # Pull latest framework improvements
+task ckeletin:update:dry-run             # Preview changes (safe)
+task ckeletin:update:check-compatibility # Test build compatibility (safe)
+task ckeletin:update                     # Apply update (creates a commit)
 ```
-
-**What updates:** `.ckeletin/` — Taskfile, packages, scripts, ADRs.
-
-**What doesn't change:** `cmd/`, `internal/`, `pkg/`, `docs/adr/`, your tool configs.
-
-### What's Framework vs. What's Yours
 
 | Framework (`.ckeletin/`) | Project (yours) |
 |--------------------------|-----------------|
@@ -416,21 +282,7 @@ task ckeletin:update    # Pull latest framework improvements
 | `scripts/` — Validation and check scripts | `pkg/` — Your public packages |
 | `docs/adr/000-099` — Framework decisions | `docs/adr/100+` — Your decisions |
 
----
-
-## Who Is This For?
-
-**Your boss needs a CLI tool by next sprint. You've never built one.**
-Clone, `task init`, and you have production-ready infrastructure in 2 minutes. The ADRs teach you the patterns as you build.
-
-**You're a senior dev who's tired of rebuilding the same scaffolding.**
-The updatable framework means you set up once and receive improvements over time. The enforced patterns mean your code stays clean even as the team grows.
-
-**You use AI coding agents and need them to produce correct code.**
-The layered AI configuration — `AGENTS.md`, `CLAUDE.md`, hooks, enforcement — means agents work within your architecture, not around it. This is what "agent-ready" looks like.
-
-**You want to make your own codebase agent-ready.**
-Study the pattern: `AGENTS.md` → behavioral rules → automated hooks → machine-checkable enforcement. It works in any project.
+See [Framework Update Guide](docs/framework-updates.md) for the safe update workflow, breaking change handling, and how AI agents can manage updates.
 
 ---
 
