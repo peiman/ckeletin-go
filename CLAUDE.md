@@ -4,13 +4,14 @@
 
 ## Non-Negotiable Rules
 
-1. **`task check` before every commit** — Non-negotiable, runs all quality checks
-2. **Commands ≤30 lines** — `cmd/*.go` files wire things together; logic goes in `internal/`
-3. **Use `config.Key*` constants** — Never hardcode config strings; run `task generate:config:key-constants` after registry changes
-4. **Never reduce test coverage** — 85% minimum overall, use `testify/assert`
-5. **Check licenses after `go get`** — Run `task check:license:source` immediately
-6. **Never `--no-verify`** — Ask user permission first with justification
-7. **ALWAYS use `task` commands** — See `.claude/rules/task-commands.md` for the full translation table
+1. **TDD: write tests FIRST, commit together** — Always write failing tests before implementation code. Test + implementation go in one atomic commit. Never commit tests without the code that makes them pass, or code without its tests
+2. **`task check` before every commit** — Non-negotiable, runs all quality checks
+3. **Commands ≤30 lines** — `cmd/*.go` files wire things together; logic goes in `internal/`
+4. **Use `config.Key*` constants** — Never hardcode config strings; run `task generate:config:key-constants` after registry changes
+5. **Never reduce test coverage** — 85% minimum overall, use `testify/assert`
+6. **Check licenses after `go get`** — Run `task check:license:source` immediately
+7. **Never `--no-verify`** — Ask user permission first with justification
+8. **ALWAYS use `task` commands** — See `.claude/rules/task-commands.md` for the full translation table
 
 **When rules conflict:** Security → License compliance → Correctness → Coverage → Style
 
@@ -82,6 +83,9 @@ After Go upgrade: `task setup` to rebuild tools. Verify with: `task --list && ta
 | Use `sed`/`awk` for edits | Use the Edit tool |
 | Hardcode `"app.log.level"` | Use `config.KeyAppLogLevel` |
 | Forget to regenerate constants | `task generate:config:key-constants` |
+| Write implementation before tests | Write failing test FIRST, then implement (TDD) |
+| Commit tests and implementation separately | Atomic commits: test + implementation together |
+| Squash merge branches/PRs | Normal merge (preserve atomic commit history) |
 | Skip tests for "simple" code | Write tests (85% coverage is mandatory) |
 | Mock everything | Use dependency injection ([ADR-003]) |
 | Add deps without license check | `go get pkg && task check:license:source` |
@@ -91,6 +95,7 @@ After Go upgrade: `task setup` to rebuild tools. Verify with: `task --list && ta
 
 ## Known Rule Violations (These Have Happened Before)
 
+- Writing implementation code before writing tests (TDD violation)
 - Running `go test ./...` instead of `task test`
 - Deleting unused variables without investigating if they represent planned functionality
 - Using raw `go`/`golangci-lint`/`goimports` commands instead of `task` equivalents

@@ -17,6 +17,7 @@ Key characteristics:
 - Centralized configuration registry with auto-generated constants
 - Structured logging with Zerolog (dual console + file output)
 - Bubble Tea for interactive UIs
+- Test-driven development (TDD) — tests first, always
 - Dependency injection over mocking
 - 85% minimum test coverage, enforced by CI
 - Public reusable packages in `pkg/` (e.g., `checkmate` for beautiful CLI output)
@@ -176,6 +177,7 @@ Use `log.Error()` only for unrecoverable failures where no error can be returned
 
 ### Testing
 
+- **TDD is mandatory** — Write failing tests FIRST, then implement to make them pass. Test + implementation are committed together as one atomic unit. Never commit tests without the code that makes them pass, or code without its tests
 - All tests must use `testify/assert` or `testify/require`
 - Use table-driven tests for multiple scenarios
 - Unit tests: `*_test.go` in same package
@@ -217,6 +219,10 @@ p.CheckFailure("format", "2 files need formatting", "Run: task format")
 
 **Branch naming:** `feat/`, `fix/`, `refactor/`, `docs/` prefixes (e.g., `feat/add-user-auth`)
 
+**Atomic commits:** Tests and the implementation they cover go in the same commit. Every commit should be a complete, passing unit. Never split tests from their implementation across separate commits.
+
+**Normal merge, never squash.** This project uses normal merge (merge commits) — not squash merge. Every atomic commit is preserved on main. This is why atomic commits matter: they survive the merge and keep `git bisect`, `git log`, and the TDD narrative intact. Do not squash when merging branches or PRs.
+
 `task check` must pass before every commit.
 
 ## Code Quality
@@ -244,7 +250,8 @@ During refactoring, temporary drops up to 2% acceptable if restored before PR me
 [ ] Create internal/<name>/ package for business logic
 [ ] Add config options to .ckeletin/pkg/config/registry.go
 [ ] Run: task generate:config:key-constants
-[ ] Write unit tests in internal/<name>/*_test.go
+[ ] Write failing tests FIRST in internal/<name>/*_test.go (TDD)
+[ ] Implement code to make tests pass
 [ ] Add integration test in test/integration/ (if needed)
 [ ] Update CHANGELOG.md
 [ ] Run: task check (must pass)
