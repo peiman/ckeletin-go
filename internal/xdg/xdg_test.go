@@ -448,7 +448,8 @@ func TestBasePaths_Linux(t *testing.T) {
 	osName = "linux"
 	t.Cleanup(func() { osName = origOS })
 
-	t.Setenv("HOME", "/home/testuser")
+	home := "/home/testuser"
+	t.Setenv("HOME", home)
 
 	t.Run("defaults without XDG vars", func(t *testing.T) {
 		t.Setenv("XDG_CONFIG_HOME", "")
@@ -456,10 +457,11 @@ func TestBasePaths_Linux(t *testing.T) {
 		t.Setenv("XDG_CACHE_HOME", "")
 		t.Setenv("XDG_STATE_HOME", "")
 
-		assert.Equal(t, "/home/testuser/.config", configBase())
-		assert.Equal(t, "/home/testuser/.local/share", dataBase())
-		assert.Equal(t, "/home/testuser/.cache", cacheBase())
-		assert.Equal(t, "/home/testuser/.local/state", stateBase())
+		// Use filepath.Join for cross-platform path separators
+		assert.Equal(t, filepath.Join(home, ".config"), configBase())
+		assert.Equal(t, filepath.Join(home, ".local", "share"), dataBase())
+		assert.Equal(t, filepath.Join(home, ".cache"), cacheBase())
+		assert.Equal(t, filepath.Join(home, ".local", "state"), stateBase())
 	})
 
 	t.Run("XDG env var overrides", func(t *testing.T) {
@@ -508,12 +510,15 @@ func TestBasePaths_Darwin(t *testing.T) {
 	osName = "darwin"
 	t.Cleanup(func() { osName = origOS })
 
-	t.Setenv("HOME", "/Users/testuser")
+	home := "/Users/testuser"
+	t.Setenv("HOME", home)
 
-	assert.Equal(t, "/Users/testuser/Library/Application Support", configBase())
-	assert.Equal(t, "/Users/testuser/Library/Application Support", dataBase())
-	assert.Equal(t, "/Users/testuser/Library/Caches", cacheBase())
-	assert.Equal(t, "/Users/testuser/Library/Application Support", stateBase())
+	// Use filepath.Join for cross-platform path separators
+	appSupport := filepath.Join(home, "Library", "Application Support")
+	assert.Equal(t, appSupport, configBase())
+	assert.Equal(t, appSupport, dataBase())
+	assert.Equal(t, filepath.Join(home, "Library", "Caches"), cacheBase())
+	assert.Equal(t, appSupport, stateBase())
 }
 
 func TestFileFunctions_ReturnAbsolutePaths(t *testing.T) {
