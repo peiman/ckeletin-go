@@ -390,3 +390,179 @@ func forceColorTheme(t *Theme) *Theme {
 	t.ForceColors = true
 	return t
 }
+
+// newTTYPrinter creates a Printer that simulates TTY mode for testing
+// the terminal escape code branches.
+func newTTYPrinter(buf *bytes.Buffer) *Printer {
+	p := New(WithWriter(buf), WithTheme(forceColorTheme(DefaultTheme())))
+	p.isTerminal = true
+	return p
+}
+
+func TestCheckHeader_TTY(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckHeader("Running lint")
+
+	output := buf.String()
+	// TTY mode should produce output (unlike non-TTY which skips)
+	assert.NotEmpty(t, output)
+	assert.Contains(t, output, "Running lint")
+}
+
+func TestCheckSuccess_TTY(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckSuccess("format passed")
+
+	output := buf.String()
+	assert.Contains(t, output, "format passed")
+	// TTY mode uses escape codes for line clearing
+	assert.Contains(t, output, "\r")
+	assert.Contains(t, output, "\033[K")
+}
+
+func TestCheckFailure_TTY(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckFailure("lint failed", "2 errors found", "Run: task format")
+
+	output := buf.String()
+	assert.Contains(t, output, "lint failed")
+	assert.Contains(t, output, "2 errors found")
+	assert.Contains(t, output, "Run: task format")
+	// TTY mode uses escape codes for line clearing
+	assert.Contains(t, output, "\r")
+	assert.Contains(t, output, "\033[K")
+}
+
+func TestCheckFailure_TTY_NoDetails(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckFailure("check failed", "", "Fix it")
+
+	output := buf.String()
+	assert.Contains(t, output, "check failed")
+	assert.NotContains(t, output, "Details:")
+	assert.Contains(t, output, "Fix it")
+}
+
+func TestCheckFailure_TTY_NoRemediation(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckFailure("check failed", "something broke", "")
+
+	output := buf.String()
+	assert.Contains(t, output, "check failed")
+	assert.Contains(t, output, "something broke")
+	assert.NotContains(t, output, "How to fix:")
+}
+
+func TestCheckLine_TTY_SkipsOutput(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckLine("format", StatusSuccess, 500*time.Millisecond)
+
+	// TTY mode should skip CheckLine output (animated output handles it)
+	assert.Empty(t, buf.String())
+}
+
+func TestCheckLine_NonTTY(t *testing.T) {
+	var buf bytes.Buffer
+	p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+	p.CheckLine("format", StatusSuccess, 1451*time.Millisecond)
+
+	output := buf.String()
+	assert.Contains(t, output, "format")
+	assert.Contains(t, output, "[OK]")
+	assert.Contains(t, output, "1.451s")
+	assert.Contains(t, output, ".") // dot padding
+}
+
+func TestCheckLine_NonTTY_Failure(t *testing.T) {
+	var buf bytes.Buffer
+	p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+	p.CheckLine("lint", StatusFailure, 3*time.Second)
+
+	output := buf.String()
+	assert.Contains(t, output, "lint")
+	assert.Contains(t, output, "[FAIL]")
+}
+
+func TestCheckInfo_MultipleLines(t *testing.T) {
+	var buf bytes.Buffer
+	p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+	p.CheckInfo("Line 1", "Line 2", "Line 3")
+
+	output := buf.String()
+	assert.Contains(t, output, "Line 1")
+	assert.Contains(t, output, "Line 2")
+	assert.Contains(t, output, "Line 3")
+}
+
+func TestCheckNote_WithMessage(t *testing.T) {
+	var buf bytes.Buffer
+	p := New(WithWriter(&buf), WithTheme(MinimalTheme()))
+
+	p.CheckNote("Remember to run task format")
+
+	output := buf.String()
+	assert.Contains(t, output, "Note:")
+	assert.Contains(t, output, "Remember to run task format")
+}
+
+func TestCheckSummary_TTY_Success(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckSummary(StatusSuccess, "All 5 Checks Passed", "lint", "format", "test")
+
+	output := buf.String()
+	assert.Contains(t, output, "All 5 Checks Passed")
+	assert.Contains(t, output, "lint")
+	assert.Contains(t, output, "format")
+	assert.Contains(t, output, "test")
+	// TTY mode uses Unicode box drawing
+	assert.Contains(t, output, "╭")
+	assert.Contains(t, output, "╰")
+}
+
+func TestCheckSummary_TTY_Failure(t *testing.T) {
+	var buf bytes.Buffer
+	p := newTTYPrinter(&buf)
+
+	p.CheckSummary(StatusFailure, "2 Checks Failed", "lint", "test")
+
+	output := buf.String()
+	assert.Contains(t, output, "2 Checks Failed")
+	assert.Contains(t, output, "lint")
+	assert.Contains(t, output, "test")
+}
+
+func TestFormatDuration(t *testing.T) {
+	tests := []struct {
+		duration time.Duration
+		expected string
+	}{
+		{500 * time.Millisecond, "500ms"},
+		{50 * time.Millisecond, "50ms"},
+		{1 * time.Second, "1.000s"},
+		{1500 * time.Millisecond, "1.500s"},
+		{10 * time.Second, "10.000s"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			assert.Equal(t, tt.expected, formatDuration(tt.duration))
+		})
+	}
+}

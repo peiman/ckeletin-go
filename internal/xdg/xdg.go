@@ -39,6 +39,10 @@ import (
 var (
 	appName string
 	mu      sync.RWMutex
+
+	// osName holds the operating system name. Defaults to runtime.GOOS.
+	// Overridden in tests to cover platform-specific branches.
+	osName = runtime.GOOS
 )
 
 // SetAppName sets the application name used for XDG directories.
@@ -164,7 +168,7 @@ func StateFile(filename string) (string, error) {
 
 // configBase returns the base config directory.
 func configBase() string {
-	switch runtime.GOOS {
+	switch osName {
 	case "darwin":
 		return filepath.Join(homeDir(), "Library", "Application Support")
 	case "windows":
@@ -182,7 +186,7 @@ func configBase() string {
 
 // dataBase returns the base data directory.
 func dataBase() string {
-	switch runtime.GOOS {
+	switch osName {
 	case "darwin":
 		return filepath.Join(homeDir(), "Library", "Application Support")
 	case "windows":
@@ -200,7 +204,7 @@ func dataBase() string {
 
 // cacheBase returns the base cache directory.
 func cacheBase() string {
-	switch runtime.GOOS {
+	switch osName {
 	case "darwin":
 		return filepath.Join(homeDir(), "Library", "Caches")
 	case "windows":
@@ -219,7 +223,7 @@ func cacheBase() string {
 // stateBase returns the base state directory.
 // State is for data that should persist between restarts but isn't config (logs, history).
 func stateBase() string {
-	switch runtime.GOOS {
+	switch osName {
 	case "darwin":
 		// macOS doesn't have a state concept, use Application Support
 		return filepath.Join(homeDir(), "Library", "Application Support")

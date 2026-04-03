@@ -333,3 +333,213 @@ func TestHomeDirFallback(t *testing.T) {
 	assert.NotEmpty(t, home)
 	assert.NotEqual(t, ".", home) // Should find actual home
 }
+
+func TestHomeDirUsesHOMEEnv(t *testing.T) {
+	t.Setenv("HOME", "/custom/home")
+	assert.Equal(t, "/custom/home", homeDir())
+}
+
+func TestHomeDirFallsBackWhenHOMEEmpty(t *testing.T) {
+	// When HOME is empty, homeDir() tries os.UserHomeDir(), then falls back to "."
+	t.Setenv("HOME", "")
+	home := homeDir()
+	// Should return something (either os.UserHomeDir result or "." fallback)
+	assert.NotEmpty(t, home)
+}
+
+func TestConfigBase_Darwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-specific test")
+	}
+	base := configBase()
+	assert.Contains(t, base, filepath.Join("Library", "Application Support"))
+}
+
+func TestDataBase_Darwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-specific test")
+	}
+	base := dataBase()
+	assert.Contains(t, base, filepath.Join("Library", "Application Support"))
+}
+
+func TestCacheBase_Darwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-specific test")
+	}
+	base := cacheBase()
+	assert.Contains(t, base, filepath.Join("Library", "Caches"))
+}
+
+func TestStateBase_Darwin(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin-specific test")
+	}
+	base := stateBase()
+	assert.Contains(t, base, filepath.Join("Library", "Application Support"))
+}
+
+func TestBasePathsUseHomeDir(t *testing.T) {
+	// Verify all base functions incorporate the home directory
+	t.Setenv("HOME", "/test/home")
+
+	config := configBase()
+	data := dataBase()
+	cache := cacheBase()
+	state := stateBase()
+
+	switch runtime.GOOS {
+	case "darwin":
+		assert.Equal(t, "/test/home/Library/Application Support", config)
+		assert.Equal(t, "/test/home/Library/Application Support", data)
+		assert.Equal(t, "/test/home/Library/Caches", cache)
+		assert.Equal(t, "/test/home/Library/Application Support", state)
+	case "windows":
+		// Windows uses env vars (AppData/LocalAppData), HOME fallback only if those are unset
+	default:
+		// Linux with no XDG vars set
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("XDG_DATA_HOME", "")
+		t.Setenv("XDG_CACHE_HOME", "")
+		t.Setenv("XDG_STATE_HOME", "")
+		assert.Equal(t, "/test/home/.config", configBase())
+		assert.Equal(t, "/test/home/.local/share", dataBase())
+		assert.Equal(t, "/test/home/.cache", cacheBase())
+		assert.Equal(t, "/test/home/.local/state", stateBase())
+	}
+}
+
+func TestDirCreatesDirectory(t *testing.T) {
+	setupTest(t)
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	SetAppName("testapp")
+
+	// All Dir functions should create their directories
+	tests := []struct {
+		name string
+		fn   func() (string, error)
+	}{
+		{"ConfigDir", ConfigDir},
+		{"DataDir", DataDir},
+		{"CacheDir", CacheDir},
+		{"StateDir", StateDir},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir, err := tt.fn()
+			require.NoError(t, err)
+			assert.DirExists(t, dir)
+			assert.Contains(t, dir, "testapp")
+
+			// Verify permissions on non-Windows
+			if runtime.GOOS != "windows" {
+				info, err := os.Stat(dir)
+				require.NoError(t, err)
+				assert.Equal(t, os.FileMode(0700), info.Mode().Perm())
+			}
+		})
+	}
+}
+
+func TestBasePaths_Linux(t *testing.T) {
+	origOS := osName
+	osName = "linux"
+	t.Cleanup(func() { osName = origOS })
+
+	t.Setenv("HOME", "/home/testuser")
+
+	t.Run("defaults without XDG vars", func(t *testing.T) {
+		t.Setenv("XDG_CONFIG_HOME", "")
+		t.Setenv("XDG_DATA_HOME", "")
+		t.Setenv("XDG_CACHE_HOME", "")
+		t.Setenv("XDG_STATE_HOME", "")
+
+		assert.Equal(t, "/home/testuser/.config", configBase())
+		assert.Equal(t, "/home/testuser/.local/share", dataBase())
+		assert.Equal(t, "/home/testuser/.cache", cacheBase())
+		assert.Equal(t, "/home/testuser/.local/state", stateBase())
+	})
+
+	t.Run("XDG env var overrides", func(t *testing.T) {
+		t.Setenv("XDG_CONFIG_HOME", "/custom/config")
+		t.Setenv("XDG_DATA_HOME", "/custom/data")
+		t.Setenv("XDG_CACHE_HOME", "/custom/cache")
+		t.Setenv("XDG_STATE_HOME", "/custom/state")
+
+		assert.Equal(t, "/custom/config", configBase())
+		assert.Equal(t, "/custom/data", dataBase())
+		assert.Equal(t, "/custom/cache", cacheBase())
+		assert.Equal(t, "/custom/state", stateBase())
+	})
+}
+
+func TestBasePaths_Windows(t *testing.T) {
+	origOS := osName
+	osName = "windows"
+	t.Cleanup(func() { osName = origOS })
+
+	t.Setenv("HOME", `C:\Users\testuser`)
+
+	t.Run("uses AppData and LocalAppData env vars", func(t *testing.T) {
+		t.Setenv("AppData", `C:\Users\testuser\AppData\Roaming`)
+		t.Setenv("LocalAppData", `C:\Users\testuser\AppData\Local`)
+
+		assert.Equal(t, `C:\Users\testuser\AppData\Roaming`, configBase())
+		assert.Equal(t, `C:\Users\testuser\AppData\Roaming`, dataBase())
+		assert.Equal(t, `C:\Users\testuser\AppData\Local`, cacheBase())
+		assert.Equal(t, `C:\Users\testuser\AppData\Roaming`, stateBase())
+	})
+
+	t.Run("falls back to HOME when env vars empty", func(t *testing.T) {
+		t.Setenv("AppData", "")
+		t.Setenv("LocalAppData", "")
+
+		assert.Contains(t, configBase(), "AppData")
+		assert.Contains(t, dataBase(), "AppData")
+		assert.Contains(t, cacheBase(), "AppData")
+		assert.Contains(t, stateBase(), "AppData")
+	})
+}
+
+func TestBasePaths_Darwin(t *testing.T) {
+	origOS := osName
+	osName = "darwin"
+	t.Cleanup(func() { osName = origOS })
+
+	t.Setenv("HOME", "/Users/testuser")
+
+	assert.Equal(t, "/Users/testuser/Library/Application Support", configBase())
+	assert.Equal(t, "/Users/testuser/Library/Application Support", dataBase())
+	assert.Equal(t, "/Users/testuser/Library/Caches", cacheBase())
+	assert.Equal(t, "/Users/testuser/Library/Application Support", stateBase())
+}
+
+func TestFileFunctions_ReturnAbsolutePaths(t *testing.T) {
+	setupTest(t)
+	tempDir := t.TempDir()
+	t.Setenv("HOME", tempDir)
+	SetAppName("testapp")
+
+	tests := []struct {
+		name     string
+		fn       func(string) (string, error)
+		filename string
+	}{
+		{"ConfigFile", ConfigFile, "config.yaml"},
+		{"DataFile", DataFile, "data.db"},
+		{"CacheFile", CacheFile, "cache.json"},
+		{"StateFile", StateFile, "state.log"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			file, err := tt.fn(tt.filename)
+			require.NoError(t, err)
+			assert.True(t, filepath.IsAbs(file))
+			assert.Equal(t, tt.filename, filepath.Base(file))
+			assert.Contains(t, file, "testapp")
+		})
+	}
+}
