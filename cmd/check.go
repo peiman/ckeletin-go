@@ -45,6 +45,7 @@ func runCheck(cmd *cobra.Command, args []string) error {
 		Parallel:   getConfigValueWithFlags[bool](cmd, "parallel", config.KeyAppCheckParallel),
 		Categories: categories,
 		ShowTiming: getConfigValueWithFlags[bool](cmd, "timing", config.KeyAppCheckTiming),
+		BinaryName: binaryName,
 	}
 
 	return check.NewExecutor(cfg, cmd.OutOrStdout()).Execute(cmd.Context())

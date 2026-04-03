@@ -102,7 +102,7 @@ func (e *Executor) buildCategories(methods *checkMethods) []categoryDef {
 			{"vuln", methods.checkVuln, "Update vulnerable dependencies"},
 			{"outdated", methods.shellCheck("check-deps-outdated.sh"), "Run: go get -u"},
 			{"license-source", methods.shellCheck("check-licenses-source.sh"), "Check dependency licenses"},
-			{"license-binary", methods.shellCheck("check-licenses-binary.sh"), "Check binary licenses"},
+			{"license-binary", methods.shellCheck("check-licenses-binary.sh", "./"+e.cfg.BinaryName), "Check binary licenses"},
 			{"sbom-vulns", methods.shellCheck("check-sbom-vulns.sh"), "Fix SBOM vulnerabilities"},
 		}},
 		{name: "Tests", checks: []checkItem{
