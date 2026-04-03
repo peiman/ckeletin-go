@@ -36,6 +36,7 @@ type Config struct {
 	Parallel   bool
 	Categories []string // Filter to specific categories (empty = all)
 	ShowTiming bool     // Show duration for each check
+	BinaryName string   // Binary name for license-binary check (e.g., "myapp")
 }
 
 // ValidateCategories checks if all provided categories are valid

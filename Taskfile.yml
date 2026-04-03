@@ -339,11 +339,26 @@ tasks:
       - go run ./.ckeletin/scripts/scaffold/ "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
       - go mod tidy
       - |
-        # Create initial version tag for clean --version output
-        if ! git tag | grep -q "^v"; then
-          git tag -a v0.0.0 -m "Initial version"
-          echo "  ✓ Created initial version tag v0.0.0"
+        set -e
+        # Reset git history for a clean start
+        CKELETIN_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
+        rm -rf .git
+        if [ -d .git ]; then
+          echo "ERROR: Failed to remove .git directory. Is another process using it?" >&2
+          exit 1
         fi
+        git init
+        # If git identity is not configured, set defaults (needed in CI, containers, fresh installs)
+        git config user.name >/dev/null 2>&1 || git config user.name "Developer"
+        git config user.email >/dev/null 2>&1 || git config user.email "developer@localhost"
+        git add -A
+        git commit -m "Initial scaffold from ckeletin-go v${CKELETIN_VERSION}"
+        echo "  ✓ Fresh git history with initial commit"
+      - |
+        set -e
+        # Create initial version tag for clean --version output
+        git tag -a v0.0.0 -m "Initial version"
+        echo "  ✓ Created initial version tag v0.0.0"
       - echo ""
       - echo "✅ Scaffold initialized successfully!"
       - echo "   Binary{{":"}} {{.NAME}}"
@@ -351,11 +366,11 @@ tasks:
       - echo "   Version{{":"}} v0.0.0"
       - echo ""
       - echo "Next steps{{":"}}"
-      - echo "  1. Format code{{":"}} task format"
-      - echo "  2. Review changes{{":"}} git diff"
-      - echo "  3. Run quality checks{{":"}} task check"
-      - echo "  4. Build binary{{":"}} task build"
-      - echo "  5. Test binary{{":"}} ./{{.NAME}} --version"
+      - echo "  1. Set up remote{{":"}}       git remote add origin <your-repo-url>"
+      - echo "  2. Update LICENSE{{":"}}       Replace [YEAR] and [YOUR NAME OR COMPANY]"
+      - echo "  3. Run quality checks{{":"}}   task check"
+      - echo "  4. Build binary{{":"}}         task build"
+      - echo "  5. Test binary{{":"}}          ./{{.NAME}} --version"
 
   generate:command:
     desc: Generate a new command with full pattern (cmd + internal + tests + config)

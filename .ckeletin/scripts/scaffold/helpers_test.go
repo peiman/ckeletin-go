@@ -88,6 +88,307 @@ func TestReplaceModulePreservingPkg(t *testing.T) {
 	}
 }
 
+func TestParseModuleParts(t *testing.T) {
+	tests := []struct {
+		name      string
+		module    string
+		wantOwner string
+		wantRepo  string
+	}{
+		{
+			name:      "standard github module",
+			module:    "github.com/me/myproject",
+			wantOwner: "me",
+			wantRepo:  "myproject",
+		},
+		{
+			name:      "gitlab module",
+			module:    "gitlab.com/team/service",
+			wantOwner: "team",
+			wantRepo:  "service",
+		},
+		{
+			name:      "vanity domain module",
+			module:    "example.com/org/tool",
+			wantOwner: "org",
+			wantRepo:  "tool",
+		},
+		{
+			name:      "deep path module uses first two segments after host",
+			module:    "github.com/org/repo/v2",
+			wantOwner: "org",
+			wantRepo:  "repo",
+		},
+		{
+			name:      "two-segment module (no host prefix in standard sense)",
+			module:    "example.com/tool",
+			wantOwner: "",
+			wantRepo:  "tool",
+		},
+		{
+			name:      "single segment module",
+			module:    "mymodule",
+			wantOwner: "",
+			wantRepo:  "mymodule",
+		},
+		{
+			name:      "empty string module",
+			module:    "",
+			wantOwner: "",
+			wantRepo:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			owner, repo := parseModuleParts(tt.module)
+			assert.Equal(t, tt.wantOwner, owner)
+			assert.Equal(t, tt.wantRepo, repo)
+		})
+	}
+}
+
+func TestResetChangelog(t *testing.T) {
+	t.Run("creates clean keepachangelog template", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		changelogPath := filepath.Join(tmpDir, "CHANGELOG.md")
+
+		// Write existing changelog with ckeletin-go history
+		require.NoError(t, os.WriteFile(changelogPath, []byte("# Changelog\n\n## [0.9.1] - old stuff\n"), 0600))
+
+		err := resetChangelog(tmpDir)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(changelogPath)
+		require.NoError(t, err)
+
+		got := string(content)
+		assert.Contains(t, got, "# Changelog")
+		assert.Contains(t, got, "Keep a Changelog")
+		assert.Contains(t, got, "Semantic Versioning")
+		assert.Contains(t, got, "## [Unreleased]")
+		assert.NotContains(t, got, "0.9.1")
+		assert.NotContains(t, got, "old stuff")
+	})
+
+	t.Run("creates changelog even if none exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		err := resetChangelog(tmpDir)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(filepath.Join(tmpDir, "CHANGELOG.md"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "## [Unreleased]")
+	})
+}
+
+func TestResetLicense(t *testing.T) {
+	t.Run("replaces existing license with MIT template", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		licensePath := filepath.Join(tmpDir, "LICENSE")
+
+		require.NoError(t, os.WriteFile(licensePath, []byte("Copyright Peiman Khorramshahi"), 0600))
+
+		err := resetLicense(tmpDir)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(licensePath)
+		require.NoError(t, err)
+
+		got := string(content)
+		assert.Contains(t, got, "MIT License")
+		assert.Contains(t, got, "[YEAR]")
+		assert.Contains(t, got, "[YOUR NAME OR COMPANY]")
+		assert.Contains(t, got, "Permission is hereby granted")
+		assert.NotContains(t, got, "Peiman")
+	})
+
+	t.Run("creates license even if none exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		err := resetLicense(tmpDir)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(filepath.Join(tmpDir, "LICENSE"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "MIT License")
+	})
+}
+
+func TestReplaceInTextFiles(t *testing.T) {
+	t.Run("replaces patterns in markdown files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		readme := filepath.Join(tmpDir, "README.md")
+		require.NoError(t, os.WriteFile(readme, []byte(
+			"[![Build](https://github.com/peiman/ckeletin-go/actions)]\nProject: ckeletin-go\n",
+		), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "github.com/peiman/ckeletin-go", New: "github.com/me/myapp"},
+			{Old: "peiman/ckeletin-go", New: "me/myapp"},
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(readme)
+		require.NoError(t, err)
+		got := string(content)
+		assert.Contains(t, got, "me/myapp/actions")
+		assert.Contains(t, got, "Project: myapp")
+		assert.NotContains(t, got, "peiman")
+		assert.NotContains(t, got, "ckeletin-go")
+	})
+
+	t.Run("replaces patterns in .yml files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlFile := filepath.Join(tmpDir, "config.yml")
+		require.NoError(t, os.WriteFile(yamlFile, []byte(
+			"reviewers:\n  - \"peiman\"\n",
+		), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "\"peiman\"", New: "\"me\""},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(yamlFile)
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "\"me\"")
+		assert.NotContains(t, string(content), "\"peiman\"")
+	})
+
+	t.Run("replaces patterns in .yaml files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		yamlFile := filepath.Join(tmpDir, "config.yaml")
+		require.NoError(t, os.WriteFile(yamlFile, []byte("name: ckeletin-go\n"), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(yamlFile)
+		require.NoError(t, err)
+		assert.Equal(t, "name: myapp\n", string(content))
+	})
+
+	t.Run("skips .git, vendor, dist, and .task directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		for _, dir := range []string{".git", "vendor", "dist", ".task"} {
+			d := filepath.Join(tmpDir, dir)
+			require.NoError(t, os.MkdirAll(d, 0750))
+			require.NoError(t, os.WriteFile(filepath.Join(d, "config.yml"), []byte("ckeletin-go"), 0600))
+		}
+
+		replacements := []StringReplacement{
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+
+		// Verify files were NOT modified
+		for _, dir := range []string{".git", "vendor", "dist", ".task"} {
+			content, _ := os.ReadFile(filepath.Join(tmpDir, dir, "config.yml"))
+			assert.Equal(t, "ckeletin-go", string(content), "%s directory should be skipped", dir)
+		}
+	})
+
+	t.Run("skips Go source files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		goFile := filepath.Join(tmpDir, "main.go")
+		require.NoError(t, os.WriteFile(goFile, []byte("// ckeletin-go"), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+
+		content, _ := os.ReadFile(goFile)
+		assert.Equal(t, "// ckeletin-go", string(content))
+	})
+
+	t.Run("applies replacements in order (most specific first)", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		mdFile := filepath.Join(tmpDir, "test.md")
+		require.NoError(t, os.WriteFile(mdFile, []byte(
+			"url: github.com/peiman/ckeletin-go\nowner: peiman/ckeletin-go\nname: ckeletin-go\n",
+		), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "github.com/peiman/ckeletin-go", New: "github.com/me/myapp"},
+			{Old: "peiman/ckeletin-go", New: "me/myapp"},
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		_, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(mdFile)
+		require.NoError(t, err)
+		got := string(content)
+		assert.Equal(t, "url: github.com/me/myapp\nowner: me/myapp\nname: myapp\n", got)
+	})
+
+	t.Run("no changes when no matches", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		mdFile := filepath.Join(tmpDir, "test.md")
+		require.NoError(t, os.WriteFile(mdFile, []byte("no matches here"), 0600))
+
+		replacements := []StringReplacement{
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("handles nested directory structures", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		nestedDir := filepath.Join(tmpDir, ".github", "ISSUE_TEMPLATE")
+		require.NoError(t, os.MkdirAll(nestedDir, 0750))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(nestedDir, "config.yml"),
+			[]byte("url: https://github.com/peiman/ckeletin-go/discussions"),
+			0600,
+		))
+
+		replacements := []StringReplacement{
+			{Old: "peiman/ckeletin-go", New: "me/myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, _ := os.ReadFile(filepath.Join(nestedDir, "config.yml"))
+		assert.Contains(t, string(content), "me/myapp/discussions")
+	})
+}
+
 func TestRemovePkgDirectory(t *testing.T) {
 	t.Run("removes pkg directory and nested contents", func(t *testing.T) {
 		tmpDir := t.TempDir()

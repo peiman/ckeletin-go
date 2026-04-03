@@ -19,7 +19,9 @@ func TestNewExecutor(t *testing.T) {
 	executor := NewExecutor(cfg, &buf)
 
 	require.NotNil(t, executor)
-	assert.Equal(t, cfg, executor.cfg)
+	assert.Equal(t, true, executor.cfg.FailFast)
+	assert.Equal(t, true, executor.cfg.Verbose)
+	assert.Equal(t, "ckeletin-go", executor.cfg.BinaryName, "empty BinaryName should default to ckeletin-go")
 	assert.NotNil(t, executor.writer)
 	assert.NotNil(t, executor.timings)
 }
