@@ -1,6 +1,7 @@
 #!/bin/bash
 # Check if patch/diff coverage meets minimum threshold
-# True patch coverage: only counts coverage blocks that overlap with changed lines
+# True patch coverage: for each changed line, checks if ANY coverage block
+# containing that line was exercised by tests.
 
 set -eo pipefail
 
@@ -14,12 +15,14 @@ if [ ! -f "$COVERAGE_FILE" ]; then
     exit 1
 fi
 
-# Get list of changed .go files (excluding _test.go, scripts/, .ckeletin/scripts/, testutil/, demo/, and _tui.go)
-# testutil is excluded because platform-specific skip helpers can't achieve 100% coverage on any single platform
-# demo is excluded because demo code is meant for documentation, not production
-# _tui.go files are excluded because TUI code requires interactive testing that's difficult to unit test
-# .ckeletin/scripts/ is excluded because these are standalone build-time scripts (run via go run)
-#   with their own test suites, not compiled into the binary — they don't appear in coverage.txt
+# Get list of changed .go files (excluding test files and non-production code)
+# Exclusions:
+#   _test.go      — test files don't need coverage
+#   scripts/      — top-level build scripts
+#   .ckeletin/scripts/ — framework build-time scripts (standalone go run, own test suite)
+#   internal/testutil/ — test utilities (platform-specific, can't achieve full coverage)
+#   /demo/        — demo code for documentation
+#   _tui.go       — TUI code requiring interactive testing
 if git rev-parse --verify "$BASE_BRANCH" &>/dev/null; then
     changed_files=$(git diff "$BASE_BRANCH"...HEAD --name-only --diff-filter=AM | grep '\.go$' | grep -v '_test\.go$' | grep -v '^scripts/' | grep -v '^\.ckeletin/scripts/' | grep -v '^internal/testutil/' | grep -v '/demo/' | grep -v '_tui\.go$' || true)
 else
@@ -37,20 +40,13 @@ echo "$changed_files" | sed 's/^/  - /'
 echo ""
 
 # get_changed_lines extracts added/modified line numbers from git diff for a file.
-# Returns one line number per line, sorted and deduplicated.
 get_changed_lines() {
     local file="$1"
-    local diff_cmd
-
     if git rev-parse --verify "$BASE_BRANCH" &>/dev/null; then
-        diff_cmd="git diff $BASE_BRANCH...HEAD --unified=0 -- $file"
+        git diff "$BASE_BRANCH"...HEAD --unified=0 -- "$file"
     else
-        diff_cmd="git diff --cached --unified=0 -- $file"
-    fi
-
-    # Parse @@ hunk headers: @@ -old,count +new,count @@
-    # Extract the +new,count part (lines added/modified in the new version)
-    $diff_cmd | grep '^@@' | sed -E 's/^@@ -[0-9,]+ \+([0-9]+)(,([0-9]+))? @@.*/\1 \3/' | while read -r start count; do
+        git diff --cached --unified=0 -- "$file"
+    fi | grep '^@@' | sed -E 's/^@@ -[0-9,]+ \+([0-9]+)(,([0-9]+))? @@.*/\1 \3/' | while read -r start count; do
         count=${count:-1}
         local end=$((start + count - 1))
         for ((i = start; i <= end; i++)); do
@@ -59,89 +55,100 @@ get_changed_lines() {
     done | sort -n | uniq
 }
 
-# Check if a coverage block (startLine-endLine) overlaps with any changed line
-block_overlaps_changes() {
-    local block_start="$1"
-    local block_end="$2"
-    local changed_lines_file="$3"
+# is_line_covered checks if a line number falls within ANY coverage block that has hits > 0.
+# Reads coverage entries from stdin.
+is_line_covered() {
+    local line_num="$1"
+    local cov_file="$2"
 
-    while read -r changed_line; do
-        if [ "$changed_line" -ge "$block_start" ] && [ "$changed_line" -le "$block_end" ]; then
-            return 0  # overlap found
+    while IFS= read -r entry; do
+        # Parse: file.go:startLine.startCol,endLine.endCol numStmts numHits
+        if [[ $entry =~ :([0-9]+)\.[0-9]+,([0-9]+)\.[0-9]+[[:space:]]+[0-9]+[[:space:]]+([0-9]+)$ ]]; then
+            local block_start="${BASH_REMATCH[1]}"
+            local block_end="${BASH_REMATCH[2]}"
+            local hits="${BASH_REMATCH[3]}"
+
+            if [ "$line_num" -ge "$block_start" ] && [ "$line_num" -le "$block_end" ] && [ "$hits" -gt 0 ]; then
+                return 0  # covered
+            fi
         fi
-    done < "$changed_lines_file"
-    return 1  # no overlap
+    done < "$cov_file"
+    return 1  # not covered
 }
 
-# Parse coverage for changed files — only count blocks that overlap with changed lines
-# Coverage format: github.com/user/repo/file.go:startLine.startCol,endLine.endCol numStmts numHits
-total_statements=0
-covered_statements=0
+# Main loop: for each changed file, check coverage of each changed line
+total_lines=0
+covered_lines=0
 
 while IFS= read -r file; do
-    # Skip if file doesn't exist
     [ -f "$file" ] || continue
 
-    # Get coverage data for this file
-    file_data=$(grep "$(basename "$file")" "$COVERAGE_FILE" | grep "/$file:" || true)
+    # Get all coverage entries for this file (unsorted, undeduped — we check all)
+    cov_tmp=$(mktemp)
+    grep "$(basename "$file")" "$COVERAGE_FILE" | grep "/$file:" > "$cov_tmp" 2>/dev/null || true
 
-    if [ -z "$file_data" ]; then
+    if [ ! -s "$cov_tmp" ]; then
         echo "⚠️  No coverage data for $file"
+        rm -f "$cov_tmp"
         continue
     fi
 
-    # Get changed line numbers for this file
-    changed_lines_tmp=$(mktemp)
-    get_changed_lines "$file" > "$changed_lines_tmp"
-
-    if [ ! -s "$changed_lines_tmp" ]; then
-        rm -f "$changed_lines_tmp"
+    # Get changed lines
+    changed_lines=$(get_changed_lines "$file")
+    if [ -z "$changed_lines" ]; then
+        rm -f "$cov_tmp"
         continue
     fi
 
     file_total=0
     file_covered=0
 
-    while IFS= read -r line; do
-        # Parse: file.go:10.2,12.3 5 2
-        # Full regex: capture startLine, endLine, numStmts, numHits
-        if [[ $line =~ :([0-9]+)\.[0-9]+,([0-9]+)\.[0-9]+[[:space:]]+([0-9]+)[[:space:]]+([0-9]+)$ ]]; then
-            block_start="${BASH_REMATCH[1]}"
-            block_end="${BASH_REMATCH[2]}"
-            stmts="${BASH_REMATCH[3]}"
-            hits="${BASH_REMATCH[4]}"
-
-            # Only count this block if it overlaps with changed lines
-            if block_overlaps_changes "$block_start" "$block_end" "$changed_lines_tmp"; then
-                file_total=$((file_total + stmts))
-                if [ "$hits" -gt 0 ]; then
-                    file_covered=$((file_covered + stmts))
+    while read -r line_num; do
+        # Check if this line falls within ANY coverage block (even uncovered ones)
+        # If it doesn't fall in any block, it's a non-statement line (comment, blank, etc.)
+        in_any_block=false
+        while IFS= read -r entry; do
+            if [[ $entry =~ :([0-9]+)\.[0-9]+,([0-9]+)\.[0-9]+[[:space:]] ]]; then
+                local_start="${BASH_REMATCH[1]}"
+                local_end="${BASH_REMATCH[2]}"
+                if [ "$line_num" -ge "$local_start" ] && [ "$line_num" -le "$local_end" ]; then
+                    in_any_block=true
+                    break
                 fi
             fi
-        fi
-    done <<< "$file_data"
+        done < "$cov_tmp"
 
-    rm -f "$changed_lines_tmp"
+        if ! $in_any_block; then
+            continue  # skip non-statement lines
+        fi
+
+        file_total=$((file_total + 1))
+        if is_line_covered "$line_num" "$cov_tmp"; then
+            file_covered=$((file_covered + 1))
+        fi
+    done <<< "$changed_lines"
+
+    rm -f "$cov_tmp"
 
     if [ "$file_total" -gt 0 ]; then
         file_pct=$(echo "scale=1; $file_covered * 100 / $file_total" | bc -l)
-        echo "  $file: ${file_pct}% (${file_covered}/${file_total} statements)"
-        total_statements=$((total_statements + file_total))
-        covered_statements=$((covered_statements + file_covered))
+        echo "  $file: ${file_pct}% (${file_covered}/${file_total} changed lines)"
+        total_lines=$((total_lines + file_total))
+        covered_lines=$((covered_lines + file_covered))
     fi
 done <<< "$changed_files"
 
 echo ""
 
-if [ "$total_statements" -eq 0 ]; then
+if [ "$total_lines" -eq 0 ]; then
     echo "ℹ️  No measurable statements in changed files"
     exit 0
 fi
 
 # Calculate patch coverage percentage
-patch_coverage=$(echo "scale=2; $covered_statements * 100 / $total_statements" | bc -l)
+patch_coverage=$(echo "scale=2; $covered_lines * 100 / $total_lines" | bc -l)
 
-echo "📊 Patch Coverage: ${patch_coverage}% (${covered_statements}/${total_statements} statements)"
+echo "📊 Patch Coverage: ${patch_coverage}% (${covered_lines}/${total_lines} changed lines)"
 echo "🎯 Minimum Required: ${MIN_PATCH_COVERAGE}%"
 
 # Compare coverage
