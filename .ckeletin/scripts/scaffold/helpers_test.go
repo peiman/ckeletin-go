@@ -131,6 +131,12 @@ func TestParseModuleParts(t *testing.T) {
 			wantOwner: "",
 			wantRepo:  "mymodule",
 		},
+		{
+			name:      "empty string module",
+			module:    "",
+			wantOwner: "",
+			wantRepo:  "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -238,7 +244,7 @@ func TestReplaceInTextFiles(t *testing.T) {
 		assert.NotContains(t, got, "ckeletin-go")
 	})
 
-	t.Run("replaces patterns in yaml files", func(t *testing.T) {
+	t.Run("replaces patterns in .yml files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		yamlFile := filepath.Join(tmpDir, "config.yml")
@@ -260,16 +266,33 @@ func TestReplaceInTextFiles(t *testing.T) {
 		assert.NotContains(t, string(content), "\"peiman\"")
 	})
 
-	t.Run("skips .git and vendor directories", func(t *testing.T) {
+	t.Run("replaces patterns in .yaml files", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
-		gitDir := filepath.Join(tmpDir, ".git")
-		require.NoError(t, os.MkdirAll(gitDir, 0750))
-		require.NoError(t, os.WriteFile(filepath.Join(gitDir, "config.yml"), []byte("ckeletin-go"), 0600))
+		yamlFile := filepath.Join(tmpDir, "config.yaml")
+		require.NoError(t, os.WriteFile(yamlFile, []byte("name: ckeletin-go\n"), 0600))
 
-		vendorDir := filepath.Join(tmpDir, "vendor")
-		require.NoError(t, os.MkdirAll(vendorDir, 0750))
-		require.NoError(t, os.WriteFile(filepath.Join(vendorDir, "README.md"), []byte("ckeletin-go"), 0600))
+		replacements := []StringReplacement{
+			{Old: "ckeletin-go", New: "myapp"},
+		}
+
+		count, err := replaceInTextFiles(tmpDir, replacements)
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(yamlFile)
+		require.NoError(t, err)
+		assert.Equal(t, "name: myapp\n", string(content))
+	})
+
+	t.Run("skips .git, vendor, dist, and .task directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		for _, dir := range []string{".git", "vendor", "dist", ".task"} {
+			d := filepath.Join(tmpDir, dir)
+			require.NoError(t, os.MkdirAll(d, 0750))
+			require.NoError(t, os.WriteFile(filepath.Join(d, "config.yml"), []byte("ckeletin-go"), 0600))
+		}
 
 		replacements := []StringReplacement{
 			{Old: "ckeletin-go", New: "myapp"},
@@ -280,8 +303,10 @@ func TestReplaceInTextFiles(t *testing.T) {
 		assert.Equal(t, 0, count)
 
 		// Verify files were NOT modified
-		gitContent, _ := os.ReadFile(filepath.Join(gitDir, "config.yml"))
-		assert.Equal(t, "ckeletin-go", string(gitContent))
+		for _, dir := range []string{".git", "vendor", "dist", ".task"} {
+			content, _ := os.ReadFile(filepath.Join(tmpDir, dir, "config.yml"))
+			assert.Equal(t, "ckeletin-go", string(content), "%s directory should be skipped", dir)
+		}
 	})
 
 	t.Run("skips Go source files", func(t *testing.T) {

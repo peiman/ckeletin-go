@@ -183,15 +183,16 @@ func checkAlreadyInitialized(oldModule string) error {
 
 // hasUncommittedChanges checks if there are uncommitted git changes
 func hasUncommittedChanges() bool {
-	// Check if .git directory exists
 	if _, err := os.Stat(".git"); os.IsNotExist(err) {
 		return false // Not a git repo
 	}
 
-	// Simple check: look for modified files
-	// In production, you'd use git status, but for simplicity we'll skip this
-	// since it's just a warning anyway
-	return false
+	cmd := exec.Command("git", "status", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return false // git not available or not a repo
+	}
+	return len(strings.TrimSpace(string(output))) > 0
 }
 
 // updateGoMod updates the module declaration in go.mod

@@ -339,17 +339,23 @@ tasks:
       - go run ./.ckeletin/scripts/scaffold/ "{{.OLD_MODULE}}" "{{.MODULE}}" "{{.OLD_NAME}}" "{{.NAME}}"
       - go mod tidy
       - |
+        set -e
         # Reset git history for a clean start
         CKELETIN_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
         rm -rf .git
+        if [ -d .git ]; then
+          echo "ERROR: Failed to remove .git directory. Is another process using it?" >&2
+          exit 1
+        fi
         git init
-        # Set default identity if not configured (CI environments, fresh installs)
-        git config user.name 2>/dev/null || git config user.name "Developer"
-        git config user.email 2>/dev/null || git config user.email "developer@localhost"
+        # If git identity is not configured, set defaults (needed in CI, containers, fresh installs)
+        git config user.name >/dev/null 2>&1 || git config user.name "Developer"
+        git config user.email >/dev/null 2>&1 || git config user.email "developer@localhost"
         git add -A
         git commit -m "Initial scaffold from ckeletin-go v${CKELETIN_VERSION}"
         echo "  ✓ Fresh git history with initial commit"
       - |
+        set -e
         # Create initial version tag for clean --version output
         git tag -a v0.0.0 -m "Initial version"
         echo "  ✓ Created initial version tag v0.0.0"

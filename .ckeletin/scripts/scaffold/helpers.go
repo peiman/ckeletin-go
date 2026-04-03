@@ -33,8 +33,10 @@ func removePkgDirectory(projectRoot string) error {
 	return os.RemoveAll(pkgDir)
 }
 
-// parseModuleParts extracts the owner and repository name from a Go module path.
+// parseModuleParts extracts the second and third path segments from a Go module path.
+// For the standard "host/owner/repo" pattern, these correspond to owner and repo.
 // For "github.com/owner/repo", returns ("owner", "repo").
+// For "github.com/org/repo/v2", returns ("org", "repo") — segments beyond the third are ignored.
 // For "example.com/tool", returns ("", "tool").
 // For "mymodule", returns ("", "mymodule").
 func parseModuleParts(module string) (owner, repo string) {
@@ -91,15 +93,16 @@ SOFTWARE.
 }
 
 // StringReplacement defines a single find/replace pair.
-// Replacements should be ordered most-specific-first to avoid partial matches.
 type StringReplacement struct {
 	Old string
 	New string
 }
 
-// replaceInTextFiles walks the project tree and applies ordered string
-// replacements in text files (.md, .yml, .yaml). It skips .git, vendor,
-// dist, .task directories and Go source files (handled by the AST rewriter).
+// replaceInTextFiles walks the project tree and applies string replacements
+// sequentially in text files (.md, .yml, .yaml). It skips .git, vendor,
+// dist, and .task directories. Replacements are applied in slice order,
+// so callers should list most-specific patterns first to prevent shorter
+// patterns from corrupting longer ones' match targets.
 // Returns the number of files that were modified.
 func replaceInTextFiles(root string, replacements []StringReplacement) (int, error) {
 	count := 0

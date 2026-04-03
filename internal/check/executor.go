@@ -55,6 +55,9 @@ type categoryDef struct {
 
 // NewExecutor creates a new executor with TUI or simple output based on environment.
 func NewExecutor(cfg Config, writer io.Writer) *Executor {
+	if cfg.BinaryName == "" {
+		cfg.BinaryName = "ckeletin-go"
+	}
 	timings := loadTimingHistory()
 	e := &Executor{
 		cfg:     cfg,

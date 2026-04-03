@@ -10,10 +10,8 @@ import (
 )
 
 func TestCheckCommand(t *testing.T) {
-	// SETUP PHASE
 	checkCmd := findCommandByName(RootCmd, "check")
 
-	// ASSERTION PHASE
 	assert.NotNil(t, checkCmd, "Check command must exist")
 	assert.Equal(t, "check", checkCmd.Use, "Command should be named 'check'")
 	assert.NotEmpty(t, checkCmd.Short, "Command should have a short description")
@@ -35,6 +33,7 @@ func TestCheckCommandInvalidCategory(t *testing.T) {
 	RootCmd.SetOut(buf)
 	RootCmd.SetErr(buf)
 	RootCmd.SetArgs([]string{"check", "--category", "nonexistent"})
+	defer RootCmd.SetArgs([]string{})
 
 	err := RootCmd.Execute()
 	assert.Error(t, err, "Invalid category should produce an error")
@@ -43,14 +42,19 @@ func TestCheckCommandInvalidCategory(t *testing.T) {
 
 func TestCheckCommandRun(t *testing.T) {
 	// Exercise the runCheck config construction path by running with
-	// --category environment (lightest category — only checks go version and tools).
+	// --category environment (lightest built-in category).
 	// This covers the Config struct construction including BinaryName wiring.
 	buf := new(bytes.Buffer)
 	RootCmd.SetOut(buf)
 	RootCmd.SetErr(buf)
 	RootCmd.SetArgs([]string{"check", "--category", "environment"})
+	defer RootCmd.SetArgs([]string{})
 
-	// Execute — may fail if dev environment is incomplete, which is fine.
-	// The goal is to exercise the config construction path.
-	_ = RootCmd.Execute()
+	err := RootCmd.Execute()
+	if err != nil {
+		// Environment checks may fail in test environments; verify it's not
+		// a config construction error (nil pointer, missing field, etc.)
+		assert.NotContains(t, err.Error(), "nil pointer")
+		assert.NotContains(t, err.Error(), "invalid memory")
+	}
 }

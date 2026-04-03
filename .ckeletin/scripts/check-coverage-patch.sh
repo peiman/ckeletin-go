@@ -1,7 +1,7 @@
 #!/bin/bash
-# Check if patch/diff coverage meets minimum threshold
-# True patch coverage: for each changed line, checks if ANY coverage block
-# containing that line was exercised by tests.
+# Check if patch/diff coverage meets minimum threshold.
+# For each changed line, checks whether any coverage block containing
+# that line was exercised by tests.
 
 set -eo pipefail
 
@@ -56,7 +56,7 @@ get_changed_lines() {
 }
 
 # is_line_covered checks if a line number falls within ANY coverage block that has hits > 0.
-# Reads coverage entries from stdin.
+# Reads coverage entries from the file at cov_file.
 is_line_covered() {
     local line_num="$1"
     local cov_file="$2"
@@ -77,26 +77,30 @@ is_line_covered() {
 }
 
 # Main loop: for each changed file, check coverage of each changed line
+cov_tmpdir=$(mktemp -d) || { echo "ERROR: Failed to create temp directory" >&2; exit 1; }
+trap 'rm -rf "$cov_tmpdir"' EXIT
+
 total_lines=0
 covered_lines=0
+file_idx=0
 
 while IFS= read -r file; do
     [ -f "$file" ] || continue
 
-    # Get all coverage entries for this file (unsorted, undeduped — we check all)
-    cov_tmp=$(mktemp)
+    # Get all coverage entries for this file (may contain overlapping blocks — that's fine,
+    # we only need ANY block with hits > 0 to mark a line as covered)
+    file_idx=$((file_idx + 1))
+    cov_tmp="$cov_tmpdir/cov_$file_idx"
     grep "$(basename "$file")" "$COVERAGE_FILE" | grep "/$file:" > "$cov_tmp" 2>/dev/null || true
 
     if [ ! -s "$cov_tmp" ]; then
         echo "⚠️  No coverage data for $file"
-        rm -f "$cov_tmp"
         continue
     fi
 
     # Get changed lines
     changed_lines=$(get_changed_lines "$file")
     if [ -z "$changed_lines" ]; then
-        rm -f "$cov_tmp"
         continue
     fi
 
@@ -127,8 +131,6 @@ while IFS= read -r file; do
             file_covered=$((file_covered + 1))
         fi
     done <<< "$changed_lines"
-
-    rm -f "$cov_tmp"
 
     if [ "$file_total" -gt 0 ]; then
         file_pct=$(echo "scale=1; $file_covered * 100 / $file_total" | bc -l)
