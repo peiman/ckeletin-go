@@ -343,6 +343,9 @@ tasks:
         CKELETIN_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
         rm -rf .git
         git init
+        # Set default identity if not configured (CI environments, fresh installs)
+        git config user.name 2>/dev/null || git config user.name "Developer"
+        git config user.email 2>/dev/null || git config user.email "developer@localhost"
         git add -A
         git commit -m "Initial scaffold from ckeletin-go v${CKELETIN_VERSION}"
         echo "  ✓ Fresh git history with initial commit"

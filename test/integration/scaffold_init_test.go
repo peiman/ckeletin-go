@@ -518,9 +518,16 @@ func TestFrameworkUpdate(t *testing.T) {
 		require.NoError(t, err, "task init failed\nOutput: %s", string(output))
 	}
 
-	// Commit the initialized state
-	runGit(t, tmpDir, "add", ".")
-	runGit(t, tmpDir, "commit", "-m", "Initialize as downstream project")
+	if useTaskFallback {
+		// Direct script doesn't reset git history, so commit the initialized state
+		runGit(t, tmpDir, "add", ".")
+		runGit(t, tmpDir, "commit", "-m", "Initialize as downstream project")
+	} else {
+		// task init resets git history (rm -rf .git && git init && commit).
+		// Re-set local git config since the original .git was destroyed.
+		runGit(t, tmpDir, "config", "user.email", "test@ckeletin-go.example")
+		runGit(t, tmpDir, "config", "user.name", "Test User")
+	}
 
 	// Step 3: Simulate framework update by re-copying .ckeletin/ from source
 	srcCkeletin := filepath.Join(projectRoot, ".ckeletin")
