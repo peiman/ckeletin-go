@@ -154,6 +154,84 @@ func replaceInTextFiles(root string, replacements []StringReplacement) (int, err
 	return count, err
 }
 
+// replaceNameInGoFiles walks the project tree and replaces the old binary name
+// with the new name in Go source files, skipping import statements.
+// Import paths are handled separately by the AST-based import rewriter
+// (which deliberately preserves pkg/ imports), so this function must not
+// modify import lines. It handles string literals, comments, and other
+// non-import references.
+// Returns the number of files that were modified.
+func replaceNameInGoFiles(root, oldName, newName string) (int, error) {
+	count := 0
+
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			name := info.Name()
+			if name == ".git" || name == "vendor" || name == "dist" || name == ".task" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		if !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+
+		// #nosec G304 - path is controlled by filepath.Walk, not user input
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		original := string(content)
+
+		// Replace line by line, skipping import lines to avoid clobbering
+		// preserved pkg/ imports from the AST rewriter
+		lines := strings.Split(original, "\n")
+		inImportBlock := false
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+
+			// Track import blocks
+			if strings.HasPrefix(trimmed, "import (") {
+				inImportBlock = true
+				continue
+			}
+			if inImportBlock {
+				if trimmed == ")" {
+					inImportBlock = false
+				}
+				continue
+			}
+			// Skip single-line imports
+			if strings.HasPrefix(trimmed, "import ") {
+				continue
+			}
+
+			lines[i] = strings.ReplaceAll(line, oldName, newName)
+		}
+
+		updated := strings.Join(lines, "\n")
+
+		if updated == original {
+			return nil
+		}
+
+		if err := os.WriteFile(path, []byte(updated), info.Mode()); err != nil {
+			return err
+		}
+
+		count++
+		return nil
+	})
+
+	return count, err
+}
+
 // cleanArchLintConfig removes the public component from .go-arch-lint.yml.
 // Called after pkg/ is removed during scaffold init, since the public component
 // references pkg/** which no longer exists.

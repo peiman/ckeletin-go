@@ -163,6 +163,16 @@ func main() {
 		fmt.Printf("    Updated %d text files\n", textCount)
 	}
 
+	fmt.Println("  ✓ Updating Go source files (binary name in string literals)")
+	goCount, err := replaceNameInGoFiles(".", oldName, newName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error updating Go files: %v\n", err)
+		os.Exit(1)
+	}
+	if goCount > 0 {
+		fmt.Printf("    Updated %d Go files\n", goCount)
+	}
+
 	fmt.Println("  ✓ Running go mod tidy")
 
 	fmt.Println("  ✓ Formatting code")

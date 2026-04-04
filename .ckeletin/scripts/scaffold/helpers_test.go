@@ -522,3 +522,110 @@ deps:
 		assert.Contains(t, string(result), "business:")
 	})
 }
+
+func TestReplaceNameInGoFiles(t *testing.T) {
+	t.Run("replaces old name in string literals and comments", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		goFile := filepath.Join(tmpDir, "root.go")
+		require.NoError(t, os.WriteFile(goFile, []byte(
+			"package cmd\n\nvar binaryName = \"ckeletin-go\"\nvar logPath = \"./logs/ckeletin-go.log\"\n",
+		), 0600))
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(goFile)
+		require.NoError(t, err)
+		got := string(content)
+		assert.Contains(t, got, "\"myapp\"")
+		assert.Contains(t, got, "myapp.log")
+		assert.NotContains(t, got, "ckeletin-go")
+	})
+
+	t.Run("skips .git vendor dist .task directories", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		for _, dir := range []string{".git", "vendor", "dist", ".task"} {
+			d := filepath.Join(tmpDir, dir)
+			require.NoError(t, os.MkdirAll(d, 0750))
+			require.NoError(t, os.WriteFile(filepath.Join(d, "main.go"), []byte("// ckeletin-go"), 0600))
+		}
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("skips non-Go files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("ckeletin-go"), 0600))
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+
+		content, _ := os.ReadFile(filepath.Join(tmpDir, "README.md"))
+		assert.Equal(t, "ckeletin-go", string(content))
+	})
+
+	t.Run("preserves import statements", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		goFile := filepath.Join(tmpDir, "executor.go")
+		require.NoError(t, os.WriteFile(goFile, []byte(`package check
+
+import (
+	"github.com/peiman/ckeletin-go/pkg/checkmate"
+)
+
+var fallback = "ckeletin-go"
+`), 0600))
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		content, err := os.ReadFile(goFile)
+		require.NoError(t, err)
+		got := string(content)
+		// Import line preserved (pkg/ import should NOT be modified)
+		assert.Contains(t, got, "github.com/peiman/ckeletin-go/pkg/checkmate")
+		// String literal replaced
+		assert.Contains(t, got, `"myapp"`)
+		assert.NotContains(t, got, `"ckeletin-go"`)
+	})
+
+	t.Run("preserves single-line imports", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		goFile := filepath.Join(tmpDir, "simple.go")
+		require.NoError(t, os.WriteFile(goFile, []byte(`package main
+
+import "github.com/peiman/ckeletin-go/pkg/checkmate"
+
+var name = "ckeletin-go"
+`), 0600))
+
+		_, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+
+		content, err := os.ReadFile(goFile)
+		require.NoError(t, err)
+		got := string(content)
+		assert.Contains(t, got, "github.com/peiman/ckeletin-go/pkg/checkmate")
+		assert.Contains(t, got, `"myapp"`)
+	})
+
+	t.Run("no changes when name not found", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "main.go"), []byte("package main"), 0600))
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 0, count)
+	})
+}
