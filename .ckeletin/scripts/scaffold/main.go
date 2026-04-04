@@ -112,6 +112,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("  ✓ Updating .go-arch-lint.yml (removing pkg/ references)")
+	if err := cleanArchLintConfig("."); err != nil {
+		fmt.Fprintf(os.Stderr, "Error updating .go-arch-lint.yml: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("  ✓ Resetting CHANGELOG.md")
 	if err := resetChangelog("."); err != nil {
 		fmt.Fprintf(os.Stderr, "Error resetting CHANGELOG.md: %v\n", err)
