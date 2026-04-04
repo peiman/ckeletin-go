@@ -39,6 +39,22 @@ func removePkgDirectory(projectRoot string) error {
 // For "github.com/org/repo/v2", returns ("org", "repo") — segments beyond the third are ignored.
 // For "example.com/tool", returns ("", "tool").
 // For "mymodule", returns ("", "mymodule").
+// toEnvPrefix converts a binary name to its environment variable prefix form.
+// Uppercases the name and replaces non-alphanumeric characters with underscores.
+// For "ckeletin-go" returns "CKELETIN_GO", for "myapp" returns "MYAPP".
+func toEnvPrefix(name string) string {
+	upper := strings.ToUpper(name)
+	var result strings.Builder
+	for _, r := range upper {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			result.WriteRune(r)
+		} else {
+			result.WriteRune('_')
+		}
+	}
+	return result.String()
+}
+
 func parseModuleParts(module string) (owner, repo string) {
 	parts := strings.Split(module, "/")
 	switch {

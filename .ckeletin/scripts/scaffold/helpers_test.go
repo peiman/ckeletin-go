@@ -88,6 +88,25 @@ func TestReplaceModulePreservingPkg(t *testing.T) {
 	}
 }
 
+func TestToEnvPrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"hyphenated name", "ckeletin-go", "CKELETIN_GO"},
+		{"simple name", "myapp", "MYAPP"},
+		{"dotted name", "app.v2", "APP_V2"},
+		{"already uppercase", "MYAPP", "MYAPP"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, toEnvPrefix(tt.input))
+		})
+	}
+}
+
 func TestParseModuleParts(t *testing.T) {
 	tests := []struct {
 		name      string

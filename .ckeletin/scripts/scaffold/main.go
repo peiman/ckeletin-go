@@ -169,6 +169,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error updating Go files: %v\n", err)
 		os.Exit(1)
 	}
+	// Also replace the env var prefix form (CKELETIN_GO → TESTAPP)
+	oldEnvPrefix := toEnvPrefix(oldName)
+	newEnvPrefix := toEnvPrefix(newName)
+	if oldEnvPrefix != newEnvPrefix {
+		envCount, err := replaceNameInGoFiles(".", oldEnvPrefix, newEnvPrefix)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error updating env var prefixes: %v\n", err)
+			os.Exit(1)
+		}
+		goCount += envCount
+	}
 	if goCount > 0 {
 		fmt.Printf("    Updated %d Go files\n", goCount)
 	}

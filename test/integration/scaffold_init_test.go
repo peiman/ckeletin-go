@@ -340,6 +340,28 @@ func TestScaffoldInit(t *testing.T) {
 		assert.Contains(t, string(output), testName,
 			"binary output should contain expected name")
 	})
+
+	// Run: task check (the real user workflow — everything should pass)
+	// This catches issues like #72 (binary name in check scripts), #73 (arch-lint
+	// stale references), #74 (validator too strict). Skipped when task is not
+	// available or on Windows (shell checks require bash).
+	t.Run("task check passes", func(t *testing.T) {
+		if useTaskFallback {
+			t.Skip("task command not available")
+		}
+		if runtime.GOOS == "windows" {
+			t.Skip("task check requires bash (shell-based validators)")
+		}
+
+		t.Log("Running: task check")
+		cmd := exec.Command("task", "check")
+		cmd.Dir = tmpDir
+		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1")
+		output, err := cmd.CombinedOutput()
+
+		assert.NoError(t, err,
+			"task check should pass after task init\nOutput:\n%s", string(output))
+	})
 }
 
 // copyProjectFiles recursively copies all project files to the destination
