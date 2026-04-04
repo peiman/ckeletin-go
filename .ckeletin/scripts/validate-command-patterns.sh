@@ -19,8 +19,8 @@ ERROR_DETAILS=""
 
 check_header "Validating ADR-001: Ultra-thin command pattern"
 
-# Get all command files (exclude framework files and tests)
-COMMAND_FILES=$(find cmd -name "*.go" -not -name "*_test.go" -not -name "root.go" -not -name "flags.go" -not -name "helpers.go" -not -name "template*.go")
+# Get all command files (exclude framework files, tests, and helper files)
+COMMAND_FILES=$(find cmd -name "*.go" -not -name "*_test.go" -not -name "root.go" -not -name "flags.go" -not -name "helpers.go" -not -name "*_helpers.go" -not -name "template*.go")
 
 for cmd_file in $COMMAND_FILES; do
     cmd_name=$(basename "$cmd_file" .go)
@@ -30,13 +30,31 @@ for cmd_file in $COMMAND_FILES; do
         continue
     fi
 
+    # Skip parent-only commands (files that group subcommands with AddCommand but have no RunE/Run)
+    if grep -q "AddCommand(" "$cmd_file" && ! grep -qE "(RunE:|Run:)" "$cmd_file"; then
+        continue
+    fi
+
     # Check 1: Command metadata exists (check both project and framework locations)
-    if ! find internal/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
-        # Also check framework location
-        if ! find .ckeletin/pkg/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
-            ERROR_DETAILS+="$cmd_name: Missing metadata file internal/config/commands/${cmd_name}_config.go"$'\n'
-            ((++ERRORS))
+    # For subcommands like note_get.go, also check parent config (note_config.go)
+    metadata_found=false
+    if find internal/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
+        metadata_found=true
+    elif find .ckeletin/pkg/config/commands -name "${cmd_name}_config.go" 2>/dev/null | grep -q .; then
+        metadata_found=true
+    else
+        # Check parent config: note_get -> note
+        parent_name="${cmd_name%%_*}"
+        if [ "$parent_name" != "$cmd_name" ]; then
+            if find internal/config/commands -name "${parent_name}_config.go" 2>/dev/null | grep -q .; then
+                metadata_found=true
+            fi
         fi
+    fi
+
+    if ! $metadata_found; then
+        ERROR_DETAILS+="$cmd_name: Missing metadata file internal/config/commands/${cmd_name}_config.go"$'\n'
+        ((++ERRORS))
     fi
 
     # Check 2: Uses NewCommand helper
@@ -55,7 +73,8 @@ for cmd_file in $COMMAND_FILES; do
 
     # Check 4: Business logic detection (simple heuristic)
     # Look for complex control flow outside of run* functions
-    if grep -v "^func run" "$cmd_file" | grep -E "(for\s+.*{|if\s+.*{\s*$|switch\s+.*{)" | grep -v "^//" | grep -q .; then
+    # Exclude common command-layer patterns: JSON encoding, formatted output, envelope wrapping
+    if grep -v "^func run" "$cmd_file" | grep -E "(for\s+.*\{|if\s+.*\{\s*$|switch\s+.*\{)" | grep -v "^//" | grep -vE "(json\.(NewEncoder|Marshal)|fmt\.Fprint|envelope\.)" | grep -q .; then
         ERROR_DETAILS+="$cmd_name: Possible business logic in command file (should be in internal/$cmd_name/)"$'\n'
         ((++WARNINGS))
     fi
