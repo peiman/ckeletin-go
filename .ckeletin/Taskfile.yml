@@ -153,8 +153,11 @@ tasks:
         echo "   Formatting code..."
         task ckeletin:format 2>/dev/null || true
 
+        echo "   Running post-update migrations..."
+        bash .ckeletin/scripts/migrate-post-update.sh 2>/dev/null || true
+
         echo "   Committing framework update..."
-        git add .ckeletin
+        git add .ckeletin .go-arch-lint.yml
         # Only commit if there are staged changes
         if git diff --cached --quiet; then
           echo ""
