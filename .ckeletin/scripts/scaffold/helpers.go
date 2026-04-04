@@ -153,3 +153,83 @@ func replaceInTextFiles(root string, replacements []StringReplacement) (int, err
 
 	return count, err
 }
+
+// cleanArchLintConfig removes the public component from .go-arch-lint.yml.
+// Called after pkg/ is removed during scaffold init, since the public component
+// references pkg/** which no longer exists.
+func cleanArchLintConfig(projectRoot string) error {
+	configPath := filepath.Join(projectRoot, ".go-arch-lint.yml")
+
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	original := string(content)
+	lines := strings.Split(original, "\n")
+	var result []string
+	inPublicBlock := false
+	publicIndent := 0
+
+	for _, line := range lines {
+		trimmed := strings.TrimRight(line, " \t")
+
+		// Skip comment lines related to the public section
+		stripped := strings.TrimSpace(trimmed)
+		if strings.Contains(stripped, "PUBLIC PACKAGES") ||
+			strings.Contains(stripped, "pkg/ contains standalone") ||
+			strings.Contains(stripped, "Do NOT import from internal/") ||
+			strings.Contains(stripped, "Can be imported by external") ||
+			strings.Contains(stripped, "Are independent of the CLI") ||
+			strings.Contains(stripped, "See ADR-010 for guidance") ||
+			strings.Contains(stripped, "Cannot depend on any internal packages (enforced by validation script too)") ||
+			strings.Contains(stripped, "Can use any external vendor dependencies") ||
+			strings.Contains(stripped, "Public packages are completely standalone") {
+			continue
+		}
+
+		// Skip separator lines that are part of the public block header
+		if strings.HasPrefix(stripped, "# -----") && !inPublicBlock {
+			// Look ahead: if next meaningful content is public-related, skip
+			// For now, keep it — the comment lines above catch the specific ones
+		}
+
+		// Detect "  public:" blocks (under components: or deps:)
+		if trimmed == "  public:" {
+			inPublicBlock = true
+			publicIndent = 2
+			continue
+		}
+
+		if inPublicBlock {
+			if trimmed == "" {
+				continue
+			}
+			strippedLine := strings.TrimLeft(line, " ")
+			indent := len(line) - len(strippedLine)
+			if indent > publicIndent {
+				continue // Still inside the block
+			}
+			inPublicBlock = false
+		}
+
+		// Skip "- public" entries in commonComponents
+		if strings.TrimSpace(trimmed) == "- public" ||
+			strings.Contains(trimmed, "- public  #") ||
+			strings.Contains(trimmed, "- public\t#") {
+			continue
+		}
+
+		result = append(result, line)
+	}
+
+	updated := strings.Join(result, "\n")
+	if updated == original {
+		return nil
+	}
+
+	return os.WriteFile(configPath, []byte(updated), 0600)
+}

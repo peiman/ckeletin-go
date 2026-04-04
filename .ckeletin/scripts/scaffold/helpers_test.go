@@ -432,3 +432,93 @@ func TestRemovePkgDirectory(t *testing.T) {
 		assert.True(t, os.IsNotExist(err), "pkg/ should be removed")
 	})
 }
+
+func TestCleanArchLintConfig(t *testing.T) {
+	t.Run("removes public component section", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, ".go-arch-lint.yml")
+
+		content := `components:
+  business:
+    in:
+      - internal/ping/**
+
+  # -------------------------------------------------------------------------
+  # PUBLIC PACKAGES: Standalone Reusable Libraries
+  # -------------------------------------------------------------------------
+  # pkg/ contains standalone packages that:
+  # - Do NOT import from internal/ (enforced by validate-package-organization.sh)
+  # - Can be imported by external Go projects
+  # - Are independent of the CLI architecture
+  #
+  # See ADR-010 for guidance on when to use pkg/
+  public:
+    in:
+      - pkg/**
+
+vendors:
+  cobra:
+    in: github.com/spf13/cobra
+
+commonComponents:
+  - infrastructure
+  - public  # Public packages can be used by any layer
+
+deps:
+  commands:
+    mayDependOn:
+      - business
+
+  public:
+    anyVendorDeps: true
+`
+		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
+
+		err := cleanArchLintConfig(tmpDir)
+		require.NoError(t, err)
+
+		result, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+		got := string(result)
+
+		// public component section removed
+		assert.NotContains(t, got, "public:")
+		assert.NotContains(t, got, "pkg/**")
+		assert.NotContains(t, got, "anyVendorDeps")
+
+		// public removed from commonComponents
+		assert.NotContains(t, got, "- public")
+
+		// Comment block removed
+		assert.NotContains(t, got, "PUBLIC PACKAGES")
+		assert.NotContains(t, got, "ADR-010")
+
+		// Other content preserved
+		assert.Contains(t, got, "business:")
+		assert.Contains(t, got, "internal/ping/**")
+		assert.Contains(t, got, "commonComponents:")
+		assert.Contains(t, got, "- infrastructure")
+		assert.Contains(t, got, "commands:")
+		assert.Contains(t, got, "cobra:")
+	})
+
+	t.Run("no error when file does not exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		err := cleanArchLintConfig(tmpDir)
+		assert.NoError(t, err)
+	})
+
+	t.Run("no error when file has no public section", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		configPath := filepath.Join(tmpDir, ".go-arch-lint.yml")
+		content := "components:\n  business:\n    in:\n      - internal/ping/**\n"
+		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
+
+		err := cleanArchLintConfig(tmpDir)
+		assert.NoError(t, err)
+
+		result, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+		assert.Contains(t, string(result), "business:")
+	})
+}
