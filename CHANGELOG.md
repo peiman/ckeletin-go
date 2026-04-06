@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **JSON output mode (`--output json`)**: Global persistent flag that switches all CLI output to a consistent JSON envelope (`{"status", "command", "data", "error"}`). Every command using `ui.RenderSuccess` gets JSON for free; complex commands can implement `ui.JSONResponder` for custom shapes. Stderr is silenced in JSON mode for clean programmatic consumption.
+- **Config JSON Schema export**: `task generate:config:schema` produces `config.schema.json` from the config registry, enabling agents and tools to validate config files without reading Go source.
+- **Cross-agent configuration**: Added `.cursorrules` (Cursor) and `.github/copilot-instructions.md` (GitHub Copilot) with essential project rules pointing to `AGENTS.md` as the source of truth.
+
+### Changed
+
+- **CONVENTIONS.md deprecated**: Replaced with a deprecation notice pointing to `AGENTS.md` as the single source of truth for all project conventions.
+
 ## [0.9.1] - 2026-04-02
 
 ### Fixed
