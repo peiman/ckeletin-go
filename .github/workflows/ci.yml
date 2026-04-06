@@ -424,7 +424,7 @@ jobs:
 
       - name: Scan release artifacts for vulnerabilities
         if: startsWith(github.ref, 'refs/tags/')
-        uses: anchore/scan-action@64a33b277ea7a1215a3c142735a1091341939ff5  # v4
+        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2  # v7.4.0
         with:
           path: "dist/"
           fail-build: false
