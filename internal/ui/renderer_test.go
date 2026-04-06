@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -111,4 +112,96 @@ func TestRenderSuccess_WriteError(t *testing.T) {
 func TestRenderError_WriteError(t *testing.T) {
 	err := RenderError(&errorWriter{}, "message", errors.New("test"))
 	assert.Error(t, err)
+}
+
+func TestRenderSuccess_JSONMode(t *testing.T) {
+	SetOutputMode("json")
+	SetCommandName("test")
+	defer func() {
+		SetOutputMode("")
+		SetCommandName("")
+	}()
+
+	type testData struct {
+		Value string `json:"value"`
+	}
+
+	var buf bytes.Buffer
+	err := RenderSuccess(&buf, "human message", testData{Value: "hello"})
+	assert.NoError(t, err)
+
+	var envelope JSONEnvelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "success", envelope.Status)
+	assert.Equal(t, "test", envelope.Command)
+	assert.Nil(t, envelope.Error)
+	dataMap, ok := envelope.Data.(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "hello", dataMap["value"])
+}
+
+func TestRenderSuccess_JSONMode_WithResponder(t *testing.T) {
+	SetOutputMode("json")
+	SetCommandName("test")
+	defer func() {
+		SetOutputMode("")
+		SetCommandName("")
+	}()
+
+	responder := &mockJSONResponderForRenderer{custom: map[string]string{"custom": "data"}}
+	var buf bytes.Buffer
+	err := RenderSuccess(&buf, "human message", responder)
+	assert.NoError(t, err)
+
+	var envelope JSONEnvelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	assert.NoError(t, err)
+
+	dataMap, ok := envelope.Data.(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "data", dataMap["custom"])
+}
+
+type mockJSONResponderForRenderer struct {
+	custom map[string]string
+}
+
+func (m *mockJSONResponderForRenderer) JSONResponse() interface{} {
+	return m.custom
+}
+
+func TestRenderError_JSONMode(t *testing.T) {
+	SetOutputMode("json")
+	SetCommandName("test")
+	defer func() {
+		SetOutputMode("")
+		SetCommandName("")
+	}()
+
+	var buf bytes.Buffer
+	err := RenderError(&buf, "something failed", errors.New("connection timeout"))
+	assert.NoError(t, err)
+
+	var envelope JSONEnvelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "error", envelope.Status)
+	assert.Equal(t, "test", envelope.Command)
+	assert.Nil(t, envelope.Data)
+	assert.NotNil(t, envelope.Error)
+	assert.Equal(t, "something failed", envelope.Error.Message)
+}
+
+func TestRenderSuccess_TextMode_Unchanged(t *testing.T) {
+	SetOutputMode("text")
+	defer SetOutputMode("")
+
+	var buf bytes.Buffer
+	err := RenderSuccess(&buf, "Operation completed", nil)
+	assert.NoError(t, err)
+	assert.Contains(t, buf.String(), "✔")
+	assert.Contains(t, buf.String(), "Operation completed")
 }
