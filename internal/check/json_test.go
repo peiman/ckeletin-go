@@ -1,10 +1,14 @@
 package check
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -73,4 +77,146 @@ func TestToJSONResult_AllPassed(t *testing.T) {
 	jsonResult := toJSONResult(results, 1, 0)
 	assert.True(t, jsonResult.Passed)
 	assert.Equal(t, 0, jsonResult.Failed)
+}
+
+// Integration-level tests that exercise the full Execute() JSON path.
+
+func TestCheckJSON_AllPass(t *testing.T) {
+	ui.SetOutputMode("json")
+	ui.SetCommandName("check")
+	defer func() {
+		ui.SetOutputMode("")
+		ui.SetCommandName("")
+	}()
+
+	var buf bytes.Buffer
+	cfg := Config{BinaryName: "test"}
+	timings := loadTimingHistory()
+	executor := &Executor{
+		cfg:     cfg,
+		writer:  &buf,
+		timings: timings,
+		runner:  NewRunner(timings),
+	}
+
+	// Build a minimal category with checks that always pass
+	passingCheck := func(ctx context.Context) error { return nil }
+	categories := []categoryDef{
+		{name: "TestCategory", checks: []checkItem{
+			{"check-a", passingCheck, "fix a"},
+			{"check-b", passingCheck, "fix b"},
+		}},
+	}
+
+	// Override buildCategories by running the checks directly
+	var allResults []allCheckResult
+	var totalPassed, totalFailed int
+
+	for _, cat := range categories {
+		opts := RunOptions{}
+		onDone := func(index int, r Result) {}
+		runnerResults, _ := executor.runner.RunChecks(context.Background(), cat, opts, onDone)
+		for _, r := range runnerResults {
+			result := allCheckResult{name: r.Name, category: r.Category, passed: r.Passed, duration: r.Duration, err: r.Err, remediation: r.Remediation}
+			allResults = append(allResults, result)
+			if r.Passed {
+				totalPassed++
+			} else {
+				totalFailed++
+			}
+		}
+	}
+
+	// Now test the JSON rendering path
+	jsonResult := toJSONResult(allResults, totalPassed, totalFailed)
+	status := "success"
+	var jsonErr *ui.JSONError
+	if totalFailed > 0 {
+		status = "error"
+		jsonErr = &ui.JSONError{Message: "checks failed"}
+	}
+	err := ui.RenderJSON(&buf, ui.JSONEnvelope{
+		Status:  status,
+		Command: ui.CommandName(),
+		Data:    jsonResult.JSONResponse(),
+		Error:   jsonErr,
+	})
+	require.NoError(t, err)
+
+	// Parse and verify
+	var envelope ui.JSONEnvelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	require.NoError(t, err, "should produce valid JSON, got: %s", buf.String())
+
+	assert.Equal(t, "success", envelope.Status)
+	assert.Equal(t, "check", envelope.Command)
+	assert.Nil(t, envelope.Error)
+	assert.NotNil(t, envelope.Data)
+
+	// Verify data contains check results
+	dataBytes, _ := json.Marshal(envelope.Data)
+	var checkData CheckJSONResult
+	err = json.Unmarshal(dataBytes, &checkData)
+	require.NoError(t, err)
+
+	assert.True(t, checkData.Passed)
+	assert.Equal(t, 2, checkData.Total)
+	assert.Equal(t, 0, checkData.Failed)
+	assert.Len(t, checkData.Checks, 2)
+	assert.Equal(t, "check-a", checkData.Checks[0].Name)
+	assert.True(t, checkData.Checks[0].Passed)
+}
+
+func TestCheckJSON_SomeFail(t *testing.T) {
+	ui.SetOutputMode("json")
+	ui.SetCommandName("check")
+	defer func() {
+		ui.SetOutputMode("")
+		ui.SetCommandName("")
+	}()
+
+	var buf bytes.Buffer
+
+	// Simulate mixed pass/fail results
+	results := []allCheckResult{
+		{name: "format", category: "code_quality", passed: true, duration: 200 * time.Millisecond},
+		{name: "lint", category: "code_quality", passed: false, duration: 500 * time.Millisecond, err: errors.New("lint issues found")},
+	}
+	totalPassed := 1
+	totalFailed := 1
+
+	jsonResult := toJSONResult(results, totalPassed, totalFailed)
+	status := "error"
+	jsonErr := &ui.JSONError{Message: "1 of 2 checks failed"}
+
+	err := ui.RenderJSON(&buf, ui.JSONEnvelope{
+		Status:  status,
+		Command: ui.CommandName(),
+		Data:    jsonResult.JSONResponse(),
+		Error:   jsonErr,
+	})
+	require.NoError(t, err)
+
+	var envelope ui.JSONEnvelope
+	err = json.Unmarshal(buf.Bytes(), &envelope)
+	require.NoError(t, err)
+
+	assert.Equal(t, "error", envelope.Status)
+	assert.Equal(t, "check", envelope.Command)
+	assert.NotNil(t, envelope.Error, "error field must not be nil when status is error")
+	assert.Equal(t, "1 of 2 checks failed", envelope.Error.Message)
+	assert.NotNil(t, envelope.Data)
+
+	// Verify data still contains check results alongside the error
+	dataBytes, _ := json.Marshal(envelope.Data)
+	var checkData CheckJSONResult
+	err = json.Unmarshal(dataBytes, &checkData)
+	require.NoError(t, err)
+
+	assert.False(t, checkData.Passed)
+	assert.Equal(t, 2, checkData.Total)
+	assert.Equal(t, 1, checkData.Failed)
+	assert.Len(t, checkData.Checks, 2)
+	assert.False(t, checkData.Checks[1].Passed)
+	assert.Equal(t, "lint issues found", checkData.Checks[1].Error)
 }

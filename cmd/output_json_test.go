@@ -9,10 +9,20 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func findSubcommand(root *cobra.Command, name string) *cobra.Command {
+	for _, cmd := range root.Commands() {
+		if cmd.Name() == name {
+			return cmd
+		}
+	}
+	return nil
+}
 
 // resetOutputJSONTestState resets all global state that integration tests modify.
 // Must be called via defer at the start of each test.
@@ -27,12 +37,22 @@ func resetOutputJSONTestState(origCfgFile string, origStatus string, origUsed st
 	RootCmd.SetOut(nil)
 	RootCmd.SetErr(nil)
 
-	// Reset the --output persistent flag to its default value.
-	// Without this, Cobra retains the flag value from a previous Execute() call,
-	// causing subsequent tests to inherit the prior test's --output setting.
-	if f := RootCmd.PersistentFlags().Lookup("output"); f != nil {
-		f.Value.Set("text") //nolint:errcheck // resetting to known-good default
-		f.Changed = false
+	// Reset persistent flags to their default values.
+	// Without this, Cobra retains flag values from a previous Execute() call,
+	// causing subsequent tests to inherit prior test settings.
+	resetFlags := map[string]string{"output": "text", "log-level": "info"}
+	for name, def := range resetFlags {
+		if f := RootCmd.PersistentFlags().Lookup(name); f != nil {
+			f.Value.Set(def) //nolint:errcheck // resetting to known-good default
+			f.Changed = false
+		}
+	}
+	// Reset subcommand flags that tests may have set
+	if pingCmd := findSubcommand(RootCmd, "ping"); pingCmd != nil {
+		if f := pingCmd.Flags().Lookup("color"); f != nil {
+			f.Value.Set("white") //nolint:errcheck // reset to default
+			f.Changed = false
+		}
 	}
 }
 
@@ -130,6 +150,31 @@ func TestOutputJSON_StderrSilent(t *testing.T) {
 	var envelope ui.JSONEnvelope
 	err = json.Unmarshal(stdout.Bytes(), &envelope)
 	assert.NoError(t, err, "stdout should be valid JSON")
+}
+
+func TestOutputJSON_ErrorCommand(t *testing.T) {
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	origCfgFile := cfgFile
+	origStatus := configFileStatus
+	origUsed := configFileUsed
+	defer resetOutputJSONTestState(origCfgFile, origStatus, origUsed)
+
+	var stdout bytes.Buffer
+	RootCmd.SetOut(&stdout)
+	RootCmd.SetErr(&bytes.Buffer{})
+	// Use an invalid color to trigger a config validation error through Cobra
+	RootCmd.SetArgs([]string{"ping", "--output", "json", "--color", "purple"})
+
+	err := RootCmd.Execute()
+	assert.Error(t, err, "invalid color should cause an error")
+	assert.Contains(t, err.Error(), "purple")
+
+	// JSON mode should have been activated early (before config validation),
+	// so main.go's error handler will emit the JSON error envelope.
+	// The actual JSON envelope emission is tested in main_test.go (TestRun_JSONMode_Error).
+	assert.True(t, ui.IsJSONMode(), "JSON mode should be active even when config validation fails")
 }
 
 func TestOutputJSON_EnvelopeStructure(t *testing.T) {
