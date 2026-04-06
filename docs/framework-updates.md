@@ -38,11 +38,11 @@ task ckeletin:update:check-compatibility
 
 This safely tests whether the update will build with your code:
 
-1. Stashes your current `.ckeletin/` state
+1. Backs up your current `.ckeletin/` to a temp directory
 2. Applies the update temporarily
-3. Rewrites imports (AST-based)
+3. Rewrites imports (AST-based) and runs `go mod tidy`
 4. Runs `go build ./...`
-5. Restores your original state regardless of the outcome
+5. Restores your original state regardless of the outcome (via `trap` on exit)
 
 Reports either "Compatible — safe to update" or "Incompatible" with the specific build errors.
 

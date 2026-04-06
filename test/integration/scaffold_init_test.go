@@ -1010,54 +1010,67 @@ func parseFrameworkTaskNames(t *testing.T, path string) []string {
 
 // replaceNameInCkeletinGoFiles replaces the old binary name with the new name
 // in Go string literals within .ckeletin/, skipping import lines.
+// Also replaces the env var prefix form (e.g., CKELETIN_GO → UPDATETEST).
 // This mirrors what task ckeletin:update does for binary name references
 // (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log").
 func replaceNameInCkeletinGoFiles(t *testing.T, ckeletinDir, oldName, newName string) {
 	t.Helper()
 
-	err := filepath.Walk(ckeletinDir, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil || info.IsDir() {
-			return walkErr
-		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
+	// Build replacement pairs: binary name + env var prefix
+	type replacement struct{ old, new string }
+	replacements := []replacement{{oldName, newName}}
 
-		content, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
+	oldEnv := strings.ToUpper(strings.ReplaceAll(oldName, "-", "_"))
+	newEnv := strings.ToUpper(strings.ReplaceAll(newName, "-", "_"))
+	if oldEnv != newEnv {
+		replacements = append(replacements, replacement{oldEnv, newEnv})
+	}
 
-		original := string(content)
-		lines := strings.Split(original, "\n")
-		inImportBlock := false
-
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-
-			if strings.HasPrefix(trimmed, "import (") {
-				inImportBlock = true
-				continue
+	for _, r := range replacements {
+		err := filepath.Walk(ckeletinDir, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil || info.IsDir() {
+				return walkErr
 			}
-			if inImportBlock {
-				if trimmed == ")" {
-					inImportBlock = false
+			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+
+			content, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+
+			original := string(content)
+			lines := strings.Split(original, "\n")
+			inImportBlock := false
+
+			for i, line := range lines {
+				trimmed := strings.TrimSpace(line)
+
+				if strings.HasPrefix(trimmed, "import (") {
+					inImportBlock = true
+					continue
 				}
-				continue
+				if inImportBlock {
+					if trimmed == ")" {
+						inImportBlock = false
+					}
+					continue
+				}
+				if strings.HasPrefix(trimmed, "import ") {
+					continue
+				}
+
+				lines[i] = strings.ReplaceAll(line, r.old, r.new)
 			}
-			if strings.HasPrefix(trimmed, "import ") {
-				continue
+
+			updated := strings.Join(lines, "\n")
+			if updated != original {
+				return os.WriteFile(path, []byte(updated), info.Mode())
 			}
+			return nil
+		})
 
-			lines[i] = strings.ReplaceAll(line, oldName, newName)
-		}
-
-		updated := strings.Join(lines, "\n")
-		if updated != original {
-			return os.WriteFile(path, []byte(updated), info.Mode())
-		}
-		return nil
-	})
-
-	require.NoError(t, err, "failed to replace binary name in .ckeletin Go files")
+		require.NoError(t, err, "failed to replace %q in .ckeletin Go files", r.old)
+	}
 }

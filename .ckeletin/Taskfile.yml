@@ -117,6 +117,7 @@ tasks:
     desc: Update ckeletin framework to latest version (set version=vX.Y.Z to pin)
     cmds:
       - |
+        set -eo pipefail
         echo "🔄 Updating ckeletin framework..."
 
         # Get current module path from go.mod
@@ -236,8 +237,14 @@ tasks:
           echo "✅ Build verified successfully"
 
           echo "🧪 Verifying framework tests pass..."
-          if ! go test ./.ckeletin/... 2>/dev/null; then
-            echo "⚠️  Some framework tests failed after update."
+          set +e
+          TEST_OUTPUT=$(go test ./.ckeletin/... 2>&1)
+          TEST_RESULT=$?
+          set -e
+          if [ $TEST_RESULT -ne 0 ]; then
+            echo "⚠️  Some framework tests failed after update:"
+            echo "$TEST_OUTPUT"
+            echo ""
             echo "   This may indicate breaking changes in test utilities."
             echo "   Check .ckeletin/CHANGELOG.md for migration notes."
             echo "   To rollback: git revert HEAD"
@@ -386,10 +393,12 @@ tasks:
         # Run go mod tidy to ensure dependencies are consistent
         go mod tidy 2>/dev/null || true
 
-        # Test build
+        # Test build (disable set -e so we capture the exit code)
         echo "🔍 Checking compatibility with framework update ($UPDATE_TARGET)..."
+        set +e
         BUILD_OUTPUT=$(go build ./... 2>&1)
         BUILD_RESULT=$?
+        set -e
 
         # Restore happens via trap — no manual cleanup needed
 
