@@ -216,6 +216,14 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
+		// Activate JSON output mode early so errors during config/logger init
+		// are properly routed through the JSON error handler in main.go.
+		// The flag value is available via viper after bindFlags.
+		if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Changed {
+			ui.SetOutputMode(outputFlag.Value.String())
+		}
+		ui.SetCommandName(cmd.Name())
+
 		// Initialize configuration
 		if err := initConfig(); err != nil {
 			return err
@@ -226,10 +234,10 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
 
-		// Activate JSON output mode if requested
+		// Now apply full JSON mode: read final config value (flag > env > config file)
+		// and suppress stderr if JSON mode is active.
 		outputFormat := viper.GetString(config.KeyAppOutputFormat)
 		ui.SetOutputMode(outputFormat)
-		ui.SetCommandName(cmd.Name())
 
 		if ui.IsJSONMode() {
 			// Suppress all stderr output — agents want clean stdout only.
