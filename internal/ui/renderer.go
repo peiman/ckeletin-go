@@ -13,6 +13,17 @@ import (
 // Stream 1 (Data): Prints formatted message to out
 // Stream 3 (Audit): Logs raw data to file
 func RenderSuccess(out io.Writer, message string, data interface{}) error {
+	// JSON mode: emit envelope instead of formatted text
+	if IsJSONMode() {
+		return RenderJSON(out, JSONEnvelope{
+			Status:  "success",
+			Command: CommandName(),
+			Data:    ResolveJSONData(data),
+			Error:   nil,
+		})
+	}
+
+	// Text mode: existing behavior
 	// 1. Shadow Log (Audit Stream)
 	// We log the raw data so the log file has the full context of what was returned
 	event := log.Info().Str("user_message", message)
@@ -45,6 +56,17 @@ func RenderSuccess(out io.Writer, message string, data interface{}) error {
 // Stream 2 (Status): Prints friendly error to out
 // Stream 3 (Audit): Logs full error with stack trace to file
 func RenderError(out io.Writer, friendlyMessage string, err error) error {
+	// JSON mode: emit error envelope
+	if IsJSONMode() {
+		return RenderJSON(out, JSONEnvelope{
+			Status:  "error",
+			Command: CommandName(),
+			Data:    nil,
+			Error:   &JSONError{Message: friendlyMessage},
+		})
+	}
+
+	// Text mode: existing behavior
 	// 1. Shadow Log (Audit Stream)
 	// Capture the full technical error
 	log.Error().

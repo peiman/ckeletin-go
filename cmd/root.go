@@ -23,7 +23,9 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/peiman/ckeletin-go/internal/xdg"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -214,6 +216,14 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
+		// Activate JSON output mode early so errors during config/logger init
+		// are properly routed through the JSON error handler in main.go.
+		// The flag value is available via viper after bindFlags.
+		if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Changed {
+			ui.SetOutputMode(outputFlag.Value.String())
+		}
+		ui.SetCommandName(cmd.Name())
+
 		// Initialize configuration
 		if err := initConfig(); err != nil {
 			return err
@@ -222,6 +232,17 @@ var RootCmd = &cobra.Command{
 		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
+		}
+
+		// Now apply full JSON mode: read final config value (flag > env > config file)
+		// and suppress stderr if JSON mode is active.
+		outputFormat := viper.GetString(config.KeyAppOutputFormat)
+		ui.SetOutputMode(outputFormat)
+
+		if ui.IsJSONMode() {
+			// Suppress all stderr output — agents want clean stdout only.
+			// The audit log file is unaffected (initialized separately by logger.Init).
+			zerolog.SetGlobalLevel(zerolog.Disabled)
 		}
 
 		// Log config status after logger is initialized
@@ -305,6 +326,9 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 	RootCmd.PersistentFlags().Int("log-sampling-initial", 100, "Number of messages to log per second before sampling")
 
 	RootCmd.PersistentFlags().Int("log-sampling-thereafter", 100, "Number of messages to log thereafter per second")
+
+	// Output format flag
+	RootCmd.PersistentFlags().String("output", "text", "Output format: text (human-readable) or json (machine-readable)")
 }
 
 // bindFlags binds all persistent flags to viper configuration keys.
@@ -337,6 +361,7 @@ func bindFlags(cmd *cobra.Command) error {
 	bindFlag(config.KeyAppLogSamplingEnabled, "log-sampling-enabled")
 	bindFlag(config.KeyAppLogSamplingInitial, "log-sampling-initial")
 	bindFlag(config.KeyAppLogSamplingThereafter, "log-sampling-thereafter")
+	bindFlag(config.KeyAppOutputFormat, "output")
 
 	// Return combined error if any bindings failed
 	if len(errs) > 0 {

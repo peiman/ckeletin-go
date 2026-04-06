@@ -18,6 +18,7 @@ const (
 	KeyAppLogSamplingEnabled    = "app.log.sampling_enabled"    // Enable log sampling for high-volume scenarios
 	KeyAppLogSamplingInitial    = "app.log.sampling_initial"    // Number of messages to log per second before sampling
 	KeyAppLogSamplingThereafter = "app.log.sampling_thereafter" // Number of messages to log thereafter per second
+	KeyAppOutputFormat          = "app.output_format"           // Output format: text (human-readable) or json (machine-readable)
 	KeyAppDocsOutputFormat      = "app.docs.output_format"      // Output format for documentation (markdown, yaml)
 	KeyAppDocsOutputFile        = "app.docs.output_file"        // Output file for documentation (defaults to stdout)
 	KeyAppCheckFailFast         = "app.check.fail_fast"         // Stop on first failed check

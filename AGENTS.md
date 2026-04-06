@@ -16,6 +16,7 @@ Key characteristics:
 - Ultra-thin command pattern (commands ≤30 lines, logic in `internal/`)
 - Centralized configuration registry with auto-generated constants
 - Structured logging with Zerolog (dual console + file output)
+- Framework-level `--output json` flag for machine-readable output
 - Bubble Tea for interactive UIs
 - Test-driven development (TDD) — tests first, always
 - Dependency injection over mocking
@@ -42,6 +43,7 @@ Use `task` commands for all standard workflows. The `task` runner wraps Go tooli
 | Integration tests | `task test:integration` |
 | Vulnerability check | `task check:vuln` |
 | Regenerate config constants | `task generate:config:key-constants` |
+| Generate config JSON Schema | `task generate:config:schema` |
 
 **Daily workflow:** `task format` → `task test` → `task lint` → `task check`
 
@@ -174,6 +176,53 @@ Log level rules:
 - Unrecoverable system failure? → `log.Error()`
 
 Use `log.Error()` only for unrecoverable failures where no error can be returned. Semgrep rule `ckeletin-log-error-and-return` enforces this. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
+
+### JSON Output Mode (`--output json`)
+
+Every command supports `--output json` for machine-readable output. When active:
+- Stdout emits exactly one JSON envelope
+- Stderr is silenced (zerolog disabled)
+- Audit log file continues unchanged
+
+**JSON envelope structure:**
+```json
+{
+  "status": "success",
+  "command": "ping",
+  "data": { "message": "Hello", "color": "white", "timestamp": "now" },
+  "error": null
+}
+```
+
+On error:
+```json
+{
+  "status": "error",
+  "command": "ping",
+  "data": null,
+  "error": { "message": "invalid color value", "code": "CONFIG_VALIDATION" }
+}
+```
+
+**Config:** `app.output_format` (default: `"text"`, valid: `"text"` or `"json"`)
+**Env var:** `CKELETINGO_APP_OUTPUT_FORMAT=json`
+**Constant:** `config.KeyAppOutputFormat`
+
+**How it works for command authors:**
+- Commands that call `ui.RenderSuccess(out, message, data)` get JSON for free — the `data` argument becomes the envelope's `.data` field
+- For custom JSON shapes, implement `ui.JSONResponder` on your data type:
+  ```go
+  type MyResult struct { /* fields */ }
+  func (r MyResult) JSONResponse() interface{} { return r }
+  ```
+- The `check` command uses `JSONResponder` to emit a flat list of results instead of its internal state
+
+**Types (in `internal/ui/json.go`):**
+- `ui.JSONEnvelope` — the standard envelope wrapper
+- `ui.JSONError` — structured error with message and optional code
+- `ui.JSONResponder` — interface for custom JSON data shapes
+- `ui.IsJSONMode()` — check if JSON mode is active
+- `ui.RenderJSON(out, envelope)` — marshal envelope to writer
 
 ### Testing
 

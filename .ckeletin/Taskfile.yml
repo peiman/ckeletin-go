@@ -1207,6 +1207,11 @@ tasks:
       - go run {{.SCRIPTS_DIR}}/generate-config-constants.go
       - task: format
 
+  generate:config:schema:
+    desc: Generate JSON Schema from config registry
+    cmds:
+      - go run {{.SCRIPTS_DIR}}/generate-config-schema.go
+
   # --- Release ---
 
   check:release:

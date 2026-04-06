@@ -8,12 +8,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var templateCmd = NewCommand(commands.TemplateMetadata, runTemplate)
+var templateCmd = MustNewCommand(commands.TemplateMetadata, runTemplate)
 
 func init() {
 	MustAddToRoot(templateCmd)
 }
 
+// runTemplate wires config to the executor. JSON output (--output json) is
+// handled automatically: the data passed to ui.RenderSuccess in your executor
+// becomes the envelope's "data" field. For custom JSON shapes, implement
+// ui.JSONResponder on your result type.
 func runTemplate(cmd *cobra.Command, args []string) error {
 	cfg := template.Config{
 		ExampleOption: getConfigValueWithFlags[string](cmd, "example-flag", "app.template.example_option"),

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
 
@@ -123,6 +124,52 @@ type allCheckResult struct {
 	remediation string
 }
 
+// CheckJSONItem represents a single check result in JSON output.
+type CheckJSONItem struct {
+	Name       string `json:"name"`
+	Category   string `json:"category"`
+	Passed     bool   `json:"passed"`
+	DurationMs int64  `json:"duration_ms"`
+	Error      string `json:"error,omitempty"`
+}
+
+// CheckJSONResult represents the full check output in JSON mode.
+// Implements ui.JSONResponder for custom JSON envelope data.
+type CheckJSONResult struct {
+	Passed bool            `json:"passed"`
+	Total  int             `json:"total"`
+	Failed int             `json:"failed"`
+	Checks []CheckJSONItem `json:"checks"`
+}
+
+// JSONResponse implements ui.JSONResponder.
+func (r CheckJSONResult) JSONResponse() interface{} {
+	return r
+}
+
+// toJSONResult converts internal results to the JSON output format.
+func toJSONResult(results []allCheckResult, totalPassed, totalFailed int) CheckJSONResult {
+	checks := make([]CheckJSONItem, len(results))
+	for i, r := range results {
+		item := CheckJSONItem{
+			Name:       r.name,
+			Category:   r.category,
+			Passed:     r.passed,
+			DurationMs: r.duration.Milliseconds(),
+		}
+		if r.err != nil {
+			item.Error = r.err.Error()
+		}
+		checks[i] = item
+	}
+	return CheckJSONResult{
+		Passed: totalFailed == 0,
+		Total:  totalPassed + totalFailed,
+		Failed: totalFailed,
+		Checks: checks,
+	}
+}
+
 // Execute runs all checks with TUI progress display or simple output.
 func (e *Executor) Execute(ctx context.Context) error {
 	methods := &checkMethods{cfg: e.cfg}
@@ -133,14 +180,21 @@ func (e *Executor) Execute(ctx context.Context) error {
 	var totalPassed, totalFailed int
 	startTime := time.Now()
 
+	jsonMode := ui.IsJSONMode()
+
 	for _, category := range categories {
 		var results []allCheckResult
 		var err error
-		useTUI := e.useTUI && !e.cfg.Parallel
-		if useTUI {
-			results, err = e.runCategoryTUI(ctx, category)
+		if jsonMode {
+			// JSON mode: run checks silently, no TUI or checkmate output to stdout
+			results, err = e.runCategorySilent(ctx, category)
 		} else {
-			results, err = e.runCategorySimple(ctx, category)
+			useTUI := e.useTUI && !e.cfg.Parallel
+			if useTUI {
+				results, err = e.runCategoryTUI(ctx, category)
+			} else {
+				results, err = e.runCategorySimple(ctx, category)
+			}
 		}
 		allResults = append(allResults, results...)
 		for _, r := range results {
@@ -156,6 +210,30 @@ func (e *Executor) Execute(ctx context.Context) error {
 	}
 
 	e.runner.SaveTimings()
+
+	if jsonMode {
+		jsonResult := toJSONResult(allResults, totalPassed, totalFailed)
+		status := "success"
+		var jsonErr *ui.JSONError
+		if totalFailed > 0 {
+			status = "error"
+			jsonErr = &ui.JSONError{
+				Message: fmt.Sprintf("%d of %d checks failed", totalFailed, totalPassed+totalFailed),
+			}
+		}
+		if err := ui.RenderJSON(e.writer, ui.JSONEnvelope{
+			Status:  status,
+			Command: ui.CommandName(),
+			Data:    jsonResult.JSONResponse(),
+			Error:   jsonErr,
+		}); err != nil {
+			return fmt.Errorf("failed to write JSON output: %w", err)
+		}
+		// Return nil — the JSON envelope already communicates success/failure.
+		// Returning an error here would cause main.go to emit a second envelope.
+		return nil
+	}
+
 	e.printFinalSummary(allResults, totalPassed, totalFailed, time.Since(startTime))
 
 	if totalFailed > 0 {
@@ -231,6 +309,21 @@ func (e *Executor) runCategorySimple(ctx context.Context, category categoryDef) 
 			printer.CheckLine(r.Name, checkmate.StatusFailure, r.Duration)
 		}
 	}
+
+	runnerResults, categoryErr := e.runner.RunChecks(ctx, category, opts, onDone)
+
+	results := make([]allCheckResult, len(runnerResults))
+	for i, r := range runnerResults {
+		results[i] = allCheckResult{name: r.Name, category: r.Category, passed: r.Passed, duration: r.Duration, err: r.Err, remediation: r.Remediation}
+	}
+	return results, categoryErr
+}
+
+// runCategorySilent runs checks without any output — used in JSON mode where
+// only the final JSON envelope should be written to stdout.
+func (e *Executor) runCategorySilent(ctx context.Context, category categoryDef) ([]allCheckResult, error) {
+	opts := RunOptions{FailFast: e.cfg.FailFast, Parallel: e.cfg.Parallel}
+	onDone := func(index int, r Result) {} // no-op: no output
 
 	runnerResults, categoryErr := e.runner.RunChecks(ctx, category, opts, onDone)
 
