@@ -8,6 +8,8 @@
 
 package config
 
+import "fmt"
+
 // CoreOptions returns core application configuration options
 // These settings affect the overall behavior of the application
 func CoreOptions() []ConfigOption {
@@ -124,6 +126,27 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "100",
+		},
+		// Output format option (framework-level)
+		{
+			Key:          "app.output_format",
+			DefaultValue: "text",
+			Description:  "Output format: text (human-readable) or json (machine-readable)",
+			Type:         "string",
+			Required:     false,
+			Example:      "json",
+			Validation: func(value interface{}) error {
+				str, ok := value.(string)
+				if !ok {
+					return fmt.Errorf("output_format must be a string")
+				}
+				switch str {
+				case "text", "json":
+					return nil
+				default:
+					return fmt.Errorf("invalid output format %q: must be \"text\" or \"json\"", str)
+				}
+			},
 		},
 		// Add other application-wide settings here
 	}

@@ -207,8 +207,8 @@ func TestBindFlags_ErrorCollection(t *testing.T) {
 	errMsg := err.Error()
 	assert.Contains(t, errMsg, "failed to bind", "Error message should mention 'failed to bind'")
 
-	// Verify it mentions the number of failures (14 flags total)
-	assert.Contains(t, errMsg, "14 flag(s)", "Error message should mention '14 flag(s)'")
+	// Verify it mentions the number of failures (15 flags total)
+	assert.Contains(t, errMsg, "15 flag(s)", "Error message should mention '15 flag(s)'")
 }
 
 // TestBindFlags_Integration tests the full flag binding flow
