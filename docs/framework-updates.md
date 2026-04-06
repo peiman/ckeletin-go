@@ -14,7 +14,8 @@ This means you get framework improvements (better validation, new scripts, updat
 |---------|---------|-----------------|
 | `task ckeletin:update:dry-run` | Preview what would change | No (read-only) |
 | `task ckeletin:update:check-compatibility` | Test if the update builds with your code | No (restores original) |
-| `task ckeletin:update` | Apply the update | Yes (creates a commit) |
+| `task ckeletin:update` | Apply the update (latest) | Yes (creates a commit) |
+| `task ckeletin:update version=v0.2.0` | Apply a specific version | Yes (creates a commit) |
 | `task ckeletin:version` | Show current framework version | No |
 
 ## The Safe Update Workflow
@@ -55,20 +56,24 @@ Applies the framework update and creates a single, revertable commit. See the ne
 
 ## What `task ckeletin:update` Does
 
-The update is a 10-step process:
+The update is a 14-step process:
 
 1. **Validates environment** — Confirms you're not running on the upstream ckeletin-go repo itself (run `task init` first)
 2. **Sets up remote** — Adds or reuses the `ckeletin-upstream` git remote pointing to `https://github.com/peiman/ckeletin-go.git`
-3. **Fetches upstream** — `git fetch ckeletin-upstream main`
-4. **Checks out framework** — `git checkout ckeletin-upstream/main -- .ckeletin/` — only the `.ckeletin/` directory, nothing else
-5. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
-6. **Regenerates constants** — `task ckeletin:generate:config:key-constants` to keep config constants in sync
-7. **Formats code** — `task ckeletin:format`
-8. **Commits** — `git add .ckeletin && git commit` with message `"chore: update ckeletin framework"`
-9. **Verifies build** — `go build ./...` to catch any breaking changes
-10. **Reports result** — Success with instructions to review (`git diff HEAD~1`), or "already up-to-date" if nothing changed
+3. **Fetches upstream** — `git fetch ckeletin-upstream main` (or a specific tag if `version=vX.Y.Z` is set)
+4. **Captures old version** — Records current `.ckeletin/VERSION` for changelog diff
+5. **Checks out framework** — `git checkout ckeletin-upstream/main -- .ckeletin/` — only the `.ckeletin/` directory, nothing else
+6. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
+7. **Replaces binary name** — Updates string literals in `.ckeletin/` Go files (e.g., `"./logs/ckeletin-go.log"` → `"./logs/myapp.log"`) and env var prefixes
+8. **Tidies modules** — `go mod tidy` to update `go.mod`/`go.sum` if dependencies changed
+9. **Regenerates constants** — `task ckeletin:generate:config:key-constants` to keep config constants in sync
+10. **Formats code** — `task ckeletin:format`
+11. **Runs migrations** — `migrate-post-update.sh` for structural changes (e.g., removing stale config entries)
+12. **Commits** — `git add .ckeletin go.mod go.sum && git commit` with message including the new version
+13. **Verifies build and tests** — `go build ./...` to catch compilation errors, then `go test ./.ckeletin/...` to catch test utility breakage
+14. **Reports result** — Shows changelog diff (old → new version), success message, or "already up-to-date"
 
-If the build fails at step 9, the commit still exists so you can inspect it. See [Handling Breaking Changes](#handling-breaking-changes) for recovery.
+If the build fails at step 13, the commit still exists so you can inspect it. See [Handling Breaking Changes](#handling-breaking-changes) for recovery.
 
 ## What Gets Updated vs. What Doesn't
 
@@ -187,8 +192,108 @@ If you had local modifications to files inside `.ckeletin/`, they will be overwr
 
 ### Can I pin to a specific framework version?
 
-The update always pulls from `ckeletin-upstream/main` (the latest). To stay on a specific version:
+Yes. Pass a version tag to target a specific release instead of the latest:
 
-1. Don't run `task ckeletin:update`
-2. Check `.ckeletin/VERSION` to see what you're currently on
-3. When ready to update, use the safe workflow to review changes before applying
+```bash
+# Preview a specific version
+task ckeletin:update:dry-run version=v0.2.0
+
+# Check compatibility with a specific version
+task ckeletin:update:check-compatibility version=v0.2.0
+
+# Update to a specific version
+task ckeletin:update version=v0.2.0
+```
+
+Without the `version` parameter, all commands default to the latest `main` branch.
+
+### Why does the update commit use `--no-verify`?
+
+The framework update commit bypasses pre-commit hooks (`--no-verify`) because:
+
+- The commit is machine-generated with deterministic content
+- The update task runs its own verification (build + tests) after committing
+- User pre-commit hooks (commit message format, secret scanning, etc.) may reject the auto-generated commit message or flag framework files the user doesn't control
+
+If you need pre-commit hooks to run on framework updates, you can amend the commit afterward:
+
+```bash
+task ckeletin:update
+git commit --amend --no-edit  # Re-runs hooks on the same content
+```
+
+## CI Integration
+
+You can automate framework update checking in CI. Here's a GitHub Actions example that runs weekly and creates an issue when updates are available:
+
+```yaml
+# .github/workflows/framework-update-check.yml
+name: Check Framework Updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9am UTC
+  workflow_dispatch:       # Allow manual trigger
+
+jobs:
+  check-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+
+      - name: Check for framework updates
+        id: check
+        run: |
+          OUTPUT=$(task ckeletin:update:dry-run 2>&1)
+          echo "$OUTPUT"
+          if echo "$OUTPUT" | grep -q "already up-to-date"; then
+            echo "has_update=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_update=true" >> "$GITHUB_OUTPUT"
+            echo "diff<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check compatibility
+        if: steps.check.outputs.has_update == 'true'
+        id: compat
+        run: |
+          if task ckeletin:update:check-compatibility 2>&1; then
+            echo "compatible=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "compatible=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create issue for available update
+        if: steps.check.outputs.has_update == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const compatible = '${{ steps.compat.outputs.compatible }}' === 'true';
+            const label = compatible ? '🟢 compatible' : '🔴 incompatible';
+            const body = compatible
+              ? `A compatible framework update is available.\n\n\`\`\`\n${{ steps.check.outputs.diff }}\n\`\`\`\n\nRun \`task ckeletin:update\` to apply.`
+              : `A framework update is available but has compatibility issues. Review the build errors before updating.\n\n\`\`\`\n${{ steps.check.outputs.diff }}\n\`\`\``;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Framework update available (${label})`,
+              body: body,
+              labels: ['framework-update']
+            });
+```
+
+This workflow:
+1. Runs `task ckeletin:update:dry-run` to detect available updates
+2. If updates exist, runs `task ckeletin:update:check-compatibility` to test build
+3. Creates a GitHub issue with the diff and compatibility status

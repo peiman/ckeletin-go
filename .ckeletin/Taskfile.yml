@@ -114,7 +114,7 @@ tasks:
     silent: false
 
   update:
-    desc: Update ckeletin framework to latest version
+    desc: Update ckeletin framework to latest version (set version=vX.Y.Z to pin)
     cmds:
       - |
         echo "🔄 Updating ckeletin framework..."
@@ -138,14 +138,70 @@ tasks:
           git remote add ckeletin-upstream https://github.com/peiman"/ckeletin-go.git"
         fi
 
-        echo "   Fetching latest framework..."
-        git fetch ckeletin-upstream main
+        # Determine update target: pinned version or latest main
+        UPDATE_REF="{{.CLI_ARGS}}"
+        if [ -z "$UPDATE_REF" ]; then
+          UPDATE_REF="{{.version}}"
+        fi
+        if [ -z "$UPDATE_REF" ]; then
+          UPDATE_TARGET="main"
+          echo "   Fetching latest framework..."
+          git fetch ckeletin-upstream main
+          CHECKOUT_REF="ckeletin-upstream/main"
+        else
+          UPDATE_TARGET="$UPDATE_REF"
+          echo "   Fetching framework version $UPDATE_REF..."
+          git fetch ckeletin-upstream "$UPDATE_REF"
+          CHECKOUT_REF="FETCH_HEAD"
+        fi
 
-        echo "   Applying framework update..."
-        git checkout ckeletin-upstream/main -- .ckeletin/
+        # Capture old version for changelog diff
+        OLD_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
+
+        echo "   Applying framework update ($UPDATE_TARGET)..."
+        git checkout "$CHECKOUT_REF" -- .ckeletin/
+
+        # Capture new version for changelog diff
+        NEW_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
 
         echo "   Updating module paths (AST-based import rewriting)..."
         go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
+
+        # Replace upstream binary name in .ckeletin/ Go string literals
+        # (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log")
+        # NOTE: String split prevents scaffold-init from replacing this name
+        UPSTREAM_NAME="ckeletin""-go"
+        CURRENT_NAME=$(grep 'BINARY_NAME:' Taskfile.yml | head -1 | awk '{print $2}')
+        if [ -n "$CURRENT_NAME" ] && [ "$CURRENT_NAME" != "$UPSTREAM_NAME" ]; then
+          echo "   Updating binary name references ($UPSTREAM_NAME → $CURRENT_NAME)..."
+          find .ckeletin -name "*.go" ! -name "*_test.go" -print0 | while IFS= read -r -d '' f; do
+            # Skip import lines, only replace in non-import content
+            awk -v old="$UPSTREAM_NAME" -v new="$CURRENT_NAME" '
+              /^import \(/ { in_import=1; print; next }
+              in_import && /^\)/ { in_import=0; print; next }
+              in_import { print; next }
+              /^import "/ { print; next }
+              { gsub(old, new); print }
+            ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+          done
+          # Also replace env var prefix form (CKELETIN_GO → MYAPP)
+          UPSTREAM_ENV=$(echo "$UPSTREAM_NAME" | tr '[:lower:]-' '[:upper:]_')
+          CURRENT_ENV=$(echo "$CURRENT_NAME" | tr '[:lower:]-' '[:upper:]_')
+          if [ "$UPSTREAM_ENV" != "$CURRENT_ENV" ]; then
+            find .ckeletin -name "*.go" ! -name "*_test.go" -print0 | while IFS= read -r -d '' f; do
+              awk -v old="$UPSTREAM_ENV" -v new="$CURRENT_ENV" '
+                /^import \(/ { in_import=1; print; next }
+                in_import && /^\)/ { in_import=0; print; next }
+                in_import { print; next }
+                /^import "/ { print; next }
+                { gsub(old, new); print }
+              ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            done
+          fi
+        fi
+
+        echo "   Updating module dependencies..."
+        go mod tidy
 
         echo "   Regenerating config constants..."
         task ckeletin:generate:config:key-constants 2>/dev/null || true
@@ -157,14 +213,18 @@ tasks:
         bash .ckeletin/scripts/migrate-post-update.sh 2>/dev/null || true
 
         echo "   Committing framework update..."
-        git add .ckeletin .go-arch-lint.yml
+        git add .ckeletin .go-arch-lint.yml go.mod go.sum
         # Only commit if there are staged changes
         if git diff --cached --quiet; then
           echo ""
           echo "✅ Framework is already up-to-date!"
           echo "   No changes needed."
         else
-          git commit --no-verify -m "chore: update ckeletin framework"
+          # --no-verify: framework update commits bypass pre-commit hooks because
+          # the commit is machine-generated and verified by build+test below.
+          # User hooks (e.g., commit-msg format, secret scan) don't apply here.
+          git commit --no-verify -m "chore: update ckeletin framework to v${NEW_VERSION}"
+
           echo "🔍 Verifying project builds after update..."
           if ! go build ./...; then
             echo "❌ Build failed after framework update!"
@@ -174,6 +234,36 @@ tasks:
             exit 1
           fi
           echo "✅ Build verified successfully"
+
+          echo "🧪 Verifying framework tests pass..."
+          if ! go test ./.ckeletin/... 2>/dev/null; then
+            echo "⚠️  Some framework tests failed after update."
+            echo "   This may indicate breaking changes in test utilities."
+            echo "   Check .ckeletin/CHANGELOG.md for migration notes."
+            echo "   To rollback: git revert HEAD"
+          else
+            echo "✅ Framework tests passed"
+          fi
+
+          # Show what changed between versions
+          if [ "$OLD_VERSION" != "$NEW_VERSION" ] && [ "$OLD_VERSION" != "unknown" ]; then
+            echo ""
+            echo "📋 Updated: v$OLD_VERSION → v$NEW_VERSION"
+            if [ -f ".ckeletin/CHANGELOG.md" ]; then
+              echo "   Changes in this update:"
+              # Extract changelog entries between old and new version
+              awk -v old="$OLD_VERSION" -v new="$NEW_VERSION" '
+                /^## \[/ {
+                  if (found) exit
+                  if (index($0, new) > 0) found=1
+                  if (index($0, old) > 0) exit
+                }
+                found && /^### / { print "   " $0 }
+                found && /^- / { print "     " $0 }
+              ' .ckeletin/CHANGELOG.md
+            fi
+          fi
+
           echo ""
           echo "✅ Framework updated successfully!"
           echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
@@ -181,7 +271,7 @@ tasks:
         fi
 
   update:dry-run:
-    desc: Preview framework update without applying
+    desc: Preview framework update without applying (set version=vX.Y.Z to check a specific version)
     cmds:
       - |
         set -e
@@ -196,13 +286,27 @@ tasks:
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
           git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
         fi
-        git fetch ckeletin-upstream
+
+        # Determine update target
+        UPDATE_REF="{{.CLI_ARGS}}"
+        if [ -z "$UPDATE_REF" ]; then
+          UPDATE_REF="{{.version}}"
+        fi
+        if [ -z "$UPDATE_REF" ]; then
+          git fetch ckeletin-upstream main
+          CHECKOUT_REF="ckeletin-upstream/main"
+          UPDATE_TARGET="latest (main)"
+        else
+          git fetch ckeletin-upstream "$UPDATE_REF"
+          CHECKOUT_REF="FETCH_HEAD"
+          UPDATE_TARGET="$UPDATE_REF"
+        fi
 
         # Show what would change
-        echo "📋 Preview of framework update:"
+        echo "📋 Preview of framework update ($UPDATE_TARGET):"
         echo ""
 
-        DIFF_STAT=$(git diff --stat HEAD ckeletin-upstream/main -- .ckeletin/)
+        DIFF_STAT=$(git diff --stat HEAD "$CHECKOUT_REF" -- .ckeletin/)
         if [ -z "$DIFF_STAT" ]; then
           echo "✅ Framework is already up-to-date"
         else
@@ -212,7 +316,7 @@ tasks:
         fi
 
   update:check-compatibility:
-    desc: Check if latest framework update is compatible with your code
+    desc: Check if framework update is compatible with your code (set version=vX.Y.Z to check a specific version)
     cmds:
       - |
         set -e
@@ -224,42 +328,70 @@ tasks:
           exit 0
         fi
 
-        # Fetch latest
+        # Set up remote if needed
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
           git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
         fi
-        git fetch ckeletin-upstream
+
+        # Determine update target
+        UPDATE_REF="{{.CLI_ARGS}}"
+        if [ -z "$UPDATE_REF" ]; then
+          UPDATE_REF="{{.version}}"
+        fi
+        if [ -z "$UPDATE_REF" ]; then
+          git fetch ckeletin-upstream main
+          CHECKOUT_REF="ckeletin-upstream/main"
+          UPDATE_TARGET="latest (main)"
+        else
+          git fetch ckeletin-upstream "$UPDATE_REF"
+          CHECKOUT_REF="FETCH_HEAD"
+          UPDATE_TARGET="$UPDATE_REF"
+        fi
 
         # Check if there are changes
-        DIFF_STAT=$(git diff --stat HEAD ckeletin-upstream/main -- .ckeletin/)
+        DIFF_STAT=$(git diff --stat HEAD "$CHECKOUT_REF" -- .ckeletin/)
         if [ -z "$DIFF_STAT" ]; then
           echo "✅ Framework is already up-to-date — nothing to check"
           exit 0
         fi
 
-        # Stash current changes
-        STASH_MSG="ckeletin-compat-check-$$"
-        git stash push -m "$STASH_MSG" --include-untracked -- .ckeletin/ 2>/dev/null || true
+        # Back up .ckeletin/ to temp dir (safer than git stash — survives interruption)
+        BACKUP_DIR=$(mktemp -d)
+        cp -R .ckeletin/ "$BACKUP_DIR/ckeletin-backup"
+        # Also back up go.mod and go.sum for tidy restore
+        cp go.mod "$BACKUP_DIR/go.mod.bak"
+        [ -f go.sum ] && cp go.sum "$BACKUP_DIR/go.sum.bak"
+
+        # Ensure restore happens even on error or interruption
+        cleanup() {
+          rm -rf .ckeletin
+          cp -R "$BACKUP_DIR/ckeletin-backup" .ckeletin
+          cp "$BACKUP_DIR/go.mod.bak" go.mod
+          [ -f "$BACKUP_DIR/go.sum.bak" ] && cp "$BACKUP_DIR/go.sum.bak" go.sum
+          rm -rf "$BACKUP_DIR"
+        }
+        trap cleanup EXIT
 
         # Apply update temporarily
-        git checkout ckeletin-upstream/main -- .ckeletin/ 2>/dev/null
+        git checkout "$CHECKOUT_REF" -- .ckeletin/ 2>/dev/null
 
-        # Rewrite imports
-        if [ -f ".ckeletin/scripts/rewrite-imports/main.go" ]; then
-          go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
-        else
-          find .ckeletin -name "*.go" -exec sed -i.bak "s|$UPSTREAM_MODULE|$CURRENT_MODULE|g" {} \;
-          find .ckeletin -name "*.bak" -delete
+        # Rewrite imports — require AST rewriter (no sed fallback)
+        if [ ! -f ".ckeletin/scripts/rewrite-imports/main.go" ]; then
+          echo "❌ AST import rewriter not found in fetched framework version."
+          echo "   Cannot safely check compatibility without it."
+          exit 1
         fi
+        go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
+
+        # Run go mod tidy to ensure dependencies are consistent
+        go mod tidy 2>/dev/null || true
 
         # Test build
-        echo "🔍 Checking compatibility with latest framework..."
+        echo "🔍 Checking compatibility with framework update ($UPDATE_TARGET)..."
         BUILD_OUTPUT=$(go build ./... 2>&1)
         BUILD_RESULT=$?
 
-        # Restore original
-        git checkout -- .ckeletin/
-        git stash pop --index 2>/dev/null || true
+        # Restore happens via trap — no manual cleanup needed
 
         if [ $BUILD_RESULT -eq 0 ]; then
           echo "✅ Compatible — safe to update"

@@ -562,10 +562,29 @@ func TestFrameworkUpdate(t *testing.T) {
 	err = copyDir(srcCkeletin, dstCkeletin)
 	require.NoError(t, err, "failed to copy .ckeletin from source")
 
-	// Replace upstream module references with downstream module in .ckeletin/*.go
+	// Use AST-based import rewriter (matches real update workflow)
+	t.Log("Rewriting imports with AST rewriter")
+	rewriteCmd := exec.Command("go", "run", "./.ckeletin/scripts/rewrite-imports/",
+		"-old", upstreamModule, "-new", testModule, "-dir", ".ckeletin")
+	rewriteCmd.Dir = tmpDir
+	rewriteOutput, err := rewriteCmd.CombinedOutput()
+	require.NoError(t, err, "AST import rewrite failed\nOutput: %s", string(rewriteOutput))
+
+	// Replace binary name in .ckeletin/ Go string literals (matches real update workflow).
+	// The AST rewriter only handles import paths; string literals like
+	// "./logs/ckeletin-go.log" need separate replacement.
+	t.Log("Replacing binary name in .ckeletin/ Go string literals")
+	replaceNameInCkeletinGoFiles(t, dstCkeletin, oldName, testName)
+
+	// Also replace non-import references (e.g., string constants in non-Go files)
+	// that the AST rewriter doesn't touch
 	err = filepath.Walk(dstCkeletin, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
+		if walkErr != nil || info.IsDir() {
 			return walkErr
+		}
+		// Only process non-Go files (AST rewriter handles .go files)
+		if strings.HasSuffix(path, ".go") {
+			return nil
 		}
 		content, readErr := os.ReadFile(path)
 		if readErr != nil {
@@ -577,13 +596,35 @@ func TestFrameworkUpdate(t *testing.T) {
 		}
 		return nil
 	})
-	require.NoError(t, err, "failed to replace module paths in .ckeletin")
+	require.NoError(t, err, "failed to replace module paths in non-Go files")
 
 	// Run go mod tidy after update
 	tidyCmd := exec.Command("go", "mod", "tidy")
 	tidyCmd.Dir = tmpDir
 	tidyOutput, err := tidyCmd.CombinedOutput()
 	require.NoError(t, err, "go mod tidy after update failed\nOutput: %s", string(tidyOutput))
+
+	// Format code (matches real update workflow step)
+	if !useTaskFallback {
+		t.Log("Formatting code after update")
+		fmtCmd := exec.Command("task", "format")
+		fmtCmd.Dir = tmpDir
+		fmtOutput, err := fmtCmd.CombinedOutput()
+		if err != nil {
+			t.Logf("task format output: %s", string(fmtOutput))
+		}
+	}
+
+	// Regenerate config constants (matches real update workflow step)
+	if !useTaskFallback {
+		t.Log("Regenerating config constants after update")
+		genCmd := exec.Command("task", "ckeletin:generate:config:key-constants")
+		genCmd.Dir = tmpDir
+		genOutput, err := genCmd.CombinedOutput()
+		if err != nil {
+			t.Logf("constant generation output: %s", string(genOutput))
+		}
+	}
 
 	// Subtests
 	t.Run("build succeeds after update", func(t *testing.T) {
@@ -593,26 +634,59 @@ func TestFrameworkUpdate(t *testing.T) {
 		assert.NoError(t, err, "go build failed after framework update\nOutput: %s", string(output))
 	})
 
-	t.Run("no stale module references", func(t *testing.T) {
-		var filesWithStaleRefs []string
+	t.Run("no stale module references in imports", func(t *testing.T) {
+		// Only check import statements — the AST rewriter intentionally leaves
+		// string constants, comments, and test fixtures unchanged.
+		importLineRe := regexp.MustCompile(`^\s*(\w+\s+)?"[^"]*"`)
+		var staleRefs []string
+
 		err := filepath.Walk(filepath.Join(tmpDir, ".ckeletin"), func(path string, info os.FileInfo, walkErr error) error {
 			if walkErr != nil || info.IsDir() || !strings.HasSuffix(path, ".go") {
 				return walkErr
 			}
+			// Skip test files — they contain upstream module as test fixture data
+			if strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+
 			content, readErr := os.ReadFile(path)
 			if readErr != nil {
 				return readErr
 			}
-			if strings.Contains(string(content), upstreamModule) {
-				relPath, _ := filepath.Rel(tmpDir, path)
-				filesWithStaleRefs = append(filesWithStaleRefs, relPath)
+
+			inImportBlock := false
+			lines := strings.Split(string(content), "\n")
+			for lineNum, line := range lines {
+				trimmed := strings.TrimSpace(line)
+
+				if strings.HasPrefix(trimmed, "import (") {
+					inImportBlock = true
+					continue
+				}
+				if inImportBlock && trimmed == ")" {
+					inImportBlock = false
+					continue
+				}
+
+				isImportLine := false
+				if strings.HasPrefix(trimmed, "import \"") || strings.HasPrefix(trimmed, "import\t\"") {
+					isImportLine = true
+				}
+				if inImportBlock && importLineRe.MatchString(trimmed) {
+					isImportLine = true
+				}
+
+				if isImportLine && strings.Contains(line, upstreamModule) {
+					relPath, _ := filepath.Rel(tmpDir, path)
+					staleRefs = append(staleRefs, fmt.Sprintf("%s:%d: %s", relPath, lineNum+1, trimmed))
+				}
 			}
 			return nil
 		})
 		require.NoError(t, err, "failed to walk .ckeletin")
-		assert.Empty(t, filesWithStaleRefs,
-			"found stale upstream module references after update:\n%s",
-			strings.Join(filesWithStaleRefs, "\n"))
+		assert.Empty(t, staleRefs,
+			"found stale upstream module references in import statements after update:\n%s",
+			strings.Join(staleRefs, "\n"))
 	})
 
 	t.Run("task aliases resolve", func(t *testing.T) {
@@ -648,6 +722,167 @@ func TestFrameworkUpdate(t *testing.T) {
 		assert.Empty(t, unresolved,
 			"alias targets in Taskfile.yml point to missing framework tasks:\n%s",
 			strings.Join(unresolved, "\n"))
+	})
+
+	// Verify that task check passes after a framework update — catches validator,
+	// lint, and architecture check breakage that go build alone wouldn't find.
+	t.Run("task check passes after update", func(t *testing.T) {
+		if useTaskFallback {
+			t.Skip("task command not available")
+		}
+		if runtime.GOOS == "windows" {
+			t.Skip("task check requires bash (shell-based validators)")
+		}
+
+		t.Log("Running: task check")
+		cmd := exec.Command("task", "check")
+		cmd.Dir = tmpDir
+		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1")
+		output, err := cmd.CombinedOutput()
+
+		assert.NoError(t, err,
+			"task check should pass after framework update\nOutput:\n%s", string(output))
+	})
+}
+
+// TestPostUpdateMigration tests that the post-update migration script
+// correctly handles stale configuration and is idempotent.
+func TestPostUpdateMigration(t *testing.T) {
+	// Skip in derived projects
+	currentModule := getCurrentModule(t)
+	if currentModule != upstreamModule {
+		t.Skipf("Migration test only runs in upstream repo (current: %s)", currentModule)
+	}
+
+	projectRoot := getProjectRoot(t)
+	migrationScript := filepath.Join(projectRoot, ".ckeletin", "scripts", "migrate-post-update.sh")
+	if _, err := os.Stat(migrationScript); os.IsNotExist(err) {
+		t.Skip("migrate-post-update.sh not found")
+	}
+
+	t.Run("cleans stale pkg references from arch lint config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create a .go-arch-lint.yml with stale pkg/** references but no pkg/ directory
+		staleConfig := `version: 3
+workdir: .
+components:
+  public:
+    in: pkg/**
+  internal:
+    in: internal/**
+commonComponents:
+  - public
+  - internal
+deps:
+  public:
+    canDependOn: []
+  internal:
+    canDependOn:
+      - public
+`
+		err := os.WriteFile(filepath.Join(tmpDir, ".go-arch-lint.yml"), []byte(staleConfig), 0644)
+		require.NoError(t, err)
+
+		// Ensure no pkg/ directory exists
+		pkgDir := filepath.Join(tmpDir, "pkg")
+		assert.NoDirExists(t, pkgDir, "pkg/ should not exist for this test")
+
+		// Run migration script
+		cmd := exec.Command("bash", migrationScript)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "migration script failed\nOutput: %s", string(output))
+
+		// Verify pkg/** references are removed
+		content, err := os.ReadFile(filepath.Join(tmpDir, ".go-arch-lint.yml"))
+		require.NoError(t, err)
+		contentStr := string(content)
+
+		assert.NotContains(t, contentStr, "pkg/**",
+			"pkg/** references should be removed after migration")
+		assert.NotContains(t, contentStr, "public:",
+			"public component should be removed after migration")
+		assert.NotContains(t, contentStr, "- public",
+			"public commonComponent entry should be removed after migration")
+		// internal should still exist
+		assert.Contains(t, contentStr, "internal",
+			"internal component should still exist after migration")
+	})
+
+	t.Run("is idempotent when no pkg dir and no config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// No .go-arch-lint.yml, no pkg/ — migration should be a no-op
+		cmd := exec.Command("bash", migrationScript)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		assert.NoError(t, err,
+			"migration should succeed as no-op when config doesn't exist\nOutput: %s", string(output))
+	})
+
+	t.Run("is idempotent when pkg dir exists", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create pkg/ directory and .go-arch-lint.yml with pkg/** references
+		err := os.MkdirAll(filepath.Join(tmpDir, "pkg"), 0755)
+		require.NoError(t, err)
+
+		configWithPkg := `version: 3
+components:
+  public:
+    in: pkg/**
+  internal:
+    in: internal/**
+`
+		err = os.WriteFile(filepath.Join(tmpDir, ".go-arch-lint.yml"), []byte(configWithPkg), 0644)
+		require.NoError(t, err)
+
+		// Run migration — should NOT remove pkg/** because pkg/ dir exists
+		cmd := exec.Command("bash", migrationScript)
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err, "migration script failed\nOutput: %s", string(output))
+
+		// Verify pkg/** references are preserved
+		content, err := os.ReadFile(filepath.Join(tmpDir, ".go-arch-lint.yml"))
+		require.NoError(t, err)
+		assert.Contains(t, string(content), "pkg/**",
+			"pkg/** references should be preserved when pkg/ directory exists")
+	})
+
+	t.Run("is idempotent on repeated runs", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		staleConfig := `version: 3
+components:
+  public:
+    in: pkg/**
+  internal:
+    in: internal/**
+commonComponents:
+  - public
+deps:
+  public:
+    canDependOn: []
+`
+		err := os.WriteFile(filepath.Join(tmpDir, ".go-arch-lint.yml"), []byte(staleConfig), 0644)
+		require.NoError(t, err)
+
+		// Run migration twice
+		for i := 0; i < 2; i++ {
+			cmd := exec.Command("bash", migrationScript)
+			cmd.Dir = tmpDir
+			output, err := cmd.CombinedOutput()
+			assert.NoError(t, err,
+				"migration run %d should succeed\nOutput: %s", i+1, string(output))
+		}
+
+		// Verify final state is clean
+		content, err := os.ReadFile(filepath.Join(tmpDir, ".go-arch-lint.yml"))
+		require.NoError(t, err)
+		assert.NotContains(t, string(content), "pkg/**",
+			"pkg/** should be removed after repeated migration runs")
 	})
 }
 
@@ -771,4 +1006,58 @@ func parseFrameworkTaskNames(t *testing.T, path string) []string {
 		}
 	}
 	return names
+}
+
+// replaceNameInCkeletinGoFiles replaces the old binary name with the new name
+// in Go string literals within .ckeletin/, skipping import lines.
+// This mirrors what task ckeletin:update does for binary name references
+// (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log").
+func replaceNameInCkeletinGoFiles(t *testing.T, ckeletinDir, oldName, newName string) {
+	t.Helper()
+
+	err := filepath.Walk(ckeletinDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil || info.IsDir() {
+			return walkErr
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return readErr
+		}
+
+		original := string(content)
+		lines := strings.Split(original, "\n")
+		inImportBlock := false
+
+		for i, line := range lines {
+			trimmed := strings.TrimSpace(line)
+
+			if strings.HasPrefix(trimmed, "import (") {
+				inImportBlock = true
+				continue
+			}
+			if inImportBlock {
+				if trimmed == ")" {
+					inImportBlock = false
+				}
+				continue
+			}
+			if strings.HasPrefix(trimmed, "import ") {
+				continue
+			}
+
+			lines[i] = strings.ReplaceAll(line, oldName, newName)
+		}
+
+		updated := strings.Join(lines, "\n")
+		if updated != original {
+			return os.WriteFile(path, []byte(updated), info.Mode())
+		}
+		return nil
+	})
+
+	require.NoError(t, err, "failed to replace binary name in .ckeletin Go files")
 }
