@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
 
@@ -123,6 +124,52 @@ type allCheckResult struct {
 	remediation string
 }
 
+// CheckJSONItem represents a single check result in JSON output.
+type CheckJSONItem struct {
+	Name       string `json:"name"`
+	Category   string `json:"category"`
+	Passed     bool   `json:"passed"`
+	DurationMs int64  `json:"duration_ms"`
+	Error      string `json:"error,omitempty"`
+}
+
+// CheckJSONResult represents the full check output in JSON mode.
+// Implements ui.JSONResponder for custom JSON envelope data.
+type CheckJSONResult struct {
+	Passed bool            `json:"passed"`
+	Total  int             `json:"total"`
+	Failed int             `json:"failed"`
+	Checks []CheckJSONItem `json:"checks"`
+}
+
+// JSONResponse implements ui.JSONResponder.
+func (r CheckJSONResult) JSONResponse() interface{} {
+	return r
+}
+
+// toJSONResult converts internal results to the JSON output format.
+func toJSONResult(results []allCheckResult, totalPassed, totalFailed int) CheckJSONResult {
+	checks := make([]CheckJSONItem, len(results))
+	for i, r := range results {
+		item := CheckJSONItem{
+			Name:       r.name,
+			Category:   r.category,
+			Passed:     r.passed,
+			DurationMs: r.duration.Milliseconds(),
+		}
+		if r.err != nil {
+			item.Error = r.err.Error()
+		}
+		checks[i] = item
+	}
+	return CheckJSONResult{
+		Passed: totalFailed == 0,
+		Total:  totalPassed + totalFailed,
+		Failed: totalFailed,
+		Checks: checks,
+	}
+}
+
 // Execute runs all checks with TUI progress display or simple output.
 func (e *Executor) Execute(ctx context.Context) error {
 	methods := &checkMethods{cfg: e.cfg}
@@ -156,6 +203,27 @@ func (e *Executor) Execute(ctx context.Context) error {
 	}
 
 	e.runner.SaveTimings()
+
+	if ui.IsJSONMode() {
+		jsonResult := toJSONResult(allResults, totalPassed, totalFailed)
+		status := "success"
+		if totalFailed > 0 {
+			status = "error"
+		}
+		if err := ui.RenderJSON(e.writer, ui.JSONEnvelope{
+			Status:  status,
+			Command: ui.CommandName(),
+			Data:    jsonResult.JSONResponse(),
+			Error:   nil,
+		}); err != nil {
+			return fmt.Errorf("failed to write JSON output: %w", err)
+		}
+		if totalFailed > 0 {
+			return fmt.Errorf("%d checks failed", totalFailed)
+		}
+		return nil
+	}
+
 	e.printFinalSummary(allResults, totalPassed, totalFailed, time.Since(startTime))
 
 	if totalFailed > 0 {
