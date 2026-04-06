@@ -43,6 +43,7 @@ Use `task` commands for all standard workflows. The `task` runner wraps Go tooli
 | Integration tests | `task test:integration` |
 | Vulnerability check | `task check:vuln` |
 | Regenerate config constants | `task generate:config:key-constants` |
+| Generate config JSON Schema | `task generate:config:schema` |
 
 **Daily workflow:** `task format` → `task test` → `task lint` → `task check`
 

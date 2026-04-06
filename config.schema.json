@@ -1,0 +1,225 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Configuration schema for ckeletin-go CLI applications. Generated from the config registry.",
+  "properties": {
+    "app": {
+      "properties": {
+        "check": {
+          "properties": {
+            "category": {
+              "default": "",
+              "description": "Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)",
+              "examples": [
+                "security,tests"
+              ],
+              "type": "string"
+            },
+            "fail_fast": {
+              "default": false,
+              "description": "Stop on first failed check",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            },
+            "parallel": {
+              "default": true,
+              "description": "Run checks within each category in parallel (disable with --parallel=false)",
+              "examples": [
+                "false"
+              ],
+              "type": "boolean"
+            },
+            "timing": {
+              "default": true,
+              "description": "Show duration for each check in the output",
+              "examples": [
+                "false"
+              ],
+              "type": "boolean"
+            },
+            "verbose": {
+              "default": false,
+              "description": "Show verbose output including command details",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        },
+        "docs": {
+          "properties": {
+            "output_file": {
+              "default": "",
+              "description": "Output file for documentation (defaults to stdout)",
+              "examples": [
+                "/path/to/output.md"
+              ],
+              "type": "string"
+            },
+            "output_format": {
+              "default": "markdown",
+              "description": "Output format for documentation (markdown, yaml)",
+              "examples": [
+                "yaml"
+              ],
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "log": {
+          "properties": {
+            "color_enabled": {
+              "default": "auto",
+              "description": "Enable colored console output (auto, true, false). Auto detects TTY.",
+              "examples": [
+                "true"
+              ],
+              "type": "string"
+            },
+            "console_level": {
+              "default": "",
+              "description": "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.",
+              "examples": [
+                "info"
+              ],
+              "type": "string"
+            },
+            "file_compress": {
+              "default": false,
+              "description": "Compress rotated log files with gzip",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            },
+            "file_enabled": {
+              "default": false,
+              "description": "Enable file logging to capture detailed logs",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            },
+            "file_level": {
+              "default": "debug",
+              "description": "File log level (trace, debug, info, warn, error, fatal, panic)",
+              "examples": [
+                "debug"
+              ],
+              "type": "string"
+            },
+            "file_max_age": {
+              "default": 28,
+              "description": "Maximum number of days to retain old log files",
+              "examples": [
+                "28"
+              ],
+              "type": "integer"
+            },
+            "file_max_backups": {
+              "default": 3,
+              "description": "Maximum number of old log files to retain",
+              "examples": [
+                "3"
+              ],
+              "type": "integer"
+            },
+            "file_max_size": {
+              "default": 100,
+              "description": "Maximum size in megabytes before log file is rotated",
+              "examples": [
+                "100"
+              ],
+              "type": "integer"
+            },
+            "file_path": {
+              "default": "./logs/ckeletin-go.log",
+              "description": "Path to the log file (created with secure 0600 permissions)",
+              "examples": [
+                "/var/log/ckeletin-go/app.log"
+              ],
+              "type": "string"
+            },
+            "sampling_enabled": {
+              "default": false,
+              "description": "Enable log sampling for high-volume scenarios",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            },
+            "sampling_initial": {
+              "default": 100,
+              "description": "Number of messages to log per second before sampling",
+              "examples": [
+                "100"
+              ],
+              "type": "integer"
+            },
+            "sampling_thereafter": {
+              "default": 100,
+              "description": "Number of messages to log thereafter per second",
+              "examples": [
+                "100"
+              ],
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "log_level": {
+          "default": "info",
+          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.",
+          "examples": [
+            "debug"
+          ],
+          "type": "string"
+        },
+        "output_format": {
+          "default": "text",
+          "description": "Output format: text (human-readable) or json (machine-readable)",
+          "examples": [
+            "json"
+          ],
+          "type": "string"
+        },
+        "ping": {
+          "properties": {
+            "output_color": {
+              "default": "white",
+              "description": "Text color for ping command output (white, red, green, blue, cyan, yellow, magenta)",
+              "examples": [
+                "green"
+              ],
+              "type": "string"
+            },
+            "output_message": {
+              "default": "Pong",
+              "description": "Default message to display for the ping command",
+              "examples": [
+                "Hello World!"
+              ],
+              "type": "string"
+            },
+            "ui": {
+              "default": false,
+              "description": "Enable interactive UI for the ping command",
+              "examples": [
+                "true"
+              ],
+              "type": "boolean"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "title": "ckeletin-go configuration",
+  "type": "object"
+}

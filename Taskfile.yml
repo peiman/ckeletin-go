@@ -275,6 +275,10 @@ tasks:
     desc: Generate type-safe config key constants
     cmds: [task: ckeletin:generate:config:key-constants]
 
+  generate:config:schema:
+    desc: Generate JSON Schema from config registry
+    cmds: [task: ckeletin:generate:config:schema]
+
   generate:license:
     desc: Generate all license artifacts
     cmds: [task: ckeletin:generate:license]
