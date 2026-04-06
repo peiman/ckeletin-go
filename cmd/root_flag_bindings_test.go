@@ -25,6 +25,11 @@ func viperKeyToFlagName(viperKey string) string {
 		return "log-color"
 	}
 
+	// Special case: output_format flag is named "output" not "output-format"
+	if viperKey == "app.output_format" {
+		return "output"
+	}
+
 	// Remove app. prefix
 	key := strings.TrimPrefix(viperKey, "app.")
 	// Replace dots and underscores with hyphens
