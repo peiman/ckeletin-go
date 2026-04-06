@@ -3,10 +3,12 @@ package check
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -758,4 +760,131 @@ func TestExecutor_CheckTestCoverageCallback(t *testing.T) {
 		methods.coverage = 75.0
 		assert.Equal(t, 75.0, methods.coverage)
 	})
+}
+
+func TestRunCategorySilent_PassingChecks(t *testing.T) {
+	setupTimingTestEnv(t)
+
+	var buf bytes.Buffer
+	timings := &timingHistory{Checks: make(map[string]*checkTiming)}
+	executor := &Executor{
+		cfg:     Config{},
+		writer:  &buf,
+		runner:  NewRunner(timings),
+		timings: timings,
+	}
+
+	category := categoryDef{
+		name: "Silent Test",
+		checks: []checkItem{
+			{name: "check-a", fn: func(ctx context.Context) error { return nil }, remediation: "fix a"},
+			{name: "check-b", fn: func(ctx context.Context) error { return nil }, remediation: "fix b"},
+		},
+	}
+
+	results, err := executor.runCategorySilent(context.Background(), category)
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	assert.True(t, results[0].passed)
+	assert.True(t, results[1].passed)
+	// Silent mode should produce no output
+	assert.Empty(t, buf.String(), "runCategorySilent should produce no output")
+}
+
+func TestRunCategorySilent_FailingChecks(t *testing.T) {
+	setupTimingTestEnv(t)
+
+	var buf bytes.Buffer
+	timings := &timingHistory{Checks: make(map[string]*checkTiming)}
+	executor := &Executor{
+		cfg:     Config{},
+		writer:  &buf,
+		runner:  NewRunner(timings),
+		timings: timings,
+	}
+
+	category := categoryDef{
+		name: "Silent Fail",
+		checks: []checkItem{
+			{name: "pass", fn: func(ctx context.Context) error { return nil }, remediation: ""},
+			{name: "fail", fn: func(ctx context.Context) error { return errors.New("broken") }, remediation: "fix it"},
+		},
+	}
+
+	results, err := executor.runCategorySilent(context.Background(), category)
+	require.Error(t, err)
+	require.Len(t, results, 2)
+	assert.True(t, results[0].passed)
+	assert.False(t, results[1].passed)
+	assert.Empty(t, buf.String(), "runCategorySilent should produce no output even on failure")
+}
+
+func TestExecute_JSONMode_AllPass(t *testing.T) {
+	setupTimingTestEnv(t)
+
+	ui.SetOutputMode("json")
+	ui.SetCommandName("check")
+	defer func() {
+		ui.SetOutputMode("")
+		ui.SetCommandName("")
+	}()
+
+	var buf bytes.Buffer
+	timings := &timingHistory{Checks: make(map[string]*checkTiming)}
+	executor := &Executor{
+		cfg:     Config{Categories: []string{"nonexistent-json-test"}},
+		writer:  &buf,
+		runner:  NewRunner(timings),
+		timings: timings,
+		useTUI:  false,
+	}
+
+	// With a nonexistent category, no checks run → all pass (0 failed)
+	err := executor.Execute(context.Background())
+	require.NoError(t, err)
+
+	var envelope ui.JSONEnvelope
+	unmarshalErr := json.Unmarshal(buf.Bytes(), &envelope)
+	require.NoError(t, unmarshalErr, "should produce valid JSON, got: %s", buf.String())
+
+	assert.Equal(t, "success", envelope.Status)
+	assert.Equal(t, "check", envelope.Command)
+	assert.Nil(t, envelope.Error)
+}
+
+func TestExecute_JSONMode_NoStdoutContamination(t *testing.T) {
+	setupTimingTestEnv(t)
+
+	ui.SetOutputMode("json")
+	ui.SetCommandName("check")
+	defer func() {
+		ui.SetOutputMode("")
+		ui.SetCommandName("")
+	}()
+
+	var buf bytes.Buffer
+	timings := &timingHistory{Checks: make(map[string]*checkTiming)}
+	executor := &Executor{
+		cfg:     Config{},
+		writer:  &buf,
+		runner:  NewRunner(timings),
+		timings: timings,
+		useTUI:  false,
+		checks:  []checkItem{{name: "mock", fn: func(ctx context.Context) error { return nil }, remediation: ""}},
+	}
+
+	// Inject a single passing check via buildCategories override
+	// Actually, Execute calls buildCategories which builds real checks.
+	// Use category filter to get empty set, so we test the JSON envelope path.
+	executor.cfg.Categories = []string{"nonexistent-json-test-2"}
+
+	err := executor.Execute(context.Background())
+	require.NoError(t, err)
+
+	output := buf.String()
+	// Output should be exactly one JSON object — no checkmate text before it
+	assert.True(t, len(output) > 0, "should have output")
+	var raw json.RawMessage
+	unmarshalErr := json.Unmarshal([]byte(output), &raw)
+	assert.NoError(t, unmarshalErr, "entire stdout should be valid JSON, got: %s", output)
 }
