@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/pkg/checkmate"
 )
 
@@ -134,7 +134,7 @@ type CheckJSONItem struct {
 }
 
 // CheckJSONResult represents the full check output in JSON mode.
-// Implements ui.JSONResponder for custom JSON envelope data.
+// Implements output.JSONResponder for custom JSON envelope data.
 type CheckJSONResult struct {
 	Passed bool            `json:"passed"`
 	Total  int             `json:"total"`
@@ -142,7 +142,7 @@ type CheckJSONResult struct {
 	Checks []CheckJSONItem `json:"checks"`
 }
 
-// JSONResponse implements ui.JSONResponder.
+// JSONResponse implements output.JSONResponder.
 func (r CheckJSONResult) JSONResponse() interface{} {
 	return r
 }
@@ -180,7 +180,7 @@ func (e *Executor) Execute(ctx context.Context) error {
 	var totalPassed, totalFailed int
 	startTime := time.Now()
 
-	jsonMode := ui.IsJSONMode()
+	jsonMode := output.IsJSONMode()
 
 	for _, category := range categories {
 		var results []allCheckResult
@@ -214,16 +214,16 @@ func (e *Executor) Execute(ctx context.Context) error {
 	if jsonMode {
 		jsonResult := toJSONResult(allResults, totalPassed, totalFailed)
 		status := "success"
-		var jsonErr *ui.JSONError
+		var jsonErr *output.JSONError
 		if totalFailed > 0 {
 			status = "error"
-			jsonErr = &ui.JSONError{
+			jsonErr = &output.JSONError{
 				Message: fmt.Sprintf("%d of %d checks failed", totalFailed, totalPassed+totalFailed),
 			}
 		}
-		if err := ui.RenderJSON(e.writer, ui.JSONEnvelope{
+		if err := output.RenderJSON(e.writer, output.JSONEnvelope{
 			Status:  status,
-			Command: ui.CommandName(),
+			Command: output.CommandName(),
 			Data:    jsonResult.JSONResponse(),
 			Error:   jsonErr,
 		}); err != nil {

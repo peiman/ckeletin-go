@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -822,11 +822,11 @@ func TestRunCategorySilent_FailingChecks(t *testing.T) {
 func TestExecute_JSONMode_AllPass(t *testing.T) {
 	setupTimingTestEnv(t)
 
-	ui.SetOutputMode("json")
-	ui.SetCommandName("check")
+	output.SetOutputMode("json")
+	output.SetCommandName("check")
 	defer func() {
-		ui.SetOutputMode("")
-		ui.SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	var buf bytes.Buffer
@@ -843,7 +843,7 @@ func TestExecute_JSONMode_AllPass(t *testing.T) {
 	err := executor.Execute(context.Background())
 	require.NoError(t, err)
 
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	unmarshalErr := json.Unmarshal(buf.Bytes(), &envelope)
 	require.NoError(t, unmarshalErr, "should produce valid JSON, got: %s", buf.String())
 
@@ -855,11 +855,11 @@ func TestExecute_JSONMode_AllPass(t *testing.T) {
 func TestExecute_JSONMode_NoStdoutContamination(t *testing.T) {
 	setupTimingTestEnv(t)
 
-	ui.SetOutputMode("json")
-	ui.SetCommandName("check")
+	output.SetOutputMode("json")
+	output.SetCommandName("check")
 	defer func() {
-		ui.SetOutputMode("")
-		ui.SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	var buf bytes.Buffer

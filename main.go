@@ -6,18 +6,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/cmd"
-	"github.com/peiman/ckeletin-go/internal/ui"
 )
 
 func run() int {
 	if err := cmd.Execute(); err != nil {
-		if ui.IsJSONMode() {
-			_ = ui.RenderJSON(os.Stdout, ui.JSONEnvelope{
+		if output.IsJSONMode() {
+			_ = output.RenderJSON(os.Stdout, output.JSONEnvelope{
 				Status:  "error",
-				Command: ui.CommandName(),
+				Command: output.CommandName(),
 				Data:    nil,
-				Error:   &ui.JSONError{Message: err.Error()},
+				Error:   &output.JSONError{Message: err.Error()},
 			})
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

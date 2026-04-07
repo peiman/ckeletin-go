@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -27,8 +27,8 @@ func findSubcommand(root *cobra.Command, name string) *cobra.Command {
 // resetOutputJSONTestState resets all global state that integration tests modify.
 // Must be called via defer at the start of each test.
 func resetOutputJSONTestState(origCfgFile string, origStatus string, origUsed string) {
-	ui.SetOutputMode("")
-	ui.SetCommandName("")
+	output.SetOutputMode("")
+	output.SetCommandName("")
 	viper.Reset()
 	cfgFile = origCfgFile
 	configFileStatus = origStatus
@@ -73,7 +73,7 @@ func TestOutputJSON_PingCommand(t *testing.T) {
 	err := RootCmd.Execute()
 	require.NoError(t, err)
 
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(stdout.Bytes(), &envelope)
 	require.NoError(t, err, "stdout should contain valid JSON, got: %s", stdout.String())
 
@@ -100,10 +100,10 @@ func TestOutputJSON_DefaultIsText(t *testing.T) {
 	err := RootCmd.Execute()
 	require.NoError(t, err)
 
-	output := stdout.String()
-	assert.Contains(t, output, "Pong", "text mode should contain default ping message")
+	textOutput := stdout.String()
+	assert.Contains(t, textOutput, "Pong", "text mode should contain default ping message")
 
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(stdout.Bytes(), &envelope)
 	assert.Error(t, err, "text mode output should not be valid JSON")
 }
@@ -147,7 +147,7 @@ func TestOutputJSON_StderrSilent(t *testing.T) {
 	assert.Empty(t, stderr.String(), "stderr should be empty in JSON mode")
 
 	// Stdout should have valid JSON
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(stdout.Bytes(), &envelope)
 	assert.NoError(t, err, "stdout should be valid JSON")
 }
@@ -174,7 +174,7 @@ func TestOutputJSON_ErrorCommand(t *testing.T) {
 	// JSON mode should have been activated early (before config validation),
 	// so main.go's error handler will emit the JSON error envelope.
 	// The actual JSON envelope emission is tested in main_test.go (TestRun_JSONMode_Error).
-	assert.True(t, ui.IsJSONMode(), "JSON mode should be active even when config validation fails")
+	assert.True(t, output.IsJSONMode(), "JSON mode should be active even when config validation fails")
 }
 
 func TestOutputJSON_EnvelopeStructure(t *testing.T) {

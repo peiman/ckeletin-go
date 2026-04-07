@@ -1,8 +1,9 @@
-package ui
+package output
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,6 +73,13 @@ func TestRenderJSON_NilData(t *testing.T) {
 
 	assert.Equal(t, "null", string(raw["data"]))
 	assert.Equal(t, "null", string(raw["error"]))
+}
+
+// errorWriter is a writer that always returns an error.
+type errorWriter struct{}
+
+func (e *errorWriter) Write(p []byte) (n int, err error) {
+	return 0, errors.New("write error")
 }
 
 func TestRenderJSON_WriteError(t *testing.T) {

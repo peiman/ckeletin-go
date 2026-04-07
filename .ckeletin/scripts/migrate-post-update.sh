@@ -31,3 +31,14 @@ if [ ! -d "pkg" ] && [ -f ".go-arch-lint.yml" ] && grep -q "pkg/\*\*" .go-arch-l
     ' .go-arch-lint.yml > "$tmpfile"
     mv "$tmpfile" .go-arch-lint.yml
 fi
+
+# Migration 2: JSON output types moved from internal/ui to .ckeletin/pkg/output
+# When: internal/ui/json.go still exists (pre-refactoring state)
+if [ -f "internal/ui/json.go" ] && grep -q "JSONEnvelope" internal/ui/json.go; then
+    echo "   ✓ Removing internal/ui/json.go (moved to .ckeletin/pkg/output/)"
+    rm -f internal/ui/json.go internal/ui/json_test.go
+    echo "   ⚠ ACTION REQUIRED: Update imports in your code:"
+    echo "     - Replace 'internal/ui' with '.ckeletin/pkg/output' for JSON types"
+    echo "     - Affected: cmd/root.go, main.go, internal/check/executor.go"
+    echo "     - Types moved: JSONEnvelope, JSONError, JSONResponder, IsJSONMode, SetOutputMode, etc."
+fi
