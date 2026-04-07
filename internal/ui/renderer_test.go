@@ -55,9 +55,9 @@ func TestRenderSuccess(t *testing.T) {
 			err := RenderSuccess(&buf, tt.message, tt.data)
 
 			assert.NoError(t, err)
-			output := buf.String()
+			textOutput := buf.String()
 			for _, expected := range tt.contains {
-				assert.Contains(t, output, expected)
+				assert.Contains(t, textOutput, expected)
 			}
 		})
 	}
@@ -90,9 +90,9 @@ func TestRenderError(t *testing.T) {
 			err := RenderError(&buf, tt.message, tt.err)
 
 			assert.NoError(t, err)
-			output := buf.String()
+			textOutput := buf.String()
 			for _, expected := range tt.contains {
-				assert.Contains(t, output, expected)
+				assert.Contains(t, textOutput, expected)
 			}
 		})
 	}
