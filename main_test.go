@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/cmd"
-	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,11 +75,11 @@ func TestRun_JSONMode_Error(t *testing.T) {
 	originalRoot := cmd.RootCmd
 	defer func() { cmd.RootCmd = originalRoot }()
 
-	ui.SetOutputMode("json")
-	ui.SetCommandName("fail")
+	output.SetOutputMode("json")
+	output.SetCommandName("fail")
 	defer func() {
-		ui.SetOutputMode("")
-		ui.SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	testRoot := &cobra.Command{Use: "test", SilenceErrors: true}
@@ -107,7 +107,7 @@ func TestRun_JSONMode_Error(t *testing.T) {
 
 	assert.Equal(t, 1, code)
 
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err := json.Unmarshal(buf.Bytes(), &envelope)
 	assert.NoError(t, err, "stdout should contain valid JSON, got: %s", buf.String())
 	assert.Equal(t, "error", envelope.Status)

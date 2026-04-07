@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,11 +82,11 @@ func TestToJSONResult_AllPassed(t *testing.T) {
 // Integration-level tests that exercise the full Execute() JSON path.
 
 func TestCheckJSON_AllPass(t *testing.T) {
-	ui.SetOutputMode("json")
-	ui.SetCommandName("check")
+	output.SetOutputMode("json")
+	output.SetCommandName("check")
 	defer func() {
-		ui.SetOutputMode("")
-		ui.SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	var buf bytes.Buffer
@@ -130,21 +130,21 @@ func TestCheckJSON_AllPass(t *testing.T) {
 	// Now test the JSON rendering path
 	jsonResult := toJSONResult(allResults, totalPassed, totalFailed)
 	status := "success"
-	var jsonErr *ui.JSONError
+	var jsonErr *output.JSONError
 	if totalFailed > 0 {
 		status = "error"
-		jsonErr = &ui.JSONError{Message: "checks failed"}
+		jsonErr = &output.JSONError{Message: "checks failed"}
 	}
-	err := ui.RenderJSON(&buf, ui.JSONEnvelope{
+	err := output.RenderJSON(&buf, output.JSONEnvelope{
 		Status:  status,
-		Command: ui.CommandName(),
+		Command: output.CommandName(),
 		Data:    jsonResult.JSONResponse(),
 		Error:   jsonErr,
 	})
 	require.NoError(t, err)
 
 	// Parse and verify
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(buf.Bytes(), &envelope)
 	require.NoError(t, err, "should produce valid JSON, got: %s", buf.String())
 
@@ -168,11 +168,11 @@ func TestCheckJSON_AllPass(t *testing.T) {
 }
 
 func TestCheckJSON_SomeFail(t *testing.T) {
-	ui.SetOutputMode("json")
-	ui.SetCommandName("check")
+	output.SetOutputMode("json")
+	output.SetCommandName("check")
 	defer func() {
-		ui.SetOutputMode("")
-		ui.SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	var buf bytes.Buffer
@@ -187,17 +187,17 @@ func TestCheckJSON_SomeFail(t *testing.T) {
 
 	jsonResult := toJSONResult(results, totalPassed, totalFailed)
 	status := "error"
-	jsonErr := &ui.JSONError{Message: "1 of 2 checks failed"}
+	jsonErr := &output.JSONError{Message: "1 of 2 checks failed"}
 
-	err := ui.RenderJSON(&buf, ui.JSONEnvelope{
+	err := output.RenderJSON(&buf, output.JSONEnvelope{
 		Status:  status,
-		Command: ui.CommandName(),
+		Command: output.CommandName(),
 		Data:    jsonResult.JSONResponse(),
 		Error:   jsonErr,
 	})
 	require.NoError(t, err)
 
-	var envelope ui.JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(buf.Bytes(), &envelope)
 	require.NoError(t, err)
 

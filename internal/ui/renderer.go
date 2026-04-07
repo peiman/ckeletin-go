@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog/log"
 )
 
@@ -14,11 +15,11 @@ import (
 // Stream 3 (Audit): Logs raw data to file
 func RenderSuccess(out io.Writer, message string, data interface{}) error {
 	// JSON mode: emit envelope instead of formatted text
-	if IsJSONMode() {
-		return RenderJSON(out, JSONEnvelope{
+	if output.IsJSONMode() {
+		return output.RenderJSON(out, output.JSONEnvelope{
 			Status:  "success",
-			Command: CommandName(),
-			Data:    ResolveJSONData(data),
+			Command: output.CommandName(),
+			Data:    output.ResolveJSONData(data),
 			Error:   nil,
 		})
 	}
@@ -57,12 +58,12 @@ func RenderSuccess(out io.Writer, message string, data interface{}) error {
 // Stream 3 (Audit): Logs full error with stack trace to file
 func RenderError(out io.Writer, friendlyMessage string, err error) error {
 	// JSON mode: emit error envelope
-	if IsJSONMode() {
-		return RenderJSON(out, JSONEnvelope{
+	if output.IsJSONMode() {
+		return output.RenderJSON(out, output.JSONEnvelope{
 			Status:  "error",
-			Command: CommandName(),
+			Command: output.CommandName(),
 			Data:    nil,
-			Error:   &JSONError{Message: friendlyMessage},
+			Error:   &output.JSONError{Message: friendlyMessage},
 		})
 	}
 

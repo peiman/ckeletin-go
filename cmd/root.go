@@ -23,7 +23,7 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -220,9 +220,9 @@ var RootCmd = &cobra.Command{
 		// are properly routed through the JSON error handler in main.go.
 		// The flag value is available via viper after bindFlags.
 		if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Changed {
-			ui.SetOutputMode(outputFlag.Value.String())
+			output.SetOutputMode(outputFlag.Value.String())
 		}
-		ui.SetCommandName(cmd.Name())
+		output.SetCommandName(cmd.Name())
 
 		// Initialize configuration
 		if err := initConfig(); err != nil {
@@ -237,9 +237,9 @@ var RootCmd = &cobra.Command{
 		// Now apply full JSON mode: read final config value (flag > env > config file)
 		// and suppress stderr if JSON mode is active.
 		outputFormat := viper.GetString(config.KeyAppOutputFormat)
-		ui.SetOutputMode(outputFormat)
+		output.SetOutputMode(outputFormat)
 
-		if ui.IsJSONMode() {
+		if output.IsJSONMode() {
 			// Suppress all stderr output — agents want clean stdout only.
 			// The audit log file is unaffected (initialized separately by logger.Init).
 			zerolog.SetGlobalLevel(zerolog.Disabled)

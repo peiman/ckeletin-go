@@ -210,19 +210,19 @@ On error:
 
 **How it works for command authors:**
 - Commands that call `ui.RenderSuccess(out, message, data)` get JSON for free — the `data` argument becomes the envelope's `.data` field
-- For custom JSON shapes, implement `ui.JSONResponder` on your data type:
+- For custom JSON shapes, implement `output.JSONResponder` on your data type:
   ```go
   type MyResult struct { /* fields */ }
   func (r MyResult) JSONResponse() interface{} { return r }
   ```
 - The `check` command uses `JSONResponder` to emit a flat list of results instead of its internal state
 
-**Types (in `internal/ui/json.go`):**
-- `ui.JSONEnvelope` — the standard envelope wrapper
-- `ui.JSONError` — structured error with message and optional code
-- `ui.JSONResponder` — interface for custom JSON data shapes
-- `ui.IsJSONMode()` — check if JSON mode is active
-- `ui.RenderJSON(out, envelope)` — marshal envelope to writer
+**Types (in `.ckeletin/pkg/output/json.go`):**
+- `output.JSONEnvelope` — the standard envelope wrapper
+- `output.JSONError` — structured error with message and optional code
+- `output.JSONResponder` — interface for custom JSON data shapes
+- `output.IsJSONMode()` — check if JSON mode is active
+- `output.RenderJSON(out, envelope)` — marshal envelope to writer
 
 ### Testing
 

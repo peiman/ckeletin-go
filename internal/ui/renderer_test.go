@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -115,11 +116,11 @@ func TestRenderError_WriteError(t *testing.T) {
 }
 
 func TestRenderSuccess_JSONMode(t *testing.T) {
-	SetOutputMode("json")
-	SetCommandName("test")
+	output.SetOutputMode("json")
+	output.SetCommandName("test")
 	defer func() {
-		SetOutputMode("")
-		SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	type testData struct {
@@ -130,7 +131,7 @@ func TestRenderSuccess_JSONMode(t *testing.T) {
 	err := RenderSuccess(&buf, "human message", testData{Value: "hello"})
 	assert.NoError(t, err)
 
-	var envelope JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(buf.Bytes(), &envelope)
 	assert.NoError(t, err)
 
@@ -143,11 +144,11 @@ func TestRenderSuccess_JSONMode(t *testing.T) {
 }
 
 func TestRenderSuccess_JSONMode_WithResponder(t *testing.T) {
-	SetOutputMode("json")
-	SetCommandName("test")
+	output.SetOutputMode("json")
+	output.SetCommandName("test")
 	defer func() {
-		SetOutputMode("")
-		SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	responder := &mockJSONResponderForRenderer{custom: map[string]string{"custom": "data"}}
@@ -155,7 +156,7 @@ func TestRenderSuccess_JSONMode_WithResponder(t *testing.T) {
 	err := RenderSuccess(&buf, "human message", responder)
 	assert.NoError(t, err)
 
-	var envelope JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(buf.Bytes(), &envelope)
 	assert.NoError(t, err)
 
@@ -173,18 +174,18 @@ func (m *mockJSONResponderForRenderer) JSONResponse() interface{} {
 }
 
 func TestRenderError_JSONMode(t *testing.T) {
-	SetOutputMode("json")
-	SetCommandName("test")
+	output.SetOutputMode("json")
+	output.SetCommandName("test")
 	defer func() {
-		SetOutputMode("")
-		SetCommandName("")
+		output.SetOutputMode("")
+		output.SetCommandName("")
 	}()
 
 	var buf bytes.Buffer
 	err := RenderError(&buf, "something failed", errors.New("connection timeout"))
 	assert.NoError(t, err)
 
-	var envelope JSONEnvelope
+	var envelope output.JSONEnvelope
 	err = json.Unmarshal(buf.Bytes(), &envelope)
 	assert.NoError(t, err)
 
@@ -196,8 +197,8 @@ func TestRenderError_JSONMode(t *testing.T) {
 }
 
 func TestRenderSuccess_TextMode_Unchanged(t *testing.T) {
-	SetOutputMode("text")
-	defer SetOutputMode("")
+	output.SetOutputMode("text")
+	defer output.SetOutputMode("")
 
 	var buf bytes.Buffer
 	err := RenderSuccess(&buf, "Operation completed", nil)
