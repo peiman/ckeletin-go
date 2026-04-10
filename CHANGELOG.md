@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **CONVENTIONS.md deprecated**: Replaced with a deprecation notice pointing to `AGENTS.md` as the single source of truth for all project conventions.
+- **`task setup` scoped to core tools**: Now installs only pinned dev tools. Optional security/audit tools (`grype`, `gitleaks`, etc.) no longer block setup on network failures. Use `task setup:all` for everything or `task setup:security` for just audit tools.
+
+### Fixed
+
+- **Framework update detects missing task forwardings**: `task ckeletin:update` now warns when new framework tasks lack project-level aliases in `Taskfile.yml`, with exact YAML to add.
+- **Go version bumped to 1.26.2**: `.go-version` and `go.mod` synced to match installed toolchain.
 
 ## [0.9.1] - 2026-04-02
 
