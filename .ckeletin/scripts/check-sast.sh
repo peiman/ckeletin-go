@@ -26,7 +26,7 @@ if ! command -v semgrep &> /dev/null; then
     echo "  pip install semgrep                      # Python"
     echo "  pipx install semgrep                     # Isolated Python"
     echo ""
-    echo "Or run: task setup  # Installs all dev tools"
+    echo "Or run: task setup  # Installs core dev tools including semgrep"
     exit 1
 fi
 

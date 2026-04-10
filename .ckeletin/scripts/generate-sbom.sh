@@ -44,7 +44,7 @@ check_syft() {
         echo "  brew install syft                    # macOS"
         echo "  curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin"
         echo ""
-        echo "Or run: task setup  # Installs all dev tools"
+        echo "Or run: task setup  # Installs core dev tools"
         exit 1
     fi
 }

@@ -25,7 +25,7 @@ if ! command -v grype &> /dev/null; then
     echo "  brew install grype                       # macOS"
     echo "  curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin"
     echo ""
-    echo "Or run: task setup  # Installs all dev tools"
+    echo "Or run: task setup:security  # Installs security scanning tools"
     exit 1
 fi
 
