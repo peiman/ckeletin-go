@@ -5,6 +5,8 @@
 
 set -eo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Migration 1: Remove stale public component from .go-arch-lint.yml
 # When: pkg/ directory doesn't exist but .go-arch-lint.yml still references it
 if [ ! -d "pkg" ] && [ -f ".go-arch-lint.yml" ] && grep -q "pkg/\*\*" .go-arch-lint.yml; then
@@ -41,4 +43,39 @@ if [ -f "internal/ui/json.go" ] && grep -q "JSONEnvelope" internal/ui/json.go; t
     echo "     - Replace 'internal/ui' with '.ckeletin/pkg/output' for JSON types"
     echo "     - Affected: cmd/root.go, main.go, internal/check/executor.go"
     echo "     - Types moved: JSONEnvelope, JSONError, JSONResponder, IsJSONMode, SetOutputMode, etc."
+fi
+
+# Migration 3: Detect missing task forwardings in project Taskfile.yml
+# When: .ckeletin/Taskfile.yml has tasks that the project Taskfile doesn't forward
+# The expected-forwardings.txt file lists framework tasks that should have
+# project-level aliases. This runs on every update to catch new tasks.
+FORWARDINGS_FILE="$SCRIPT_DIR/expected-forwardings.txt"
+if [ -f "$FORWARDINGS_FILE" ] && [ -f "Taskfile.yml" ]; then
+    missing=()
+    while IFS= read -r task_name; do
+        # Skip empty lines and comments
+        [[ -z "$task_name" || "$task_name" == \#* ]] && continue
+        # Check if the project Taskfile has a forwarding for this task
+        if ! grep -q "^  ${task_name}:" Taskfile.yml 2>/dev/null; then
+            missing+=("$task_name")
+        fi
+    done < "$FORWARDINGS_FILE"
+
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo ""
+        echo "   ⚠ Missing task forwardings in Taskfile.yml:"
+        echo "     The following framework tasks have no project-level alias."
+        echo "     Add these to your Taskfile.yml under '# === Convenience Aliases ===':"
+        echo ""
+        for task_name in "${missing[@]}"; do
+            # Derive description from framework Taskfile
+            desc=$(grep -A1 "^  ${task_name}:" .ckeletin/Taskfile.yml 2>/dev/null | grep "desc:" | sed 's/.*desc: //' | head -1)
+            echo "  ${task_name}:"
+            if [ -n "$desc" ]; then
+                echo "    desc: ${desc}"
+            fi
+            echo "    cmds: [task: ckeletin:${task_name}]"
+            echo ""
+        done
+    fi
 fi

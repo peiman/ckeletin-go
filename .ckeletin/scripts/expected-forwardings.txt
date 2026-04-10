@@ -1,0 +1,91 @@
+# Expected task forwardings from .ckeletin/Taskfile.yml → project Taskfile.yml
+# Each line is a framework task name that should have a project-level alias.
+# The post-update migration checks for missing entries and warns the user.
+#
+# Format: task-name (maps to ckeletin:task-name in framework Taskfile)
+# Lines starting with # are comments. Empty lines are ignored.
+
+# === Setup ===
+setup
+setup:all
+setup:pinned
+setup:latest
+
+# === Development ===
+doctor
+format
+lint
+tidy
+run
+install
+
+# === Build ===
+build
+build:dev
+build:prod
+build:release
+
+# === Test ===
+test
+test:unit
+test:race
+test:dev
+test:prod
+test:integration
+test:golden
+test:golden:update
+test:full
+test:watch
+test:fuzz
+test:release
+test:coverage:html
+
+# === Quality Checks ===
+check
+check:fast
+check:deps
+check:deps:checksum
+check:deps:outdated
+check:license
+check:license:source
+check:license:binary
+check:release
+check:sast
+check:sast:full
+check:sbom:vulns
+check:secrets
+check:tools:installed
+check:vuln
+
+# === Clean ===
+clean
+clean:local
+clean:release
+
+# === Generate ===
+generate:config:key-constants
+generate:config:schema
+generate:license
+generate:license:report
+generate:license:files
+generate:attribution
+generate:sbom
+
+# === Validate ===
+validate:constants
+validate:commands
+validate:defaults
+validate:layering
+validate:security
+validate:architecture
+validate:package-organization
+validate:config-consumption
+validate:output
+validate:task-naming
+
+# === Hook Aliases (used by .lefthook.yml) ===
+format:staged
+check:deps:verify
+check:secrets:staged
+check:vuln:fast
+test:coverage
