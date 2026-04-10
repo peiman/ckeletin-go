@@ -25,8 +25,12 @@ tasks:
   # These let you run `task check` instead of `task ckeletin:check`
 
   setup:
-    desc: Install development tools
+    desc: Install core development tools (pinned versions only)
     cmds: [task: ckeletin:setup]
+
+  setup:all:
+    desc: Install all development tools (core + security/audit)
+    cmds: [task: ckeletin:setup:all]
 
   setup:pinned:
     desc: Install pinned dev tools (cacheable in CI)
@@ -34,6 +38,10 @@ tasks:
 
   setup:latest:
     desc: Install @latest tools (security tools, always fresh)
+    cmds: [task: ckeletin:setup:latest]
+
+  setup:security:
+    desc: Install security scanning tools only
     cmds: [task: ckeletin:setup:latest]
 
   doctor:

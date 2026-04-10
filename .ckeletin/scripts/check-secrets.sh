@@ -25,7 +25,7 @@ if ! command -v gitleaks &> /dev/null; then
     echo "  brew install gitleaks                    # macOS"
     echo "  go install github.com/gitleaks/gitleaks/v8@latest"
     echo ""
-    echo "Or run: task setup  # Installs all dev tools"
+    echo "Or run: task setup:security  # Installs security scanning tools"
     exit 1
 fi
 

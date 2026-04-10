@@ -58,8 +58,8 @@ tasks:
   # --- Setup & Environment ---
 
   setup:
-    desc: Install all development tools
-    deps: [setup:pinned, setup:latest]
+    desc: Install core development tools (pinned versions only)
+    deps: [setup:pinned]
     cmds:
     - |
       if command -v semgrep &> /dev/null; then
@@ -72,7 +72,14 @@ tasks:
         echo "  Warning: semgrep requires pip/pipx. Install manually: pip install semgrep"
       fi
     - lefthook install
-    - echo "✅ All tools installed successfully"
+    - echo "✅ Core tools installed. Run 'task setup:all' for security/audit tools too."
+    silent: false
+
+  setup:all:
+    desc: Install all development tools (core + security/audit)
+    deps: [setup, setup:latest]
+    cmds:
+    - echo "✅ All tools installed (core + security/audit)"
     silent: false
 
   setup:pinned:
