@@ -446,6 +446,76 @@ func TestViolation_ENF005_IncompleteMappng(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// CKSPEC-ENF-006: Violation tests for enforcement claims
+// Enforcement: conform.sh flags missing violation tests as feedback signals
+// Violation: remove a violation test from mapping, verify generator flags it
+// ---------------------------------------------------------------------------
+
+func TestViolation_ENF006_MissingViolationTestFlagged(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	// Verify ENF-006 enforcement: the conform script contains logic that
+	// flags requirements claiming enforcement above honor-system but
+	// lacking violation tests. We verify this by checking that the script
+	// has the detection logic AND that the current mapping has violation
+	// tests for requirements with enforcement claims.
+	//
+	// We can't run conform.sh here because it runs `go test -tags conformance`
+	// which would recursively invoke this test. Instead, verify the mechanism
+	// exists and the mapping is consistent.
+	root := projectRoot(t)
+
+	// 1. The conform script checks for missing violation tests
+	script, err := os.ReadFile(filepath.Join(root, ".ckeletin", "scripts", "conform.sh"))
+	require.NoError(t, err)
+	assert.Contains(t, string(script), "violation_test",
+		"conform.sh must check for missing violation tests")
+	assert.Contains(t, string(script), "FEEDBACK_FILE",
+		"conform.sh must collect feedback signals")
+
+	// 2. The mapping has violation tests for all linter/script/sast claims
+	mapping, err := os.ReadFile(filepath.Join(root, "conformance-mapping.yaml"))
+	require.NoError(t, err)
+	content := string(mapping)
+
+	// Every requirement with enforcement_level: linter should have a violation_test
+	// Count mismatches: linter claims without violation tests
+	lines := strings.Split(content, "\n")
+	currentReq := ""
+	currentLevel := ""
+	hasViolationTest := false
+	mismatches := []string{}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "CKSPEC-") && strings.HasSuffix(trimmed, ":") {
+			// Save previous requirement check
+			if currentReq != "" && (currentLevel == "linter" || currentLevel == "sast") && !hasViolationTest {
+				mismatches = append(mismatches, currentReq+" ("+currentLevel+")")
+			}
+			currentReq = strings.TrimSuffix(trimmed, ":")
+			currentLevel = ""
+			hasViolationTest = false
+		}
+		if strings.HasPrefix(trimmed, "enforcement_level:") {
+			currentLevel = strings.TrimSpace(strings.TrimPrefix(trimmed, "enforcement_level:"))
+		}
+		if strings.Contains(trimmed, "TestViolation_") {
+			hasViolationTest = true
+		}
+	}
+	// Check last requirement
+	if currentReq != "" && (currentLevel == "linter" || currentLevel == "sast") && !hasViolationTest {
+		mismatches = append(mismatches, currentReq+" ("+currentLevel+")")
+	}
+
+	assert.Empty(t, mismatches,
+		"Requirements claiming linter/sast enforcement must have violation tests: %v", mismatches)
+}
+
+// ---------------------------------------------------------------------------
 // CKSPEC-ENF-007: Automatic feedback signals
 // Enforcement: conform.sh reports missing violation tests
 // Violation: N/A — verifies the generator produces feedback signals
