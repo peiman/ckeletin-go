@@ -6,6 +6,7 @@
 *.dylib
 # Replace the following line with the Binary name from BINARY_NAME in Taskfile.yml
 ckeletin-go
+scaffold
 
 # Task artifacts
 .task
@@ -60,6 +61,8 @@ ckeletin-go.yaml
 
 # Test coverage
 coverage.txt
+coverage.tmp
+coverage.raw.txt
 test-output.json
 coverage.html
 
