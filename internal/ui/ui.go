@@ -56,7 +56,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 
 	// For testing - if newProgram is nil, just log success and return
 	if d.newProgram == nil {
-		log.Info().
+		log.Debug().
 			Str("component", "ui").
 			Str("message", message).
 			Str("color", col).
@@ -77,7 +77,7 @@ func (d *DefaultUIRunner) RunUI(message, col string) error {
 		return err
 	}
 
-	log.Info().
+	log.Debug().
 		Str("component", "ui").
 		Str("message", message).
 		Str("color", col).

@@ -55,7 +55,7 @@ func (e *Executor) Execute() error {
 
 	if e.cfg.UI {
 		// For UI mode, we log that we are handing over control
-		log.Info().Msg("Starting interactive UI mode")
+		log.Debug().Msg("Starting interactive UI mode")
 
 		if err := e.uiRunner.RunUI(e.cfg.Message, e.cfg.Color); err != nil {
 			// Use RenderError for consistent error reporting
@@ -69,8 +69,8 @@ func (e *Executor) Execute() error {
 
 	// Non-UI mode: Structured Output + Shadow Logging
 
-	// 1. Status Stream (Stderr) - Tell the operator what we are doing
-	log.Info().Msg("Preparing output...")
+	// 1. Audit Stream (Log File) - Record what we are doing
+	log.Debug().Msg("Preparing output...")
 
 	// 2. Prepare the Data
 

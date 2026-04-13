@@ -52,7 +52,7 @@ func (g *Generator) Generate() error {
 			}
 		}()
 		writer = file
-		log.Info().Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Writing documentation to file")
+		log.Debug().Str("component", "docs").Str("file", g.cfg.OutputFile).Msg("Writing documentation to file")
 	}
 
 	// Generate documentation

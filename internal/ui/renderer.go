@@ -27,7 +27,7 @@ func RenderSuccess(out io.Writer, message string, data interface{}) error {
 	// Text mode: existing behavior
 	// 1. Shadow Log (Audit Stream)
 	// We log the raw data so the log file has the full context of what was returned
-	event := log.Info().Str("user_message", message)
+	event := log.Debug().Str("user_message", message)
 
 	if data != nil {
 		event.Interface("data", data)
@@ -70,7 +70,7 @@ func RenderError(out io.Writer, friendlyMessage string, err error) error {
 	// Text mode: existing behavior
 	// 1. Shadow Log (Audit Stream)
 	// Capture the full technical error
-	log.Error().
+	log.Debug().
 		Err(err).
 		Str("user_error", friendlyMessage).
 		Msg("Command failed")
