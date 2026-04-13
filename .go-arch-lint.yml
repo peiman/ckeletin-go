@@ -33,7 +33,7 @@ workdir: .
 
 # Global allow settings
 allow:
-  depOnAnyVendor: true  # Allow vendor imports (external libraries)
+  depOnAnyVendor: true  # TODO: set to false to enforce canUse rules (CKSPEC-ARCH-003) — blocked by scaffold test compatibility
   deepScan: false       # Disable deep AST scanning for performance
   ignoreNotFoundComponents: false  # Fail if unmatched files found
 
@@ -114,14 +114,36 @@ components:
       - pkg/**
 
 # External dependencies (vendors from go.mod)
+# Each vendor must be registered here for canUse rules to work.
+# depOnAnyVendor: false means unregistered vendors are rejected.
 vendors:
-  # Cobra CLI framework
+  # CLI framework — restricted to commands layer
   cobra:
     in: github.com/spf13/cobra
+  pflag:
+    in: github.com/spf13/pflag
 
-  # Viper configuration library
+  # Configuration library
   viper:
     in: github.com/spf13/viper
+
+  # Logging (base package + sub-packages like zerolog/log)
+  zerolog:
+    in:
+      - github.com/rs/zerolog
+      - github.com/rs/zerolog/**
+
+  # UI and terminal
+  lipgloss:
+    in: github.com/charmbracelet/lipgloss
+  bubbletea:
+    in: github.com/charmbracelet/bubbletea
+  isatty:
+    in: github.com/mattn/go-isatty
+
+  # Log file rotation
+  lumberjack:
+    in: gopkg.in/natefinch/lumberjack.v2
 
 # Common components available to all layers
 commonComponents:
@@ -141,30 +163,41 @@ commonComponents:
 # you may be violating the layered architecture.
 deps:
   # Command layer delegates to business logic and uses infrastructure
-  # Can also use Cobra and Viper (CLI framework)
+  # Can also use CLI framework (Cobra, pflag) and Viper
   commands:
     mayDependOn:
       - business
       - infrastructure
     canUse:
       - cobra
+      - pflag
       - viper
+      - zerolog
 
   # Business logic uses infrastructure only
   # Cannot import commands or other business logic
-  # Cannot use Cobra (framework independence)
+  # CANNOT use Cobra/pflag (CKSPEC-ARCH-003: CLI framework isolation)
   business:
     mayDependOn:
       - infrastructure
-    # canUse is intentionally omitted - uses only standard library + infrastructure
+    canUse:
+      - zerolog
+      - lipgloss
+      - bubbletea
+      - isatty
+      - viper
 
   # Infrastructure is the foundation
   # Cannot depend on upper layers (commands, business)
-  # Can use Viper for configuration
   infrastructure:
     mayDependOn: []  # Empty - depends on nothing
     canUse:
       - viper
+      - zerolog
+      - lipgloss
+      - bubbletea
+      - isatty
+      - lumberjack
 
   # Public packages are completely standalone
   # Cannot depend on any internal packages (enforced by validation script too)
