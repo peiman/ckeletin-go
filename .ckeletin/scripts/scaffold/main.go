@@ -113,7 +113,9 @@ func main() {
 	}
 
 	fmt.Println("  ✓ Updating .go-arch-lint.yml (removing pkg/ references)")
-	if err := cleanArchLintConfig("."); err != nil {
+	// Note: vendor registration for upstream pkg/ happens after text replacement
+	// to avoid replaceInTextFiles rewriting the upstream module path.
+	if err := cleanArchLintConfig(".", ""); err != nil {
 		fmt.Fprintf(os.Stderr, "Error updating .go-arch-lint.yml: %v\n", err)
 		os.Exit(1)
 	}
@@ -182,6 +184,14 @@ func main() {
 	}
 	if goCount > 0 {
 		fmt.Printf("    Updated %d Go files\n", goCount)
+	}
+
+	// Register upstream pkg/ as vendor AFTER text replacement
+	// (replaceInTextFiles would rewrite oldModule to newModule in the vendor entry)
+	fmt.Println("  ✓ Registering upstream pkg/ as vendor dependency")
+	if err := registerUpstreamVendor(".", oldModule); err != nil {
+		fmt.Fprintf(os.Stderr, "Error registering upstream vendor: %v\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("  ✓ Running go mod tidy")

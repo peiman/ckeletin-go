@@ -33,7 +33,7 @@ workdir: .
 
 # Global allow settings
 allow:
-  depOnAnyVendor: true  # TODO: set to false to enforce canUse rules (CKSPEC-ARCH-003) — blocked by scaffold test compatibility
+  depOnAnyVendor: false  # Enforce vendor import rules via canUse
   deepScan: false       # Disable deep AST scanning for performance
   ignoreNotFoundComponents: false  # Fail if unmatched files found
 

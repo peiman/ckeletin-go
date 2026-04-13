@@ -114,17 +114,9 @@ func TestViolation_ARCH003_BusinessImportsCobra(t *testing.T) {
 		t.Skip("violation tests modify the source tree")
 	}
 
-	// KNOWN GAP: This test documents that CKSPEC-ARCH-003 (CLI framework
-	// isolation) is NOT enforced by go-arch-lint when depOnAnyVendor: true.
-	// The canUse rules in .go-arch-lint.yml are decorative — they are never
-	// checked because the "Advanced: vendor imports" linter is disabled.
-	//
-	// Fix: set depOnAnyVendor: false and register all legitimate vendors.
-	// The fix is ready (.go-arch-lint.yml has the vendor entries) but
-	// breaks scaffold integration tests. Tracked for follow-up.
-	//
-	// Until fixed, enforcement_level for CKSPEC-ARCH-003 is honor-system.
-	t.Skip("KNOWN GAP: depOnAnyVendor:true bypasses canUse rules — CKSPEC-ARCH-003 not enforced")
+	// This test was originally a KNOWN GAP — depOnAnyVendor:true bypassed
+	// canUse rules. Fixed by setting depOnAnyVendor:false and registering
+	// all legitimate vendors in .go-arch-lint.yml.
 
 	cleanup := writeViolationFile(t,
 		"internal/ping/ckspec_violation.go",
