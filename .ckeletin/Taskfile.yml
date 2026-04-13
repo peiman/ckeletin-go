@@ -815,6 +815,12 @@ tasks:
     cmd: |
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
 
+  test:scaffold:
+    desc: Run scaffold integration tests (slow — copies project, runs task check)
+    silent: true
+    cmd: |
+      gotestsum --format short -- -v -tags "dev scaffold" -count=1 ./test/integration/...
+
   test:race:
     desc: Run tests with race detection
     cmd: |

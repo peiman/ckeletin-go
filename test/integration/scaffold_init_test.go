@@ -1,3 +1,5 @@
+//go:build scaffold
+
 // test/integration/scaffold_init_test.go
 //
 // Integration tests for scaffold initialization (task init)

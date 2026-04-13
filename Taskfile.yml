@@ -321,6 +321,10 @@ tasks:
     desc: Check if latest framework update is compatible
     cmds: [task: ckeletin:update:check-compatibility]
 
+  test:scaffold:
+    desc: Run scaffold integration tests (slow)
+    cmds: [task: ckeletin:test:scaffold]
+
   # === Conformance ===
 
   conform:

@@ -33,3 +33,5 @@ pre-push:
   commands:
     coverage:
       run: task test:coverage
+    scaffold:
+      run: task test:scaffold
