@@ -9,17 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Conformance generator (`task conform`)**: Automated CKSPEC conformance reporting — reads `conformance-mapping.yaml`, runs checks against all 35 spec requirements, validates completeness, and produces feedback signals. Supports `--json` for machine-readable output. 35/35 requirements met.
+- **15 violation tests**: Prove enforcement mechanisms catch violations (CKSPEC-ENF-006). Cover architecture layering, CLI framework isolation, business logic isolation, output patterns, file organization, mock framework detection, and conformance infrastructure. Behind `//go:build conformance` tag.
+- **CKSPEC-ARCH-003 enforcement**: `depOnAnyVendor:false` in `.go-arch-lint.yml` enables real vendor import checking. `canUse` rules now enforced — Cobra restricted to cmd/ layer. All legitimate vendors registered.
+- **`.package-organization-allow` support**: Projects where `pkg/` intentionally wraps `internal/` (facade pattern) can create this file to exclude specific paths from the import check.
+- **`task test:scaffold`**: Scaffold integration tests behind build tag for explicit invocation.
 - **JSON output mode (`--output json`)**: Global persistent flag that switches all CLI output to a consistent JSON envelope (`{"status", "command", "data", "error"}`). Every command using `ui.RenderSuccess` gets JSON for free; complex commands can implement `ui.JSONResponder` for custom shapes. Stderr is silenced in JSON mode for clean programmatic consumption.
 - **Config JSON Schema export**: `task generate:config:schema` produces `config.schema.json` from the config registry, enabling agents and tools to validate config files without reading Go source.
 - **Cross-agent configuration**: Added `.cursorrules` (Cursor) and `.github/copilot-instructions.md` (GitHub Copilot) with essential project rules pointing to `AGENTS.md` as the source of truth.
 
 ### Changed
 
+- **Shadow logs demoted to Debug**: `RenderSuccess`/`RenderError` shadow logs and operational status logs across `internal/` now use `log.Debug()` instead of `log.Info()`/`log.Error()`, preventing audit-stream noise on the console (ADR-013 compliance).
+- **SBOM scans built binary**: `generate-sbom.sh` now uses `syft file:./binary` instead of `syft dir:.`, scanning only what ships. Eliminates false CVE positives from stale module cache artifacts. `PROJECT_NAME` derived from Taskfile, not hardcoded.
+- **Scaffold tests moved to pre-push**: `task check` dropped from ~90s to ~19s. Scaffold integration tests (`TestScaffoldInit`, `TestFrameworkUpdate`) behind `//go:build scaffold` tag — run on pre-push and CI, skipped during development.
+- **Scaffold init excludes framework artifacts**: `task init` now removes `test/conformance/`, `scaffold_init_test.go`, and `conformance-mapping.yaml` — downstream projects don't get framework development concerns.
 - **CONVENTIONS.md deprecated**: Replaced with a deprecation notice pointing to `AGENTS.md` as the single source of truth for all project conventions.
 - **`task setup` scoped to core tools**: Now installs only pinned dev tools. Optional security/audit tools (`grype`, `gitleaks`, etc.) no longer block setup on network failures. Use `task setup:all` for everything or `task setup:security` for just audit tools.
 
 ### Fixed
 
+- **Goreleaser v2 deprecations**: `archives.format` → `formats`, `snapshot.name_template` → `version_template`, `brews` → `homebrew_casks`, cosign → `--bundle --new-bundle-format`. `goreleaser check` passes clean.
+- **CI env var wiring**: `GITHUB_TOKEN` falls back to `secrets.GITHUB_TOKEN` when project-specific secret isn't set. `HOMEBREW_TAP_OWNER` now passed to goreleaser.
+- **macOS bash 3.2 compatibility**: Replaced `read -r -d ''` (bash 4+) with `read -r` in update task.
+- **`task check` fallback**: Falls back to `check:bash` when binary lacks `check` subcommand (dev build tag not present).
+- **Post-update migration**: Warns about missing framework packages in `.go-arch-lint.yml` infrastructure component.
+- **Stale scaffold binary**: Added `scaffold` to `.gitignore`. Prevented SBOM from picking up go1.26.1 stdlib via stale binary.
 - **Framework update detects missing task forwardings**: `task ckeletin:update` now warns when new framework tasks lack project-level aliases in `Taskfile.yml`, with exact YAML to add.
 - **Go version bumped to 1.26.2**: `.go-version` and `go.mod` synced to match installed toolchain.
 

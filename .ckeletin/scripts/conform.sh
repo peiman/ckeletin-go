@@ -65,9 +65,21 @@ echo "================================"
 echo ""
 
 SPEC_VERSION=$(get_spec_version)
+# The spec version this generator was built for
+GENERATOR_SPEC_VERSION="0.4.0"
+
 echo "Spec version: $SPEC_VERSION"
+echo "Generator built for: $GENERATOR_SPEC_VERSION"
 echo "Mapping file: $MAPPING_FILE"
 echo ""
+
+# Warn if mapping targets a different spec version than the generator expects
+if [[ "$SPEC_VERSION" != "$GENERATOR_SPEC_VERSION" ]]; then
+    echo "⚠ SPEC VERSION MISMATCH"
+    echo "  Mapping targets spec $SPEC_VERSION but generator built for $GENERATOR_SPEC_VERSION"
+    echo "  Update conformance-mapping.yaml and conform.sh to match the latest spec."
+    echo ""
+fi
 
 REQ_IDS=$(get_requirement_ids)
 TOTAL=$(echo "$REQ_IDS" | wc -l | tr -d ' ')
@@ -122,12 +134,21 @@ for req_id in $REQ_IDS; do
         echo "$req_id ($title): partial" >> "$WARNING_FILE"
     fi
 
-    # ── ENF-006: Check violation tests exist for claims above honor-system ──
+    # ── ENF-006: Check proof exists for claims above honor-system ──
+    # Accepts either violation_tests OR violation_evidence (spec v0.4.0+)
     if [[ "$enforcement" != "honor-system" && "$enforcement" != "" ]]; then
         vtests=$(get_array_items "$req_id" "violation_tests")
-        if [[ -z "$vtests" ]]; then
-            echo "$req_id: claims $enforcement but has no violation test" >> "$FEEDBACK_FILE"
-        else
+        # Check if violation_evidence exists in this requirement's block
+        # (multi-line field, so get_field may not capture it — use grep)
+        vevidence=$(awk -v req="$req_id" '
+            /^  [A-Z]/ && $0 ~ req":" { found=1; next }
+            found && /^  [A-Z]/ { found=0 }
+            found && /violation_evidence:/ { print "yes"; exit }
+        ' "$MAPPING_FILE")
+
+        if [[ -z "$vtests" && -z "$vevidence" ]]; then
+            echo "$req_id: claims $enforcement but has no violation test or evidence" >> "$FEEDBACK_FILE"
+        elif [[ -n "$vtests" ]]; then
             echo "$vtests" | while IFS= read -r vt; do
                 # Strip test function reference (file.go::TestFunc -> file.go)
                 vt_file="${vt%%::*}"
@@ -136,6 +157,8 @@ for req_id in $REQ_IDS; do
                 fi
             done
         fi
+        # violation_evidence is accepted at face value if it exists —
+        # the file-path requirement is enforced by review, not tooling
     fi
 
     # ── Run automated checks ──
