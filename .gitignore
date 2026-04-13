@@ -32,6 +32,9 @@ go.work
 *.swo
 *~
 
+# Conformance cache (fetched from spec repo, not committed)
+.ckeletin/cache/
+
 # Claude Code (keep hooks.json and rules/, ignore local state)
 .claude/*
 !.claude/hooks.json

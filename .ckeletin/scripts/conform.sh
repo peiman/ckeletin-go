@@ -65,21 +65,10 @@ echo "================================"
 echo ""
 
 SPEC_VERSION=$(get_spec_version)
-# The spec version this generator was built for
-GENERATOR_SPEC_VERSION="0.4.0"
 
-echo "Spec version: $SPEC_VERSION"
-echo "Generator built for: $GENERATOR_SPEC_VERSION"
+echo "Spec version (mapping): $SPEC_VERSION"
 echo "Mapping file: $MAPPING_FILE"
 echo ""
-
-# Warn if mapping targets a different spec version than the generator expects
-if [[ "$SPEC_VERSION" != "$GENERATOR_SPEC_VERSION" ]]; then
-    echo "⚠ SPEC VERSION MISMATCH"
-    echo "  Mapping targets spec $SPEC_VERSION but generator built for $GENERATOR_SPEC_VERSION"
-    echo "  Update conformance-mapping.yaml and conform.sh to match the latest spec."
-    echo ""
-fi
 
 REQ_IDS=$(get_requirement_ids)
 TOTAL=$(echo "$REQ_IDS" | wc -l | tr -d ' ')
@@ -88,19 +77,64 @@ echo "Requirements mapped: $TOTAL"
 echo ""
 
 # ── ENF-005: Completeness check ─────────────────────────────────
+# Fetch the authoritative requirement list from the spec repo.
+# Falls back to a hardcoded list if the fetch fails (offline mode).
 
-EXPECTED_IDS="CKSPEC-ARCH-001 CKSPEC-ARCH-002 CKSPEC-ARCH-003 CKSPEC-ARCH-004 \
-CKSPEC-ARCH-005 CKSPEC-ARCH-006 CKSPEC-ARCH-007 \
-CKSPEC-ENF-001 CKSPEC-ENF-002 CKSPEC-ENF-003 CKSPEC-ENF-004 \
-CKSPEC-ENF-005 CKSPEC-ENF-006 CKSPEC-ENF-007 \
-CKSPEC-TEST-001 CKSPEC-TEST-002 CKSPEC-TEST-003 CKSPEC-TEST-004 \
-CKSPEC-OUT-001 CKSPEC-OUT-002 CKSPEC-OUT-003 CKSPEC-OUT-004 CKSPEC-OUT-005 \
-CKSPEC-AGENT-001 CKSPEC-AGENT-002 CKSPEC-AGENT-003 CKSPEC-AGENT-004 CKSPEC-AGENT-005 \
-CKSPEC-CL-001 CKSPEC-CL-002 CKSPEC-CL-003 CKSPEC-CL-004 \
-CKSPEC-CL-005 CKSPEC-CL-006 CKSPEC-CL-007"
+SPEC_REPO="peiman/ckeletin"
+SPEC_JSON_URL="https://raw.githubusercontent.com/${SPEC_REPO}/main/spec/requirements.json"
+CACHE_FILE=".ckeletin/cache/requirements.json"
+SPEC_JSON=""
+EXPECTED_IDS=""
+SPEC_LATEST_VERSION=""
+
+# Try fetching from GitHub (silent, fast timeout)
+if command -v curl &> /dev/null; then
+    SPEC_JSON=$(curl -sfL --max-time 5 "$SPEC_JSON_URL" 2>/dev/null || true)
+fi
+
+if [[ -n "$SPEC_JSON" ]]; then
+    # Cache the successful fetch for offline use
+    mkdir -p "$(dirname "$CACHE_FILE")"
+    echo "$SPEC_JSON" > "$CACHE_FILE"
+    SOURCE="fetched from spec repo"
+elif [[ -f "$CACHE_FILE" ]]; then
+    # Fall back to last cached version
+    SPEC_JSON=$(cat "$CACHE_FILE")
+    SOURCE="cached (offline)"
+fi
+
+if [[ -n "$SPEC_JSON" ]]; then
+    EXPECTED_IDS=$(echo "$SPEC_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for r in data['requirements']:
+    print(r['id'])
+" 2>/dev/null || true)
+    SPEC_LATEST_VERSION=$(echo "$SPEC_JSON" | python3 -c "
+import sys, json
+print(json.load(sys.stdin)['spec_version'])
+" 2>/dev/null || true)
+    echo "Requirement list: ${SOURCE} (v${SPEC_LATEST_VERSION})"
+else
+    echo "Requirement list: no spec data available (fetch failed, no cache)"
+    echo "FAILED — cannot validate completeness without requirement list."
+    exit 1
+fi
+
+# Warn on spec version mismatch
+if [[ -n "$SPEC_LATEST_VERSION" && "$SPEC_VERSION" != "$SPEC_LATEST_VERSION" ]]; then
+    echo ""
+    echo "⚠ SPEC VERSION MISMATCH"
+    echo "  Mapping targets spec $SPEC_VERSION but latest spec is $SPEC_LATEST_VERSION"
+    echo "  Update conformance-mapping.yaml to match the latest spec."
+    echo ""
+fi
+
+echo ""
 
 MISSING_COUNT=0
 for expected in $EXPECTED_IDS; do
+    [[ -z "$expected" ]] && continue
     if ! echo "$REQ_IDS" | grep -q "^${expected}$"; then
         echo "  MISSING: $expected"
         MISSING_COUNT=$((MISSING_COUNT + 1))
