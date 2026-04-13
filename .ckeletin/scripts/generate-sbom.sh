@@ -10,8 +10,11 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 
 # Output directory
 OUTPUT_DIR="${SBOM_OUTPUT_DIR:-reports/sbom}"
-PROJECT_NAME="${PROJECT_NAME:-ckeletin-go}"
+# Derive project name from Taskfile BINARY_NAME (not hardcoded)
+PROJECT_NAME="${PROJECT_NAME:-$(grep 'BINARY_NAME:' Taskfile.yml 2>/dev/null | head -1 | awk '{print $2}' || echo 'app')}"
 VERSION="${VERSION:-$(git describe --tags --always 2>/dev/null || echo 'dev')}"
+# Binary path for scanning (scan the artifact, not the directory)
+BINARY_PATH="./${PROJECT_NAME}"
 
 # Format selection
 FORMAT="${1:-all}"  # all, spdx, cyclonedx
@@ -49,11 +52,22 @@ check_syft() {
     fi
 }
 
+syft_source() {
+    # Scan the binary (accurate: only what ships) or fall back to directory
+    if [ -n "$BINARY_PATH" ] && [ -f "$BINARY_PATH" ]; then
+        echo "file:${BINARY_PATH}"
+    else
+        echo "dir:."
+    fi
+}
+
 generate_spdx() {
     echo "Generating SPDX SBOM..."
+    local source
+    source=$(syft_source)
 
     # SPDX JSON format (machine-readable, most common)
-    syft dir:. \
+    syft "$source" \
         --output spdx-json="${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.spdx.json" \
         --source-name "${PROJECT_NAME}" \
         --source-version "${VERSION}" \
@@ -62,7 +76,7 @@ generate_spdx() {
     echo "  Created: ${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.spdx.json"
 
     # Also generate human-readable tag-value format
-    syft dir:. \
+    syft "$source" \
         --output spdx="${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.spdx" \
         --source-name "${PROJECT_NAME}" \
         --source-version "${VERSION}" \
@@ -73,9 +87,11 @@ generate_spdx() {
 
 generate_cyclonedx() {
     echo "Generating CycloneDX SBOM..."
+    local source
+    source=$(syft_source)
 
     # CycloneDX JSON format
-    syft dir:. \
+    syft "$source" \
         --output cyclonedx-json="${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.cdx.json" \
         --source-name "${PROJECT_NAME}" \
         --source-version "${VERSION}" \
@@ -84,7 +100,7 @@ generate_cyclonedx() {
     echo "  Created: ${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.cdx.json"
 
     # CycloneDX XML format (some tools prefer XML)
-    syft dir:. \
+    syft "$source" \
         --output cyclonedx-xml="${OUTPUT_DIR}/${PROJECT_NAME}-${VERSION}.cdx.xml" \
         --source-name "${PROJECT_NAME}" \
         --source-version "${VERSION}" \
@@ -115,6 +131,15 @@ main() {
     echo "  Version: ${VERSION}"
     echo "  Output:  ${OUTPUT_DIR}/"
     echo ""
+
+    # Build binary if it doesn't exist (SBOM scans the artifact, not the source)
+    if [ ! -f "$BINARY_PATH" ]; then
+        echo "  Building binary for SBOM scanning..."
+        go build -o "$BINARY_PATH" . 2>/dev/null || {
+            echo "  ⚠ Binary build failed — falling back to directory scan"
+            BINARY_PATH=""
+        }
+    fi
 
     # Create output directory
     mkdir -p "$OUTPUT_DIR"
