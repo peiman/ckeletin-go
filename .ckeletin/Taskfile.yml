@@ -1077,7 +1077,17 @@ tasks:
     cmds:
       - task: build:dev
         vars: { CLI_ARGS: "" }
-      - cmd: ./{{._BINARY_NAME}} check {{.CLI_ARGS}}
+      - cmd: |
+          # Check if binary has the 'check' subcommand (requires dev build tag).
+          # Fall back to bash-based checks if not available.
+          if ./{{._BINARY_NAME}} help check >/dev/null 2>&1; then
+            ./{{._BINARY_NAME}} check {{.CLI_ARGS}}
+          else
+            echo "ℹ️  Binary does not have 'check' subcommand (dev build tag required)"
+            echo "   Falling back to bash-based checks..."
+            echo ""
+            task ckeletin:check:bash
+          fi
     vars:
       CLI_ARGS: ""
 

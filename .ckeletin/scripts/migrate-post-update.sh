@@ -79,3 +79,31 @@ if [ -f "$FORWARDINGS_FILE" ] && [ -f "Taskfile.yml" ]; then
         done
     fi
 fi
+
+# Migration 4: Ensure .go-arch-lint.yml includes all framework infrastructure packages
+# When: Framework adds new packages (e.g., .ckeletin/pkg/output/) that aren't
+# in the downstream project's infrastructure component
+if [ -f ".go-arch-lint.yml" ]; then
+    FRAMEWORK_INFRA_PKGS=(
+        ".ckeletin/pkg/config/**"
+        ".ckeletin/pkg/logger/**"
+        ".ckeletin/pkg/output/**"
+        ".ckeletin/pkg/testutil/**"
+    )
+    missing_pkgs=()
+    for pkg in "${FRAMEWORK_INFRA_PKGS[@]}"; do
+        if ! grep -qF "$pkg" .go-arch-lint.yml; then
+            missing_pkgs+=("$pkg")
+        fi
+    done
+    if [ ${#missing_pkgs[@]} -gt 0 ]; then
+        echo ""
+        echo "   ⚠ Missing framework packages in .go-arch-lint.yml infrastructure component:"
+        for pkg in "${missing_pkgs[@]}"; do
+            echo "     - $pkg"
+        done
+        echo ""
+        echo "   Add these to the 'infrastructure.in' section in .go-arch-lint.yml"
+        echo "   to prevent 'not attached to any component' errors."
+    fi
+fi

@@ -12,14 +12,43 @@ ERRORS=0
 ERROR_DETAILS=""
 
 # Rule 1: pkg/ packages must NOT import from internal/ (standalone requirement)
+# Exclusions: .package-organization-allow file lists pkg/ paths that may
+# import internal/ (e.g., facade packages wrapping internal implementations).
+# Format: one path prefix per line, e.g. "pkg/generate/"
+ALLOW_FILE=".package-organization-allow"
 if [ -d "pkg" ]; then
     # Find any imports from internal/ in pkg/ packages (excluding test files)
     INTERNAL_IMPORTS=$(grep -r '".*internal/' pkg --include="*.go" 2>/dev/null | grep -v "_test.go:" || true)
+
+    # Filter out allowed paths
+    if [ -n "$INTERNAL_IMPORTS" ] && [ -f "$ALLOW_FILE" ]; then
+        FILTERED=""
+        while IFS= read -r line; do
+            # Check each import against allow list
+            allowed=false
+            while IFS= read -r allow_path; do
+                [[ -z "$allow_path" || "$allow_path" == \#* ]] && continue
+                if echo "$line" | grep -q "^${allow_path}"; then
+                    allowed=true
+                    break
+                fi
+            done < "$ALLOW_FILE"
+            if [ "$allowed" = false ]; then
+                FILTERED+="$line"$'\n'
+            fi
+        done <<< "$INTERNAL_IMPORTS"
+        INTERNAL_IMPORTS="$FILTERED"
+    fi
+
     if [ -n "$INTERNAL_IMPORTS" ]; then
         ERROR_DETAILS+="pkg/ packages must be standalone (no internal/ imports):"$'\n'
         ERROR_DETAILS+="$INTERNAL_IMPORTS"$'\n\n'
         ERROR_DETAILS+="Packages in pkg/ must NOT import from internal/."$'\n'
         ERROR_DETAILS+="This ensures they are truly reusable by external projects."$'\n'
+        if [ ! -f "$ALLOW_FILE" ]; then
+            ERROR_DETAILS+="To allow specific paths, create .package-organization-allow"$'\n'
+            ERROR_DETAILS+="with one path prefix per line (e.g., pkg/generate/)"$'\n'
+        fi
         ERRORS=$((ERRORS + 1))
     fi
 fi
