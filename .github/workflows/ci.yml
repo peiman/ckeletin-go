@@ -419,7 +419,10 @@ jobs:
           version: '~> v2'
           args: release --clean
         env:
-          GITHUB_TOKEN: ${{ secrets.CKELETIN_GITHUB_TOKEN }}
+          # Use project-specific token if set, fall back to default GITHUB_TOKEN
+          GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          # Homebrew tap (optional — set these secrets to enable)
+          HOMEBREW_TAP_OWNER: ${{ secrets.HOMEBREW_TAP_OWNER }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
       - name: Scan release artifacts for vulnerabilities

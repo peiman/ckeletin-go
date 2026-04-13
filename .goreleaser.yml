@@ -93,7 +93,8 @@ builds:
 # Archive configuration
 archives:
   - id: default
-    format: tar.gz
+    formats:
+      - tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -104,7 +105,8 @@ archives:
     # Use zip for Windows
     format_overrides:
       - goos: windows
-        format: zip
+        formats:
+          - zip
 
     # Include additional files in archives
     files:
@@ -125,8 +127,8 @@ signs:
     output: true
     args:
       - sign-blob
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
+      - "--new-bundle-format"
       - "${artifact}"
       - "--yes"
 
@@ -143,7 +145,7 @@ sboms:
 
 # Snapshot builds (for testing without tags)
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 
 # Changelog configuration
 changelog:
@@ -179,19 +181,19 @@ changelog:
 #   2. Set HOMEBREW_TAP_OWNER environment variable to your GitHub username
 #   3. Set HOMEBREW_TAP_GITHUB_TOKEN secret in CI
 # If HOMEBREW_TAP_OWNER is not set, Homebrew tap updates are skipped
-brews:
+homebrew_casks:
   - name: "{{ .ProjectName }}"
 
     # Skip upload if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
     skip_upload: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
 
     repository:
-      owner: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}{{ .Env.HOMEBREW_TAP_OWNER }}{{ else }}SKIP{{ end }}'
+      owner: "{{ .Env.HOMEBREW_TAP_OWNER }}"
       name: homebrew-tap
-      token: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}{{ else }}{{ end }}'
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     # Folder inside the repository
-    directory: Formula
+    directory: Casks
 
     # Git author used to commit to the repository
     commit_author:
@@ -201,20 +203,16 @@ brews:
     # Template for the commit message
     commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
 
-    # Description for Homebrew
-    description: "A professional Golang CLI scaffold for building beautiful, robust, and modular command-line applications"
+    # Description for Homebrew — override this in your project
+    description: "{{ .ProjectName }} CLI application"
 
     homepage: "{{ .GitURL }}"
 
     license: "MIT"
 
-    # Install instructions for Homebrew
-    install: |
-      bin.install "{{ .ProjectName }}"
-
-    # Test instructions
-    test: |
-      system "#{bin}/{{ .ProjectName }}", "--version"
+    # Binaries to install
+    binaries:
+      - "{{ .ProjectName }}"
 
 # Release configuration
 # GitHub repository is auto-detected from git remote
