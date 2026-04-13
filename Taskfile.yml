@@ -321,6 +321,13 @@ tasks:
     desc: Check if latest framework update is compatible
     cmds: [task: ckeletin:update:check-compatibility]
 
+  # === Conformance ===
+
+  conform:
+    desc: Generate CKSPEC conformance report from mapping
+    cmds:
+      - bash .ckeletin/scripts/conform.sh {{.CLI_ARGS}}
+
   # === Project-Specific Tasks ===
 
   init:
