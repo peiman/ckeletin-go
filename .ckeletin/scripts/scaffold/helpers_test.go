@@ -452,6 +452,57 @@ func TestRemovePkgDirectory(t *testing.T) {
 	})
 }
 
+func TestRemoveFrameworkOnlyArtifacts(t *testing.T) {
+	t.Run("removes conformance tests and mapping", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		// Create framework-only artifacts
+		conformDir := filepath.Join(tmpDir, "test", "conformance")
+		require.NoError(t, os.MkdirAll(conformDir, 0750))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(conformDir, "violation_test.go"),
+			[]byte("package conformance"), 0600))
+
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpDir, "conformance-mapping.yaml"),
+			[]byte("spec_version: 0.3.0"), 0600))
+
+		scaffoldTest := filepath.Join(tmpDir, "test", "integration")
+		require.NoError(t, os.MkdirAll(scaffoldTest, 0750))
+		require.NoError(t, os.WriteFile(
+			filepath.Join(scaffoldTest, "scaffold_init_test.go"),
+			[]byte("package integration"), 0600))
+
+		// Create a file that should survive
+		require.NoError(t, os.WriteFile(
+			filepath.Join(scaffoldTest, "other_test.go"),
+			[]byte("package integration"), 0600))
+
+		err := removeFrameworkOnlyArtifacts(tmpDir)
+		assert.NoError(t, err)
+
+		// Framework artifacts removed
+		_, err = os.Stat(filepath.Join(tmpDir, "test", "conformance"))
+		assert.True(t, os.IsNotExist(err), "test/conformance/ should be removed")
+
+		_, err = os.Stat(filepath.Join(tmpDir, "conformance-mapping.yaml"))
+		assert.True(t, os.IsNotExist(err), "conformance-mapping.yaml should be removed")
+
+		_, err = os.Stat(filepath.Join(scaffoldTest, "scaffold_init_test.go"))
+		assert.True(t, os.IsNotExist(err), "scaffold_init_test.go should be removed")
+
+		// Other files preserved
+		_, err = os.Stat(filepath.Join(scaffoldTest, "other_test.go"))
+		assert.NoError(t, err, "other integration tests should be preserved")
+	})
+
+	t.Run("no error when artifacts do not exist", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		err := removeFrameworkOnlyArtifacts(tmpDir)
+		assert.NoError(t, err)
+	})
+}
+
 func TestCleanArchLintConfig(t *testing.T) {
 	t.Run("removes public component section", func(t *testing.T) {
 		tmpDir := t.TempDir()
@@ -493,7 +544,7 @@ deps:
 `
 		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
 
-		err := cleanArchLintConfig(tmpDir)
+		err := cleanArchLintConfig(tmpDir, "")
 		require.NoError(t, err)
 
 		result, err := os.ReadFile(configPath)
@@ -523,7 +574,7 @@ deps:
 
 	t.Run("no error when file does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		err := cleanArchLintConfig(tmpDir)
+		err := cleanArchLintConfig(tmpDir, "")
 		assert.NoError(t, err)
 	})
 
@@ -533,7 +584,7 @@ deps:
 		content := "components:\n  business:\n    in:\n      - internal/ping/**\n"
 		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
 
-		err := cleanArchLintConfig(tmpDir)
+		err := cleanArchLintConfig(tmpDir, "")
 		assert.NoError(t, err)
 
 		result, err := os.ReadFile(configPath)

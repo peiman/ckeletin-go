@@ -112,6 +112,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("  ✓ Removing framework-only artifacts (conformance tests, scaffold tests)")
+	if err := removeFrameworkOnlyArtifacts("."); err != nil {
+		fmt.Fprintf(os.Stderr, "Error removing framework artifacts: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("  ✓ Updating .go-arch-lint.yml (removing pkg/ references)")
 	// Note: vendor registration for upstream pkg/ happens after text replacement
 	// to avoid replaceInTextFiles rewriting the upstream module path.

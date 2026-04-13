@@ -34,6 +34,38 @@ func removePkgDirectory(projectRoot string) error {
 	return os.RemoveAll(pkgDir)
 }
 
+// removeFrameworkOnlyArtifacts removes files and directories that are specific
+// to the ckeletin-go framework development and should not be in downstream projects.
+// This includes conformance testing (spec compliance), scaffold integration tests,
+// and the conformance mapping.
+func removeFrameworkOnlyArtifacts(projectRoot string) error {
+	artifacts := []string{
+		"test/conformance",
+		"conformance-mapping.yaml",
+	}
+	for _, artifact := range artifacts {
+		path := filepath.Join(projectRoot, artifact)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			continue
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("removing %s: %w", artifact, err)
+		}
+	}
+
+	// Remove scaffold build tag from integration tests — downstream projects
+	// keep the integration tests but don't need the scaffold tag since they
+	// won't run scaffold init on themselves.
+	scaffoldTest := filepath.Join(projectRoot, "test", "integration", "scaffold_init_test.go")
+	if _, err := os.Stat(scaffoldTest); err == nil {
+		if err := os.Remove(scaffoldTest); err != nil {
+			return fmt.Errorf("removing scaffold_init_test.go: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // parseModuleParts extracts the second and third path segments from a Go module path.
 // For the standard "host/owner/repo" pattern, these correspond to owner and repo.
 // For "github.com/owner/repo", returns ("owner", "repo").
