@@ -114,6 +114,13 @@ for r in data['requirements']:
 import sys, json
 print(json.load(sys.stdin)['spec_version'])
 " 2>/dev/null || true)
+
+    # Guard: if python3 failed or JSON was malformed, EXPECTED_IDS is empty
+    if [[ -z "$EXPECTED_IDS" ]]; then
+        echo "FAILED — could not parse requirement IDs from spec JSON (python3 error or malformed data)."
+        exit 1
+    fi
+
     echo "Requirement list: ${SOURCE} (v${SPEC_LATEST_VERSION})"
 else
     echo "Requirement list: no spec data available (fetch failed, no cache)"
@@ -200,8 +207,18 @@ for req_id in $REQ_IDS; do
     if [[ -n "$checks" ]]; then
         echo "$checks" | while IFS= read -r check_cmd; do
             if [[ -z "$check_cmd" ]]; then continue; fi
+            # Validate check command starts with an allowed prefix
+            case "$check_cmd" in
+                task\ *|test\ *|grep\ *|go\ *|"!"\ grep\ *|\!\ grep\ *)
+                    ;; # allowed
+                *)
+                    echo "REJECTED"
+                    echo "$req_id: check command rejected (not in allowlist): $check_cmd" >> "$FAIL_FILE"
+                    continue
+                    ;;
+            esac
             printf "  %-20s %s ... " "$req_id" "$check_cmd"
-            if eval "$check_cmd" > /dev/null 2>&1; then
+            if bash -c "$check_cmd" > /dev/null 2>&1; then
                 echo "ok"
             else
                 echo "FAIL"

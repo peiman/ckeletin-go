@@ -418,7 +418,7 @@ func TestViolation_CL001_MissingChangelogMd(t *testing.T) {
 // Violation: mapping file missing a requirement
 // ---------------------------------------------------------------------------
 
-func TestViolation_ENF005_IncompleteMappng(t *testing.T) {
+func TestViolation_ENF005_IncompleteMapping(t *testing.T) {
 	if testing.Short() {
 		t.Skip("violation tests modify the source tree")
 	}

@@ -281,12 +281,10 @@ func replaceNameInGoFiles(root, oldName, newName string) (int, error) {
 	return count, err
 }
 
-// cleanArchLintConfig removes the public component from .go-arch-lint.yml
-// and registers the upstream module's pkg/ as a vendor dependency.
+// cleanArchLintConfig removes the public component from .go-arch-lint.yml.
 // Called after pkg/ is removed during scaffold init, since the public component
-// references pkg/** which no longer exists. The upstream pkg/ is now consumed
-// as an external dependency via replace directive.
-func cleanArchLintConfig(projectRoot, oldModule string) error {
+// references pkg/** which no longer exists.
+func cleanArchLintConfig(projectRoot string) error {
 	configPath := filepath.Join(projectRoot, ".go-arch-lint.yml")
 
 	content, err := os.ReadFile(configPath)

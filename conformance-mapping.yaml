@@ -161,7 +161,7 @@ requirements:
       - "test -f conformance-mapping.yaml"
       - "test -f .ckeletin/scripts/conform.sh"
     violation_tests:
-      - "test/conformance/violation_test.go::TestViolation_ENF005_IncompleteMappng"
+      - "test/conformance/violation_test.go::TestViolation_ENF005_IncompleteMapping"
 
   CKSPEC-ENF-006:
     title: "Violation tests for enforcement claims"

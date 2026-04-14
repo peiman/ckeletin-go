@@ -544,7 +544,7 @@ deps:
 `
 		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
 
-		err := cleanArchLintConfig(tmpDir, "")
+		err := cleanArchLintConfig(tmpDir)
 		require.NoError(t, err)
 
 		result, err := os.ReadFile(configPath)
@@ -574,7 +574,7 @@ deps:
 
 	t.Run("no error when file does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		err := cleanArchLintConfig(tmpDir, "")
+		err := cleanArchLintConfig(tmpDir)
 		assert.NoError(t, err)
 	})
 
@@ -584,7 +584,7 @@ deps:
 		content := "components:\n  business:\n    in:\n      - internal/ping/**\n"
 		require.NoError(t, os.WriteFile(configPath, []byte(content), 0600))
 
-		err := cleanArchLintConfig(tmpDir, "")
+		err := cleanArchLintConfig(tmpDir)
 		assert.NoError(t, err)
 
 		result, err := os.ReadFile(configPath)

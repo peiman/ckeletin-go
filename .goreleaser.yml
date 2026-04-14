@@ -181,19 +181,19 @@ changelog:
 #   2. Set HOMEBREW_TAP_OWNER environment variable to your GitHub username
 #   3. Set HOMEBREW_TAP_GITHUB_TOKEN secret in CI
 # If HOMEBREW_TAP_OWNER is not set, Homebrew tap updates are skipped
-homebrew_casks:
+brews:
   - name: "{{ .ProjectName }}"
 
     # Skip upload if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
     skip_upload: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}false{{ else }}true{{ end }}'
 
     repository:
-      owner: "{{ .Env.HOMEBREW_TAP_OWNER }}"
+      owner: '{{ if index .Env "HOMEBREW_TAP_OWNER" }}{{ .Env.HOMEBREW_TAP_OWNER }}{{ else }}SKIP{{ end }}'
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}{{ else }}{{ end }}'
 
     # Folder inside the repository
-    directory: Casks
+    directory: Formula
 
     # Git author used to commit to the repository
     commit_author:
@@ -210,9 +210,13 @@ homebrew_casks:
 
     license: "MIT"
 
-    # Binaries to install
-    binaries:
-      - "{{ .ProjectName }}"
+    # Install instructions for Homebrew
+    install: |
+      bin.install "{{ .ProjectName }}"
+
+    # Test instructions
+    test: |
+      system "#{bin}/{{ .ProjectName }}", "--version"
 
 # Release configuration
 # GitHub repository is auto-detected from git remote

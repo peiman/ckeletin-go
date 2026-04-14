@@ -121,7 +121,7 @@ func main() {
 	fmt.Println("  ✓ Updating .go-arch-lint.yml (removing pkg/ references)")
 	// Note: vendor registration for upstream pkg/ happens after text replacement
 	// to avoid replaceInTextFiles rewriting the upstream module path.
-	if err := cleanArchLintConfig(".", ""); err != nil {
+	if err := cleanArchLintConfig("."); err != nil {
 		fmt.Fprintf(os.Stderr, "Error updating .go-arch-lint.yml: %v\n", err)
 		os.Exit(1)
 	}
