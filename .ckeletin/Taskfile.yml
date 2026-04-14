@@ -130,7 +130,7 @@ tasks:
         # Get current module path from go.mod
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
         # NOTE: String split prevents scaffold-init from replacing this upstream reference
-        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
 
         if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
           echo "❌ Cannot update: this appears to be the upstream repo itself"
@@ -143,7 +143,7 @@ tasks:
         else
           echo "   Adding remote 'ckeletin-upstream'..."
           # NOTE: String split prevents scaffold-init from replacing this upstream URL
-          git remote add ckeletin-upstream https://github.com/peiman"/ckeletin-go.git"
+          git remote add ckeletin-upstream https://github.com/peiman/ckeleti""n-go.git
         fi
 
         # Determine update target: pinned version or latest main
@@ -290,7 +290,7 @@ tasks:
       - |
         set -e
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
         if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
           echo "❌ Cannot run dry-run on the upstream repository itself"
           exit 1
@@ -298,7 +298,7 @@ tasks:
 
         # Set up remote if needed
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
-          git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
+          git remote add ckeletin-upstream "https://github.com/peiman/ckeleti""n-go.git"
         fi
 
         # Determine update target
@@ -335,7 +335,7 @@ tasks:
       - |
         set -e
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
 
         if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
           echo "ℹ️  This is the upstream repository — compatibility check not applicable"
@@ -344,7 +344,7 @@ tasks:
 
         # Set up remote if needed
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
-          git remote add ckeletin-upstream "https://github.com/peiman""/ckeletin-go.git"
+          git remote add ckeletin-upstream "https://github.com/peiman/ckeleti""n-go.git"
         fi
 
         # Determine update target
@@ -494,7 +494,7 @@ tasks:
 
         # Update check
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
         if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
           echo "ℹ️  This is the upstream repository"
         else
@@ -516,7 +516,7 @@ tasks:
         echo ""
         echo "🔗 Import consistency:"
         CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman""/ckeletin-go"
+        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
         if [ "$CURRENT_MODULE" != "$UPSTREAM_MODULE" ]; then
           INCONSISTENT=$(grep -rn "$UPSTREAM_MODULE" --include="*.go" cmd/ internal/ 2>/dev/null | grep -v "_test.go" || true)
           if [ -z "$INCONSISTENT" ]; then
