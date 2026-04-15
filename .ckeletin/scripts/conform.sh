@@ -49,7 +49,7 @@ get_array_items() {
         /^  [A-Z]/ && $0 ~ req":" { found=1; next }
         found && /^  [A-Z]/ { found=0 }
         found && $0 ~ "^    " field ":" { in_array=1; next }
-        in_array && /^    [a-z]/ { in_array=0; next }
+        in_array && /^    [a-zA-Z_]/ { in_array=0; next }
         in_array && /^      - / {
             line=$0
             sub(/^ *- *"?/, "", line); sub(/"? *$/, "", line)

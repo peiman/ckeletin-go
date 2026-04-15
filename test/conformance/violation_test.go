@@ -335,31 +335,31 @@ func TestViolation_ARCH006_OversizedCommand(t *testing.T) {
 // Violation: go.mod references gomock
 // ---------------------------------------------------------------------------
 
-func TestViolation_TEST003_MockFrameworkInGoMod(t *testing.T) {
+func TestViolation_TEST003_MockFrameworkImport(t *testing.T) {
 	if testing.Short() {
 		t.Skip("violation tests modify the source tree")
 	}
 
-	root := projectRoot(t)
-	goModPath := filepath.Join(root, "go.mod")
+	// The semgrep rule ckeletin-no-mock-frameworks catches mock framework
+	// imports in Go files. Create a file with a gomock import and verify
+	// semgrep detects it.
+	cleanup := writeViolationFile(t,
+		"cmd/ckspec_violation.go",
+		`package cmd
 
-	// Read original go.mod
-	original, err := os.ReadFile(goModPath)
-	require.NoError(t, err)
+import "go.uber.org/mock/gomock"
 
-	// Append a fake gomock require (using uber's gomock fork, common pattern)
-	violated := string(original) + "\nrequire go.uber.org/mock v0.5.0 // violation test\n"
-	err = os.WriteFile(goModPath, []byte(violated), 0644)
-	require.NoError(t, err)
-	defer func() {
-		os.WriteFile(goModPath, original, 0644)
-	}()
+// Violation: mock framework import.
+// Semgrep rule ckeletin-no-mock-frameworks should catch this.
+var _ = gomock.Controller{}
+`)
+	defer cleanup()
 
-	// The check: grep should find mock framework in go.mod
-	// This tests the same pattern the mapping uses: grep for mock/mockery
-	output, exitCode := runCheck(t, "grep", "-q", "mock", goModPath)
-	assert.Equal(t, 0, exitCode,
-		"grep should find mock framework in violated go.mod\nOutput: %s", output)
+	// Run semgrep with local rules only (matches task check:sast)
+	output, exitCode := runCheck(t, "semgrep", "scan", "--config", ".semgrep.yml",
+		"--error", "--quiet", "cmd/ckspec_violation.go")
+	assert.NotEqual(t, 0, exitCode,
+		"semgrep should flag mock framework import\nOutput: %s", output)
 }
 
 // ---------------------------------------------------------------------------

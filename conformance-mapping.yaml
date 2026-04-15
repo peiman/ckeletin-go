@@ -188,8 +188,16 @@ requirements:
       structural, not volitional.
     checks:
       - "grep -q 'Feedback signals' .ckeletin/scripts/conform.sh"
-    violation_tests:
-      - "test/conformance/violation_test.go::TestViolation_ENF007_FeedbackSignalsProduced"
+    violation_tests: []
+    violation_evidence: >
+      The violation test verifies the conform script contains
+      feedback signal logic (string presence), not that it
+      produces correct output — running conform.sh from within
+      the conformance test suite causes infinite recursion.
+      Behavioral proof: task conform output shows feedback signals
+      when enforcement claims lack violation tests.
+      File: .ckeletin/scripts/conform.sh (FEEDBACK_FILE logic).
+      File: test/conformance/violation_test.go (TestViolation_ENF007).
 
   # ═══════════════════════════════════════════════════════════════
   # Testing (CKSPEC-TEST-001 through CKSPEC-TEST-004)
@@ -225,14 +233,15 @@ requirements:
   CKSPEC-TEST-003:
     title: "Dependency injection over mocking"
     status: met
-    enforcement_level: script
+    enforcement_level: sast
     evidence: >
-      Semgrep rule no-mock-frameworks detects gomock/mockery imports.
-      76 test files use testify/assert. Zero mock framework deps in go.mod.
+      Semgrep rule ckeletin-no-mock-frameworks detects gomock/mockery/
+      testify-mock imports in Go files. Violation test creates a file
+      with a gomock import and verifies semgrep catches it.
     checks:
       - "test -f .semgrep.yml"
     violation_tests:
-      - "test/conformance/violation_test.go::TestViolation_TEST003_MockFrameworkInGoMod"
+      - "test/conformance/violation_test.go::TestViolation_TEST003_MockFrameworkImport"
 
   CKSPEC-TEST-004:
     title: "Atomic test commits"
