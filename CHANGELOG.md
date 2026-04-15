@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-14
+
 ### Added
 
 - **Conformance generator (`task conform`)**: Automated CKSPEC conformance reporting — reads `conformance-mapping.yaml`, runs checks against all 35 spec requirements, validates completeness, and produces feedback signals. Supports `--json` for machine-readable output. 35/35 requirements met.
@@ -490,7 +492,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/peiman/ckeletin-go/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/peiman/ckeletin-go/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/peiman/ckeletin-go/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/peiman/ckeletin-go/compare/v0.7.0...v0.8.0
