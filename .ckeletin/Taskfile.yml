@@ -1085,8 +1085,11 @@ tasks:
         vars: { CLI_ARGS: "" }
       - cmd: |
           # Check if binary has the 'check' subcommand (requires dev build tag).
+          # Use 'check --help' (NOT 'help check') as the probe: Cobra's `help`
+          # subcommand always exits 0 even for unknown topics, so it cannot detect
+          # a missing command. `check --help` exits non-zero when 'check' is absent.
           # Fall back to bash-based checks if not available.
-          if ./{{._BINARY_NAME}} help check >/dev/null 2>&1; then
+          if ./{{._BINARY_NAME}} check --help >/dev/null 2>&1; then
             ./{{._BINARY_NAME}} check {{.CLI_ARGS}}
           else
             echo "ℹ️  Binary does not have 'check' subcommand (dev build tag required)"
