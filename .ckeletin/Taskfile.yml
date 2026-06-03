@@ -32,6 +32,18 @@ vars:
   TEST_OUTPUT_JSON: "test-output.json"
   COVERAGE_TXT: "coverage.txt"
 
+  # Consumer test-env extension point (issue #95). Every test:* task sources this
+  # file — in the SAME shell as `go test` — before running, IF it exists. A
+  # consuming project defines its test-env isolation (XDG sandboxing, GO_TEST_FLAGS,
+  # fixtures, …) ONCE in this file, and every test:* task — current and future —
+  # inherits it. This removes the footgun of re-wrapping each test sibling by hand
+  # (Task does not cascade env: across `task:` delegation). Override the path with
+  # the CKELETIN_TEST_ENV_SETUP env var. Unset / missing file = no-op (back-compat).
+  # The `case` normalisation prefixes a bare filename with ./ so POSIX `.`
+  # (which searches $PATH, not cwd, for names without a slash — e.g. dash on
+  # Linux CI) reliably sources the cwd file instead of silently doing nothing.
+  _TEST_ENV_PRELUDE: '_ck_env="${CKELETIN_TEST_ENV_SETUP:-.ckeletin.test-env.sh}"; case "$_ck_env" in /*|./*|../*) ;; *) _ck_env="./$_ck_env";; esac; [ -f "$_ck_env" ] && . "$_ck_env";'
+
   # Scripts directory (relative to this Taskfile)
   SCRIPTS_DIR: '{{.TASKFILE_DIR}}/scripts'
 
@@ -790,12 +802,19 @@ tasks:
     cmds:
       - '{{.SCRIPTS_DIR}}/validate-dev-build-tags.sh'
 
+  validate:hook-forwardings:
+    desc: Validate lefthook base hooks reference only namespaced or forwarded tasks (issue #100)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-hook-forwardings.sh'
+
   # --- Testing ---
 
   test:
     desc: Run tests with coverage
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
@@ -804,6 +823,7 @@ tasks:
     desc: Run tests with dev commands (explicit - same as 'test')
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
@@ -812,6 +832,7 @@ tasks:
     desc: Run tests without dev commands (production mode)
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
@@ -820,23 +841,27 @@ tasks:
     desc: Run unit tests only (skips integration tests)
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
 
   test:scaffold:
     desc: Run scaffold integration tests (slow — copies project, runs task check)
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short -- -v -tags "dev scaffold" -count=1 ./test/integration/...
 
   test:race:
     desc: Run tests with race detection
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format standard-verbose --jsonfile {{.TEST_OUTPUT_JSON}} -- -v -race -tags dev ./...
 
   test:full:
     desc: Run all tests with both race detection and coverage
     silent: true
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
@@ -844,24 +869,27 @@ tasks:
   test:watch:
     desc: Run tests in watch mode
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short --watch --hide-summary=skipped
 
   test:integration:
     desc: Run integration tests (disables cache with -count=1)
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       gotestsum --format short -- -v -count=1 ./test/integration/...
 
   test:golden:
     desc: Test CLI output against golden files
     dir: .
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test ./test/integration -v -run Golden
 
   test:golden:update:
     desc: Update golden files (MUST manually review changes!)
     dir: .
     cmds:
-      - GOLDEN_UPDATE=1 go test ./test/integration -run Golden
+      - '{{._TEST_ENV_PRELUDE}} GOLDEN_UPDATE=1 go test ./test/integration -run Golden'
       - echo ""
       - echo "Review golden file changes before committing!"
       - echo "Run git diff test/integration/testdata/"
@@ -870,7 +898,7 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data
     cmds:
-      - gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      - '{{._TEST_ENV_PRELUDE}} gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...'
       - gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       - rm -f coverage.raw.txt
       - echo "Detailed coverage report:"
@@ -910,6 +938,7 @@ tasks:
   bench:
     desc: Run all benchmarks
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./... -run=^$ | tee bench-results.txt
       echo "Benchmark results saved to bench-results.txt"
     silent: false
@@ -917,16 +946,19 @@ tasks:
   bench:cmd:
     desc: Run benchmarks for cmd package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./cmd -run=^$
 
   bench:config:
     desc: Run benchmarks for config package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./.ckeletin/pkg/config -run=^$
 
   bench:logger:
     desc: Run benchmarks for logger package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./.ckeletin/pkg/logger -run=^$
 
   # --- Fuzz Testing ---
@@ -934,6 +966,7 @@ tasks:
   test:fuzz:
     desc: Run all fuzz tests (default 10s per function)
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       FUZZTIME=${FUZZTIME:-10s}
       echo "Running fuzz tests for $FUZZTIME each..."
       go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./.ckeletin/pkg/config
@@ -944,12 +977,14 @@ tasks:
   test:fuzz:config:
     desc: Run fuzz tests for config package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       FUZZTIME=${FUZZTIME:-10s}
       go test -fuzz=FuzzValidateConfigValue -fuzztime=$FUZZTIME ./.ckeletin/pkg/config
 
   test:fuzz:validator:
     desc: Run fuzz tests for validator package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       FUZZTIME=${FUZZTIME:-10s}
       go test -fuzz=. -fuzztime=$FUZZTIME ./.ckeletin/pkg/config/validator
 
@@ -1065,6 +1100,7 @@ tasks:
       - task: validate:output
       - task: validate:security
       - task: validate:dev-build-tags
+      - task: validate:hook-forwardings
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Security Scanning"
@@ -1142,6 +1178,7 @@ tasks:
       - task: validate:config-consumption
       - task: validate:output
       - task: validate:dev-build-tags
+      - task: validate:hook-forwardings
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Tests (Unit Only)"

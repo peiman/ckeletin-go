@@ -29,6 +29,15 @@ extends:
   - .ckeletin/configs/lefthook.base.yml
 
 # Project-specific hooks (add below)
+
+# Framework-author concern: validate ckeletin-go's own scaffold template on push.
+# This lives here (not in the shared lefthook.base.yml) so consumers don't inherit
+# a multi-minute, non-resolving `task test:scaffold` hook. See issue #100.
+pre-push:
+  commands:
+    scaffold:
+      run: task ckeletin:test:scaffold
+
 commit-msg:
   commands:
     conventional-commit:
