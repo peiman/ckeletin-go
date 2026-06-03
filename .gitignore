@@ -35,9 +35,9 @@ go.work
 # Conformance cache (fetched from spec repo, not committed)
 .ckeletin/cache/
 
-# Claude Code (keep hooks.json and rules/, ignore local state)
+# Claude Code (keep settings.json and rules/, ignore local state)
 .claude/*
-!.claude/hooks.json
+!.claude/settings.json
 !.claude/rules/
 
 # OS generated files
