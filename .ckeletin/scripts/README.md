@@ -12,7 +12,7 @@ bash scripts/install_tools.sh
 ```
 
 **When it runs:**
-- Automatically via `.claude/hooks.json` SessionStart hook
+- Automatically via the `.claude/settings.json` SessionStart hook
 - When starting a new Claude Code session
 - Can be run manually if needed
 
