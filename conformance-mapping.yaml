@@ -2,7 +2,7 @@
 # Used by `task conform` to generate the conformance report.
 # Format agreed between ckeletin-go and ckeletin-rust architects.
 
-spec_version: "0.4.0"
+spec_version: "0.5.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -316,6 +316,24 @@ requirements:
       - "task validate:output"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_OUT005_BusinessUsesFmtPrint"
+
+  CKSPEC-OUT-006:
+    title: "Build identity in version output"
+    status: met
+    enforcement_level: test
+    evidence: >
+      cmd/root.go composes RootCmd.Version as
+      "<version>, commit <commit>, built at <date>" from the Version, Commit and
+      Date package vars injected via ldflags (see Taskfile.yml LDFLAGS). So
+      `<binary> --version` emits all three build-identity fields; TestVersionFlag
+      asserts the commit and build-date fields are present in the output.
+    checks:
+      - "grep -qE 'commit %s, built at %s' cmd/root.go"
+    violation_tests: []
+    violation_evidence: >
+      Removing any build-identity field from the cmd/root.go version template (or
+      dropping its ldflags injection) takes it out of `--version`; both the grep
+      check and TestVersionFlag fail, so the regression cannot land green.
 
   # ═══════════════════════════════════════════════════════════════
   # Agent Readiness (CKSPEC-AGENT-001 through CKSPEC-AGENT-005)
