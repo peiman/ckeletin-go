@@ -431,6 +431,9 @@ jobs:
       - name: Install Latest Tools
         run: task setup:latest
 
+      - name: Install semgrep
+        run: pip3 install --user semgrep # SAST tool the conformance violation tests (ENF-006) invoke
+
       - name: Run CKSPEC conformance against the latest spec (ENF-009 gate)
         run: task conform
 
