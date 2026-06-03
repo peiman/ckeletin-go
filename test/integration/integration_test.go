@@ -292,10 +292,13 @@ func TestVersionFlag(t *testing.T) {
 	require.NoError(t, err, "version command should succeed")
 
 	output := stdout.String()
-	// Version output should contain version info
+	// CKSPEC-OUT-006: the version output MUST carry build identity — version,
+	// commit, and build date (composed in cmd/root.go from ldflags-injected vars).
 	hasVersion := strings.Contains(output, "version") || strings.Contains(output, "dev")
 	assert.True(t, hasVersion,
 		"version output should contain 'version' or 'dev', got: %s", output)
+	assert.Contains(t, output, "commit", "version output must include build identity (commit), got: %s", output)
+	assert.Contains(t, output, "built at", "version output must include build identity (build date), got: %s", output)
 }
 
 // TestConfigLoading tests configuration loading from files
