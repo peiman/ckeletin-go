@@ -938,6 +938,7 @@ tasks:
   bench:
     desc: Run all benchmarks
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./... -run=^$ | tee bench-results.txt
       echo "Benchmark results saved to bench-results.txt"
     silent: false
@@ -945,16 +946,19 @@ tasks:
   bench:cmd:
     desc: Run benchmarks for cmd package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./cmd -run=^$
 
   bench:config:
     desc: Run benchmarks for config package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./.ckeletin/pkg/config -run=^$
 
   bench:logger:
     desc: Run benchmarks for logger package
     cmd: |
+      {{._TEST_ENV_PRELUDE}}
       go test -bench=. -benchmem ./.ckeletin/pkg/logger -run=^$
 
   # --- Fuzz Testing ---

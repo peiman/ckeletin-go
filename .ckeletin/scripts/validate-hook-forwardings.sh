@@ -18,14 +18,16 @@
 #
 # Exit 0 when consistent, 1 otherwise.
 
-set -o pipefail
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/check-output.sh
 source "${SCRIPT_DIR}/lib/check-output.sh"
 
 BASE_HOOKS=".ckeletin/configs/lefthook.base.yml"
-EXPECTED="${SCRIPT_DIR}/expected-forwardings.txt"
+# Overridable so tests can supply a controlled forwarding list (defaults to the
+# real SSOT next to this script).
+EXPECTED="${CKELETIN_EXPECTED_FORWARDINGS:-${SCRIPT_DIR}/expected-forwardings.txt}"
 
 check_header "Validating lefthook hooks reference only forwarded tasks (issue #100)"
 
@@ -39,8 +41,10 @@ if [ ! -f "$EXPECTED" ]; then
 fi
 
 # Extract task names referenced by `task <name>` in the base hooks. Comments are
-# stripped first (sed 's/#.*//') so prose mentioning a task name is not counted.
-REFERENCED=$(sed 's/#.*//' "$BASE_HOOKS" | grep -oE 'task [a-z][a-zA-Z0-9:_-]*' | awk '{print $2}' | sort -u)
+# stripped first (sed 's/#.*//'), and only `run:` directives are considered, so a
+# task name appearing in a desc: or prose is not mistaken for a hook reference.
+# `|| true`: an empty match must yield no references, not abort under `set -e`.
+REFERENCED=$(sed 's/#.*//' "$BASE_HOOKS" | grep -E '^[[:space:]]*run:' | grep -oE 'task [a-z][a-zA-Z0-9:_-]*' | awk '{print $2}' | sort -u || true)
 
 MISSING=""
 for task in $REFERENCED; do

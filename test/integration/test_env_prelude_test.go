@@ -101,7 +101,8 @@ func TestTestEnvPrelude_AllTestTasksWired(t *testing.T) {
 		}
 		joined := strings.Join(body, "\n")
 		runsGoTest := strings.Contains(joined, "gotestsum ") || strings.Contains(joined, "go test ")
-		if strings.HasPrefix(curName, "test") && runsGoTest && !strings.Contains(joined, "_TEST_ENV_PRELUDE") {
+		inScope := strings.HasPrefix(curName, "test") || strings.HasPrefix(curName, "bench")
+		if inScope && runsGoTest && !strings.Contains(joined, "_TEST_ENV_PRELUDE") {
 			offenders = append(offenders, curName)
 		}
 	}

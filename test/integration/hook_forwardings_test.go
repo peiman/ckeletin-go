@@ -26,11 +26,13 @@ func hfScriptPath(t *testing.T) string {
 	return p
 }
 
-// runHookForwardings runs the validator with the given working directory.
-func runHookForwardings(t *testing.T, dir string) (string, int) {
+// runHookForwardings runs the validator in dir. Extra "KEY=value" env entries
+// (e.g. CKELETIN_EXPECTED_FORWARDINGS) may be supplied to keep tests hermetic.
+func runHookForwardings(t *testing.T, dir string, env ...string) (string, int) {
 	t.Helper()
 	cmd := exec.Command("bash", hfScriptPath(t))
 	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), env...)
 	out, err := cmd.CombinedOutput()
 	if ee, ok := err.(*exec.ExitError); ok {
 		return string(out), ee.ExitCode()
@@ -63,7 +65,11 @@ func TestHookForwardings_DetectsUnforwardedBareTask(t *testing.T) {
 	base := "pre-push:\n  commands:\n    scaffold:\n      run: task test:scaffold\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "configs", "lefthook.base.yml"), []byte(base), 0o644))
 
-	out, code := runHookForwardings(t, dir)
+	// Hermetic forwarding list that deliberately omits test:scaffold.
+	expected := filepath.Join(dir, "expected.txt")
+	require.NoError(t, os.WriteFile(expected, []byte("# forwardings\nlint\ntest:coverage\n"), 0o644))
+
+	out, code := runHookForwardings(t, dir, "CKELETIN_EXPECTED_FORWARDINGS="+expected)
 	assert.Equal(t, 1, code, "an unforwarded bare task reference must fail.\nOutput:\n%s", out)
 	assert.Contains(t, out, "test:scaffold", "should name the offending task")
 	assert.Contains(t, out, "no forwarding", "should explain the failure")
