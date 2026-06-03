@@ -104,6 +104,10 @@ tasks:
     desc: Check if GoReleaser is installed
     cmds: [task: ckeletin:check:release]
 
+  check:release:drift:
+    desc: Detect release-infra drift (goreleaser deprecations, stale token/cosign, orphan tags) before a release
+    cmds: [task: ckeletin:check:release:drift]
+
   check:sast:
     desc: Run static analysis (SAST) with semgrep
     cmds: [task: ckeletin:check:sast]

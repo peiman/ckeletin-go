@@ -529,6 +529,13 @@ tasks:
           echo "✅ Upstream repository — imports are canonical"
         fi
 
+        # Release infrastructure drift — .goreleaser.yml and .github/workflows/*
+        # are NOT synced by ckeletin:update, so they drift silently and only fail
+        # at release time. Surface it here (non-fatal).
+        echo ""
+        echo "🚀 Release infrastructure:"
+        '{{.SCRIPTS_DIR}}/check-release-drift.sh' || true
+
   tidy:
     desc: Ensure go.mod and go.sum are up to date
     cmds:
@@ -1097,6 +1104,11 @@ tasks:
             echo ""
             task ckeletin:check:bash
           fi
+      # Non-fatal footer: nudge when the framework (.ckeletin/) is behind upstream.
+      # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
+      - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'
+        silent: true
+        ignore_error: true
     vars:
       CLI_ARGS: ""
 
@@ -1256,9 +1268,15 @@ tasks:
         echo "✅ GoReleaser is installed: $(goreleaser --version)"
     silent: false
 
+  check:release:drift:
+    desc: Detect release-infra drift (goreleaser deprecations, stale token/cosign, orphan tags) before a release
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-release-drift.sh'
+
   test:release:
     desc: Test GoReleaser configuration (snapshot build, no release)
-    deps: [check:release]
+    deps: [check:release, check:release:drift]
     cmds:
       - echo "Building snapshot release (no tags required)..."
       - goreleaser release --snapshot --clean --skip=publish
@@ -1269,7 +1287,7 @@ tasks:
 
   build:release:
     desc: Build release artifacts locally (requires git tag)
-    deps: [check:release]
+    deps: [check:release, check:release:drift]
     cmds:
       - echo "Building release artifacts..."
       - goreleaser build --clean --snapshot

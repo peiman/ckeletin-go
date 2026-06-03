@@ -181,7 +181,10 @@ changelog:
 #   2. Set HOMEBREW_TAP_OWNER environment variable to your GitHub username
 #   3. Set HOMEBREW_TAP_GITHUB_TOKEN secret in CI
 # If HOMEBREW_TAP_OWNER is not set, Homebrew tap updates are skipped
-brews:
+# NOTE: `brews:` (Homebrew formulas) is deprecated in GoReleaser in favour of
+# `homebrew_casks:`. Casks live under Casks/ in the tap repo and have no
+# `install`/`test`/`directory`/`license` stanzas (those are formula-only).
+homebrew_casks:
   - name: "{{ .ProjectName }}"
 
     # Skip upload if HOMEBREW_TAP_OWNER is not set (makes Homebrew optional)
@@ -192,31 +195,31 @@ brews:
       name: homebrew-tap
       token: '{{ if index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}{{ else }}{{ end }}'
 
-    # Folder inside the repository
-    directory: Formula
-
     # Git author used to commit to the repository
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com
 
     # Template for the commit message
-    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
 
     # Description for Homebrew — override this in your project
     description: "{{ .ProjectName }} CLI application"
 
     homepage: "{{ .GitURL }}"
 
-    license: "MIT"
+    # The binary name matches the cask name, so GoReleaser wires up the binary
+    # automatically (the homebrew_casks default — no `install` stanza needed).
 
-    # Install instructions for Homebrew
-    install: |
-      bin.install "{{ .ProjectName }}"
-
-    # Test instructions
-    test: |
-      system "#{bin}/{{ .ProjectName }}", "--version"
+    # The released binary is not Apple-notarized; strip the Gatekeeper quarantine
+    # attribute on install so it runs without a "cannot be opened" prompt.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/{{ .ProjectName }}"]
+          end
 
 # Release configuration
 # GitHub repository is auto-detected from git remote
