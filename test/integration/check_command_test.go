@@ -61,6 +61,33 @@ func buildDevBinary(t *testing.T) string {
 	return devBinaryPath
 }
 
+// ensureLicenseCheckBinary guarantees ./ckeletin-go exists in the project root for
+// the duration of the test. The license-binary check (part of
+// `check --category dependencies`) scans the built binary by name, mirroring how
+// `task check` runs build:dev before the check. Without this, the deps test passes
+// or fails depending on whether a prior `task build` happened to leave a binary
+// behind — a hidden state dependency that makes the test non-deterministic across
+// environments (CI build job and fresh worktrees disagree). Builds the binary only
+// if it is absent and removes only what it created, so a developer's existing
+// ./ckeletin-go is never clobbered.
+func ensureLicenseCheckBinary(t *testing.T, root string) {
+	t.Helper()
+
+	// "ckeletin-go" mirrors the binaryName default in cmd/root.go and
+	// internal/check/executor.go — the name license-binary scans as ./<binaryName>.
+	binaryPath := filepath.Join(root, "ckeletin-go")
+	if _, err := os.Stat(binaryPath); err == nil {
+		return // already present (e.g. from a prior `task build`); leave it in place
+	}
+
+	cmd := exec.Command("go", "build", "-tags", "dev", "-o", binaryPath, ".")
+	cmd.Dir = root
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err, "Failed to build ./ckeletin-go for license-binary check: %s", string(output))
+
+	t.Cleanup(func() { _ = os.Remove(binaryPath) })
+}
+
 // TestCheckCommand_QualityCategory runs the check command with --category quality.
 // This exercises the highest-impact uncovered code paths:
 //   - Executor.Execute (orchestration)
@@ -116,6 +143,7 @@ func TestCheckCommand_DepsCategory(t *testing.T) {
 
 	binary := buildDevBinary(t)
 	root := projectRoot(t)
+	ensureLicenseCheckBinary(t, root) // license-binary scans ./ckeletin-go; build it if absent
 
 	cmd := exec.Command(binary, "check", "--category", "dependencies")
 	cmd.Dir = root
