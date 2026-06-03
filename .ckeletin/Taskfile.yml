@@ -790,6 +790,12 @@ tasks:
     cmds:
       - '{{.SCRIPTS_DIR}}/validate-dev-build-tags.sh'
 
+  validate:hook-forwardings:
+    desc: Validate lefthook base hooks reference only namespaced or forwarded tasks (issue #100)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-hook-forwardings.sh'
+
   # --- Testing ---
 
   test:
@@ -1065,6 +1071,7 @@ tasks:
       - task: validate:output
       - task: validate:security
       - task: validate:dev-build-tags
+      - task: validate:hook-forwardings
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Security Scanning"
@@ -1142,6 +1149,7 @@ tasks:
       - task: validate:config-consumption
       - task: validate:output
       - task: validate:dev-build-tags
+      - task: validate:hook-forwardings
       - cmd: |
           source {{.SCRIPTS_DIR}}/lib/check-output.sh
           category_header "Tests (Unit Only)"

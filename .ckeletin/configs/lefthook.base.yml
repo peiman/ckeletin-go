@@ -33,5 +33,10 @@ pre-push:
   commands:
     coverage:
       run: task test:coverage
-    scaffold:
-      run: task test:scaffold
+    # NOTE: the scaffold-template integration test (`test:scaffold`) is a
+    # FRAMEWORK-AUTHOR concern — it validates ckeletin-go's own scaffold template.
+    # It is intentionally NOT defined here, because every consumer extends this
+    # base config: a bare `task test:scaffold` does not resolve downstream (the
+    # framework tasks are namespaced `ckeletin:*` there) and it would impose a
+    # multi-minute template test on every consumer push. ckeletin-go runs it via
+    # its own .lefthook.yml (using the namespaced `task ckeletin:test:scaffold`).
