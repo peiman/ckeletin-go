@@ -157,6 +157,17 @@ fi
 echo "Completeness: $TOTAL/$TOTAL requirements mapped (ENF-005: PASS)"
 echo ""
 
+# ── ENF-008 drift guard: machine-derivable facts in evidence must match reality.
+# (A hand-typed count in prose silently rots — e.g. "35" after a 36th requirement.)
+DRIFT=$(grep -oE 'all [0-9]+ requirement' "$MAPPING_FILE" | grep -oE '[0-9]+' | head -1 || true)
+if [[ -n "$DRIFT" && "$DRIFT" != "$TOTAL" ]]; then
+    echo "evidence drift: prose claims '$DRIFT requirement IDs' but $TOTAL are mapped (ENF-008)" >> "$FAIL_FILE"
+fi
+
+# ENF-008 anchoring tallies: machine-enforced vs declared-analysis.
+ENF008_AUTOMATED=0
+ENF008_ANALYSIS=0
+
 # ── Run checks and validate ──────────────────────────────────────
 
 echo "Running checks..."
@@ -173,6 +184,25 @@ for req_id in $REQ_IDS; do
 
     if [[ "$status" == "partial" ]]; then
         echo "$req_id ($title): partial" >> "$WARNING_FILE"
+    fi
+
+    # ── ENF-008: every met requirement must be machine-anchored (a check or a
+    # violation test) OR a declared honor-system with a written analysis
+    # (violation_evidence). No silent prose-only "met". ──
+    if [[ "$status" == "met" ]]; then
+        a_checks=$(get_array_items "$req_id" "checks")
+        a_vtests=$(get_array_items "$req_id" "violation_tests")
+        a_vevid=$(awk -v req="$req_id" '
+            /^  [A-Z]/ && $0 ~ req":" { f=1; next }
+            f && /^  [A-Z]/ { f=0 }
+            f && /violation_evidence:/ { print "y"; exit }' "$MAPPING_FILE")
+        if [[ -n "$a_checks" || -n "$a_vtests" ]]; then
+            ENF008_AUTOMATED=$((ENF008_AUTOMATED + 1))
+        elif [[ "$enforcement" == "honor-system" && -n "$a_vevid" ]]; then
+            ENF008_ANALYSIS=$((ENF008_ANALYSIS + 1))
+        else
+            echo "$req_id ($title): met but unanchored — add a check/violation_test, or declare honor-system + violation_evidence (ENF-008)" >> "$FAIL_FILE"
+        fi
     fi
 
     # ── ENF-006: Check proof exists for claims above honor-system ──
@@ -254,6 +284,7 @@ echo "  Met:           $MET"
 echo "  Partial:       $PARTIAL"
 echo "  Deferred:      $DEFERRED"
 echo "  Failed checks: $FAILED_CHECKS"
+echo "  Enforcement:   $ENF008_AUTOMATED automated, $ENF008_ANALYSIS analysis-with-evidence (ENF-008)"
 echo ""
 
 if [[ $WARNING_COUNT -gt 0 ]]; then
