@@ -744,6 +744,45 @@ go tool cover -html=coverage.out
 - [Testify Documentation](https://pkg.go.dev/github.com/stretchr/testify) - Assertion library docs
 - [Table-Driven Tests in Go](https://dave.cheney.net/2019/05/07/prefer-table-driven-tests) - Dave Cheney's guide
 
+## Consumer Test Environment (Downstream Projects)
+
+Consuming projects often need to inject environment setup into the test runs
+that the framework's `test:*` tasks orchestrate — XDG sandboxing so tests never
+touch real user data, `GO_TEST_FLAGS`, custom fixtures, etc.
+
+**The footgun (and why this exists):** Task does not cascade `env:` blocks across
+`task: ckeletin:test:*` delegation — each task has an isolated env scope. The old
+workaround was to re-wrap *every* `test:*` sibling in the consumer's Taskfile with
+the same `mktemp`/`export`/`trap` boilerplate. Forgetting it on any new sibling
+(`test:race`, `test:fuzz`, …) silently dropped isolation — a regression that
+typically surfaced as "flaky CI" long after it was introduced (issue #95).
+
+**The mechanism:** every framework `test:*` task sources a single, consumer-owned
+file — in the *same shell* as `go test` — before running, **if it exists**:
+
+```sh
+.ckeletin.test-env.sh        # default path, at the consumer repo root
+```
+
+Define your isolation **once** there and every `test:*` task — current and future
+— inherits it. No per-sibling wrapping; nothing to forget.
+
+```sh
+# .ckeletin.test-env.sh  (committed — team-shared)
+_d=$(mktemp -d -t myproj-test.XXXXXX)
+export XDG_DATA_HOME="$_d" XDG_CONFIG_HOME="$_d" XDG_STATE_HOME="$_d"
+trap 'rm -rf "$_d"' EXIT
+```
+
+- Override the path with the `CKELETIN_TEST_ENV_SETUP` environment variable.
+- No file → no-op (fully backward compatible).
+- **Enforcement:** a framework test (`TestTestEnvPrelude_AllTestTasksWired`) fails
+  if any `test:*` task that runs `go test` is missing the prelude, so the
+  isolation hook can never silently regress as new test tasks are added.
+- **Belt-and-suspenders:** keep a sentinel test (e.g. asserting `XDG_DATA_HOME`
+  points outside the real home) so a *missing* `.ckeletin.test-env.sh` fails
+  loudly rather than polluting real user data.
+
 ## Summary Checklist
 
 Before submitting code, ensure your tests:
