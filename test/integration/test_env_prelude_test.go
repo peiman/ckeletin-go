@@ -48,21 +48,34 @@ func extractPrelude(t *testing.T) string {
 // TestTestEnvPrelude_SourcesFileWhenPresent asserts the real prelude string
 // sources .ckeletin.test-env.sh (in the same shell) when it exists — verified
 // in POSIX sh, which is what Task uses.
+// requireSh skips the test when POSIX sh is unavailable. The prelude is sh
+// syntax and Task uses sh to run test tasks (Git Bash on Windows CI), but a bare
+// Windows host without Git Bash has no sh.
+func requireSh(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("sh not available; the test-env prelude is POSIX sh")
+	}
+}
+
 func TestTestEnvPrelude_SourcesFileWhenPresent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test-env prelude integration test in short mode")
 	}
+	requireSh(t)
 	prelude := extractPrelude(t)
 	dir := t.TempDir()
-	marker := filepath.Join(dir, "sourced.marker")
-	envFile := "export CKELETIN_TEST_ENV_PROBE=active\ntouch " + marker + "\n"
+	// Use a RELATIVE marker name: the path is embedded in a POSIX-sh script, so a
+	// Windows absolute path (with backslashes) would break. `touch` runs in cwd
+	// (= dir), so the marker lands in the temp dir.
+	envFile := "export CKELETIN_TEST_ENV_PROBE=active\ntouch sourced.marker\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin.test-env.sh"), []byte(envFile), 0o644))
 
 	cmd := exec.Command("sh", "-c", prelude+` printf 'PROBE=%s\n' "$CKELETIN_TEST_ENV_PROBE"`)
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "prelude run failed.\nOutput:\n%s", out)
-	assert.FileExists(t, marker, "the test-env file must be sourced (marker created)")
+	assert.FileExists(t, filepath.Join(dir, "sourced.marker"), "the test-env file must be sourced (marker created)")
 	assert.Contains(t, string(out), "PROBE=active", "sourced exports must be visible to the test shell")
 }
 
@@ -72,6 +85,7 @@ func TestTestEnvPrelude_NoOpWhenAbsent(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test-env prelude integration test in short mode")
 	}
+	requireSh(t)
 	prelude := extractPrelude(t)
 	dir := t.TempDir() // no .ckeletin.test-env.sh here
 
