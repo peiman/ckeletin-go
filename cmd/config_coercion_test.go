@@ -71,3 +71,21 @@ func TestGetKeyValue_BoolFromEnvString(t *testing.T) {
 	assert.True(t, getKeyValue[bool]("app.feature.enabled"),
 		"string env value \"true\" must coerce to bool true")
 }
+
+func TestGetKeyValue_Float64FromEnvString(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("app.some.ratio", "3.14")
+
+	assert.Equal(t, 3.14, getKeyValue[float64]("app.some.ratio"),
+		"string env value \"3.14\" must coerce to float64 3.14")
+}
+
+func TestGetKeyValue_StringSliceFromEnvString(t *testing.T) {
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("app.some.list", "a b c") // env-var shape: a delimited string, not a native slice
+
+	assert.Equal(t, []string{"a", "b", "c"}, getKeyValue[[]string]("app.some.list"),
+		"a delimited string env value must coerce to []string")
+}
