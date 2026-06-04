@@ -5,8 +5,11 @@
 *.so
 *.dylib
 # Replace the following line with the Binary name from BINARY_NAME in Taskfile.yml
-ckeletin-go
-scaffold
+# Root-anchored (leading slash) so these match the built binaries at the repo
+# root only — an unanchored name also matches same-named directories, e.g. the
+# .ckeletin/scripts/scaffold/ source dir, silently hiding new source files there.
+/ckeletin-go
+/scaffold
 
 # Task artifacts
 .task
