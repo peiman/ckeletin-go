@@ -282,7 +282,7 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           files: ./coverage.txt
-          fail_ci_if_error: false  # Coverage enforced by check-coverage-project.sh
+          fail_ci_if_error: false  # codecov is informational; the 85% gate is enforced by `task check` (check-coverage-project.sh)
           verbose: true
           flags: unittests
           name: codecov-${{ steps.binary-name.outputs.name }}

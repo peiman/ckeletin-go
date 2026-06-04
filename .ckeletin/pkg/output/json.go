@@ -7,8 +7,16 @@ package output
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 )
+
+// ErrRendered is a sentinel returned by a command that has already written its
+// single JSON envelope to stdout but still needs to signal a non-zero exit.
+// main.go recognizes it and exits non-zero WITHOUT rendering a second envelope.
+// This keeps the "exactly one envelope per command" contract while preserving a
+// meaningful process exit code for JSON consumers that gate on $?.
+var ErrRendered = errors.New("output: result already rendered")
 
 // JSONEnvelope is the standard response wrapper for --output json mode.
 // Every command emits exactly one envelope to stdout.

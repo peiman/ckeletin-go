@@ -22,12 +22,14 @@ The documentation can be output in various formats using the --format flag.`,
 	ConfigPrefix: "app.docs",
 	FlagOverrides: map[string]string{
 		"app.docs.output_format": "format",
-		"app.docs.output_file":   "output",
+		// Named --output-file (not --output) so it does not shadow the global
+		// --output (output FORMAT) persistent flag.
+		"app.docs.output_file": "output-file",
 	},
 	Examples: []string{
 		"docs config",
 		"docs config --format yaml",
-		"docs config --output docs/config.md",
+		"docs config --output-file docs/config.md",
 	},
 	SeeAlso: []string{"ping"},
 }

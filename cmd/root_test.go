@@ -735,8 +735,11 @@ func TestGetConfigValue_FlagErrors(t *testing.T) {
 	}
 }
 
-// TestGetConfigValue_ViperTypeMismatch tests behavior when viper has wrong type
-func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
+// TestGetConfigValue_ViperTypeCoercion tests that values are coerced to the
+// requested type using viper's typed getters (which use spf13/cast). This is
+// what makes string-typed env vars usable as bool/int/float config. A value is
+// only dropped to the zero value when it genuinely cannot be parsed.
+func TestGetConfigValue_ViperTypeCoercion(t *testing.T) {
 	tests := []struct {
 		name           string
 		viperValue     interface{}
@@ -744,28 +747,28 @@ func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
 		expectedResult interface{}
 	}{
 		{
-			name:           "Viper has int, requesting string",
+			name:           "Viper has int, requesting string -> coerced",
 			viperValue:     42,
 			requestedType:  "string",
-			expectedResult: "", // zero value
+			expectedResult: "42", // cast.ToString(42)
 		},
 		{
-			name:           "Viper has string, requesting bool",
+			name:           "Viper has unparseable string, requesting bool -> zero",
 			viperValue:     "not-a-bool",
 			requestedType:  "bool",
-			expectedResult: false, // zero value
+			expectedResult: false, // not parseable as bool
 		},
 		{
-			name:           "Viper has string, requesting int",
+			name:           "Viper has unparseable string, requesting int -> zero",
 			viperValue:     "not-an-int",
 			requestedType:  "int",
-			expectedResult: 0, // zero value
+			expectedResult: 0, // not parseable as int
 		},
 		{
-			name:           "Viper has bool, requesting float64",
+			name:           "Viper has bool, requesting float64 -> coerced",
 			viperValue:     true,
 			requestedType:  "float64",
-			expectedResult: 0.0, // zero value
+			expectedResult: 1.0, // cast.ToFloat64(true)
 		},
 	}
 
@@ -783,20 +786,20 @@ func TestGetConfigValue_ViperTypeMismatch(t *testing.T) {
 			cmd.Flags().Float64("float", 0.0, "")
 
 			// EXECUTION & ASSERTION PHASE
-			// When viper has wrong type and flag not set, should return zero value
+			// The value is coerced to the requested type (zero only when unparseable).
 			switch tt.requestedType {
 			case "string":
 				result := getConfigValueWithFlags[string](cmd, "str", "test.key")
-				assert.Equal(t, tt.expectedResult.(string), result, "Should return zero value for type mismatch")
+				assert.Equal(t, tt.expectedResult.(string), result, "value should be coerced to string")
 			case "bool":
 				result := getConfigValueWithFlags[bool](cmd, "bool", "test.key")
-				assert.Equal(t, tt.expectedResult.(bool), result, "Should return zero value for type mismatch")
+				assert.Equal(t, tt.expectedResult.(bool), result, "value should be coerced to bool (zero when unparseable)")
 			case "int":
 				result := getConfigValueWithFlags[int](cmd, "int", "test.key")
-				assert.Equal(t, tt.expectedResult.(int), result, "Should return zero value for type mismatch")
+				assert.Equal(t, tt.expectedResult.(int), result, "value should be coerced to int (zero when unparseable)")
 			case "float64":
 				result := getConfigValueWithFlags[float64](cmd, "float", "test.key")
-				assert.Equal(t, tt.expectedResult.(float64), result, "Should return zero value for type mismatch")
+				assert.Equal(t, tt.expectedResult.(float64), result, "value should be coerced to float64")
 			}
 		})
 	}

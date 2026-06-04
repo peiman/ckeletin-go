@@ -1140,6 +1140,10 @@ tasks:
             echo ""
             task ckeletin:check:bash
           fi
+      # Enforce the project coverage threshold (85%) as part of the mandatory
+      # gate. The binary/bash check above measures coverage but does not gate on
+      # it; this is the authoritative threshold check (excludes TUI/demo code).
+      - task: test:coverage:project
       # Non-fatal footer: nudge when the framework (.ckeletin/) is behind upstream.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'

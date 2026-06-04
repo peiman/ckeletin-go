@@ -1,6 +1,9 @@
 app:
-  # Logging level for the application (trace, debug, info, warn, error, fatal, panic)
+  # Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.
   log_level: debug
+
+  # Output format: text (human-readable) or json (machine-readable)
+  output_format: json
 
   docs:
     # Output format for documentation (markdown, yaml)
@@ -8,6 +11,22 @@ app:
 
     # Output file for documentation (defaults to stdout)
     output_file: /path/to/output.md
+
+  check:
+    # Stop on first failed check
+    fail_fast: true
+
+    # Show verbose output including command details
+    verbose: true
+
+    # Run checks within each category in parallel (disable with --parallel=false)
+    parallel: false
+
+    # Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)
+    category: security,tests
+
+    # Show duration for each check in the output
+    timing: false
 
   ping:
     # Default message to display for the ping command
@@ -18,4 +37,41 @@ app:
 
     # Enable interactive UI for the ping command
     ui: true
+
+  log:
+    # Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.
+    console_level: info
+
+    # Enable file logging to capture detailed logs
+    file_enabled: true
+
+    # Path to the log file (created with secure 0600 permissions)
+    file_path: /var/log/ckeletin-go/app.log
+
+    # File log level (trace, debug, info, warn, error, fatal, panic)
+    file_level: debug
+
+    # Enable colored console output (auto, true, false). Auto detects TTY.
+    color_enabled: true
+
+    # Maximum size in megabytes before log file is rotated
+    file_max_size: 100
+
+    # Maximum number of old log files to retain
+    file_max_backups: 3
+
+    # Maximum number of days to retain old log files
+    file_max_age: 28
+
+    # Compress rotated log files with gzip
+    file_compress: true
+
+    # Enable log sampling for high-volume scenarios
+    sampling_enabled: true
+
+    # Number of messages to log per second before sampling
+    sampling_initial: 100
+
+    # Number of messages to log thereafter per second
+    sampling_thereafter: 100
 

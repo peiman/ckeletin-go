@@ -229,8 +229,11 @@ func (e *Executor) Execute(ctx context.Context) error {
 		}); err != nil {
 			return fmt.Errorf("failed to write JSON output: %w", err)
 		}
-		// Return nil — the JSON envelope already communicates success/failure.
-		// Returning an error here would cause main.go to emit a second envelope.
+		// The single envelope is written. Signal a non-zero exit on failure
+		// (without main.go emitting a second envelope); nil on success.
+		if totalFailed > 0 {
+			return output.ErrRendered
+		}
 		return nil
 	}
 

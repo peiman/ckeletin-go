@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -12,6 +13,11 @@ import (
 
 func run() int {
 	if err := cmd.Execute(); err != nil {
+		// The command already emitted its single JSON envelope; exit non-zero
+		// without rendering a second envelope.
+		if errors.Is(err, output.ErrRendered) {
+			return 1
+		}
 		if output.IsJSONMode() {
 			_ = output.RenderJSON(os.Stdout, output.JSONEnvelope{
 				Status:  "error",

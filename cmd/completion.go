@@ -25,9 +25,27 @@ PowerShell:
   %s completion powershell | Out-String | Invoke-Expression
 `, binaryName, binaryName, binaryName, binaryName),
 	DisableFlagsInUseLine: true,
+	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
+	Args:                  cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Default to bash if no args provided:
-		return cmd.Root().GenBashCompletion(cmd.OutOrStdout())
+		// Default to bash when no shell is given (preserves prior behavior).
+		shell := "bash"
+		if len(args) > 0 {
+			shell = args[0]
+		}
+		out := cmd.OutOrStdout()
+		switch shell {
+		case "bash":
+			return cmd.Root().GenBashCompletion(out)
+		case "zsh":
+			return cmd.Root().GenZshCompletion(out)
+		case "fish":
+			return cmd.Root().GenFishCompletion(out, true)
+		case "powershell":
+			return cmd.Root().GenPowerShellCompletionWithDesc(out)
+		default:
+			return fmt.Errorf("unsupported shell %q (want bash, zsh, fish, or powershell)", shell)
+		}
 	},
 }
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING — `docs config` output-file flag renamed to `--output-file`**: The flag that writes generated documentation to a file is now `--output-file` (previously `--output`), so the global `--output` flag consistently selects the output _format_. Update any scripts that use `docs config --output <path>`. (Previously `docs config --output json` created a file literally named `json`.)
+- **`config validate --output json` and `check --output json` now exit non-zero on failure**: Previously they exited `0` even when validation or checks failed, reporting the result only in the JSON envelope's `status`. Pipelines that gate on the process exit code will now correctly detect failures. The output is still exactly one JSON envelope.
+- **Environment variables for non-string config are now honored**: Boolean, integer, float, and list config values supplied via environment variables (e.g. `CKELETIN_GO_APP_PING_UI=true`) now take effect; previously they were silently dropped to the type's zero value.
+
+### Fixed
+
+- **`config validate --output json` emits exactly one JSON envelope**: It no longer interleaves human-readable text with the JSON envelope, restoring the one-envelope-per-command contract for machine consumers.
+- **`completion zsh|fish|powershell` generate the correct shell script**: The command previously ignored its argument and always emitted a bash script; each shell now gets its own script, and an unsupported shell is rejected.
+- **Unparseable config values are no longer silently ignored**: A value that cannot be coerced to its declared type (e.g. a mistyped boolean like `…=yse`) is now logged at `WARN` (with the key and offending value) instead of silently becoming the zero value.
+- **`task check` enforces the 85% project coverage threshold**: The coverage gate (`check-coverage-project.sh`) now runs as part of `task check`; previously overall coverage was measured but never gated.
+- **Refreshed stale documentation**: Corrected the Go version reference (now points at `.go-version` as the source of truth) and the default config path (`~/.config/<binary>/config.yaml`), and documented the `app.output_format` and `app.check.*` configuration options.
+
 ## [0.10.0] - 2026-04-14
 
 ### Added

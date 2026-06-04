@@ -126,6 +126,9 @@ vendors:
   # Configuration library
   viper:
     in: github.com/spf13/viper
+  # Type coercion for env-var config values (viper's own coercion dependency)
+  cast:
+    in: github.com/spf13/cast
 
   # Logging (base package + sub-packages like zerolog/log)
   zerolog:
@@ -172,6 +175,7 @@ deps:
       - cobra
       - pflag
       - viper
+      - cast
       - zerolog
 
   # Business logic uses infrastructure only

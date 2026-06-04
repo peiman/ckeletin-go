@@ -27,6 +27,7 @@ import (
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -500,11 +501,9 @@ func setupCommandConfig(cmd *cobra.Command) {
 func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName string, viperKey string) T {
 	var value T
 
-	// Get the value from viper first (this will be from config file or env var)
-	if v := viper.Get(viperKey); v != nil {
-		if typedValue, ok := v.(T); ok {
-			value = typedValue
-		}
+	// Get the value from viper first (config file or env var), coerced to T.
+	if v, ok := coerceViperValue[T](viperKey); ok {
+		value = v
 	}
 
 	// If the flag was explicitly set, override the viper value
@@ -601,10 +600,61 @@ func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName string, viperKe
 //   - The configuration value of type T, or zero value if not found/conversion fails
 func getKeyValue[T any](viperKey string) T {
 	var zero T
-	if v := viper.Get(viperKey); v != nil {
-		if typedValue, ok := v.(T); ok {
-			return typedValue
-		}
+	if v, ok := coerceViperValue[T](viperKey); ok {
+		return v
 	}
 	return zero
+}
+
+// coerceViperValue reads viperKey and coerces the stored value to type T.
+//
+// Environment variables always arrive through viper as strings, so a plain
+// viper.Get + Go type assertion (v.(bool)) silently fails for non-string config
+// (bool/int/float/[]string) and drops the value to its zero. spf13/cast coerces
+// (e.g. "true" -> true, "42" -> 42), which is the behavior users expect from
+// env-var configuration.
+//
+// A value that genuinely cannot be coerced (e.g. a typo'd env var like
+// FAIL_FAST=yse) is NOT silently dropped to zero — it is logged at WARN and the
+// key is reported as unset so a default or flag can still win. Presence is
+// detected with viper.Get != nil (which works for env-only keys, unlike
+// viper.IsSet); the second return value reports whether a usable value was found.
+func coerceViperValue[T any](viperKey string) (T, bool) {
+	var zero T
+	raw := viper.Get(viperKey)
+	if raw == nil {
+		return zero, false
+	}
+
+	var (
+		val any
+		err error
+	)
+	switch any(zero).(type) {
+	case string:
+		val, err = cast.ToStringE(raw)
+	case bool:
+		val, err = cast.ToBoolE(raw)
+	case int:
+		val, err = cast.ToIntE(raw)
+	case float64:
+		val, err = cast.ToFloat64E(raw)
+	case []string:
+		val, err = cast.ToStringSliceE(raw)
+	default:
+		if typedValue, ok := raw.(T); ok {
+			return typedValue, true
+		}
+		return zero, false
+	}
+
+	if err != nil {
+		log.Warn().
+			Str("key", viperKey).
+			Interface("value", raw).
+			Err(err).
+			Msg("config value could not be coerced to its declared type; ignoring it")
+		return zero, false
+	}
+	return val.(T), true
 }

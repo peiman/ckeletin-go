@@ -424,7 +424,7 @@ tasks:
     cmds:
       - echo "Generating configuration documentation..."
       - mkdir -p docs
-      - ./{{.BINARY_NAME}} docs config --output=docs/configuration.md
+      - ./{{.BINARY_NAME}} docs config --output-file=docs/configuration.md
       - echo "Configuration documentation saved to docs/configuration.md"
     deps: [build]
 
@@ -433,7 +433,7 @@ tasks:
     cmds:
       - echo "Generating YAML configuration template..."
       - mkdir -p docs
-      - ./{{.BINARY_NAME}} docs config --format=yaml --output=docs/config-template.yaml
+      - ./{{.BINARY_NAME}} docs config --format=yaml --output-file=docs/config-template.yaml
       - echo "YAML template saved to docs/config-template.yaml"
     deps: [build]
 
