@@ -339,8 +339,15 @@ tasks:
   generate:conformance-report:
     desc: Regenerate conformance-report.json (machine-readable report) from the mapping
     cmds:
-      - bash .ckeletin/scripts/gen-conformance-report.sh > conformance-report.json
-      - 'echo "✅ conformance-report.json regenerated from conformance-mapping.yaml"'
+      # Write to a temp file and move into place only on success, so a failed
+      # generation never truncates the committed report.
+      - |
+        tmp=$(mktemp ./conformance-report.json.XXXXXX)
+        trap 'rm -f "$tmp"' EXIT
+        bash .ckeletin/scripts/gen-conformance-report.sh > "$tmp"
+        mv "$tmp" conformance-report.json
+        trap - EXIT
+        echo "✅ conformance-report.json regenerated from conformance-mapping.yaml"
 
   # === Project-Specific Tasks ===
 

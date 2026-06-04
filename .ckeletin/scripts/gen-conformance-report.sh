@@ -43,4 +43,4 @@ yq -o=json '
   }))
 }
 ' "$MAPPING_FILE" |
-    python3 -c 'import json, sys; json.dump(json.load(sys.stdin), sys.stdout, indent=2, sort_keys=True); sys.stdout.write("\n")'
+    python3 -c 'import json, sys; json.dump(json.load(sys.stdin), sys.stdout, indent=2, sort_keys=True, ensure_ascii=True); sys.stdout.write("\n")'

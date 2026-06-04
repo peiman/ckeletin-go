@@ -414,7 +414,7 @@ func TestViolation_CL001_MissingChangelogMd(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // CKSPEC-ENF-005: Conformance mapping completeness
-// Enforcement: task conform validates all 35 IDs present
+// Enforcement: task conform validates all 38 IDs present
 // Violation: mapping file missing a requirement
 // ---------------------------------------------------------------------------
 
