@@ -1,6 +1,17 @@
 # Conformance mapping: maps automated checks to CKSPEC requirement IDs.
 # Used by `task conform` to generate the conformance report.
 # Format agreed between ckeletin-go and ckeletin-rust architects.
+#
+# This file MUST be valid YAML — `conform.sh` parses it with `yq` and fails the
+# build (and the release gate) if it does not parse. A `checks:` entry is a shell
+# command. When a command contains regex backslashes or other YAML-special
+# characters, write it as a literal block scalar so it is taken verbatim — no
+# escaping:
+#     checks:
+#       - |-
+#         grep -qE 'foo\.bar' some/file
+# Simple commands with no special characters may stay as plain double-quoted
+# one-liners (e.g. "task validate:layering").
 
 spec_version: "0.6.0"
 
@@ -382,7 +393,8 @@ requirements:
       Debug level ensures shadow logs reach file logger without
       polluting console. Verified by unit tests.
     checks:
-      - "grep -qE 'log\.Debug' internal/ui/renderer.go"
+      - |-
+        grep -qE 'log\.Debug' internal/ui/renderer.go
     violation_tests: []
     violation_evidence: >
       Removing the shadow log.Debug from the renderer fails the grep
@@ -461,7 +473,8 @@ requirements:
       duplicated. .cursorrules and copilot-instructions.md also
       reference AGENTS.md.
     checks:
-      - "grep -qE 'AGENTS\.md' CLAUDE.md"
+      - |-
+        grep -qE 'AGENTS\.md' CLAUDE.md
     violation_tests: []
     violation_evidence: >
       If a provider guide stops referencing AGENTS.md, the grep check
@@ -533,7 +546,8 @@ requirements:
     enforcement_level: script
     evidence: "All dates use YYYY-MM-DD format."
     checks:
-      - "grep -qE '^## \[.+\] - [0-9]{4}-[0-9]{2}-[0-9]{2}' CHANGELOG.md"
+      - |-
+        grep -qE '^## \[.+\] - [0-9]{4}-[0-9]{2}-[0-9]{2}' CHANGELOG.md
     violation_tests: []
     violation_evidence: >
       A non-ISO-8601 release date fails the date-format grep check.
@@ -546,7 +560,8 @@ requirements:
       CHANGELOG.md states adherence to SemVer. Version numbers follow
       MAJOR.MINOR.PATCH throughout.
     checks:
-      - "grep -qE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md"
+      - |-
+        grep -qE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md
     violation_tests: []
     violation_evidence: >
       A non-SemVer version header fails the grep check.
@@ -557,7 +572,8 @@ requirements:
     enforcement_level: script
     evidence: "[Unreleased] section present at top of CHANGELOG.md."
     checks:
-      - "grep -qE '^## \[Unreleased\]' CHANGELOG.md"
+      - |-
+        grep -qE '^## \[Unreleased\]' CHANGELOG.md
     violation_tests: []
     violation_evidence: >
       Removing the Unreleased section fails the grep check.
@@ -585,7 +601,8 @@ requirements:
       Reference-style comparison links at bottom of CHANGELOG.md for
       all versions.
     checks:
-      - "grep -qE '^\[.+\]: https?://.+/compare/' CHANGELOG.md"
+      - |-
+        grep -qE '^\[.+\]: https?://.+/compare/' CHANGELOG.md
     violation_tests: []
     violation_evidence: >
       Removing the reference-style compare links fails the grep check.

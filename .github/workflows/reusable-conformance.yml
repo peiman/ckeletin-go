@@ -14,6 +14,7 @@ permissions: {}
 env:
   TASK_VERSION: '3.39.2'        # keep in sync with ci.yml
   PINNED_TOOLS_VERSION: 'v1'    # keep in sync with ci.yml (cache-busting)
+  YQ_VERSION: '4.44.6'          # conform.sh parses conformance-mapping.yaml with yq
 
 jobs:
   conformance:
@@ -68,6 +69,15 @@ jobs:
 
       - name: Install semgrep
         run: pip3 install --user semgrep  # SAST tool the conformance violation tests (ENF-006) invoke
+
+      - name: Install yq
+        run: |
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          curl -sSfL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64" -o "$INSTALL_DIR/yq"
+          chmod +x "$INSTALL_DIR/yq"
+          yq --version
+        shell: bash
 
       - name: Run CKSPEC conformance against the latest spec (ENF-009 gate)
         run: task conform
