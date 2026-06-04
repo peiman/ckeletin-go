@@ -28,6 +28,14 @@ if ! command -v yq >/dev/null 2>&1; then
     echo "  Install yq (https://github.com/mikefarah/yq) and re-run."
     exit 1
 fi
+# Must be mikefarah/yq v4 (Go): the parser below uses strenv(), which the Python
+# yq (kislyuk) lacks. Probe the capability so a wrong variant fails here with a
+# clear message instead of a cryptic "unknown function strenv" mid-run.
+if ! printf 'a: 1\n' | probe=x yq '.a = strenv(probe)' >/dev/null 2>&1; then
+    echo "FAILED — the 'yq' on PATH is not mikefarah/yq v4 (strenv unsupported)."
+    echo "  conform.sh needs mikefarah/yq: https://github.com/mikefarah/yq"
+    exit 1
+fi
 if ! yq '.' "$MAPPING_FILE" >/dev/null 2>&1; then
     echo "FAILED — $MAPPING_FILE is not valid YAML (yq could not parse it)."
     echo "  Run 'yq . $MAPPING_FILE' to see the parse error."
@@ -81,7 +89,7 @@ echo "Mapping file: $MAPPING_FILE"
 echo ""
 
 REQ_IDS=$(get_requirement_ids)
-TOTAL=$(echo "$REQ_IDS" | wc -l | tr -d ' ')
+TOTAL=$(yq '.requirements | keys | length' "$MAPPING_FILE")
 
 echo "Requirements mapped: $TOTAL"
 echo ""

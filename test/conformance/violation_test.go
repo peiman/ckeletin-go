@@ -583,3 +583,39 @@ func TestViolation_ConformMapping_InvalidYAMLRejected(t *testing.T) {
 	assert.NotContains(t, output, "Running checks",
 		"the YAML gate must fail fast, before running any checks\nOutput: %s", output)
 }
+
+// ---------------------------------------------------------------------------
+// Conformance tooling integrity: yq must be mikefarah/yq v4 (Go).
+// Enforcement: conform.sh probes strenv() — a mikefarah-only function it relies
+// on for safe field access — and fails with a clear message if the yq on PATH is
+// the unrelated Python yq (kislyuk), instead of a cryptic mid-run strenv error.
+// Violation: a non-mikefarah yq earlier on PATH must be rejected up front.
+// ---------------------------------------------------------------------------
+
+func TestViolation_ConformMapping_NonMikefarahYqRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests shell out to conform.sh")
+	}
+
+	root := projectRoot(t)
+
+	// A stand-in "yq" that parses ('.' succeeds) but lacks strenv (any other
+	// invocation fails) — the observable behaviour of the Python yq for our use.
+	fakeBin := t.TempDir()
+	fakeYq := "#!/bin/sh\n" +
+		"if [ \"$1\" = \".\" ]; then exit 0; fi\n" +
+		"echo 'yq (python stand-in): unknown function strenv' >&2\nexit 1\n"
+	require.NoError(t, os.WriteFile(filepath.Join(fakeBin, "yq"), []byte(fakeYq), 0755))
+
+	cmd := exec.Command("bash", scriptPath(t, "conform.sh"))
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(), "PATH="+fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	out, err := cmd.CombinedOutput()
+	output := string(out)
+
+	require.Error(t, err, "conform.sh must fail when yq is not mikefarah/yq\nOutput: %s", output)
+	assert.Contains(t, output, "not mikefarah/yq",
+		"conform.sh must report the wrong yq variant clearly\nOutput: %s", output)
+	assert.NotContains(t, output, "Running checks",
+		"the yq-variant gate must fail fast, before running any checks\nOutput: %s", output)
+}

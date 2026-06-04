@@ -469,7 +469,7 @@ tasks:
         task --version || echo "  ❌ Task not found"
         echo ""
         echo "Development Tools:"
-        for tool in goimports golangci-lint gotestsum govulncheck lefthook go-mod-outdated go-licenses lichen gocovmerge; do
+        for tool in goimports golangci-lint gotestsum govulncheck lefthook go-mod-outdated go-licenses lichen gocovmerge yq; do
           if command -v "$tool" > /dev/null 2>&1; then
             echo "  $tool: ✅ installed"
           else
