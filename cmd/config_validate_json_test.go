@@ -16,8 +16,9 @@ import (
 )
 
 // runConfigValidateJSON drives `config validate --file <path> --output json` and
-// returns the captured stdout.
-func runConfigValidateJSON(t *testing.T, cfgYAML string) string {
+// returns the captured stdout plus the error returned by Execute (which carries
+// the exit-code signal).
+func runConfigValidateJSON(t *testing.T, cfgYAML string) (string, error) {
 	t.Helper()
 
 	savedLogger, savedLevel := logger.SaveLoggerState()
@@ -38,10 +39,8 @@ func runConfigValidateJSON(t *testing.T, cfgYAML string) string {
 	RootCmd.SetErr(&bytes.Buffer{})
 	RootCmd.SetArgs([]string{"config", "validate", "--file", cfgPath, "--output", "json"})
 
-	// Exit status is communicated via the JSON envelope (like `check`), so the
-	// returned error is not asserted here.
-	_ = RootCmd.Execute()
-	return stdout.String()
+	err := RootCmd.Execute()
+	return stdout.String(), err
 }
 
 // TestConfigValidateJSON_WarningsEmitSingleEnvelope is the regression test for the
@@ -50,7 +49,7 @@ func runConfigValidateJSON(t *testing.T, cfgYAML string) string {
 // of it.
 func TestConfigValidateJSON_WarningsEmitSingleEnvelope(t *testing.T) {
 	// Valid config, but with an unknown key → a warning (the path that leaked text).
-	out := runConfigValidateJSON(t, "app:\n  log_level: info\nunknown_key_xyz: 1\n")
+	out, err := runConfigValidateJSON(t, "app:\n  log_level: info\nunknown_key_xyz: 1\n")
 
 	assert.NotContains(t, out, "Validating:", "no human text may precede the JSON envelope")
 	assert.NotContains(t, out, "⚠️", "no human warning text may leak to stdout")
@@ -61,14 +60,19 @@ func TestConfigValidateJSON_WarningsEmitSingleEnvelope(t *testing.T) {
 	assert.Equal(t, "validate", envelope.Command)
 	assert.Equal(t, "error", envelope.Status, "warnings map to a non-zero result")
 	require.NotNil(t, envelope.Error)
+
+	// The envelope is written, but the command still signals a non-zero exit
+	// (parity with text mode, which exits 1) via the ErrRendered sentinel.
+	assert.ErrorIs(t, err, output.ErrRendered, "JSON-mode validation failure must signal non-zero exit")
 }
 
 // TestConfigValidateJSON_ValidEmitsSingleEnvelope verifies the success path emits a
 // single JSON envelope too (previously it emitted only human text and no envelope).
 func TestConfigValidateJSON_ValidEmitsSingleEnvelope(t *testing.T) {
-	out := runConfigValidateJSON(t, "app:\n  log_level: info\n")
+	out, err := runConfigValidateJSON(t, "app:\n  log_level: info\n")
 
 	assert.NotContains(t, out, "Validating:", "no human text may precede the JSON envelope")
+	assert.NoError(t, err, "a valid config exits 0 (nil error)")
 
 	var envelope output.JSONEnvelope
 	require.NoError(t, json.Unmarshal([]byte(out), &envelope),

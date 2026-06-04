@@ -111,6 +111,12 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		}); rerr != nil {
 			return fmt.Errorf("failed to write JSON output: %w", rerr)
 		}
+		// The single envelope is written; signal a non-zero exit on failure
+		// (errors or warnings) without main.go emitting a second envelope.
+		if exitErr != nil {
+			cmd.SilenceUsage = true
+			return output.ErrRendered
+		}
 		return nil
 	}
 
