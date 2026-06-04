@@ -1,0 +1,74 @@
+name: Nightly Cross-Platform Tests
+
+# Runs the full ubuntu/macOS/windows test matrix nightly, but ONLY when commits
+# landed since the last run — no point spinning up three runners on an idle
+# night. Catches platform-specific breakage within ~24h (cheap to bisect to the
+# day's merges) instead of at release time.
+#
+# The Sunday run is UNCONDITIONAL (a weekly floor) so environment drift with no
+# code change — a macOS runner-image bump, a Go patch regression — is still
+# caught at least weekly. workflow_dispatch also runs unconditionally.
+#
+# The matrix also GATES releases via ci.yml (on tags); this workflow is the
+# early-warning net between releases.
+on:
+  schedule:
+    - cron: '0 3 * * 1-6'  # Mon–Sat at 03:00 UTC — runs only if commits landed
+    - cron: '0 3 * * 0'    # Sunday at 03:00 UTC — runs unconditionally (env-drift floor)
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    name: Check for changes since last run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 50  # enough history to inspect the last day of commits
+
+      - name: Check for recent commits
+        id: check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — running the matrix regardless."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          elif [ "$SCHEDULE" = "0 3 * * 0" ]; then
+            echo "Weekly Sunday run — running the matrix unconditionally (env-drift floor)."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(git log --since='25 hours ago' --pretty=oneline)" ]; then
+            echo "Commits landed in the last 25h — running the matrix."
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No commits in the last 25h — skipping the nightly matrix."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+  test-matrix:
+    name: Test
+    needs: [changes]
+    if: needs.changes.outputs.has_changes == 'true'
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    uses: ./.github/workflows/reusable-test-matrix.yml
+    with:
+      os: ${{ matrix.os }}

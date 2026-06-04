@@ -1,0 +1,73 @@
+name: Reusable Conformance Check
+
+# Reusable CKSPEC conformance check (CKSPEC-ENF-009): verifies the project
+# conforms to the LATEST published ckeletin spec (peiman/ckeletin). Called by:
+#   - ci.yml          → on tags, to GATE releases (release: needs [conformance])
+#   - conformance.yml → weekly (drift detection) and on workflow_dispatch
+# Single source of truth for the conformance check so the release gate and the
+# drift detector run exactly the same steps.
+on:
+  workflow_call: {}
+
+permissions: {}
+
+env:
+  TASK_VERSION: '3.39.2'        # keep in sync with ci.yml
+  PINNED_TOOLS_VERSION: 'v1'    # keep in sync with ci.yml (cache-busting)
+
+jobs:
+  conformance:
+    name: CKSPEC Conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c  # v6.4.0
+        with:
+          go-version-file: '.go-version'  # SSOT for Go version
+          cache-dependency-path: 'go.sum'
+
+      - name: Cache Task Binary
+        id: cache-task
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: ~/.local/bin/task
+          key: ${{ runner.os }}-task-${{ env.TASK_VERSION }}
+
+      - name: Install Task
+        if: steps.cache-task.outputs.cache-hit != 'true'
+        run: |
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          curl -sL "https://taskfile.dev/install.sh" | sh -s -- -b "$INSTALL_DIR" v${{ env.TASK_VERSION }}
+        shell: bash
+
+      - name: Add tools to PATH
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Dev Tools (pinned versions)
+        id: cache-devtools
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-devtools-${{ hashFiles('.go-version', '.ckeletin/Taskfile.yml') }}-${{ env.PINNED_TOOLS_VERSION }}
+
+      - name: Install Pinned Tools
+        if: steps.cache-devtools.outputs.cache-hit != 'true'
+        run: task setup:pinned
+
+      - name: Install Latest Tools
+        run: task setup:latest
+
+      - name: Install semgrep
+        run: pip3 install --user semgrep  # SAST tool the conformance violation tests (ENF-006) invoke
+
+      - name: Run CKSPEC conformance against the latest spec (ENF-009 gate)
+        run: task conform

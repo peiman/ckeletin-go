@@ -1,0 +1,52 @@
+name: CKSPEC Conformance
+
+# Verifies conformance against the latest published ckeletin spec
+# (peiman/ckeletin). Runs weekly to DETECT drift (opening an issue) and on
+# demand via workflow_dispatch. Decoupled from the test matrix, so conformance
+# can be verified in ~2 minutes without spinning up cross-platform runners.
+#
+# The RELEASE gate (CKSPEC-ENF-009) lives in ci.yml, which calls the same
+# reusable check on tags. This workflow is NOT triggered on pull_request — an
+# external spec release must never break an unrelated PR.
+on:
+  schedule:
+    # Weekly on Sunday 01:00 UTC. Staggered an hour after ci.yml's Sunday build
+    # (00:00) so the two weekly runs don't contend for runners.
+    - cron: '0 1 * * 0'
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: conformance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  conformance:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/reusable-conformance.yml
+
+  drift-issue:
+    name: Open drift issue (scheduled failure)
+    needs: [conformance]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write  # open a drift issue on scheduled failure
+    steps:
+      - name: Open drift issue (deduplicated)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Conformance drift: project no longer conforms to the latest ckeletin spec"
+        run: |
+          # No checkout in this job, so pass the repo explicitly to gh.
+          # Scope the dedup search to the title field to avoid fuzzy body/comment matches.
+          OPEN=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title $TITLE" --json number --jq 'length')
+          if [ "$OPEN" = "0" ]; then
+            RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
+              --body "The weekly CKSPEC conformance check failed — this project has drifted from the latest published spec (peiman/ckeletin). Run \`task conform\` locally and reconcile conformance-mapping.yaml. Run log: $RUN_URL"
+          fi
