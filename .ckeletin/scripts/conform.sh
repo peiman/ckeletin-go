@@ -175,6 +175,28 @@ fi
 echo "Completeness: $TOTAL/$TOTAL requirements mapped (ENF-005: PASS)"
 echo ""
 
+# ── Report sync guard: the committed conformance-report.json must match what
+# gen-conformance-report.sh produces from the mapping (mirrors the spec repo's
+# requirements.json sync pattern; P9). A stale report would publish wrong status,
+# so drift fails the build — and the release gate — here, before the checks run
+# (fast, recursion-free), prompting a regenerate. The spec repo aggregates this
+# published report instead of hand-authoring conformance/ckeletin-go.yaml.
+# Runs AFTER the completeness check so a mapping that drops a requirement fails
+# as "unmapped" (ENF-005) rather than as report drift.
+REPORT_FILE="conformance-report.json"
+GEN_SCRIPT=".ckeletin/scripts/gen-conformance-report.sh"
+if [[ ! -f "$REPORT_FILE" ]]; then
+    echo "FAILED — $REPORT_FILE is missing. Run 'task generate:conformance-report' and commit it."
+    exit 1
+fi
+if ! diff <(bash "$GEN_SCRIPT" "$MAPPING_FILE") "$REPORT_FILE" >/dev/null 2>&1; then
+    echo "FAILED — $REPORT_FILE is out of sync with $MAPPING_FILE."
+    echo "  Run 'task generate:conformance-report' and commit the result."
+    exit 1
+fi
+echo "Report sync: $REPORT_FILE matches the mapping (PASS)"
+echo ""
+
 # ── ENF-008 drift guard: machine-derivable facts in evidence must match reality.
 # (A hand-typed count in prose silently rots — e.g. "35" after a 36th requirement.)
 DRIFT=$(yq '.requirements[].evidence // ""' "$MAPPING_FILE" | grep -oE 'all [0-9]+ requirement' | grep -oE '[0-9]+' | head -1 || true)

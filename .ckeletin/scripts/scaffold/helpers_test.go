@@ -467,6 +467,10 @@ func TestRemoveFrameworkOnlyArtifacts(t *testing.T) {
 			filepath.Join(tmpDir, "conformance-mapping.yaml"),
 			[]byte("spec_version: 0.3.0"), 0600))
 
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpDir, "conformance-report.json"),
+			[]byte("{}"), 0600))
+
 		scaffoldTest := filepath.Join(tmpDir, "test", "integration")
 		require.NoError(t, os.MkdirAll(scaffoldTest, 0750))
 		require.NoError(t, os.WriteFile(
@@ -487,6 +491,9 @@ func TestRemoveFrameworkOnlyArtifacts(t *testing.T) {
 
 		_, err = os.Stat(filepath.Join(tmpDir, "conformance-mapping.yaml"))
 		assert.True(t, os.IsNotExist(err), "conformance-mapping.yaml should be removed")
+
+		_, err = os.Stat(filepath.Join(tmpDir, "conformance-report.json"))
+		assert.True(t, os.IsNotExist(err), "conformance-report.json should be removed")
 
 		_, err = os.Stat(filepath.Join(scaffoldTest, "scaffold_init_test.go"))
 		assert.True(t, os.IsNotExist(err), "scaffold_init_test.go should be removed")

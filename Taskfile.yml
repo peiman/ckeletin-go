@@ -332,9 +332,15 @@ tasks:
   # === Conformance ===
 
   conform:
-    desc: Generate CKSPEC conformance report from mapping
+    desc: Validate CKSPEC conformance against the spec (runs checks + report sync guard)
     cmds:
       - bash .ckeletin/scripts/conform.sh {{.CLI_ARGS}}
+
+  generate:conformance-report:
+    desc: Regenerate conformance-report.json (machine-readable report) from the mapping
+    cmds:
+      - bash .ckeletin/scripts/gen-conformance-report.sh > conformance-report.json
+      - 'echo "✅ conformance-report.json regenerated from conformance-mapping.yaml"'
 
   # === Project-Specific Tasks ===
 
