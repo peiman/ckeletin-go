@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/validator"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -81,11 +82,41 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Format and display results
-	validator.FormatResult(result, cmd.OutOrStdout())
+	exitErr := validator.ExitCodeForResult(result)
 
-	// Determine exit code and suppress usage on validation errors
-	if exitErr := validator.ExitCodeForResult(result); exitErr != nil {
+	// JSON mode: emit exactly one envelope (no human text). Like the `check`
+	// command, return nil afterward so main.go does not emit a second envelope —
+	// the envelope's status communicates success/failure.
+	if output.IsJSONMode() {
+		status := "success"
+		var jsonErr *output.JSONError
+		if exitErr != nil {
+			status = "error"
+			jsonErr = &output.JSONError{Message: exitErr.Error()}
+		}
+		errMsgs := make([]string, len(result.Errors))
+		for i, e := range result.Errors {
+			errMsgs[i] = e.Error()
+		}
+		if rerr := output.RenderJSON(cmd.OutOrStdout(), output.JSONEnvelope{
+			Status:  status,
+			Command: output.CommandName(),
+			Data: map[string]any{
+				"valid":       result.Valid,
+				"config_file": result.ConfigFile,
+				"errors":      errMsgs,
+				"warnings":    result.Warnings,
+			},
+			Error: jsonErr,
+		}); rerr != nil {
+			return fmt.Errorf("failed to write JSON output: %w", rerr)
+		}
+		return nil
+	}
+
+	// Text mode: human-readable formatting.
+	validator.FormatResult(result, cmd.OutOrStdout())
+	if exitErr != nil {
 		cmd.SilenceUsage = true
 		return exitErr
 	}
