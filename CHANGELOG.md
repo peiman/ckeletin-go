@@ -7,11 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-04
+
+### Added
+
+- **Self-enforcing CKSPEC conformance with machine-readable reports**: `task conform` parses `conformance-mapping.yaml` with a real YAML parser (mikefarah `yq`) and fails the build on an invalid mapping. ckeletin-go now publishes a deterministic `conformance-report.json` — `yq` extracts the data and the formatting is canonicalized, so it is byte-stable across tool versions and carries no timestamp — which the spec repo *aggregates* instead of hand-authoring each implementation's report. New requirements **CKSPEC-ENF-008** (anchored evidence), **ENF-009** (conformance release gate), and **ENF-010** (published machine-readable report); the spec advanced to v0.7.0.
+- **Conformance release gate + weekly drift detector** (CKSPEC-ENF-009): a CI conformance job gates releases (the release job depends on it), and a scheduled run opens a deduplicated issue when the project drifts from the latest spec.
+- **Framework staleness signals**: `task check` reports release-infrastructure drift (GoReleaser deprecations, stale pins) and nudges when `.ckeletin/` is behind upstream.
+- **Single-sourced test environment setup**: one extension point shared by all `test:*` tasks (closes #95).
+
 ### Changed
 
 - **BREAKING — `docs config` output-file flag renamed to `--output-file`**: The flag that writes generated documentation to a file is now `--output-file` (previously `--output`), so the global `--output` flag consistently selects the output _format_. Update any scripts that use `docs config --output <path>`. (Previously `docs config --output json` created a file literally named `json`.)
 - **`config validate --output json` and `check --output json` now exit non-zero on failure**: Previously they exited `0` even when validation or checks failed, reporting the result only in the JSON envelope's `status`. Pipelines that gate on the process exit code will now correctly detect failures. The output is still exactly one JSON envelope.
 - **Environment variables for non-string config are now honored**: Boolean, integer, float, and list config values supplied via environment variables (e.g. `CKELETIN_GO_APP_PING_UI=true`) now take effect; previously they were silently dropped to the type's zero value.
+- **CI restructured into reusable workflows**: the cross-platform (ubuntu/macOS/windows) test matrix now runs nightly (change-guarded) and gates releases on tags, rather than on every merge; conformance runs as a standalone ~2-minute job, and PRs use a fast single-platform check.
+- **Dependencies updated**: GitHub Actions (`setup-go`, `cache`, `codeql-action`, `goreleaser-action`, `upload-artifact`) and Go module dependencies bumped to current versions.
 
 ### Fixed
 
@@ -20,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Unparseable config values are no longer silently ignored**: A value that cannot be coerced to its declared type (e.g. a mistyped boolean like `…=yse`) is now logged at `WARN` (with the key and offending value) instead of silently becoming the zero value.
 - **`task check` enforces the 85% project coverage threshold**: The coverage gate (`check-coverage-project.sh`) now runs as part of `task check`; previously overall coverage was measured but never gated.
 - **Refreshed stale documentation**: Corrected the Go version reference (now points at `.go-version` as the source of truth) and the default config path (`~/.config/<binary>/config.yaml`), and documented the `app.output_format` and `app.check.*` configuration options.
+- **Claude Code hooks now fire and work with current Claude Code**: Hooks were moved into `.claude/settings.json` so they actually run (closes #96); the PreToolUse commit-attribution guard now reads `.tool_input.command` and `exit 2`s to block (it had been silently inert against the current hook schema); the SessionStart tool-installer also runs on resume and clear, not just fresh startup.
+- **Scaffold and test reliability**: Removed a hidden dependency on a built `./ckeletin-go` binary in the dependency-check test; scoped the scaffold pre-push hook to the framework and enforced hook/forwarding consistency (closes #100); made the test-environment prelude portable on Windows; and use a reliable subcommand probe in the `check` task.
+
+### Security
+
+- **Go toolchain bumped to 1.26.4** (via 1.26.3): picks up patched standard-library CVEs.
 
 ## [0.10.0] - 2026-04-14
 
@@ -506,7 +523,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/peiman/ckeletin-go/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/peiman/ckeletin-go/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/peiman/ckeletin-go/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/peiman/ckeletin-go/compare/v0.8.0...v0.9.0
