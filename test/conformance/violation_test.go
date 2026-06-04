@@ -540,3 +540,46 @@ func TestViolation_ENF007_FeedbackSignalsProduced(t *testing.T) {
 	assert.Contains(t, string(script), "Feedback signals",
 		"conform.sh should report feedback signals in output")
 }
+
+// ---------------------------------------------------------------------------
+// Conformance tooling integrity: the mapping MUST be valid YAML.
+// Enforcement: conform.sh parses conformance-mapping.yaml with yq and fails the
+// build — and therefore the release gate (CKSPEC-ENF-009) — if it does not parse.
+// This guards the conform.sh parser itself (not a spec requirement): before this
+// gate existed, a lenient text scan silently tolerated an invalid-YAML mapping
+// (e.g. a check string with an unescaped regex backslash), so a broken mapping
+// could pass conformance. Violation: an unparseable mapping must be rejected.
+// ---------------------------------------------------------------------------
+
+func TestViolation_ConformMapping_InvalidYAMLRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	root := projectRoot(t)
+	mappingPath := filepath.Join(root, "conformance-mapping.yaml")
+
+	original, err := os.ReadFile(mappingPath)
+	require.NoError(t, err)
+
+	// Append a top-level scalar with an invalid YAML escape (\q). This is the
+	// same defect class as a regex check written as a plain double-quoted string
+	// ("...\.foo"): valid to a text scan, rejected by any real YAML parser.
+	violated := string(original) + "\nbroken_invalid_yaml: \"x\\q\"\n"
+	require.NoError(t, os.WriteFile(mappingPath, []byte(violated), 0644))
+	defer func() {
+		// Restore the original mapping regardless of assertion outcome.
+		os.WriteFile(mappingPath, original, 0644)
+	}()
+
+	output, exitCode := runCheck(t, "bash", scriptPath(t, "conform.sh"))
+
+	assert.NotEqual(t, 0, exitCode,
+		"conform.sh must fail when the mapping is not valid YAML\nOutput: %s", output)
+	assert.Contains(t, output, "not valid YAML",
+		"conform.sh must report the YAML parse failure\nOutput: %s", output)
+	// The gate must run before the check loop so a broken mapping exits cheaply
+	// and never re-invokes the conformance suite (recursion-free, like ENF-005).
+	assert.NotContains(t, output, "Running checks",
+		"the YAML gate must fail fast, before running any checks\nOutput: %s", output)
+}

@@ -16,46 +16,56 @@ FEEDBACK_FILE=$(mktemp)
 WARNING_FILE=$(mktemp)
 trap 'rm -f "$FAIL_FILE" "$FEEDBACK_FILE" "$WARNING_FILE"' EXIT
 
-# ── Parse helpers (YAML subset — no external deps) ──────────────
+# ── Require yq, and fail fast if the mapping is not valid YAML ───
+# conform.sh parses the mapping with yq (one consistent YAML parser). An
+# unparseable mapping — e.g. a check string with an invalid backslash escape —
+# must fail the build, and therefore the release gate (CKSPEC-ENF-009), rather
+# than be silently tolerated by a lenient text scan. This gate runs first so a
+# broken mapping exits before any checks (including the conformance test suite),
+# which keeps it cheap and recursion-free.
+if ! command -v yq >/dev/null 2>&1; then
+    echo "FAILED — 'yq' is required to parse $MAPPING_FILE but was not found on PATH."
+    echo "  Install yq (https://github.com/mikefarah/yq) and re-run."
+    exit 1
+fi
+if ! yq '.' "$MAPPING_FILE" >/dev/null 2>&1; then
+    echo "FAILED — $MAPPING_FILE is not valid YAML (yq could not parse it)."
+    echo "  Run 'yq . $MAPPING_FILE' to see the parse error."
+    echo "  Tip: a shell command containing regex backslashes must be written as a"
+    echo "       literal block scalar (- |-) so it is taken verbatim — see the file header."
+    exit 1
+fi
+
+# ── Parse helpers (all reads go through yq — one consistent parser) ──
+# Requirement IDs contain hyphens, so paths use strenv() to pass the id/field
+# in as data rather than interpolating untrusted text into the yq expression.
 
 get_spec_version() {
-    grep '^spec_version:' "$MAPPING_FILE" | head -1 | sed 's/spec_version: *"\(.*\)"/\1/'
+    yq '.spec_version // ""' "$MAPPING_FILE"
 }
 
 get_requirement_ids() {
-    grep '^  CKSPEC-' "$MAPPING_FILE" | sed 's/^ *\(CKSPEC-[A-Z]*-[0-9]*\):.*/\1/'
+    yq '.requirements | keys | .[]' "$MAPPING_FILE"
 }
 
-# Get a scalar field from a requirement block
+# Get a scalar field (title, status, enforcement_level) from a requirement.
 get_field() {
     local req_id="$1" field="$2"
-    awk -v req="$req_id" -v field="$field" '
-        /^  [A-Z]/ && $0 ~ req":" { found=1; next }
-        found && /^  [A-Z]/ { found=0 }
-        found && $0 ~ "^    " field ":" {
-            line=$0
-            sub(/^[^:]*: */, "", line)
-            gsub(/^ *"?/, "", line); gsub(/"? *$/, "", line)
-            if (line != "" && line != ">") print line
-            exit
-        }
-    ' "$MAPPING_FILE"
+    req="$req_id" field="$field" \
+        yq '.requirements[strenv(req)][strenv(field)] // ""' "$MAPPING_FILE"
 }
 
-# Get array items (checks or violation_tests)
+# Get array items (checks or violation_tests); empty/missing → no output.
 get_array_items() {
     local req_id="$1" field="$2"
-    awk -v req="$req_id" -v field="$field" '
-        /^  [A-Z]/ && $0 ~ req":" { found=1; next }
-        found && /^  [A-Z]/ { found=0 }
-        found && $0 ~ "^    " field ":" { in_array=1; next }
-        in_array && /^    [a-zA-Z_]/ { in_array=0; next }
-        in_array && /^      - / {
-            line=$0
-            sub(/^ *- *"?/, "", line); sub(/"? *$/, "", line)
-            if (line != "") print line
-        }
-    ' "$MAPPING_FILE"
+    req="$req_id" field="$field" \
+        yq '(.requirements[strenv(req)][strenv(field)] // [])[]' "$MAPPING_FILE"
+}
+
+# Print "true" if a requirement declares a violation_evidence block, else "false".
+has_violation_evidence() {
+    local req_id="$1"
+    req="$req_id" yq '.requirements[strenv(req)] | has("violation_evidence")' "$MAPPING_FILE"
 }
 
 # ── Main ────────────────────────────────────────────────────────
@@ -159,7 +169,7 @@ echo ""
 
 # ── ENF-008 drift guard: machine-derivable facts in evidence must match reality.
 # (A hand-typed count in prose silently rots — e.g. "35" after a 36th requirement.)
-DRIFT=$(grep -oE 'all [0-9]+ requirement' "$MAPPING_FILE" | grep -oE '[0-9]+' | head -1 || true)
+DRIFT=$(yq '.requirements[].evidence // ""' "$MAPPING_FILE" | grep -oE 'all [0-9]+ requirement' | grep -oE '[0-9]+' | head -1 || true)
 if [[ -n "$DRIFT" && "$DRIFT" != "$TOTAL" ]]; then
     echo "evidence drift: prose claims '$DRIFT requirement IDs' but $TOTAL are mapped (ENF-008)" >> "$FAIL_FILE"
 fi
@@ -192,13 +202,10 @@ for req_id in $REQ_IDS; do
     if [[ "$status" == "met" ]]; then
         a_checks=$(get_array_items "$req_id" "checks")
         a_vtests=$(get_array_items "$req_id" "violation_tests")
-        a_vevid=$(awk -v req="$req_id" '
-            /^  [A-Z]/ && $0 ~ req":" { f=1; next }
-            f && /^  [A-Z]/ { f=0 }
-            f && /violation_evidence:/ { print "y"; exit }' "$MAPPING_FILE")
+        a_vevid=$(has_violation_evidence "$req_id")
         if [[ -n "$a_checks" || -n "$a_vtests" ]]; then
             ENF008_AUTOMATED=$((ENF008_AUTOMATED + 1))
-        elif [[ "$enforcement" == "honor-system" && -n "$a_vevid" ]]; then
+        elif [[ "$enforcement" == "honor-system" && "$a_vevid" == "true" ]]; then
             ENF008_ANALYSIS=$((ENF008_ANALYSIS + 1))
         else
             echo "$req_id ($title): met but unanchored — add a check/violation_test, or declare honor-system + violation_evidence (ENF-008)" >> "$FAIL_FILE"
@@ -209,15 +216,10 @@ for req_id in $REQ_IDS; do
     # Accepts either violation_tests OR violation_evidence (spec v0.4.0+)
     if [[ "$enforcement" != "honor-system" && "$enforcement" != "" ]]; then
         vtests=$(get_array_items "$req_id" "violation_tests")
-        # Check if violation_evidence exists in this requirement's block
-        # (multi-line field, so get_field may not capture it — use grep)
-        vevidence=$(awk -v req="$req_id" '
-            /^  [A-Z]/ && $0 ~ req":" { found=1; next }
-            found && /^  [A-Z]/ { found=0 }
-            found && /violation_evidence:/ { print "yes"; exit }
-        ' "$MAPPING_FILE")
+        # "true" if this requirement declares a violation_evidence block.
+        vevidence=$(has_violation_evidence "$req_id")
 
-        if [[ -z "$vtests" && -z "$vevidence" ]]; then
+        if [[ -z "$vtests" && "$vevidence" != "true" ]]; then
             echo "$req_id: claims $enforcement but has no violation test or evidence" >> "$FEEDBACK_FILE"
         elif [[ -n "$vtests" ]]; then
             echo "$vtests" | while IFS= read -r vt; do
@@ -260,9 +262,9 @@ done
 
 # ── Collect results ──────────────────────────────────────────────
 
-MET=$(grep -c 'status: met' "$MAPPING_FILE" || true)
-DEFERRED=$(grep -c 'status: deferred' "$MAPPING_FILE" || true)
-PARTIAL=$(grep -c 'status: partial' "$MAPPING_FILE" || true)
+MET=$(yq '[.requirements[] | select(.status == "met")] | length' "$MAPPING_FILE")
+DEFERRED=$(yq '[.requirements[] | select(.status == "deferred")] | length' "$MAPPING_FILE")
+PARTIAL=$(yq '[.requirements[] | select(.status == "partial")] | length' "$MAPPING_FILE")
 FAILED_CHECKS=0
 if [[ -s "$FAIL_FILE" ]]; then
     FAILED_CHECKS=$(wc -l < "$FAIL_FILE" | tr -d ' ')
