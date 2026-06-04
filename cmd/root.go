@@ -500,11 +500,9 @@ func setupCommandConfig(cmd *cobra.Command) {
 func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName string, viperKey string) T {
 	var value T
 
-	// Get the value from viper first (this will be from config file or env var)
-	if v := viper.Get(viperKey); v != nil {
-		if typedValue, ok := v.(T); ok {
-			value = typedValue
-		}
+	// Get the value from viper first (config file or env var), coerced to T.
+	if v, ok := coerceViperValue[T](viperKey); ok {
+		value = v
 	}
 
 	// If the flag was explicitly set, override the viper value
@@ -601,10 +599,44 @@ func getConfigValueWithFlags[T any](cmd *cobra.Command, flagName string, viperKe
 //   - The configuration value of type T, or zero value if not found/conversion fails
 func getKeyValue[T any](viperKey string) T {
 	var zero T
-	if v := viper.Get(viperKey); v != nil {
-		if typedValue, ok := v.(T); ok {
-			return typedValue
-		}
+	if v, ok := coerceViperValue[T](viperKey); ok {
+		return v
 	}
 	return zero
+}
+
+// coerceViperValue reads viperKey and coerces the stored value to type T.
+//
+// Environment variables always arrive through viper as strings, so a plain
+// viper.Get + Go type assertion (v.(bool)) silently fails for non-string config
+// (bool/int/float/[]string) and drops the value to its zero. viper's typed
+// getters use spf13/cast to coerce (e.g. "true" -> true, "42" -> 42), which is
+// the behavior users expect from env-var configuration.
+//
+// Presence is detected with viper.Get != nil (which works for env-only keys,
+// unlike viper.IsSet); the second return value reports whether the key was set.
+func coerceViperValue[T any](viperKey string) (T, bool) {
+	var zero T
+	if viper.Get(viperKey) == nil {
+		return zero, false
+	}
+	switch any(zero).(type) {
+	case string:
+		return any(viper.GetString(viperKey)).(T), true
+	case bool:
+		return any(viper.GetBool(viperKey)).(T), true
+	case int:
+		return any(viper.GetInt(viperKey)).(T), true
+	case float64:
+		return any(viper.GetFloat64(viperKey)).(T), true
+	case []string:
+		return any(viper.GetStringSlice(viperKey)).(T), true
+	default:
+		if v := viper.Get(viperKey); v != nil {
+			if typedValue, ok := v.(T); ok {
+				return typedValue, true
+			}
+		}
+		return zero, false
+	}
 }
