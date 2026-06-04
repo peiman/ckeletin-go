@@ -27,6 +27,7 @@ import (
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/spf13/cast"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -609,34 +610,51 @@ func getKeyValue[T any](viperKey string) T {
 //
 // Environment variables always arrive through viper as strings, so a plain
 // viper.Get + Go type assertion (v.(bool)) silently fails for non-string config
-// (bool/int/float/[]string) and drops the value to its zero. viper's typed
-// getters use spf13/cast to coerce (e.g. "true" -> true, "42" -> 42), which is
-// the behavior users expect from env-var configuration.
+// (bool/int/float/[]string) and drops the value to its zero. spf13/cast coerces
+// (e.g. "true" -> true, "42" -> 42), which is the behavior users expect from
+// env-var configuration.
 //
-// Presence is detected with viper.Get != nil (which works for env-only keys,
-// unlike viper.IsSet); the second return value reports whether the key was set.
+// A value that genuinely cannot be coerced (e.g. a typo'd env var like
+// FAIL_FAST=yse) is NOT silently dropped to zero — it is logged at WARN and the
+// key is reported as unset so a default or flag can still win. Presence is
+// detected with viper.Get != nil (which works for env-only keys, unlike
+// viper.IsSet); the second return value reports whether a usable value was found.
 func coerceViperValue[T any](viperKey string) (T, bool) {
 	var zero T
-	if viper.Get(viperKey) == nil {
+	raw := viper.Get(viperKey)
+	if raw == nil {
 		return zero, false
 	}
+
+	var (
+		val any
+		err error
+	)
 	switch any(zero).(type) {
 	case string:
-		return any(viper.GetString(viperKey)).(T), true
+		val, err = cast.ToStringE(raw)
 	case bool:
-		return any(viper.GetBool(viperKey)).(T), true
+		val, err = cast.ToBoolE(raw)
 	case int:
-		return any(viper.GetInt(viperKey)).(T), true
+		val, err = cast.ToIntE(raw)
 	case float64:
-		return any(viper.GetFloat64(viperKey)).(T), true
+		val, err = cast.ToFloat64E(raw)
 	case []string:
-		return any(viper.GetStringSlice(viperKey)).(T), true
+		val, err = cast.ToStringSliceE(raw)
 	default:
-		if v := viper.Get(viperKey); v != nil {
-			if typedValue, ok := v.(T); ok {
-				return typedValue, true
-			}
+		if typedValue, ok := raw.(T); ok {
+			return typedValue, true
 		}
 		return zero, false
 	}
+
+	if err != nil {
+		log.Warn().
+			Str("key", viperKey).
+			Interface("value", raw).
+			Err(err).
+			Msg("config value could not be coerced to its declared type; ignoring it")
+		return zero, false
+	}
+	return val.(T), true
 }

@@ -3,8 +3,12 @@
 package cmd
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -88,4 +92,27 @@ func TestGetKeyValue_StringSliceFromEnvString(t *testing.T) {
 
 	assert.Equal(t, []string{"a", "b", "c"}, getKeyValue[[]string]("app.some.list"),
 		"a delimited string env value must coerce to []string")
+}
+
+// TestCoerceViperValue_LogsAndIgnoresUnparseable pins that a value which cannot be
+// coerced (e.g. a typo'd bool env var) is NOT silently dropped to zero — it is
+// logged at WARN, so the failure is debuggable rather than invisible.
+func TestCoerceViperValue_LogsAndIgnoresUnparseable(t *testing.T) {
+	savedLogger, savedLevel := logger.SaveLoggerState()
+	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+	var buf bytes.Buffer
+	log.Logger = zerolog.New(&buf)
+	zerolog.SetGlobalLevel(zerolog.WarnLevel)
+
+	viper.Reset()
+	defer viper.Reset()
+	viper.Set("app.feature.enabled", "yse") // typo'd bool — not coercible
+
+	got := getKeyValue[bool]("app.feature.enabled")
+	assert.False(t, got, "an unparseable value falls back to the zero value")
+	assert.Contains(t, buf.String(), "could not be coerced",
+		"a warning must be logged so the coercion failure is not silent")
+	assert.Contains(t, buf.String(), "app.feature.enabled",
+		"the warning must name the offending key")
 }
