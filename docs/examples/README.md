@@ -106,7 +106,7 @@ Generate documentation for all available options:
 ./ckeletin-go docs config --format yaml
 
 # Save to file
-./ckeletin-go docs config --output docs/configuration.md
+./ckeletin-go docs config --output-file docs/configuration.md
 ```
 
 ## Quick Start Examples
