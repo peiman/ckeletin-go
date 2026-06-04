@@ -185,7 +185,7 @@ All architectural decisions are documented in **[Architecture Decision Records](
 
 ### Prerequisites
 
-- **Go**: Version specified in `.go-version` (currently 1.26.1)
+- **Go**: Version specified in `.go-version` (the single source of truth)
 - **Task**: Install from [taskfile.dev](https://taskfile.dev/#/installation)
 - **Git**: For version control
 

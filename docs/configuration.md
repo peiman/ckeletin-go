@@ -8,7 +8,7 @@ Configuration can be provided in multiple ways, in order of precedence:
 
 1. Command-line flags
 2. Environment variables (with prefix `CKELETIN_GO_`)
-3. Configuration file (~/.ckeletin-go.yaml)
+3. Configuration file (~/.config/ckeletin-go/config.yaml)
 4. Default values
 
 ## Configuration Options
@@ -28,20 +28,29 @@ Configuration can be provided in multiple ways, in order of precedence:
 | `app.log.sampling_enabled` | bool | `false` | `CKELETIN_GO_APP_LOG_SAMPLING_ENABLED` | Enable log sampling for high-volume scenarios |
 | `app.log.sampling_initial` | int | `100` | `CKELETIN_GO_APP_LOG_SAMPLING_INITIAL` | Number of messages to log per second before sampling |
 | `app.log.sampling_thereafter` | int | `100` | `CKELETIN_GO_APP_LOG_SAMPLING_THEREAFTER` | Number of messages to log thereafter per second |
+| `app.output_format` | string | `text` | `CKELETIN_GO_APP_OUTPUT_FORMAT` | Output format: text (human-readable) or json (machine-readable) |
 | `app.docs.output_format` | string | `markdown` | `CKELETIN_GO_APP_DOCS_OUTPUT_FORMAT` | Output format for documentation (markdown, yaml) |
 | `app.docs.output_file` | string | `` | `CKELETIN_GO_APP_DOCS_OUTPUT_FILE` | Output file for documentation (defaults to stdout) |
+| `app.check.fail_fast` | bool | `false` | `CKELETIN_GO_APP_CHECK_FAIL_FAST` | Stop on first failed check |
+| `app.check.verbose` | bool | `false` | `CKELETIN_GO_APP_CHECK_VERBOSE` | Show verbose output including command details |
+| `app.check.parallel` | bool | `true` | `CKELETIN_GO_APP_CHECK_PARALLEL` | Run checks within each category in parallel (disable with --parallel=false) |
+| `app.check.category` | string | `` | `CKELETIN_GO_APP_CHECK_CATEGORY` | Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests) |
+| `app.check.timing` | bool | `true` | `CKELETIN_GO_APP_CHECK_TIMING` | Show duration for each check in the output |
 | `app.ping.output_message` | string | `Pong` | `CKELETIN_GO_APP_PING_OUTPUT_MESSAGE` | Default message to display for the ping command |
 | `app.ping.output_color` | string | `white` | `CKELETIN_GO_APP_PING_OUTPUT_COLOR` | Text color for ping command output (white, red, green, blue, cyan, yellow, magenta) |
 | `app.ping.ui` | bool | `false` | `CKELETIN_GO_APP_PING_UI` | Enable interactive UI for the ping command |
 
 ## Example Configuration
 
-### YAML Configuration File (.ckeletin-go.yaml)
+### YAML Configuration File (config.yaml)
 
 ```yaml
 app:
   # Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.
   log_level: debug
+
+  # Output format: text (human-readable) or json (machine-readable)
+  output_format: json
 
   log:
     # Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.
@@ -86,6 +95,22 @@ app:
 
     # Output file for documentation (defaults to stdout)
     output_file: /path/to/output.md
+
+  check:
+    # Stop on first failed check
+    fail_fast: true
+
+    # Show verbose output including command details
+    verbose: true
+
+    # Run checks within each category in parallel (disable with --parallel=false)
+    parallel: false
+
+    # Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)
+    category: security,tests
+
+    # Show duration for each check in the output
+    timing: false
 
   ping:
     # Default message to display for the ping command
@@ -141,11 +166,29 @@ export CKELETIN_GO_APP_LOG_SAMPLING_INITIAL=100
 # Number of messages to log thereafter per second
 export CKELETIN_GO_APP_LOG_SAMPLING_THEREAFTER=100
 
+# Output format: text (human-readable) or json (machine-readable)
+export CKELETIN_GO_APP_OUTPUT_FORMAT=json
+
 # Output format for documentation (markdown, yaml)
 export CKELETIN_GO_APP_DOCS_OUTPUT_FORMAT=yaml
 
 # Output file for documentation (defaults to stdout)
 export CKELETIN_GO_APP_DOCS_OUTPUT_FILE=/path/to/output.md
+
+# Stop on first failed check
+export CKELETIN_GO_APP_CHECK_FAIL_FAST=true
+
+# Show verbose output including command details
+export CKELETIN_GO_APP_CHECK_VERBOSE=true
+
+# Run checks within each category in parallel (disable with --parallel=false)
+export CKELETIN_GO_APP_CHECK_PARALLEL=false
+
+# Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)
+export CKELETIN_GO_APP_CHECK_CATEGORY=security,tests
+
+# Show duration for each check in the output
+export CKELETIN_GO_APP_CHECK_TIMING=false
 
 # Default message to display for the ping command
 export CKELETIN_GO_APP_PING_OUTPUT_MESSAGE=Hello World!
