@@ -1,6 +1,6 @@
 # Claude Code Session Setup
 
-Tools auto-install via SessionStart hook (`.claude/hooks.json` → `.ckeletin/scripts/install_tools.sh`).
+Tools auto-install via the SessionStart hook in `.claude/settings.json` → `.ckeletin/scripts/install_tools.sh`.
 Installs: task, goimports, golangci-lint, gotestsum, govulncheck.
 
 If tools fail to install: `bash .ckeletin/scripts/install_tools.sh`

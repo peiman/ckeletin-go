@@ -1,35 +1,24 @@
 #!/bin/bash
-# Hook to prevent Claude Code attribution in git commits
-# PreToolUse hooks receive JSON via stdin containing tool details
+# PreToolUse(Bash) hook: block git commits that carry Claude Code attribution.
+#
+# Claude Code delivers the tool call as JSON on stdin. For the Bash tool the
+# command string is at .tool_input.command (current schema; .parameters.command
+# was an older shape, kept as a fallback). To BLOCK the tool call, the hook must
+# exit 2 — its stderr is shown to Claude. exit 0 lets the command proceed.
 
-# Debug: Log what we receive (for troubleshooting)
-DEBUG_LOG="/tmp/claude-hook-debug.log"
-echo "=== Hook triggered at $(date) ===" >> "$DEBUG_LOG"
-
-# Read JSON from stdin
 TOOL_JSON=$(cat)
-echo "Received JSON: $TOOL_JSON" >> "$DEBUG_LOG"
 
-# Extract the command from the tool parameters
-# For Bash tool: {"tool":"Bash","parameters":{"command":"git commit ...","description":"..."}}
-COMMAND=$(echo "$TOOL_JSON" | jq -r '.parameters.command // empty' 2>/dev/null || echo "")
-echo "Extracted command: $COMMAND" >> "$DEBUG_LOG"
+COMMAND=$(printf '%s' "$TOOL_JSON" |
+	jq -r '.tool_input.command // .parameters.command // empty' 2>/dev/null || true)
 
-# Check if this is a git commit command
 if [[ "$COMMAND" == *"git commit"* ]]; then
-    # Check for Claude attribution patterns
-    if echo "$COMMAND" | grep -q "Generated with \[Claude Code\]" || \
-       echo "$COMMAND" | grep -q "Co-Authored-By: Claude"; then
-        echo "❌ ERROR: Git commit contains Claude Code attribution" >&2
-        echo "" >&2
-        echo "Please remove the following from your commit message:" >&2
-        echo "  - 🤖 Generated with [Claude Code](https://claude.com/claude-code)" >&2
-        echo "  - Co-Authored-By: Claude <noreply@anthropic.com>" >&2
-        echo "" >&2
-        echo "Commit messages should contain only technical content." >&2
-        exit 1
-    fi
+	if printf '%s' "$COMMAND" | grep -qE 'Generated with \[Claude Code\]|Co-Authored-By: Claude'; then
+		echo "❌ Git commit contains Claude Code attribution — remove it before committing:" >&2
+		echo "  - 🤖 Generated with [Claude Code](https://claude.com/claude-code)" >&2
+		echo "  - Co-Authored-By: Claude <noreply@anthropic.com>" >&2
+		echo "Commit messages should contain only technical content (what changed and why)." >&2
+		exit 2 # exit 2 blocks the tool call; stderr is fed back to Claude
+	fi
 fi
 
-# Allow the command to proceed
 exit 0
