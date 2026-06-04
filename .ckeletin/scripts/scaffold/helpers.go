@@ -37,11 +37,12 @@ func removePkgDirectory(projectRoot string) error {
 // removeFrameworkOnlyArtifacts removes files and directories that are specific
 // to the ckeletin-go framework development and should not be in downstream projects.
 // This includes conformance testing (spec compliance), scaffold integration tests,
-// and the conformance mapping.
+// and the conformance mapping plus its generated report.
 func removeFrameworkOnlyArtifacts(projectRoot string) error {
 	artifacts := []string{
 		"test/conformance",
 		"conformance-mapping.yaml",
+		"conformance-report.json",
 	}
 	for _, artifact := range artifacts {
 		path := filepath.Join(projectRoot, artifact)

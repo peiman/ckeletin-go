@@ -414,7 +414,7 @@ func TestViolation_CL001_MissingChangelogMd(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // CKSPEC-ENF-005: Conformance mapping completeness
-// Enforcement: task conform validates all 35 IDs present
+// Enforcement: task conform validates all 38 IDs present
 // Violation: mapping file missing a requirement
 // ---------------------------------------------------------------------------
 
@@ -618,4 +618,41 @@ func TestViolation_ConformMapping_NonMikefarahYqRejected(t *testing.T) {
 		"conform.sh must report the wrong yq variant clearly\nOutput: %s", output)
 	assert.NotContains(t, output, "Running checks",
 		"the yq-variant gate must fail fast, before running any checks\nOutput: %s", output)
+}
+
+// ---------------------------------------------------------------------------
+// Conformance tooling integrity: the published report MUST match the mapping.
+// Enforcement: conform.sh regenerates conformance-report.json from the mapping
+// (gen-conformance-report.sh) and fails — and so does the release gate — if the
+// committed report has drifted. This keeps the machine-readable report (which the
+// spec repo aggregates instead of hand-authoring conformance/ckeletin-go.yaml)
+// truthful. Violation: a stale committed report must be rejected.
+// ---------------------------------------------------------------------------
+
+func TestViolation_ConformReport_OutOfSyncRejected(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	root := projectRoot(t)
+	reportPath := filepath.Join(root, "conformance-report.json")
+
+	original, err := os.ReadFile(reportPath)
+	require.NoError(t, err)
+
+	// Corrupt the committed report so it no longer matches the mapping.
+	require.NoError(t, os.WriteFile(reportPath, []byte("{\"summary\": {\"met\": 999}}\n"), 0644))
+	defer func() {
+		// Restore the original report regardless of assertion outcome.
+		os.WriteFile(reportPath, original, 0644)
+	}()
+
+	output, exitCode := runCheck(t, "bash", scriptPath(t, "conform.sh"))
+
+	assert.NotEqual(t, 0, exitCode,
+		"conform.sh must fail when conformance-report.json is out of sync\nOutput: %s", output)
+	assert.Contains(t, output, "out of sync",
+		"conform.sh must report the report drift\nOutput: %s", output)
+	assert.NotContains(t, output, "Running checks",
+		"the report-sync guard must fail fast, before running any checks\nOutput: %s", output)
 }

@@ -18,3 +18,7 @@
 # YAML files
 *.yml text eol=lf
 *.yaml text eol=lf
+
+# JSON files (conformance-report.json is byte-compared by the conform sync guard,
+# so it must be LF on every platform or the guard false-fails on a CRLF checkout)
+*.json text eol=lf

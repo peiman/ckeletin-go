@@ -1,0 +1,415 @@
+{
+  "implementation": "ckeletin-go",
+  "requirements": {
+    "CKSPEC-AGENT-001": {
+      "checks": [
+        "test -f AGENTS.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "AGENTS.md exists (358+ lines). Covers project purpose, directory structure, all task commands, coding conventions, ADR lookup, testing strategy, troubleshooting.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_AGENT001_MissingAgentsMd"
+      ]
+    },
+    "CKSPEC-AGENT-002": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "AGENTS.md contains no Claude/Gemini/Copilot-specific instructions. Provider content is in CLAUDE.md, .cursorrules, copilot-instructions.md.\n",
+      "status": "met",
+      "violation_evidence": "AGENTS.md's only provider mentions are file-tree references (e.g. 'CLAUDE.md # Claude Code-specific rules'); a grep cannot distinguish a provider reference from a provider instruction, so the absence of provider-specific instructions is verified at review.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-AGENT-003": {
+      "checks": [
+        "grep -qE 'AGENTS\\.md' CLAUDE.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "CLAUDE.md references AGENTS.md first. No project knowledge duplicated. .cursorrules and copilot-instructions.md also reference AGENTS.md.\n",
+      "status": "met",
+      "violation_evidence": "If a provider guide stops referencing AGENTS.md, the grep check fails.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-AGENT-004": {
+      "checks": [
+        "grep -qiE 'Commands' AGENTS.md",
+        "grep -qiE 'Troubleshoot' AGENTS.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "AGENTS.md is self-sufficient: project purpose, directory tree, all task commands, coding conventions, ADR table, git workflow, troubleshooting with cascading fix order.\n",
+      "status": "met",
+      "violation_evidence": "Removing the required sections from AGENTS.md fails the section grep checks.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-AGENT-005": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "CLI is primary interface. All operations via task commands. --output json provides machine-readable responses. No protocol layer required.\n",
+      "status": "met",
+      "violation_evidence": "'The CLI is the agent interface' is an architectural property (no separate protocol/daemon layer), verified by inspecting the design rather than a single artifact. Adding a non-CLI protocol layer is caught at architecture review.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ARCH-001": {
+      "checks": [
+        "task validate:layering"
+      ],
+      "enforcement_level": "linter",
+      "evidence": ".go-arch-lint.yml defines four layers: commands (cmd/), business (internal/ping, docs, dev, progress, check), infrastructure (.ckeletin/pkg/*, internal/config/commands, internal/ui, internal/xdg). Entry layer is main.go (36 lines). task validate:layering passes.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH001_FileOutsideComponent"
+      ]
+    },
+    "CKSPEC-ARCH-002": {
+      "checks": [
+        "task validate:layering"
+      ],
+      "enforcement_level": "linter",
+      "evidence": "go-arch-lint enforces directed dependencies. Business mayDependOn infrastructure only. Infrastructure mayDependOn nothing.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH002_ReverseDepBusinessImportsCmd"
+      ]
+    },
+    "CKSPEC-ARCH-003": {
+      "checks": [
+        "task validate:layering"
+      ],
+      "enforcement_level": "linter",
+      "evidence": "depOnAnyVendor:false enables vendor import checking. canUse rules restrict Cobra and pflag to commands layer only. Business and infrastructure cannot import them.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH003_BusinessImportsCobra"
+      ]
+    },
+    "CKSPEC-ARCH-004": {
+      "checks": [
+        "task validate:layering"
+      ],
+      "enforcement_level": "linter",
+      "evidence": "go-arch-lint enforces business packages cannot import each other. Each business package mayDependOn infrastructure only.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH004_BusinessImportsBusiness"
+      ]
+    },
+    "CKSPEC-ARCH-005": {
+      "checks": [
+        "task validate:layering"
+      ],
+      "enforcement_level": "linter",
+      "evidence": "go-arch-lint enforces infrastructure mayDependOn nothing. Cannot import business or command layers.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH005_InfraImportsBusiness"
+      ]
+    },
+    "CKSPEC-ARCH-006": {
+      "checks": [
+        "task validate:package-organization",
+        "task validate:commands"
+      ],
+      "enforcement_level": "script",
+      "evidence": "main.go is 36 lines. validate-package-organization.sh verifies only main.go and main_test.go exist at root. validate-command-patterns.sh checks command files are under 80 lines.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH006_OversizedCommand"
+      ]
+    },
+    "CKSPEC-ARCH-007": {
+      "checks": [
+        "task validate:package-organization"
+      ],
+      "enforcement_level": "script",
+      "evidence": "validate-package-organization.sh checks all Go files are in designated directories (cmd/, internal/, pkg/, .ckeletin/). Only main.go/main_test.go at root.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ARCH007_GoFileInRoot"
+      ]
+    },
+    "CKSPEC-CL-001": {
+      "checks": [
+        "test -f CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "CHANGELOG.md exists in repository root.",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_CL001_MissingChangelogMd"
+      ]
+    },
+    "CKSPEC-CL-002": {
+      "checks": [
+        "grep -qiE 'keepachangelog' CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "CHANGELOG.md uses Keep a Changelog format with all six categories. Versions in reverse chronological order.\n",
+      "status": "met",
+      "violation_evidence": "Dropping the Keep a Changelog format/reference from CHANGELOG.md fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-CL-003": {
+      "checks": [
+        "grep -qE '^## \\[.+\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}' CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "All dates use YYYY-MM-DD format.",
+      "status": "met",
+      "violation_evidence": "A non-ISO-8601 release date fails the date-format grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-CL-004": {
+      "checks": [
+        "grep -qE '^## \\[[0-9]+\\.[0-9]+\\.[0-9]+\\]' CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "CHANGELOG.md states adherence to SemVer. Version numbers follow MAJOR.MINOR.PATCH throughout.\n",
+      "status": "met",
+      "violation_evidence": "A non-SemVer version header fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-CL-005": {
+      "checks": [
+        "grep -qE '^## \\[Unreleased\\]' CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "[Unreleased] section present at top of CHANGELOG.md.",
+      "status": "met",
+      "violation_evidence": "Removing the Unreleased section fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-CL-006": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "Changelog entries are human-written at user-relevant granularity. Not git log dumps.\n",
+      "status": "met",
+      "violation_evidence": "Distinguishing human-curated, user-relevant changelog prose from an auto-generated git-log dump is an editorial judgment no grep can make reliably. Enforced at review; a git-log-style dump is caught there.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-CL-007": {
+      "checks": [
+        "grep -qE '^\\[.+\\]: https?://.+/compare/' CHANGELOG.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "Reference-style comparison links at bottom of CHANGELOG.md for all versions.\n",
+      "status": "met",
+      "violation_evidence": "Removing the reference-style compare links fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-001": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "ADR-014 enforcement audit: 12/14 ADRs fully automated, 1 partial (ADR-008 GoReleaser), 1 honor system (ADR-007 Bubble Tea). 23 automated checks run via task check. Enforcement coverage is verified by human review of the audit table, not a targeted check.\n",
+      "status": "met",
+      "violation_evidence": "Meta-requirement: the project must prefer automated enforcement. Its satisfaction is the aggregate of the other requirements' enforcement levels (tracked in the ADR-014 audit table and surfaced by the conform report's automated-vs-analysis split), assessed at review rather than by one check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-002": {
+      "checks": [
+        "test -f .golangci.yml",
+        "test -f .semgrep.yml"
+      ],
+      "enforcement_level": "script",
+      "evidence": "All ladder levels used. Linter: go-arch-lint + golangci-lint. SAST: 12 semgrep rules. Scripts: 9 validate-*.sh + 16 check-*.sh. CI: GitHub Actions. Honor system: ADR-007 (documented as last resort). The ladder's existence is verified by review, not a targeted check.\n",
+      "status": "met",
+      "violation_evidence": "Removing the linter (.golangci.yml) or SAST (.semgrep.yml) config fails the test checks.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-003": {
+      "checks": [
+        "grep -qiE 'gap|honor.system|partial' .ckeletin/docs/adr/014-adr-enforcement-policy.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "ADR-014 enforcement audit table documents gaps explicitly. ADR-007: honor system. ADR-008: partial. Gap documentation is verified by human review of the audit table.\n",
+      "status": "met",
+      "violation_evidence": "If ADR-014 stops documenting gaps, the grep check fails.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-004": {
+      "checks": [
+        "grep -qiE 'audit table|enforcement.*audit' .ckeletin/docs/adr/014-adr-enforcement-policy.md"
+      ],
+      "enforcement_level": "script",
+      "evidence": "ADR-014 contains living enforcement audit table tracking all 14 ADRs with enforcement mechanism, status, and gaps. Table existence verified by review.\n",
+      "status": "met",
+      "violation_evidence": "If the ADR-014 audit table is removed, the grep check fails.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-005": {
+      "checks": [
+        "test -f conformance-mapping.yaml",
+        "test -f .ckeletin/scripts/conform.sh"
+      ],
+      "enforcement_level": "script",
+      "evidence": "task conform validates all 38 requirement IDs are present in conformance-mapping.yaml before running checks. Missing IDs cause the generator to fail with a non-zero exit code. The count is machine-verified by the ENF-008 drift guard, not hand-maintained.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ENF005_IncompleteMapping"
+      ]
+    },
+    "CKSPEC-ENF-006": {
+      "checks": [
+        "go test -tags conformance ./test/conformance/..."
+      ],
+      "enforcement_level": "script",
+      "evidence": "15 violation tests prove enforcement for ARCH-001 through 007, OUT-001, OUT-005, TEST-003, AGENT-001, CL-001, ENF-005, and ENF-007. Requirements with honor-system enforcement are exempt. Run with: go test -tags conformance ./test/conformance/...\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_ENF006_MissingViolationTestFlagged"
+      ]
+    },
+    "CKSPEC-ENF-007": {
+      "checks": [
+        "grep -q 'Feedback signals' .ckeletin/scripts/conform.sh"
+      ],
+      "enforcement_level": "script",
+      "evidence": "task conform automatically reports feedback signals when checkable requirements lack violation tests or enforcement level is above honor-system without proof. Signals are structural, not volitional.\n",
+      "status": "met",
+      "violation_evidence": "The violation test verifies the conform script contains feedback signal logic (string presence), not that it produces correct output \u2014 running conform.sh from within the conformance test suite causes infinite recursion. Behavioral proof: task conform output shows feedback signals when enforcement claims lack violation tests. File: .ckeletin/scripts/conform.sh (FEEDBACK_FILE logic). File: test/conformance/violation_test.go (TestViolation_ENF007).\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-008": {
+      "checks": [
+        "grep -q 'machine-anchored' .ckeletin/scripts/conform.sh",
+        "grep -q 'met but unanchored' .ckeletin/scripts/conform.sh"
+      ],
+      "enforcement_level": "script",
+      "evidence": "conform.sh fails if any requirement claimed met lacks both an automated check and a violation_evidence anchor \u2014 no unanchored met-claims. Met requirements are tallied as machine-anchored vs analysis-with-evidence and the split is printed. The same gate also catches prose count drift (\"all N requirement\").\n",
+      "status": "met",
+      "violation_evidence": "The anchoring gate is conform.sh itself; a violation test that ran conform.sh from inside the conformance suite would recurse (same constraint as ENF-007). Behavioral proof: stripping a met requirement's checks and violation_evidence makes task conform fail with \"met but unanchored\". File: .ckeletin/scripts/conform.sh (ENF-008 anchoring gate + the automated-vs-analysis tally).\n",
+      "violation_tests": []
+    },
+    "CKSPEC-ENF-009": {
+      "checks": [
+        "grep -q 'CKSPEC Conformance' .github/workflows/ci.yml",
+        "grep -qE 'needs:.*conformance' .github/workflows/ci.yml"
+      ],
+      "enforcement_level": "ci",
+      "evidence": ".github/workflows/ci.yml defines a CKSPEC Conformance job that runs task conform; the release job declares needs: [test-matrix, build, conformance], so no release can publish while conformance fails. A scheduled run opens a deduplicated drift issue. Verified end-to-end via workflow_dispatch with the conformance job green.\n",
+      "status": "met",
+      "violation_evidence": "Enforcement is CI-structural \u2014 a job dependency in the release pipeline that a unit test cannot exercise. Proof is the workflow itself: the release job's needs: list includes conformance, so the release will not run while the conformance job fails. File: .github/workflows/ci.yml (conformance job + release needs).\n",
+      "violation_tests": []
+    },
+    "CKSPEC-OUT-001": {
+      "checks": [
+        "task validate:output"
+      ],
+      "enforcement_level": "script",
+      "evidence": "ADR-013 defines 3-stream model. Logger writes console to stderr, file to JSON. internal/ui renders to stdout. validate-output-patterns.sh enforces separation.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_OUT001_BusinessUsesOsStdout"
+      ]
+    },
+    "CKSPEC-OUT-002": {
+      "checks": [
+        "grep -rq 'IsJSONMode' .ckeletin/pkg/output"
+      ],
+      "enforcement_level": "script",
+      "evidence": "--output json flag on all commands. output.IsJSONMode() check in renderer.go. JSONEnvelope to stdout in JSON mode. Verified by unit tests in cmd/*_test.go, not a targeted enforcement check.\n",
+      "status": "met",
+      "violation_evidence": "Removing the JSON output mode (IsJSONMode plumbing) fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-OUT-003": {
+      "checks": [
+        "grep -rq 'type JSONEnvelope' .ckeletin/pkg/output"
+      ],
+      "enforcement_level": "script",
+      "evidence": "JSONEnvelope struct in .ckeletin/pkg/output/json.go with Status, Command, Data, Error fields. JSONResponder interface for custom payloads. Verified by unit tests, not a targeted enforcement check.\n",
+      "status": "met",
+      "violation_evidence": "Removing the JSONEnvelope struct fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-OUT-004": {
+      "checks": [
+        "grep -qE 'log\\.Debug' internal/ui/renderer.go"
+      ],
+      "enforcement_level": "script",
+      "evidence": "RenderSuccess and RenderError in renderer.go log.Debug() raw data to audit log file while rendering formatted text to stdout. Debug level ensures shadow logs reach file logger without polluting console. Verified by unit tests.\n",
+      "status": "met",
+      "violation_evidence": "Removing the shadow log.Debug from the renderer fails the grep check.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-OUT-005": {
+      "checks": [
+        "task validate:output"
+      ],
+      "enforcement_level": "script",
+      "evidence": "validate-output-patterns.sh detects fmt.Print* and os.Stdout in internal/* (excluding ui/ and tests). Business logic must use internal/ui for output.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_OUT005_BusinessUsesFmtPrint"
+      ]
+    },
+    "CKSPEC-OUT-006": {
+      "checks": [
+        "grep -qE 'commit %s, built at %s' cmd/root.go"
+      ],
+      "enforcement_level": "test",
+      "evidence": "cmd/root.go composes RootCmd.Version as \"<version>, commit <commit>, built at <date>\" from the Version, Commit and Date package vars injected via ldflags (see Taskfile.yml LDFLAGS). So `<binary> --version` emits all three build-identity fields; TestVersionFlag asserts the commit and build-date fields are present in the output.\n",
+      "status": "met",
+      "violation_evidence": "Removing any build-identity field from the cmd/root.go version template (or dropping its ldflags injection) takes it out of `--version`; both the grep check and TestVersionFlag fail, so the regression cannot land green.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-TEST-001": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "TDD mandatory per AGENTS.md and CLAUDE.md. Process discipline enforced through agent instructions, not tooling.\n",
+      "status": "met",
+      "violation_evidence": "TDD is a temporal property \u2014 'the failing test was written before the implementation' is not observable in the committed artifact, so no static check can decide it. Mandated by AGENTS.md/CLAUDE.md; a violation (implementation with no prior failing test) is caught at code review, not by tooling.\n",
+      "violation_tests": []
+    },
+    "CKSPEC-TEST-002": {
+      "checks": [
+        "test -f .ckeletin/scripts/check-coverage-project.sh"
+      ],
+      "enforcement_level": "script",
+      "evidence": "check-coverage-project.sh enforces 85% minimum. Pre-push hook runs coverage check. Current coverage: 90.3%.\n",
+      "status": "met",
+      "violation_evidence": "Destructive-to-test: reducing coverage below 85% to trigger the check would break the test suite. Enforcement mechanism is the script and its pre-push hook integration. File: .ckeletin/scripts/check-coverage-project.sh (MINIMUM_COVERAGE=85). File: .ckeletin/configs/lefthook.base.yml (pre-push runs coverage).\n",
+      "violation_tests": []
+    },
+    "CKSPEC-TEST-003": {
+      "checks": [
+        "test -f .semgrep.yml"
+      ],
+      "enforcement_level": "sast",
+      "evidence": "Semgrep rule ckeletin-no-mock-frameworks detects gomock/mockery/ testify-mock imports in Go files. Violation test creates a file with a gomock import and verifies semgrep catches it.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_TEST003_MockFrameworkImport"
+      ]
+    },
+    "CKSPEC-TEST-004": {
+      "checks": [],
+      "enforcement_level": "honor-system",
+      "evidence": "AGENTS.md mandates atomic commits. Process discipline enforced through agent instructions and code review.\n",
+      "status": "met",
+      "violation_evidence": "Whether a commit atomically pairs a test with its implementation is a review judgment over commit contents, not a mechanically decidable property. Mandated by AGENTS.md and enforced at review.\n",
+      "violation_tests": []
+    }
+  },
+  "spec_version": "0.6.0",
+  "summary": {
+    "deferred": 0,
+    "met": 38,
+    "partial": 0,
+    "passed": true,
+    "total": 38
+  }
+}

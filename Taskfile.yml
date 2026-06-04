@@ -332,9 +332,22 @@ tasks:
   # === Conformance ===
 
   conform:
-    desc: Generate CKSPEC conformance report from mapping
+    desc: Validate CKSPEC conformance against the spec (runs checks + report sync guard)
     cmds:
       - bash .ckeletin/scripts/conform.sh {{.CLI_ARGS}}
+
+  generate:conformance-report:
+    desc: Regenerate conformance-report.json (machine-readable report) from the mapping
+    cmds:
+      # Write to a temp file and move into place only on success, so a failed
+      # generation never truncates the committed report.
+      - |
+        tmp=$(mktemp ./conformance-report.json.XXXXXX)
+        trap 'rm -f "$tmp"' EXIT
+        bash .ckeletin/scripts/gen-conformance-report.sh > "$tmp"
+        mv "$tmp" conformance-report.json
+        trap - EXIT
+        echo "✅ conformance-report.json regenerated from conformance-mapping.yaml"
 
   # === Project-Specific Tasks ===
 
