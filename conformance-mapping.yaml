@@ -2,7 +2,7 @@
 # Used by `task conform` to generate the conformance report.
 # Format agreed between ckeletin-go and ckeletin-rust architects.
 
-spec_version: "0.5.0"
+spec_version: "0.6.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -171,7 +171,7 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 36 requirement IDs are present in
+      task conform validates all 38 requirement IDs are present in
       conformance-mapping.yaml before running checks. Missing IDs
       cause the generator to fail with a non-zero exit code. The count is
       machine-verified by the ENF-008 drift guard, not hand-maintained.
@@ -216,6 +216,51 @@ requirements:
       when enforcement claims lack violation tests.
       File: .ckeletin/scripts/conform.sh (FEEDBACK_FILE logic).
       File: test/conformance/violation_test.go (TestViolation_ENF007).
+
+  CKSPEC-ENF-008:
+    title: "Anchored conformance evidence"
+    status: met
+    enforcement_level: script
+    evidence: >
+      conform.sh fails if any requirement claimed met lacks both an
+      automated check and a violation_evidence anchor — no unanchored
+      met-claims. Met requirements are tallied as machine-anchored vs
+      analysis-with-evidence and the split is printed. The same gate
+      also catches prose count drift ("all N requirement").
+    checks:
+      - "grep -q 'machine-anchored' .ckeletin/scripts/conform.sh"
+      - "grep -q 'met but unanchored' .ckeletin/scripts/conform.sh"
+    violation_tests: []
+    violation_evidence: >
+      The anchoring gate is conform.sh itself; a violation test that
+      ran conform.sh from inside the conformance suite would recurse
+      (same constraint as ENF-007). Behavioral proof: stripping a met
+      requirement's checks and violation_evidence makes task conform
+      fail with "met but unanchored".
+      File: .ckeletin/scripts/conform.sh (ENF-008 anchoring gate + the
+      automated-vs-analysis tally).
+
+  CKSPEC-ENF-009:
+    title: "Conformance gate on release"
+    status: met
+    enforcement_level: ci
+    evidence: >
+      .github/workflows/ci.yml defines a CKSPEC Conformance job that
+      runs task conform; the release job declares
+      needs: [test-matrix, build, conformance], so no release can
+      publish while conformance fails. A scheduled run opens a
+      deduplicated drift issue. Verified end-to-end via
+      workflow_dispatch with the conformance job green.
+    checks:
+      - "grep -q 'CKSPEC Conformance' .github/workflows/ci.yml"
+      - "grep -qE 'needs:.*conformance' .github/workflows/ci.yml"
+    violation_tests: []
+    violation_evidence: >
+      Enforcement is CI-structural — a job dependency in the release
+      pipeline that a unit test cannot exercise. Proof is the workflow
+      itself: the release job's needs: list includes conformance, so
+      the release will not run while the conformance job fails.
+      File: .github/workflows/ci.yml (conformance job + release needs).
 
   # ═══════════════════════════════════════════════════════════════
   # Testing (CKSPEC-TEST-001 through CKSPEC-TEST-004)
