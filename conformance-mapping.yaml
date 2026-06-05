@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.7.0"
+spec_version: "0.8.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -182,7 +182,7 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 39 requirement IDs are present in
+      task conform validates all 40 requirement IDs are present in
       conformance-mapping.yaml before running checks. Missing IDs
       cause the generator to fail with a non-zero exit code. The count is
       machine-verified by the ENF-008 drift guard, not hand-maintained.
@@ -451,7 +451,7 @@ requirements:
       check and TestVersionFlag fail, so the regression cannot land green.
 
   # ═══════════════════════════════════════════════════════════════
-  # Agent Readiness (CKSPEC-AGENT-001 through CKSPEC-AGENT-005)
+  # Agent Readiness (CKSPEC-AGENT-001 through CKSPEC-AGENT-006)
   # ═══════════════════════════════════════════════════════════════
 
   CKSPEC-AGENT-001:
@@ -530,6 +530,28 @@ requirements:
       separate protocol/daemon layer), verified by inspecting the design
       rather than a single artifact. Adding a non-CLI protocol layer is
       caught at architecture review.
+
+  CKSPEC-AGENT-006:
+    title: "Machine-readable command catalog"
+    status: met
+    enforcement_level: script
+    evidence: >
+      ckeletin-go exposes a `catalog` command (cmd/catalog.go) that emits its
+      command surface as the data of an OUT-002 success envelope
+      (`catalog --output json`), derived from the live cobra command tree
+      (RootCmd) - the same tree the parser uses - so the catalog cannot drift
+      from the actual surface (anti-drift is structural, not tested-in). The
+      shared schema types live in .ckeletin/pkg/catalog (Catalog/Command/Flag),
+      matching the cross-implementation contract agreed with ckeletin-rust: the
+      required core (long/required/takes_value) is always present and optional
+      fields (short/description/default) are omitted when absent. Derivation and
+      schema are verified by cmd/catalog_test.go and .ckeletin/pkg/catalog.
+    checks:
+      - "test -f cmd/catalog.go"
+      - "test -f .ckeletin/pkg/catalog/catalog.go"
+      - "grep -q 'MustAddToRoot(catalogCmd)' cmd/catalog.go"
+    violation_tests:
+      - "test/conformance/violation_test.go::TestViolation_AGENT006_CatalogCommandRemoved"
 
   # ═══════════════════════════════════════════════════════════════
   # Changelog (CKSPEC-CL-001 through CKSPEC-CL-007)

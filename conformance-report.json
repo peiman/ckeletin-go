@@ -50,6 +50,20 @@
       "violation_evidence": "'The CLI is the agent interface' is an architectural property (no separate protocol/daemon layer), verified by inspecting the design rather than a single artifact. Adding a non-CLI protocol layer is caught at architecture review.\n",
       "violation_tests": []
     },
+    "CKSPEC-AGENT-006": {
+      "checks": [
+        "test -f cmd/catalog.go",
+        "test -f .ckeletin/pkg/catalog/catalog.go",
+        "grep -q 'MustAddToRoot(catalogCmd)' cmd/catalog.go"
+      ],
+      "enforcement_level": "script",
+      "evidence": "ckeletin-go exposes a `catalog` command (cmd/catalog.go) that emits its command surface as the data of an OUT-002 success envelope (`catalog --output json`), derived from the live cobra command tree (RootCmd) - the same tree the parser uses - so the catalog cannot drift from the actual surface (anti-drift is structural, not tested-in). The shared schema types live in .ckeletin/pkg/catalog (Catalog/Command/Flag), matching the cross-implementation contract agreed with ckeletin-rust: the required core (long/required/takes_value) is always present and optional fields (short/description/default) are omitted when absent. Derivation and schema are verified by cmd/catalog_test.go and .ckeletin/pkg/catalog.\n",
+      "status": "met",
+      "violation_evidence": null,
+      "violation_tests": [
+        "test/conformance/violation_test.go::TestViolation_AGENT006_CatalogCommandRemoved"
+      ]
+    },
     "CKSPEC-ARCH-001": {
       "checks": [
         "task validate:layering"
@@ -250,7 +264,7 @@
         "test -f .ckeletin/scripts/conform.sh"
       ],
       "enforcement_level": "script",
-      "evidence": "task conform validates all 39 requirement IDs are present in conformance-mapping.yaml before running checks. Missing IDs cause the generator to fail with a non-zero exit code. The count is machine-verified by the ENF-008 drift guard, not hand-maintained.\n",
+      "evidence": "task conform validates all 40 requirement IDs are present in conformance-mapping.yaml before running checks. Missing IDs cause the generator to fail with a non-zero exit code. The count is machine-verified by the ENF-008 drift guard, not hand-maintained.\n",
       "status": "met",
       "violation_evidence": null,
       "violation_tests": [
@@ -418,12 +432,12 @@
       "violation_tests": []
     }
   },
-  "spec_version": "0.7.0",
+  "spec_version": "0.8.0",
   "summary": {
     "deferred": 0,
-    "met": 39,
+    "met": 40,
     "partial": 0,
     "passed": true,
-    "total": 39
+    "total": 40
   }
 }

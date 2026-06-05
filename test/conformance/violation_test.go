@@ -656,3 +656,39 @@ func TestViolation_ConformReport_OutOfSyncRejected(t *testing.T) {
 	assert.NotContains(t, output, "Running checks",
 		"the report-sync guard must fail fast, before running any checks\nOutput: %s", output)
 }
+
+// TestViolation_AGENT006_CatalogCommandRemoved verifies CKSPEC-AGENT-006's
+// enforcement: removing the `catalog` command (the CLI's machine-readable
+// command surface) must fail the conformance check. The command file and its
+// test are removed together so the cmd package still compiles and only the
+// AGENT-006 `test -f cmd/catalog.go` check fires.
+func TestViolation_AGENT006_CatalogCommandRemoved(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	root := projectRoot(t)
+	files := []string{
+		filepath.Join(root, "cmd", "catalog.go"),
+		filepath.Join(root, "cmd", "catalog_test.go"),
+	}
+	saved := map[string][]byte{}
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		require.NoError(t, err)
+		saved[f] = b
+		require.NoError(t, os.Remove(f))
+	}
+	defer func() {
+		for f, b := range saved {
+			os.WriteFile(f, b, 0644)
+		}
+	}()
+
+	output, exitCode := runCheck(t, "bash", scriptPath(t, "conform.sh"))
+
+	assert.NotEqual(t, 0, exitCode,
+		"conform.sh must fail when the catalog command (CKSPEC-AGENT-006) is removed\nOutput: %s", output)
+	assert.Contains(t, output, "CKSPEC-AGENT-006",
+		"conform.sh must name the failed requirement\nOutput: %s", output)
+}
