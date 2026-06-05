@@ -71,6 +71,7 @@ components:
   # Project UI: internal/ui/** (rarely changes)
   infrastructure:
     in:
+      - .ckeletin/pkg/catalog/**
       - .ckeletin/pkg/config/**
       - .ckeletin/pkg/logger/**
       - .ckeletin/pkg/output/**
