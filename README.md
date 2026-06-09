@@ -31,7 +31,7 @@ ckeletin-go is an AI-first Go CLI framework — every architectural rule is mach
 
 - **AI agents build correctly here** — `AGENTS.md`, `CLAUDE.md`, hooks, and automated enforcement mean agents follow your architecture, not fight it
 - **Updatable framework** — `.ckeletin/` updates independently via `task ckeletin:update`. Your code is never touched. AI agent infrastructure improves automatically
-- **Read the code in 5 minutes** — Ultra-thin commands (~20 lines each). No framework magic to decode
+- **Read the code in 5 minutes** — Ultra-thin commands (run functions ≤30 lines, enforced). No framework magic to decode
 - **Ship with confidence** — ≥85% test coverage, automated architecture validation, GPL/AGPL blocking. Every rule is machine-checkable
 - **One command setup** — `task init name=myapp module=...` updates 40+ files. Start coding in 2 minutes
 
@@ -110,7 +110,7 @@ myapp/
 │   ├── scripts/            # Enforcement scripts (architecture, patterns, security)
 │   └── docs/adr/           # Framework ADRs (000-099)
 │
-├── cmd/                    # YOUR commands (ultra-thin, ≤30 lines)
+├── cmd/                    # YOUR commands (ultra-thin, run funcs ≤30 lines)
 ├── internal/               # YOUR business logic
 ├── pkg/                    # YOUR public reusable packages
 ├── docs/adr/               # YOUR ADRs (100+)
@@ -156,7 +156,7 @@ myapp/
 ckeletin-go follows a principled architecture with automated enforcement:
 
 - **Layered architecture** — 4-layer pattern (Entry → Command → Business Logic → Infrastructure) with validation ([ADR-009](.ckeletin/docs/adr/009-layered-architecture-pattern.md))
-- **Ultra-thin commands** — ~20-30 lines, delegate to business logic ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md))
+- **Ultra-thin commands** — run functions ≤30 lines (enforced), delegate to business logic ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md))
 - **Centralized configuration** — Type-safe registry with auto-generated constants ([ADR-002](.ckeletin/docs/adr/002-centralized-configuration-registry.md))
 - **Dependency injection** — Over mocking, for testability ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
 - **Dual-tool license compliance** — Source + binary analysis ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md))
@@ -236,11 +236,12 @@ See [Configuration Reference](docs/configuration.md) for all options, auto-gener
 
 ## Commands
 
-Built-in commands: `ping` (demo), `config validate`, `check` (quality gates), `dev` (dev-only tools), and `doctor` (environment health).
+Built-in commands: `ping` (demo), `config validate` (file + per-option validation), `docs config` (config reference docs), `catalog` (machine-readable command catalog), and `completion` (shell completions). Dev builds (`task build:dev`) add `check` (quality gates) and the `dev` group (`config`, `doctor`, `progress`). Environment health checks run via `task doctor`.
 
 ```bash
 ./myapp ping --message "Hello!" --color cyan
 ./myapp config validate
+./myapp catalog
 task doctor
 ```
 

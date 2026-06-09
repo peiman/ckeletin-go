@@ -2,12 +2,13 @@
 
 ## Supported Versions
 
-We release patches for security vulnerabilities in the following versions:
+ckeletin-go is pre-1.0 software: APIs and behavior may change between minor
+releases, and security fixes are released for the latest minor version only.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| 0.11.x (latest release) | :white_check_mark: |
+| < 0.11  | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -122,4 +123,4 @@ We would like to publicly thank the following people for responsibly disclosing 
 
 This security policy may be updated from time to time. Please check back regularly for any changes.
 
-**Last Updated**: 2025-10-29
+**Last Updated**: 2026-06-10

@@ -35,7 +35,7 @@ goldie.Assert(t, "check-summary", []byte(output))
 
 ### Golden Files in This Project
 
-We use golden files to test the **check summary output** (`scripts/check-summary.sh`):
+We use golden files to test the **check summary output** (`.ckeletin/scripts/check-summary.sh`):
 
 - **File:** `test/integration/testdata/check-summary.golden`
 - **Tests:** Component output (not full integration)
@@ -59,7 +59,7 @@ Update golden files when you **intentionally** change output format:
 
 Edit the output format:
 ```bash
-vim scripts/check-summary.sh
+vim .ckeletin/scripts/check-summary.sh
 ```
 
 #### 2. Update Golden Files

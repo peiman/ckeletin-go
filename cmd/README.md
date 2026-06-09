@@ -4,7 +4,7 @@ This directory contains command files following the **ultra-thin command pattern
 
 ## Overview
 
-Command files in this directory are intentionally minimal (~20-30 lines) and serve as thin CLI wrappers. All business logic, configuration, and metadata are separated into dedicated packages.
+Command files in this directory are intentionally minimal and serve as thin CLI wrappers — every `run*` function targets ≤30 lines (hard limit 35, enforced by `task validate:commands`). All business logic, configuration, and metadata are separated into dedicated packages.
 
 ## Directory Structure
 
@@ -47,7 +47,7 @@ This creates:
 ```go
 package commands
 
-import "github.com/peiman/ckeletin-go/internal/config"
+import "github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 
 // MycommandMetadata defines all metadata for the mycommand command
 var MycommandMetadata = config.CommandMetadata{
@@ -87,7 +87,7 @@ import (
     "github.com/spf13/cobra"
 )
 
-var mycommandCmd = NewCommand(commands.MycommandMetadata, runMycommand)
+var mycommandCmd = MustNewCommand(commands.MycommandMetadata, runMycommand)
 
 func init() {
     MustAddToRoot(mycommandCmd)
@@ -132,9 +132,9 @@ func (e *Executor) Execute() error {
 
 ### ✅ DO
 
-- Use `NewCommand()` to create commands from metadata
+- Use `MustNewCommand()` to create commands from metadata (`NewCommand()` if you need the error)
 - Use `MustAddToRoot()` to register commands
-- Keep command files ~20-30 lines
+- Keep `run*` functions ≤30 lines (hard limit 35)
 - Move all business logic to `internal/<command>/`
 - Define metadata in `internal/config/commands/<command>_config.go`
 - Use dependency injection (pass io.Writer, etc.)
@@ -158,11 +158,13 @@ task validate:commands
 
 ### Whitelisting Commands
 
-If you need to deviate from the pattern (e.g., complex command hierarchy), add this comment to the command file:
+If you need to deviate from the pattern (e.g., complex command hierarchy), add this marker to the command file **with a justification** — a bare marker fails validation:
 
 ```go
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — <why this file cannot follow the pattern>
 ```
+
+The justification must appear on the marker line or in a comment directly above/below it. See ADR-001 → Enforcement.
 
 ## Examples
 
@@ -179,8 +181,8 @@ If you need to deviate from the pattern (e.g., complex command hierarchy), add t
 
 ## Related Files
 
-- `internal/config/command_metadata.go` - CommandMetadata struct definition
-- `internal/config/command_options.go` - ConfigOption struct definition
-- `internal/config/commands/` - All command configs (metadata + options)
+- `.ckeletin/pkg/config/command_metadata.go` - CommandMetadata struct definition
+- `.ckeletin/pkg/config/command_options.go` - ConfigOption struct definition
+- `internal/config/commands/` - Project command configs (metadata + options)
 - `cmd/helpers.go` - Framework helpers for creating commands
-- `scripts/validate-command-patterns.sh` - Validation script
+- `.ckeletin/scripts/validate-command-patterns.sh` - Validation script

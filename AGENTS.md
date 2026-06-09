@@ -13,7 +13,7 @@ The `.ckeletin/` directory contains the **framework** — config registry, loggi
 Every architectural rule in this project is machine-checkable. `task check` is the single gateway — run it before every commit. If it passes, the code is correct regardless of who wrote it.
 
 Key characteristics:
-- Ultra-thin command pattern (commands ≤30 lines, logic in `internal/`)
+- Ultra-thin command pattern (run functions ≤30 lines, logic in `internal/`)
 - Centralized configuration registry with auto-generated constants
 - Structured logging with Zerolog (dual console + file output)
 - Framework-level `--output json` flag for machine-readable output
@@ -76,9 +76,12 @@ ckeletin-go/
 │   │   ├── registry.go    # Config option definitions
 │   │   └── keys_generated.go  # Auto-generated constants
 │   ├── pkg/logger/        # Logging infrastructure (Zerolog)
+│   ├── pkg/output/        # JSON output mode (--output json)
+│   ├── pkg/catalog/       # Command catalog types (CKSPEC-AGENT-006)
+│   ├── pkg/testutil/      # Shared test helpers
 │   ├── scripts/           # Build, validation, and utility scripts
 │   └── Taskfile.yml       # Framework task definitions
-├── cmd/                   # Commands (ultra-thin, ≤30 lines each)
+├── cmd/                   # Commands (ultra-thin, run funcs ≤30 lines)
 │   ├── root.go            # Root command setup
 │   └── *.go               # Feature commands
 ├── internal/              # Private application code
@@ -96,12 +99,12 @@ ckeletin-go/
 ```
 
 **Key principles:**
-1. **Ultra-thin commands**: `cmd/*.go` files are wiring only (≤30 lines) — read config, create structs, call `internal/`. Loops, conditionals, or string manipulation → move to `internal/`.
+1. **Ultra-thin commands**: `cmd/*.go` files are wiring only (run functions ≤30 lines, enforced) — read config, create structs, call `internal/`. Loops, conditionals, or string manipulation → move to `internal/`.
 2. **Business logic in `internal/`**: Private implementation packages.
 3. **Framework code in `.ckeletin/`**: Config registry, logger, scripts, validators.
 4. **Public libraries in `pkg/`**: Importable by external consumers.
 
-**30-line guidance:** Target ≤30. 31-35 acceptable if refactoring reduces clarity. Beyond 35 requires refactoring. Example:
+**30-line contract (enforced):** `task validate:commands` measures every `run*` function from its `func` line through its closing brace: ≤30 lines passes, 31-35 warns, >35 **fails the build**. Whole files >80 lines draw an advisory warning. Exemptions require a `// ckeletin:allow-custom-command` marker **with a justification** (a bare marker fails validation). See ADR-001 → Enforcement. Example:
 ```go
 // cmd/ping.go — wiring only, no business logic
 func runPing(cmd *cobra.Command, args []string) error {
@@ -120,7 +123,7 @@ Read `.ckeletin/docs/adr/*.md` before making architectural changes.
 | ADR | Topic | Key Principle |
 |-----|-------|---------------|
 | ADR-000 | Task-Based Workflow | Single source of truth for dev commands |
-| ADR-001 | Command Pattern | Commands are ultra-thin (≤30 lines) |
+| ADR-001 | Command Pattern | Commands are ultra-thin (run functions ≤30 lines) |
 | ADR-002 | Config Registry | Centralized config with type safety |
 | ADR-003 | Testing Strategy | Dependency injection over mocking |
 | ADR-004 | Security | Input validation and safe defaults |
@@ -231,7 +234,7 @@ On error:
 - Use table-driven tests for multiple scenarios
 - Unit tests: `*_test.go` in same package
 - Integration tests: `test/integration/`
-- Dependency injection over mocking ([ADR-003](.ckeletin/docs/adr/003-testing-strategy.md))
+- Dependency injection over mocking ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
 
 ### Golden File Testing
 
@@ -295,7 +298,7 @@ During refactoring, temporary drops up to 2% acceptable if restored before PR me
 ### New Command Checklist
 
 ```
-[ ] Create cmd/<name>.go (≤30 lines, wiring only)
+[ ] Create cmd/<name>.go (wiring only, run functions ≤30 lines)
 [ ] Create internal/<name>/ package for business logic
 [ ] Add config options to .ckeletin/pkg/config/registry.go
 [ ] Run: task generate:config:key-constants
@@ -340,7 +343,7 @@ Details: [docs/licenses.md](docs/licenses.md) and [ADR-011](.ckeletin/docs/adr/0
 | Coverage below 85% | Missing tests | `go tool cover -html=coverage.out` to find gaps |
 | License check fails | Copyleft dep added | `go get pkg@none && go mod tidy`, find MIT alternative |
 | `golangci-lint` timeout | Slow machine | `task lint` (has proper timeout) |
-| Validate commands fails | cmd file too long | Move logic to `internal/`, keep ≤30 lines |
+| Validate commands fails | `run*` function >35 lines or bare exemption marker | Move logic to `internal/` (run functions ≤30 lines); justify any `allow-custom-command` marker |
 
 **Local passes but CI fails:**
 1. Go version mismatch — check `.go-version`

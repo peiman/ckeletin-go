@@ -22,7 +22,7 @@ Be respectful, professional, and constructive in all interactions. This project 
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go — the exact required version is pinned in `.go-version` (the single source of truth; also reflected in `go.mod`)
 - Git
 - A GitHub account
 
@@ -65,8 +65,8 @@ ckeletin-go separates **framework code** (reusable infrastructure) from **projec
 
 | Directory | Owner | What Lives Here |
 |-----------|-------|-----------------|
-| `.ckeletin/` | **Framework** — updated via `task ckeletin:update` | Taskfile, pkg/ (config, logger, testutil), scripts, ADRs 000-099 |
-| `cmd/` | **Project** — yours to edit | Ultra-thin CLI commands (≤30 lines) |
+| `.ckeletin/` | **Framework** — updated via `task ckeletin:update` | Taskfile, pkg/ (catalog, config, logger, output, testutil), scripts, ADRs 000-099 |
+| `cmd/` | **Project** — yours to edit | Ultra-thin CLI commands (run functions ≤30 lines) |
 | `internal/` | **Project** — yours to edit | Business logic packages |
 | `pkg/` | **Project** — yours to edit | Public reusable packages (standalone, no `internal/` imports) |
 | `docs/adr/` | **Project** — yours to edit | Your ADRs (100+) |
@@ -100,7 +100,7 @@ The framework includes AI agent configuration (`AGENTS.md`, `CLAUDE.md`, `.claud
    │   ├── scripts/            # Validation and build scripts
    │   ├── docs/adr/           # Framework ADRs (000-099)
    │   └── Taskfile.yml        # Framework task definitions
-   ├── cmd/                    # YOUR ultra-thin CLI commands (~20-30 lines)
+   ├── cmd/                    # YOUR ultra-thin CLI commands (run funcs ≤30 lines)
    ├── internal/               # YOUR business logic
    │   ├── <feature>/          # Feature packages
    │   ├── config/commands/    # Command configuration metadata
@@ -156,6 +156,10 @@ Pre-commit hooks will also run automatically via Lefthook.
 
 Follow the **ultra-thin command pattern** ([ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md)):
 
+> **TDD is mandatory in this project.** Write failing tests *before* the
+> implementation (Step 4 before Step 5), and commit tests together with the
+> implementation as one atomic commit. See [AGENTS.md](AGENTS.md) → Testing.
+
 ### Step 1: Scaffold the Command
 
 ```bash
@@ -164,6 +168,8 @@ task generate:command name=mycommand
 
 This creates:
 - `cmd/mycommand.go` - Ultra-thin CLI wrapper
+- `internal/mycommand/mycommand.go` - Executor skeleton (Config, NewExecutor, Execute)
+- `internal/mycommand/mycommand_test.go` - Table-driven test skeleton (testify)
 - `internal/config/commands/mycommand_config.go` - Configuration metadata
 
 ### Step 2: Define Configuration Options
@@ -173,7 +179,7 @@ Edit `internal/config/commands/mycommand_config.go`:
 ```go
 package commands
 
-import "github.com/peiman/ckeletin-go/internal/config"
+import "github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 
 // MycommandMetadata defines the command metadata
 var MycommandMetadata = config.CommandMetadata{
@@ -212,13 +218,72 @@ func MycommandOptions() []config.ConfigOption {
 task generate:config:key-constants
 ```
 
-This updates `internal/config/keys_generated.go` with new constants like:
+This updates `.ckeletin/pkg/config/keys_generated.go` with new constants like:
 - `KeyAppMycommandOption1`
 - `KeyAppMycommandOption2`
 
-### Step 4: Implement Business Logic
+### Step 4: Write Failing Tests FIRST (TDD)
 
-Create `internal/mycommand/mycommand.go`:
+Before writing any implementation, describe the behavior you want in
+`internal/mycommand/mycommand_test.go`. The tests must fail at this point —
+that failure is what proves they test something real.
+
+```go
+package mycommand
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestExecutor_Execute(t *testing.T) {
+	tests := []struct {
+		name       string
+		cfg        Config
+		wantOutput string
+		wantErr    bool
+	}{
+		{
+			name: "Successful execution",
+			cfg: Config{
+				Option1: "value1",
+				Option2: "value2",
+			},
+			wantErr: false,
+		},
+		// Add more test cases
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outBuf := &bytes.Buffer{}
+			executor := NewExecutor(tt.cfg, outBuf)
+
+			err := executor.Execute()
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			if tt.wantOutput != "" {
+				assert.Contains(t, outBuf.String(), tt.wantOutput)
+			}
+		})
+	}
+}
+```
+
+Run `task test` (or `go test -v -run TestExecutor_Execute ./internal/mycommand/...`)
+and watch the tests fail before moving on.
+
+### Step 5: Implement Business Logic
+
+Now write the implementation in `internal/mycommand/mycommand.go` until the
+tests from Step 4 pass:
 
 ```go
 package mycommand
@@ -262,15 +327,15 @@ func (e *Executor) Execute() error {
 }
 ```
 
-### Step 5: Wire the Command
+### Step 6: Wire the Command
 
-Edit `cmd/mycommand.go` to wire everything together (keep it ultra-thin, ~20-30 lines):
+Edit `cmd/mycommand.go` to wire everything together (keep the run function ≤30 lines — enforced by `task validate:commands`):
 
 ```go
 package cmd
 
 import (
-	"github.com/peiman/ckeletin-go/internal/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/internal/config/commands"
 	"github.com/peiman/ckeletin-go/internal/mycommand"
 	"github.com/spf13/cobra"
@@ -288,51 +353,6 @@ func runMycommand(cmd *cobra.Command, args []string) error {
 		Option2: getConfigValueWithFlags[string](cmd, "opt2", config.KeyAppMycommandOption2),
 	}
 	return mycommand.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
-}
-```
-
-### Step 6: Add Tests
-
-Create `internal/mycommand/mycommand_test.go`:
-
-```go
-package mycommand
-
-import (
-	"bytes"
-	"testing"
-)
-
-func TestExecutor_Execute(t *testing.T) {
-	tests := []struct {
-		name       string
-		cfg        Config
-		wantOutput string
-		wantErr    bool
-	}{
-		{
-			name: "Successful execution",
-			cfg: Config{
-				Option1: "value1",
-				Option2: "value2",
-			},
-			wantErr: false,
-		},
-		// Add more test cases
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			outBuf := &bytes.Buffer{}
-			executor := NewExecutor(tt.cfg, outBuf)
-
-			err := executor.Execute()
-
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Execute() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
 }
 ```
 
@@ -420,18 +440,20 @@ Add test cases covering the new option.
 |-------------|------------------|-----------------|
 | Overall | 85% | 90%+ |
 | `cmd/*` | 80% | 90%+ |
-| `internal/config` | 80% | 90%+ |
-| `internal/logger` | 80% | 90%+ |
+| `.ckeletin/pkg/config` | 80% | 90%+ |
+| `.ckeletin/pkg/logger` | 80% | 90%+ |
 | Other packages | 70% | 80%+ |
 
 ### Testing Principles
 
 Follow [ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md):
 
-1. **Use dependency injection** over mocking frameworks
-2. **Inject concrete implementations** via constructors
-3. **Use table-driven tests** for multiple scenarios
-4. **Follow AAA pattern**: Arrange (Setup) → Act (Execute) → Assert
+1. **Write tests first (TDD)** — failing test, then implementation, committed together
+2. **Use dependency injection** over mocking frameworks
+3. **Inject concrete implementations** via constructors
+4. **Use table-driven tests** for multiple scenarios
+5. **Use `testify/assert` and `testify/require`** for assertions
+6. **Follow AAA pattern**: Arrange (Setup) → Act (Execute) → Assert
 
 ### Example Test Structure
 
@@ -466,17 +488,11 @@ func TestFeature(t *testing.T) {
 
 			// ASSERT
 			if tt.wantErr {
-				if err == nil {
-					t.Error("Expected error, got nil")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if got != tt.expected {
-					t.Errorf("got %v, want %v", got, tt.expected)
-				}
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, got)
 		})
 	}
 }
@@ -492,7 +508,7 @@ task test
 task test:race
 
 # View detailed coverage
-task test:coverage:text
+task ckeletin:test:coverage:text
 
 # Generate HTML coverage report
 task test:coverage:html
@@ -656,7 +672,7 @@ fix: correct color rendering in non-TTY environments
 ### What Reviewers Look For
 
 1. **Architectural Compliance:**
-   - ✅ Commands are ultra-thin (~20-30 lines)
+   - ✅ Commands are ultra-thin (run functions ≤30 lines, enforced by `task validate:commands`)
    - ✅ No direct `viper.SetDefault()` calls
    - ✅ Configuration uses generated constants
    - ✅ Business logic is in `internal/` packages

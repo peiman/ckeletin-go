@@ -4,13 +4,16 @@
 coverage:
   status:
     # Overall project coverage
+    # NOTE: .ckeletin/scripts/check-coverage-project.sh (85%) is the
+    # authoritative coverage gate; this target mirrors it for Codecov UI/PRs.
     project:
       default:
-        target: 80%          # Minimum coverage for entire project
+        target: 85%          # Minimum coverage for entire project
         threshold: 1%        # Allow 1% drop before failing
         informational: false # Fail CI if below target
 
     # Coverage for new code in PR
+    # Mirrors .ckeletin/scripts/check-coverage-patch.sh (MIN_PATCH_COVERAGE=80)
     patch:
       default:
         target: 80%          # New code must have 80% coverage
