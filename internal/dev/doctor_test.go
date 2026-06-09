@@ -354,6 +354,69 @@ func TestCheckToolNotFound(t *testing.T) {
 	})
 }
 
+func TestGoVersionLess(t *testing.T) {
+	tests := []struct {
+		name string
+		a    string
+		b    string
+		want bool
+	}{
+		{
+			name: "single-digit minor below double-digit minor (lexicographic trap)",
+			a:    "1.9",
+			b:    "1.26",
+			want: true,
+		},
+		{
+			name: "minor below minimum",
+			a:    "1.24",
+			b:    "1.25",
+			want: true,
+		},
+		{
+			name: "equal versions",
+			a:    "1.25",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "minor above minimum",
+			a:    "1.26",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "newer major wins regardless of minor",
+			a:    "2.0",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "patch release of minimum is not less",
+			a:    "1.25.3",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "old version with patch is less",
+			a:    "1.9.9",
+			b:    "1.26",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// EXECUTION PHASE
+			result := goVersionLess(tt.a, tt.b)
+
+			// ASSERTION PHASE
+			assert.Equal(t, tt.want, result,
+				"goVersionLess(%q, %q) should be %v", tt.a, tt.b, tt.want)
+		})
+	}
+}
+
 func TestCheckGoVersionLogic(t *testing.T) {
 	// Test the logic of checkGoVersion by calling it directly
 	doctor := NewDoctor()

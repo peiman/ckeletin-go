@@ -11,10 +11,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// minGoVersion is the minimum Go version recommended for this project
+const minGoVersion = "1.25"
 
 // HealthCheck represents a single health check result
 type HealthCheck struct {
@@ -257,13 +261,13 @@ func (d *Doctor) checkGoVersion() {
 	}
 
 	version := matches[1]
-	// Check if version is 1.25+
-	if version < "1.25" {
+	// Check if version meets the minimum requirement
+	if goVersionLess(version, minGoVersion) {
 		d.checks = append(d.checks, HealthCheck{
 			Name:    "Go version",
 			Status:  CheckWarning,
-			Message: fmt.Sprintf("Go %s found, but 1.25+ recommended", version),
-			Details: "Project requires Go 1.25 or higher",
+			Message: fmt.Sprintf("Go %s found, but %s+ recommended", version, minGoVersion),
+			Details: fmt.Sprintf("Project requires Go %s or higher", minGoVersion),
 		})
 		return
 	}
@@ -274,6 +278,29 @@ func (d *Doctor) checkGoVersion() {
 		Message: fmt.Sprintf("Go %s meets requirements", version),
 		Details: strings.TrimSpace(versionStr),
 	})
+}
+
+// goVersionLess reports whether Go version a is numerically lower than b.
+// Versions are dotted numeric strings such as "1.9" or "1.25.3". Segments are
+// compared as integers because lexicographic string comparison is wrong here
+// ("1.9" > "1.25" as strings). Missing or non-numeric segments compare as zero.
+func goVersionLess(a, b string) bool {
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	segments := max(len(aParts), len(bParts))
+	for i := 0; i < segments; i++ {
+		av, bv := 0, 0
+		if i < len(aParts) {
+			av, _ = strconv.Atoi(aParts[i])
+		}
+		if i < len(bParts) {
+			bv, _ = strconv.Atoi(bParts[i])
+		}
+		if av != bv {
+			return av < bv
+		}
+	}
+	return false
 }
 
 // checkProjectStructure verifies project structure is valid
