@@ -1,5 +1,6 @@
 // cmd/completion.go
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — emits cobra-generated shell scripts, not
+// config-registry output; help text is computed lazily from the root command.
 
 package cmd
 

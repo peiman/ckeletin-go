@@ -135,6 +135,51 @@ func TestValidateCategories(t *testing.T) {
 	}
 }
 
+func TestParseCategories(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  []string
+	}{
+		{
+			name:  "empty string",
+			input: "",
+			want:  nil,
+		},
+		{
+			name:  "single category",
+			input: "security",
+			want:  []string{"security"},
+		},
+		{
+			name:  "multiple categories",
+			input: "security,tests",
+			want:  []string{"security", "tests"},
+		},
+		{
+			name:  "whitespace trimmed",
+			input: " security , tests ",
+			want:  []string{"security", "tests"},
+		},
+		{
+			name:  "empty elements dropped",
+			input: "security,,tests,",
+			want:  []string{"security", "tests"},
+		},
+		{
+			name:  "only separators yields none",
+			input: ", ,",
+			want:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ParseCategories(tt.input))
+		})
+	}
+}
+
 func TestAllCategories(t *testing.T) {
 	// Verify all expected categories exist
 	expectedCategories := []string{

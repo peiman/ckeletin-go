@@ -1,6 +1,9 @@
 //go:build dev
 
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — dev-build-only tool with no config-registry
+// options: metadata in internal/config/commands would compile dev config into
+// production builds, so the NewCommand/metadata pattern does not apply. The
+// RunE only delegates to internal/dev.
 // cmd/dev_doctor.go
 //
 // Environment health checker subcommand (dev-only).

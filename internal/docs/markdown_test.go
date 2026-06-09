@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -209,4 +210,23 @@ func TestMarkdownGenerationNoUserPaths(t *testing.T) {
 	// SHOULD contain generic placeholder
 	assert.True(t, strings.Contains(output, "$HOME") || strings.Contains(output, "~"),
 		"Generated markdown should use $HOME or ~ for home directory")
+}
+
+func TestNewAppInfo(t *testing.T) {
+	info := NewAppInfo("testapp", "TESTAPP", "/home/user/.config/testapp")
+
+	assert.Equal(t, "testapp", info.BinaryName)
+	assert.Equal(t, "TESTAPP", info.EnvPrefix)
+	assert.Equal(t, filepath.Join("/home/user/.config/testapp", "config.yaml"),
+		info.ConfigPaths.DefaultPath)
+	assert.Equal(t, "config.yaml", info.ConfigPaths.DefaultFullName)
+}
+
+func TestNewAppInfo_NoDefaultDir(t *testing.T) {
+	info := NewAppInfo("testapp", "TESTAPP", "")
+
+	assert.Empty(t, info.ConfigPaths.DefaultPath,
+		"without a default config dir there is no default path")
+	assert.Equal(t, "config.yaml", info.ConfigPaths.DefaultFullName,
+		"the local project config name is always set")
 }

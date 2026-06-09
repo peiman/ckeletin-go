@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,6 +18,21 @@ type AppInfo struct {
 		DefaultPath     string
 		DefaultFullName string
 	}
+}
+
+// NewAppInfo assembles the AppInfo the docs generator embeds. defaultConfigDir
+// is the user config directory ("" when none applies); the default config path
+// is derived from it.
+func NewAppInfo(binaryName, envPrefix, defaultConfigDir string) AppInfo {
+	info := AppInfo{
+		BinaryName: binaryName,
+		EnvPrefix:  envPrefix,
+	}
+	if defaultConfigDir != "" {
+		info.ConfigPaths.DefaultPath = filepath.Join(defaultConfigDir, "config.yaml")
+	}
+	info.ConfigPaths.DefaultFullName = "config.yaml" // local project config
+	return info
 }
 
 // GenerateMarkdownDocs generates Markdown documentation for all configuration options

@@ -1,6 +1,10 @@
 //go:build dev
 
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — dev-build-only tool: flags are local
+// inspection switches, not config-registry options, and metadata in
+// internal/config/commands would compile dev config into production builds,
+// so the NewCommand/metadata pattern does not apply. The RunE only delegates
+// to internal/dev.
 // cmd/dev_config.go
 //
 // Configuration inspector subcommand (dev-only).

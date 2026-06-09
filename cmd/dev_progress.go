@@ -1,6 +1,7 @@
 //go:build dev
 
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — dev-only demo wiring with local flag switches,
+// not a config-registry-driven command.
 // cmd/dev_progress.go
 //
 // Progress package demonstration command (dev-only).

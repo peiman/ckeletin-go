@@ -3,8 +3,6 @@
 package cmd
 
 import (
-	"path/filepath"
-
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands"
 	"github.com/peiman/ckeletin-go/internal/docs"
@@ -37,20 +35,6 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 		Str("output_file", outputFile).
 		Msg("Documentation configuration loaded")
 
-	// Create application info for the documentation generator
-	appInfo := docs.AppInfo{
-		BinaryName: binaryName,
-		EnvPrefix:  EnvPrefix(),
-	}
-
-	// Set config paths
-	paths := ConfigPaths()
-	if defaultDir := defaultUserConfigDir(paths); defaultDir != "" {
-		appInfo.ConfigPaths.DefaultPath = filepath.Join(defaultDir, "config.yaml")
-	}
-	appInfo.ConfigPaths.DefaultFullName = "config.yaml" // local project config
-
-	// Create document generator configuration
 	cfg := docs.Config{
 		Writer:       cmd.OutOrStdout(),
 		OutputFormat: outputFormat,
@@ -58,8 +42,7 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 		Registry:     config.Registry,
 	}
 
-	// Create generator and generate documentation
 	generator := docs.NewGenerator(cfg)
-	generator.SetAppInfo(appInfo)
+	generator.SetAppInfo(docs.NewAppInfo(binaryName, EnvPrefix(), defaultUserConfigDir(ConfigPaths())))
 	return generator.Generate()
 }
