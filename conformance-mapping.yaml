@@ -28,7 +28,8 @@ requirements:
       .go-arch-lint.yml defines four layers: commands (cmd/), business
       (internal/ping, docs, dev, progress, check), infrastructure
       (.ckeletin/pkg/*, internal/config/commands, internal/ui, internal/xdg).
-      Entry layer is main.go (36 lines). task validate:layering passes.
+      Entry layer is main.go (wiring only; size capped by the ARCH-006
+      check). task validate:layering passes.
     checks:
       - "task validate:layering"
     violation_tests:
@@ -88,12 +89,16 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      main.go is 36 lines. validate-package-organization.sh verifies
-      only main.go and main_test.go exist at root. validate-command-patterns.sh
-      checks command files are under 80 lines.
+      main.go is a minimal wiring-only entry point (run() + error handling),
+      capped at 60 lines by a conform check so the size claim cannot silently
+      rot. validate-package-organization.sh verifies only main.go and
+      main_test.go exist at root. validate-command-patterns.sh enforces the
+      command-layer limits (run* functions ≤30-line target / 35 hard,
+      command files ≤80 advisory).
     checks:
       - "task validate:package-organization"
       - "task validate:commands"
+      - "test $(wc -l < main.go) -le 60"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_ARCH006_OversizedCommand"
 
@@ -138,9 +143,11 @@ requirements:
     enforcement_level: script
     evidence: >
       All ladder levels used. Linter: go-arch-lint + golangci-lint.
-      SAST: 12 semgrep rules. Scripts: 9 validate-*.sh + 16 check-*.sh.
-      CI: GitHub Actions. Honor system: ADR-007 (documented as last resort).
-      The ladder's existence is verified by review, not a targeted check.
+      SAST: semgrep rules (.semgrep.yml). Scripts: the validate-*.sh and
+      check-*.sh suites in .ckeletin/scripts/ (counts are deliberately not
+      hand-written here — they rot). CI: GitHub Actions. Honor system:
+      ADR-007 (documented as last resort). The ladder's existence is
+      verified by review, not a targeted check.
     checks:
       - "test -f .golangci.yml"
       - "test -f .semgrep.yml"
@@ -197,10 +204,17 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      15 violation tests prove enforcement for ARCH-001 through 007,
-      OUT-001, OUT-005, TEST-003, AGENT-001, CL-001, ENF-005, and
-      ENF-007. Requirements with honor-system enforcement are exempt.
-      Run with: go test -tags conformance ./test/conformance/...
+      test/conformance/violation_test.go proves enforcement with one
+      violation test per claim across the architecture (ARCH-001..007),
+      output (OUT-001, OUT-005), testing (TEST-003), agent (AGENT-001,
+      AGENT-002, AGENT-006), changelog (CL-001) and conformance-tooling
+      (ENF-005, ENF-006, ENF-007, ENF-010 plus mapping-YAML/yq/report-sync
+      integrity) claims. Requirements with honor-system enforcement are
+      exempt; claims above honor-system without a violation test carry a
+      written violation_evidence analysis instead (spec v0.4.0+), which
+      TestViolation_ENF006_MissingViolationTestFlagged verifies for every
+      enforcement level. Run with: go test -tags conformance
+      ./test/conformance/...
     checks:
       - "go test -tags conformance ./test/conformance/..."
     violation_tests:
@@ -378,15 +392,35 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      --output json flag on all commands. output.IsJSONMode() check in
-      renderer.go. JSONEnvelope to stdout in JSON mode. Verified by
-      unit tests in cmd/*_test.go, not a targeted enforcement check.
+      The global --output text|json flag (cmd/root.go PersistentPreRunE)
+      activates JSON mode for every production command, each emitting the
+      standard envelope to stdout: ping (ui.RenderSuccess), docs config
+      (docs.GenerateJSON), config validate (ui.RenderValidationJSON),
+      catalog, and --version (renderVersion). Stderr logging is silenced in
+      JSON mode. Behavioral proof: the TestOutputJSON_* suite plus
+      command-specific JSON tests execute each command with --output json
+      and assert a single valid envelope. Documented exemptions:
+      `completion` emits shell scripts whose only consumer is already a
+      machine (the shell sources them; a JSON wrapper would break every
+      `source <(app completion bash)` usage), and dev-only commands
+      (check, dev *) are compiled out of production builds (//go:build dev)
+      so they are not part of the released command surface.
     checks:
       - "grep -rq 'IsJSONMode' .ckeletin/pkg/output"
+      - "grep -q 'IsJSONMode' internal/ui/renderer.go"
+      - "grep -q 'IsJSONMode' cmd/docs.go"
+      - "grep -q 'IsJSONMode' cmd/config.go"
+      - "grep -q 'IsJSONMode' cmd/catalog.go"
+      - "grep -q 'IsJSONMode' cmd/root.go"
     violation_tests: []
     violation_evidence: >
-      Removing the JSON output mode (IsJSONMode plumbing) fails the grep
-      check.
+      Removing the JSON plumbing from the output package, the renderer, or
+      any per-command wiring (docs config, config validate, catalog,
+      --version) fails the per-file greps above. Behavioral coverage:
+      cmd/output_json_test.go, cmd/docs_json_test.go,
+      cmd/config_validate_json_test.go, cmd/catalog_test.go and
+      cmd/version_output_test.go fail if any of those commands stops
+      emitting a valid envelope under --output json.
 
   CKSPEC-OUT-003:
     title: "Standardized output envelope"
@@ -407,17 +441,27 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      RenderSuccess and RenderError in renderer.go log.Debug() raw data
-      to audit log file while rendering formatted text to stdout.
-      Debug level ensures shadow logs reach file logger without
-      polluting console. Verified by unit tests.
+      RenderSuccess and RenderError in internal/ui/renderer.go log.Debug()
+      raw data to the audit log file while rendering formatted text to
+      stdout; debug level reaches the file logger without polluting the
+      console. Commands that stream generated artifacts shadow-log the
+      operation's metadata rather than the full artifact: docs config
+      records format, output file and content size
+      (internal/docs/json.go, cmd/docs.go), and completion's shell
+      scripts are cobra-generated artifacts. This metadata-not-artifact
+      narrowing for generated artifacts is a documented project
+      interpretation of OUT-004 (verbatim multi-KB artifacts would bloat
+      the audit stream without adding evidence) — flagged upstream as
+      spec feedback. Verified by unit tests.
     checks:
       - |-
         grep -qE 'log\.Debug' internal/ui/renderer.go
+      - |-
+        grep -qE 'log\.Debug' internal/docs/json.go
     violation_tests: []
     violation_evidence: >
-      Removing the shadow log.Debug from the renderer fails the grep
-      check.
+      Removing the shadow log.Debug from the renderer or from the docs
+      JSON path fails the grep checks.
 
   CKSPEC-OUT-005:
     title: "Output isolation from business logic"
@@ -425,8 +469,13 @@ requirements:
     enforcement_level: script
     evidence: >
       validate-output-patterns.sh detects fmt.Print* and os.Stdout in
-      internal/* (excluding ui/ and tests). Business logic must use
-      internal/ui for output.
+      internal/* (excluding tests). Business logic must use internal/ui
+      for output. Documented scan exemptions: ui/ and logger/ ARE the
+      rendering/audit layers, testutil/ is test plumbing, and progress/
+      touches os.Stdout only for terminal detection
+      (IsInteractive(os.Stdout) in internal/progress/terminal.go) plus
+      dev-build-only demo rendering — none of these emit business output
+      directly.
     checks:
       - "task validate:output"
     violation_tests:
@@ -437,18 +486,27 @@ requirements:
     status: met
     enforcement_level: test
     evidence: >
-      cmd/root.go composes RootCmd.Version as
-      "<version>, commit <commit>, built at <date>" from the Version, Commit and
-      Date package vars injected via ldflags (see Taskfile.yml LDFLAGS). So
-      `<binary> --version` emits all three build-identity fields; TestVersionFlag
-      asserts the commit and build-date fields are present in the output.
+      cmd/root.go composes the --version string as
+      "<version>, commit <commit>, built at <date>, tree <state>" — all four
+      OUT-006 fields including dirty-tree state. Uninjected builds degrade
+      to explicit "unknown" (Version/Commit/Date default to versionUnknown,
+      never empty). treeState() resolves clean/dirty/unknown from the Dirty
+      ldflag (GoReleaser {{ .IsGitDirty }}), the git-describe "-dirty"
+      suffix (Taskfile builds), or degrades to "unknown". --version honors
+      --output json via renderVersion (versionData envelope with
+      version/commit/date/tree).
     checks:
-      - "grep -qE 'commit %s, built at %s' cmd/root.go"
+      - "grep -qE 'commit %s, built at %s, tree %s' cmd/root.go"
+      - "grep -q 'Version = versionUnknown' cmd/root.go"
+      - "go test -run 'TestVersionString_SurfacesAllFourFields|TestTreeState|TestBuildIdentityDefaults_UninjectedBuild|TestVersionFlag_JSONOutput' ./cmd/"
     violation_tests: []
     violation_evidence: >
-      Removing any build-identity field from the cmd/root.go version template (or
-      dropping its ldflags injection) takes it out of `--version`; both the grep
-      check and TestVersionFlag fail, so the regression cannot land green.
+      Dropping any of the four fields from versionString(), the
+      unknown-degradation defaults, or the JSON envelope path fails the
+      greps and the behavioral tests the third check runs
+      (TestVersionString_SurfacesAllFourFields, TestTreeState,
+      TestBuildIdentityDefaults_UninjectedBuild, TestVersionFlag_JSONOutput
+      in cmd/version_output_test.go), so the regression cannot land green.
 
   # ═══════════════════════════════════════════════════════════════
   # Agent Readiness (CKSPEC-AGENT-001 through CKSPEC-AGENT-006)
@@ -470,18 +528,29 @@ requirements:
   CKSPEC-AGENT-002:
     title: "No provider-specific content in universal guide"
     status: met
-    enforcement_level: honor-system
+    enforcement_level: script
     evidence: >
-      AGENTS.md contains no Claude/Gemini/Copilot-specific instructions.
-      Provider content is in CLAUDE.md, .cursorrules, copilot-instructions.md.
-    checks: []
-    violation_tests: []
+      AGENTS.md contains no Claude/Gemini/Copilot-specific instructions;
+      provider content lives in CLAUDE.md, .cursorrules and
+      copilot-instructions.md. A grep check rejects provider names
+      (Claude, Gemini, Copilot, ChatGPT, Anthropic, OpenAI, Cursor) in
+      AGENTS.md except on lines that reference the provider-specific
+      files themselves (file-tree entries and cross-references), so a
+      provider instruction such as 'Claude should ...' fails conformance.
+    checks:
+      - |-
+        ! grep -nE 'Claude|Gemini|Copilot|ChatGPT|Anthropic|OpenAI|Cursor' AGENTS.md | grep -viE 'CLAUDE\.md|GEMINI\.md|\.cursorrules|copilot-instructions\.md' | grep -q .
+    violation_tests:
+      - "test/conformance/violation_test.go::TestViolation_AGENT002_ProviderInstructionCaught"
     violation_evidence: >
-      AGENTS.md's only provider mentions are file-tree references (e.g.
-      'CLAUDE.md # Claude Code-specific rules'); a grep cannot
-      distinguish a provider reference from a provider instruction, so
-      the absence of provider-specific instructions is verified at
-      review.
+      Residual gap (reviewed, accepted): the grep filters whole lines
+      that mention a provider FILE, so a provider instruction sharing a
+      line with such a cross-reference (e.g. 'Claude must X, see
+      CLAUDE.md') escapes it — those lines remain a review concern.
+      TestViolation_AGENT002_ProviderInstructionCaught proves the check
+      passes on the current AGENTS.md and catches a plain
+      provider-instruction line, running the exact command from this
+      mapping against a doctored copy.
 
   CKSPEC-AGENT-003:
     title: "Provider-specific guides follow provider guidance"
@@ -572,14 +641,20 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      CHANGELOG.md uses Keep a Changelog format with all six categories.
-      Versions in reverse chronological order.
+      CHANGELOG.md follows Keep a Changelog: the format is referenced in
+      the header, and every change-group heading is one of the six
+      standard categories (Added, Changed, Deprecated, Removed, Fixed,
+      Security) — both grep-enforced. Reverse-chronological version order
+      is verified at review/release, not by a check.
     checks:
       - "grep -qiE 'keepachangelog' CHANGELOG.md"
+      - |-
+        ! grep -E '^### ' CHANGELOG.md | grep -vE '^### (Added|Changed|Deprecated|Removed|Fixed|Security)$' | grep -q .
     violation_tests: []
     violation_evidence: >
-      Dropping the Keep a Changelog format/reference from CHANGELOG.md
-      fails the grep check.
+      Dropping the Keep a Changelog reference fails the first check; a
+      non-standard change category heading (e.g. '### Misc') fails the
+      second.
 
   CKSPEC-CL-003:
     title: "ISO 8601 dates"

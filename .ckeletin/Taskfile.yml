@@ -1181,6 +1181,10 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
+      # validate:security is a sub-second grep script (ADR-004) — fast mode
+      # runs the same validate:* set as check:common, only skipping the
+      # heavyweight stages (race detection, integration tests, dep scans).
+      - task: validate:security
       - task: validate:dev-build-tags
       - task: validate:hook-forwardings
       - cmd: |
