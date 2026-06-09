@@ -42,6 +42,32 @@ func TestNew_WithStderr(t *testing.T) {
 	assert.Equal(t, os.Stderr, p.writer)
 }
 
+func TestNew_WithNilTheme(t *testing.T) {
+	var buf bytes.Buffer
+
+	var p *Printer
+	assert.NotPanics(t, func() {
+		p = New(WithTheme(nil), WithWriter(&buf))
+	})
+
+	p.CheckSuccess("still works")
+	assert.Contains(t, buf.String(), "still works")
+}
+
+func TestPrinter_ZeroValue(t *testing.T) {
+	// A zero-value Printer (constructed without New) must not panic;
+	// it lazily applies the same defaults New provides.
+	var buf bytes.Buffer
+	p := Printer{writer: &buf}
+
+	assert.NotPanics(t, func() {
+		p.CheckSuccess("zero value")
+		p.CheckSummary(StatusSuccess, "Done")
+	})
+	assert.Contains(t, buf.String(), "zero value")
+	assert.Contains(t, buf.String(), "Done")
+}
+
 func TestNew_AutoDetectNonTTY(t *testing.T) {
 	// When writing to a buffer (non-TTY), should auto-switch to minimal theme
 	var buf bytes.Buffer
@@ -276,6 +302,133 @@ func TestCheckSummary(t *testing.T) {
 			for _, expected := range tt.contains {
 				assert.Contains(t, output, expected)
 			}
+		})
+	}
+}
+
+func TestCheckSummary_LongTitle_NoPanic(t *testing.T) {
+	tests := []struct {
+		name  string
+		theme *Theme
+		title string
+	}{
+		{
+			name:  "title longer than summary width",
+			theme: MinimalTheme(),
+			title: strings.Repeat("x", 60),
+		},
+		{
+			name:  "title just over inner width",
+			theme: MinimalTheme(),
+			title: strings.Repeat("x", 43),
+		},
+		{
+			name: "tiny summary width",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryWidth = 1
+				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
+				return th
+			}(),
+			title: "Done",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			p := New(WithWriter(&buf), WithTheme(tt.theme))
+
+			assert.NotPanics(t, func() {
+				p.CheckSummary(StatusFailure, tt.title, "item")
+			})
+			assert.Contains(t, buf.String(), tt.title)
+		})
+	}
+}
+
+func TestCheckSummary_BoxAlignment(t *testing.T) {
+	tests := []struct {
+		name   string
+		status Status
+		title  string
+		items  []string
+	}{
+		{
+			name:   "success box lines are flush",
+			status: StatusSuccess,
+			title:  "All checks passed",
+			items:  []string{"Build", "Test"},
+		},
+		{
+			name:   "failure box lines are flush",
+			status: StatusFailure,
+			title:  "2 checks failed",
+			items:  []string{"Build", "Test"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			theme := MinimalTheme()
+			p := New(WithWriter(&buf), WithTheme(theme))
+
+			p.CheckSummary(tt.status, tt.title, tt.items...)
+
+			// Minimal theme output is pure ASCII with no escape codes,
+			// so every box line must be exactly SummaryWidth chars wide.
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if line == "" {
+					continue
+				}
+				assert.Len(t, line, theme.SummaryWidth, "line %q", line)
+			}
+		})
+	}
+}
+
+func TestCheckSummary_UsesSummaryChar(t *testing.T) {
+	tests := []struct {
+		name     string
+		theme    *Theme
+		contains string
+	}{
+		{
+			name:     "minimal theme summary char",
+			theme:    MinimalTheme(),
+			contains: "+" + strings.Repeat("=", 43) + "+",
+		},
+		{
+			name: "custom summary char",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryChar = "~"
+				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
+				return th
+			}(),
+			contains: "+" + strings.Repeat("~", 43) + "+",
+		},
+		{
+			name: "empty summary char falls back to ASCII default",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryChar = ""
+				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
+				return th
+			}(),
+			contains: "+" + strings.Repeat("-", 43) + "+",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			p := New(WithWriter(&buf), WithTheme(tt.theme))
+
+			p.CheckSummary(StatusSuccess, "Done")
+
+			assert.Contains(t, buf.String(), tt.contains)
 		})
 	}
 }

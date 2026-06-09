@@ -285,6 +285,39 @@ func TestProgressModel_View(t *testing.T) {
 	})
 }
 
+func TestProgressModel_View_OutOfRangeProgress(t *testing.T) {
+	tests := []struct {
+		name     string
+		progress float64
+	}{
+		{name: "progress above 1.0", progress: 1.5},
+		{name: "negative progress", progress: -0.5},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewProgressModel("Test", []string{"test"})
+			m.checks[0].Status = CheckRunning
+			m.checks[0].Progress = tt.progress
+
+			assert.NotPanics(t, func() {
+				_ = m.View()
+			})
+		})
+	}
+}
+
+func TestProgressModel_ViewDone_OutOfRangeCoverage(t *testing.T) {
+	m := NewProgressModel("Test", []string{"test"})
+	m.checks[0].Status = CheckPassed
+	m.coverage = 150.0
+	m.done = true
+
+	assert.NotPanics(t, func() {
+		_ = m.View()
+	})
+}
+
 func TestProgressModel_ViewDone(t *testing.T) {
 	t.Run("shows summary when done", func(t *testing.T) {
 		m := NewProgressModel("Test", []string{"test1", "test2"})

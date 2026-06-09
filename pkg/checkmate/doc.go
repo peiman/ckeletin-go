@@ -54,7 +54,7 @@
 //
 // CategoryHeader("Code Quality"):
 //
-//	─── Code Quality ────────────────────────
+//	Code Quality  (styled with colored background)
 //
 // CheckHeader("Checking formatting"):
 //

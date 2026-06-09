@@ -31,25 +31,37 @@ type Option func(*Printer)
 //	p.CheckHeader("Running tests")
 //	p.CheckSuccess("All tests passed")
 func New(opts ...Option) *Printer {
-	p := &Printer{
-		writer: os.Stdout,
-		theme:  DefaultTheme(),
-	}
+	p := &Printer{}
 	for _, opt := range opts {
 		opt(p)
 	}
-	// Create a lipgloss renderer for this writer to enable colors
-	p.renderer = lipgloss.NewRenderer(p.writer)
-
-	// Detect if we're writing to a terminal
-	p.isTerminal = IsTerminal(p.writer)
-
-	// Auto-detect TTY and switch to minimal theme if needed
-	// (unless ForceColors is set)
-	if !p.theme.ForceColors && !p.isTerminal {
-		p.theme = MinimalTheme()
-	}
+	p.ensureInit()
 	return p
+}
+
+// ensureInit applies New's defaults, making a zero-value Printer (or one
+// configured with nil options like WithTheme(nil)) safe to use.
+// Callers other than New must hold p.mu.
+func (p *Printer) ensureInit() {
+	if p.writer == nil {
+		p.writer = os.Stdout
+	}
+	if p.theme == nil {
+		p.theme = DefaultTheme()
+	}
+	if p.renderer == nil {
+		// Create a lipgloss renderer for this writer to enable colors
+		p.renderer = lipgloss.NewRenderer(p.writer)
+
+		// Detect if we're writing to a terminal
+		p.isTerminal = IsTerminal(p.writer)
+
+		// Auto-detect TTY and switch to minimal theme if needed
+		// (unless ForceColors is set)
+		if !p.theme.ForceColors && !p.isTerminal {
+			p.theme = MinimalTheme()
+		}
+	}
 }
 
 // WithWriter sets the output writer.
@@ -84,11 +96,12 @@ func WithStderr() Option {
 	return WithWriter(os.Stderr)
 }
 
-// CategoryHeader displays a category header with decorative separators.
-// Example: "─── Code Quality ────────────────────────"
+// CategoryHeader displays a styled category header.
+// Example: " Code Quality " (with colored background)
 func (p *Printer) CategoryHeader(title string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCategoryHeader(title)
 }
 
@@ -97,6 +110,7 @@ func (p *Printer) CategoryHeader(title string) {
 func (p *Printer) CheckHeader(message string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckHeader(message)
 }
 
@@ -105,6 +119,7 @@ func (p *Printer) CheckHeader(message string) {
 func (p *Printer) CheckSuccess(message string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckSuccess(message)
 }
 
@@ -113,6 +128,7 @@ func (p *Printer) CheckSuccess(message string) {
 func (p *Printer) CheckFailure(title, details, remediation string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckFailure(title, details, remediation)
 }
 
@@ -121,6 +137,7 @@ func (p *Printer) CheckFailure(title, details, remediation string) {
 func (p *Printer) CheckSummary(status Status, title string, items ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckSummary(status, title, items)
 }
 
@@ -129,6 +146,7 @@ func (p *Printer) CheckSummary(status Status, title string, items ...string) {
 func (p *Printer) CheckInfo(lines ...string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckInfo(lines)
 }
 
@@ -137,6 +155,7 @@ func (p *Printer) CheckInfo(lines ...string) {
 func (p *Printer) CheckNote(message string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckNote(message)
 }
 
@@ -146,6 +165,7 @@ func (p *Printer) CheckNote(message string) {
 func (p *Printer) CheckLine(name string, status Status, duration time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.ensureInit()
 	p.renderCheckLine(name, status, duration)
 }
 

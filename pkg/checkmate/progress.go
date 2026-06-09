@@ -324,6 +324,14 @@ func formatErrorDetails(errMsg string, maxWidth int) []string {
 }
 
 func (m ProgressModel) renderProgressBar(percent float64, color lipgloss.Color) string {
+	// Clamp to [0, 1] - out-of-range values would make the
+	// strings.Repeat counts below negative and panic
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 1 {
+		percent = 1
+	}
 	width := 25
 	filled := int(percent * float64(width))
 	empty := width - filled

@@ -99,6 +99,9 @@ func (p *Printer) renderCheckFailure(title, details, remediation string) {
 // renderCheckSummary renders a beautiful summary box with borders.
 func (p *Printer) renderCheckSummary(status Status, title string, items []string) {
 	width := p.theme.SummaryWidth
+	if width < 2 {
+		width = 2
+	}
 
 	// Box drawing characters
 	topLeft := "╭"
@@ -116,6 +119,11 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 		bottomRight = "+"
 		horizontal = "-"
 		vertical = "|"
+	}
+
+	// Theme overrides the horizontal rule character when set
+	if p.theme.SummaryChar != "" {
+		horizontal = p.theme.SummaryChar
 	}
 
 	// Style the box based on status
@@ -154,19 +162,29 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 	// Empty line
 	_, _ = fmt.Fprintf(p.writer, "%s%s%s\n", styledVertical(), strings.Repeat(" ", width-2), styledVertical())
 
+	// The rendered icon depends on status, so measure the matching one
+	iconLen := len(p.theme.IconSuccess)
+	if status == StatusFailure {
+		iconLen = len(p.theme.IconFailure)
+	}
+
 	// Title line centered
 	titleContent := fmt.Sprintf("%s %s", iconStyled, titleStyled)
 	// Calculate visible length (without ANSI codes) - approximate
-	visibleLen := len(p.theme.IconSuccess) + 1 + len(title)
+	visibleLen := iconLen + 1 + len(title)
 	padding := (width - 2 - visibleLen) / 2
 	if padding < 1 {
 		padding = 1
+	}
+	rightPadding := width - 2 - padding - visibleLen
+	if rightPadding < 0 {
+		rightPadding = 0
 	}
 	_, _ = fmt.Fprintf(p.writer, "%s%s%s%s%s\n",
 		styledVertical(),
 		strings.Repeat(" ", padding),
 		titleContent,
-		strings.Repeat(" ", width-2-padding-visibleLen),
+		strings.Repeat(" ", rightPadding),
 		styledVertical())
 
 	// Items if present
@@ -185,7 +203,8 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 			}
 			styledConnector := p.style(p.theme.TreeStyle, connector)
 			itemLine := fmt.Sprintf("  %s %s %s", styledConnector, itemIcon, item)
-			itemPadding := width - 2 - len(connector) - len(p.theme.IconSuccess) - len(item) - 5
+			// Inner width minus the two-space indent and two separator spaces
+			itemPadding := width - 2 - len(connector) - iconLen - len(item) - 4
 			if itemPadding < 0 {
 				itemPadding = 0
 			}
