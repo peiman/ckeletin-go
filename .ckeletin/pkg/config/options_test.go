@@ -158,6 +158,20 @@ func TestCoreOptionsValidators(t *testing.T) {
 			validValues:   []interface{}{1, 100},
 			invalidValues: []interface{}{0, -1},
 		},
+		{
+			name: "file_path rejects traversal, symlinks handled separately",
+			key:  KeyAppLogFilePath,
+			validValues: []interface{}{
+				"./logs/ckeletin-go.log",
+				"/var/log/ckeletin-go/app.log",
+				"logs/app.log",
+			},
+			invalidValues: []interface{}{
+				"../escape.log",
+				"logs/../../escape.log",
+				"",
+			},
+		},
 	}
 
 	for _, tt := range tests {

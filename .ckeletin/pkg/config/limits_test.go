@@ -5,6 +5,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -333,6 +334,35 @@ func TestValidateAllConfigValues(t *testing.T) {
 			errs := ValidateAllConfigValues(tt.values)
 			assert.Len(t, errs, tt.wantCount,
 				"ValidateAllConfigValues() returned %d errors, want %d", len(errs), tt.wantCount)
+		})
+	}
+}
+
+func TestTruncateString(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		input  string
+		maxLen int
+		want   string
+	}{
+		{name: "Shorter than limit", input: "short", maxLen: 10, want: "short"},
+		{name: "Exactly at limit", input: "exact", maxLen: 5, want: "exact"},
+		{name: "ASCII truncated at limit", input: "abcdefghij", maxLen: 4, want: "abcd..."},
+		{name: "Two-byte rune straddling the cut", input: "ééé", maxLen: 3, want: "é..."},
+		{name: "Three-byte rune straddling the cut", input: "日本語", maxLen: 4, want: "日..."},
+		{name: "Cut directly on rune boundary", input: "日本語", maxLen: 6, want: "日本..."},
+		{name: "First rune wider than limit", input: "語abc", maxLen: 2, want: "..."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := truncateString(tt.input, tt.maxLen)
+
+			assert.Equal(t, tt.want, got)
+			assert.True(t, utf8.ValidString(got),
+				"truncated string must remain valid UTF-8, got %q", got)
 		})
 	}
 }

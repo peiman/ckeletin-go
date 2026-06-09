@@ -1,4 +1,4 @@
-// internal/config/limits.go
+// .ckeletin/pkg/config/limits.go
 //
 // Configuration value size limits to prevent DoS attacks
 
@@ -6,6 +6,7 @@ package config
 
 import (
 	"fmt"
+	"unicode/utf8"
 )
 
 const (
@@ -142,10 +143,16 @@ func ValidateAllConfigValues(values map[string]interface{}) []error {
 	return errors
 }
 
-// truncateString truncates a string to the specified length with ellipsis
+// truncateString truncates a string to at most maxLen bytes with an ellipsis,
+// cutting on a rune boundary so valid UTF-8 input never yields invalid UTF-8
+// output. Mirrors the truncation in the logger package's SanitizeLogString;
+// the code cannot be shared because logger already imports config.
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
+	}
+	for maxLen > 0 && !utf8.RuneStart(s[maxLen]) {
+		maxLen--
 	}
 	return s[:maxLen] + "..."
 }

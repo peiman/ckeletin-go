@@ -51,6 +51,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "/var/log/ckeletin-go/app.log",
+			Validation:   ValidateLogFilePath(),
 		},
 		{
 			Key:          "app.log.file_level",
