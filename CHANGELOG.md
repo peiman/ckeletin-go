@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`catalog` command (CKSPEC-AGENT-006)**: Emits the CLI's command surface — commands, flags, and globals — as machine-readable JSON derived from the live Cobra command tree, so agents discover capabilities without parsing `--help` text. Conformance published against spec v0.8.0 (40/40 requirements met).
+- **Complete `--version` output (CKSPEC-OUT-006)**: Now reports four fields — version, commit, build date, and working-tree state (clean/dirty/unknown) — and supports `--version --output json` (previously a latent `unknown command` error). Uninjected builds degrade to `unknown` instead of empty strings.
+- **Validators for numeric and constrained config options**: Positive-integer validation for the `app.log.sampling_*` and `app.log.file_max_*` options, plus validators for `app.log.color_enabled` and `app.docs.output_format`, catch invalid values at startup.
+
+### Changed
+
+- **BREAKING — `pkg/checkmate` public API**: The exported `MockPrinter.Calls` field is replaced by the thread-safe `AllCalls()` accessor, and the unused `Theme.CategoryWidth`/`Theme.CategoryChar` fields are removed. `Theme.SummaryChar` is now actually applied to the summary-box border.
+- **The 30-line command rule is now a failing gate**: `run*` functions in `cmd/` pass at ≤30 lines, warn at 31–35, and fail `task check` above 35 (previously only an advisory warning at 80 lines per file); `ckeletin:allow-custom-command` markers without a justification also fail. ADR-001 documents the enforced contract; downstream projects inherit it via framework sync.
+
+### Fixed
+
+- **`config validate` runs semantic per-option validation**: Invalid values — e.g. a bad log level, color, or output format — now fail validation; previously this step was skipped entirely, so such configs passed.
+- **`completion` help shows the actual binary name**: Shell examples previously rendered with an empty binary name because the help text was captured before the name was injected.
+- **`docs config` YAML output is deterministic**: Group keys are sorted instead of relying on Go map iteration order, so regenerated documentation is byte-stable.
+- **`pkg/checkmate` rendering no longer panics**: Negative padding from long summary titles and out-of-range progress percentages are clamped, failure-icon alignment uses visible width, and `New(WithTheme(nil))` and zero-value printers are safe.
+- **`check` summary box aligns with multibyte characters**: Border math uses display width instead of byte length.
+- **`dev doctor` compares Go versions numerically**: Lexicographic string comparison treated 1.9 as newer than 1.26.
+- **Logger race and UTF-8 safety**: `SetConsoleLevel`/`SetFileLevel` and `SetMaxLogLength` are now race-free, string truncation (log sanitization and config-value limits) backs off to a rune boundary so it cannot emit invalid UTF-8, and the sampling init status message goes to the configured writer instead of writing before the logger is assigned.
+- **Progress `TeaHandler` is reusable after `Stop`**: Calling `Start` again no longer panics, matching the contract of the other handlers.
+- **Check scripts no longer fail silently**: Constants generation writes via a temp location so `keys_generated.go` cannot be corrupted by an interrupted run, coverage checks surface stderr and preserve the user's coverage file, and `install_tools.sh` installs the Taskfile-pinned tool versions instead of `@latest`.
+
+### Security
+
+- **`app.log.file_path` validated as an attack surface (ADR-004)**: Log file paths containing traversal components or resolving through symlinks are rejected at config load.
+- **CI supply chain pinned tighter**: SHA-pinned `attest-build-provenance` in the provenance workflow, actionlint installed from a pinned release with sha256 verification, `.github/workflows/` no longer excluded from gitleaks secret scanning, the `cmd/` gosec exclusion narrowed to G204 only, and a single `.github/TASK_VERSION` consumed by all workflows.
+
 ## [0.11.0] - 2026-06-04
 
 ### Added
