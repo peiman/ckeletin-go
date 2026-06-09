@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Standard output functions for check scripts
 # Usage: source scripts/lib/check-output.sh
+#
+# Sourced library: deliberately no `set -eo pipefail` here — shell options
+# would leak into (or fight with) the sourcing script, which owns strict mode
 
 # Colors and formatting
 RED='\033[0;31m'

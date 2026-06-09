@@ -2,6 +2,8 @@
 # Display summary after all checks pass
 # This script only runs if all checks succeeded (task stops on first failure)
 
+set -eo pipefail
+
 # Source standard output functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/check-output.sh

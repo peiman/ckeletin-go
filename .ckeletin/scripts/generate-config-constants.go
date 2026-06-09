@@ -82,6 +82,11 @@ func main() {
 	if _, err := os.Stat(".ckeletin/pkg/config"); os.IsNotExist(err) {
 		outFile = "internal/config/keys_generated.go"
 	}
+	// CKELETIN_CONSTANTS_OUT redirects output so checks (check-constants.sh)
+	// can generate to a temp file without mutating the working tree
+	if override := os.Getenv("CKELETIN_CONSTANTS_OUT"); override != "" {
+		outFile = override
+	}
 	f, err := os.Create(outFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create output file: %v\n", err)

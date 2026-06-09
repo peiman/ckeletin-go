@@ -13,11 +13,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 MODE="${1:-fix}"
 shift || true
-FILES="${@:-.}"
+FILES=("$@")
+if [ ${#FILES[@]} -eq 0 ]; then
+    FILES=(".")
+fi
 
 format_files() {
-    goimports -w $FILES
-    gofmt -s -w $FILES
+    goimports -w "${FILES[@]}"
+    gofmt -s -w "${FILES[@]}"
 }
 
 check_files() {
@@ -29,13 +32,13 @@ check_files() {
     local unformatted_output=""
 
     # Check goimports
-    local goimports_output=$(goimports -l $FILES 2>/dev/null || true)
+    local goimports_output=$(goimports -l "${FILES[@]}" 2>/dev/null || true)
     if [ -n "$goimports_output" ]; then
         unformatted_output+="Files need goimports:"$'\n'"$goimports_output"$'\n\n'
     fi
 
     # Check gofmt
-    local gofmt_output=$(gofmt -l $FILES 2>/dev/null || true)
+    local gofmt_output=$(gofmt -l "${FILES[@]}" 2>/dev/null || true)
     if [ -n "$gofmt_output" ]; then
         unformatted_output+="Files need gofmt:"$'\n'"$gofmt_output"
     fi

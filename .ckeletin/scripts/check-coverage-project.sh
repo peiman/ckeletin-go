@@ -39,13 +39,18 @@ fi
 # with different boundaries that inflate the total statement count and undercount
 # actual coverage. For accurate threshold enforcement, we generate a separate
 # per-package coverage profile where each package is only instrumented once.
-PERPKG_COV=$(mktemp)
-trap 'rm -f "$PERPKG_COV"' EXIT
+# Cleanup must reference the temp path, not $PERPKG_COV: the fallback below
+# repoints PERPKG_COV at the primary coverage file, which must survive exit
+PERPKG_TMP=$(mktemp)
+GO_TEST_ERR=$(mktemp)
+trap 'rm -f "$PERPKG_TMP" "$GO_TEST_ERR"' EXIT
+PERPKG_COV="$PERPKG_TMP"
 
-go test -tags dev -coverprofile="$PERPKG_COV" -covermode=atomic ./... ./.ckeletin/pkg/... 2>/dev/null
-
-if [ ! -s "$PERPKG_COV" ]; then
+# Run inside the if-condition so set -e doesn't abort before the fallback
+if ! go test -tags dev -coverprofile="$PERPKG_COV" -covermode=atomic ./... ./.ckeletin/pkg/... 2> "$GO_TEST_ERR" \
+    || [ ! -s "$PERPKG_COV" ]; then
     echo "❌ Failed to generate per-package coverage profile"
+    cat "$GO_TEST_ERR" >&2
     echo "Falling back to primary coverage file"
     PERPKG_COV="$COVERAGE_FILE"
 fi
