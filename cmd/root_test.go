@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -193,60 +194,115 @@ func TestRootCmd_PersistentPreRunE_Errors(t *testing.T) {
 	assert.Equal(t, "initConfig error", err.Error(), "Error message should match")
 }
 
-// Test the specific status logging in PersistentPreRunE
+// Test the config status logging through the REAL RootCmd.PersistentPreRunE.
+// It runs the full initialization path (bindFlags -> initConfig -> logger.Init)
+// and asserts on the stderr log output PersistentPreRunE actually produces.
 func TestRootCmd_ConfigStatusLogging(t *testing.T) {
-	// Save originals
-	origStatus := configFileStatus
-	origUsed := configFileUsed
-	defer func() {
-		configFileStatus = origStatus
-		configFileUsed = origUsed
-	}()
+	// runPersistentPreRunE executes the real RootCmd.PersistentPreRunE with
+	// os.Stderr captured (logger.Init(nil) inside it writes there), returning
+	// everything it logged plus its error.
+	runPersistentPreRunE := func(t *testing.T) (string, error) {
+		t.Helper()
 
-	tests := []struct {
-		name         string
-		configStatus string
-		configUsed   string
-	}{
-		{
-			name:         "No config file",
-			configStatus: "No config file found",
-			configUsed:   "",
-		},
-		{
-			name:         "With config file",
-			configStatus: "Using config file",
-			configUsed:   "/path/to/config.yaml",
-		},
+		savedLogger, savedLevel := logger.SaveLoggerState()
+		defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+		r, w, err := os.Pipe()
+		require.NoError(t, err, "Failed to create stderr pipe")
+		origStderr := os.Stderr
+		os.Stderr = w
+		defer func() { os.Stderr = origStderr }()
+
+		preRunErr := RootCmd.PersistentPreRunE(RootCmd, []string{})
+
+		os.Stderr = origStderr
+		require.NoError(t, w.Close(), "Failed to close stderr pipe writer")
+		captured, err := io.ReadAll(r)
+		require.NoError(t, err, "Failed to read captured stderr")
+
+		return string(captured), preRunErr
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// SETUP PHASE
-			// Set up test state
-			configFileStatus = tt.configStatus
-			configFileUsed = tt.configUsed
+	// saveConfigState snapshots the package-level config state mutated by
+	// initConfig and resets it so a stale configFileUsed from a previous test
+	// cannot select the wrong logging branch.
+	saveConfigState := func(t *testing.T) {
+		t.Helper()
 
-			// Mock the cmd so we can capture the check without running logger.Init
-			mockCmd := &cobra.Command{
-				PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-					// This is the core of what we're testing:
-					if configFileStatus != "" {
-						// If we have config status, it should be logged appropriately
-						assert.Equal(t, tt.configStatus, configFileStatus, "Status should match")
-						assert.Equal(t, tt.configUsed, configFileUsed, "ConfigUsed should match")
-					}
-					return nil
-				},
-			}
-
-			// EXECUTION PHASE
-			err := mockCmd.PersistentPreRunE(mockCmd, []string{})
-
-			// ASSERTION PHASE
-			assert.NoError(t, err, "Mock command should not fail")
+		origCfgFile := cfgFile
+		origStatus := configFileStatus
+		origUsed := configFileUsed
+		t.Cleanup(func() {
+			cfgFile = origCfgFile
+			configFileStatus = origStatus
+			configFileUsed = origUsed
 		})
+
+		viper.Reset()
+		cfgFile = ""
+		configFileStatus = ""
+		configFileUsed = ""
 	}
+
+	t.Run("With config file logs status and path at info level", func(t *testing.T) {
+		// SETUP PHASE
+		saveConfigState(t)
+
+		wd, err := os.Getwd()
+		require.NoError(t, err, "Failed to get working directory")
+		cfgFile = filepath.Join(wd, "..", "testdata", "config", "valid.yaml")
+		_, err = os.Stat(cfgFile)
+		require.NoError(t, err, "Test fixture config must exist")
+
+		// EXECUTION PHASE
+		logOutput, preRunErr := runPersistentPreRunE(t)
+
+		// ASSERTION PHASE
+		require.NoError(t, preRunErr, "PersistentPreRunE should succeed with a valid config file")
+		assert.Equal(t, "Using config file", configFileStatus,
+			"real initConfig should set the config file status")
+		assert.Contains(t, configFileUsed, "valid.yaml",
+			"real initConfig should record the config file used")
+		assert.Contains(t, logOutput, "Using config file",
+			"PersistentPreRunE should log the config status to stderr")
+		assert.Contains(t, logOutput, "config_file=",
+			"config file path should be logged as a structured field")
+		assert.Contains(t, logOutput, "valid.yaml",
+			"logged path should reference the actual config file")
+	})
+
+	t.Run("No config file logs status at debug level without path field", func(t *testing.T) {
+		// SETUP PHASE
+		saveConfigState(t)
+
+		oldWd, err := os.Getwd()
+		require.NoError(t, err, "Failed to get working directory")
+		defer func() { os.Chdir(oldWd) }()
+
+		// Isolate config discovery: empty cwd, HOME, and XDG config dir
+		tempDir := t.TempDir()
+		homeDir := filepath.Join(tempDir, "home")
+		require.NoError(t, os.MkdirAll(homeDir, 0755), "Failed to create temp home")
+		t.Setenv("HOME", homeDir)
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+		// The no-config status is logged at debug level, which the default
+		// info console level filters out — raise verbosity via env var.
+		t.Setenv(EnvPrefix()+"_APP_LOG_LEVEL", "debug")
+		require.NoError(t, os.Chdir(tempDir), "Failed to change to temp dir")
+
+		// EXECUTION PHASE
+		logOutput, preRunErr := runPersistentPreRunE(t)
+
+		// ASSERTION PHASE
+		require.NoError(t, preRunErr, "PersistentPreRunE should succeed without a config file")
+		assert.Equal(t, "No config file found, using defaults and environment variables",
+			configFileStatus, "real initConfig should set the no-config status")
+		assert.Empty(t, configFileUsed, "no config file should be recorded")
+		assert.Contains(t, logOutput, "No config file found",
+			"PersistentPreRunE should log the no-config status to stderr")
+		assert.NotContains(t, logOutput, "config_file=",
+			"no config_file field should be logged when no config file is used")
+	})
 }
 
 func TestExecute_ErrorPropagation(t *testing.T) {
