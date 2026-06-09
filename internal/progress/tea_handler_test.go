@@ -580,6 +580,50 @@ func TestTeaHandler_Stop_AfterStart(t *testing.T) {
 	<-done
 }
 
+func TestTeaHandler_OnProgress_AfterStop_Restarts(t *testing.T) {
+	// SETUP PHASE
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	ctx := context.Background()
+
+	// First lifecycle: start, then stop
+	first := make(chan struct{})
+	go func() {
+		h.OnProgress(ctx, NewEvent(EventStart, "first run"))
+		close(first)
+	}()
+	select {
+	case <-first:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("first OnProgress did not complete")
+	}
+	h.Stop()
+
+	// EXECUTION PHASE
+	// Reusing the handler after Stop must restart cleanly; closing the
+	// already-closed ready channel would panic
+	second := make(chan struct{})
+	go func() {
+		h.OnProgress(ctx, NewEvent(EventStart, "second run"))
+		close(second)
+	}()
+	select {
+	case <-second:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("OnProgress after Stop did not complete; handler is not reusable")
+	}
+
+	// ASSERTION PHASE
+	h.mu.Lock()
+	started := h.started
+	program := h.program
+	h.mu.Unlock()
+	assert.True(t, started, "handler should have restarted after Stop")
+	assert.NotNil(t, program, "program should be running again after restart")
+
+	h.Stop()
+}
+
 func TestTeaHandler_start_DoubleStart(t *testing.T) {
 	var buf bytes.Buffer
 	h := NewTeaHandler(&buf)

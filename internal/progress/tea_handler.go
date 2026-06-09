@@ -57,11 +57,16 @@ func (h *TeaHandler) OnProgress(ctx context.Context, event Event) {
 		h.start()
 	}
 
+	// Snapshot the channel under the mutex: Stop() replaces it for reuse
+	h.mu.Lock()
+	ready := h.ready
+	h.mu.Unlock()
+
 	// Wait for program to be ready (with context cancellation support)
 	select {
 	case <-ctx.Done():
 		return
-	case <-h.ready:
+	case <-ready:
 		// Program is ready
 	}
 
@@ -105,18 +110,20 @@ func (h *TeaHandler) start() {
 	h.mu.Lock()
 	h.program = tea.NewProgram(h.model, opts...)
 	program := h.program
+	ready := h.ready
 	h.mu.Unlock()
 
 	// Run in goroutine so OnProgress doesn't block
 	go func() {
 		// Signal that the program is ready to receive messages
 		// Close the channel to signal all waiting goroutines
-		close(h.ready)
+		close(ready)
 		_, _ = program.Run()
 	}()
 }
 
 // Stop gracefully stops the Bubble Tea program.
+// The handler can be reused after Stop: the next OnProgress starts a new program.
 func (h *TeaHandler) Stop() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -125,6 +132,9 @@ func (h *TeaHandler) Stop() {
 		h.program.Quit()
 		h.program = nil
 		h.started = false
+		// Recreate the ready channel so the handler can be restarted;
+		// start() closed the old one, and closing twice would panic
+		h.ready = make(chan struct{})
 	}
 }
 
