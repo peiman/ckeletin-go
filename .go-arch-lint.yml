@@ -198,6 +198,10 @@ deps:
     mayDependOn: []  # Empty - depends on nothing
     canUse:
       - viper
+      # cast is viper's own coercion dependency; the framework config
+      # validators (.ckeletin/pkg/config/validators.go) use it to coerce
+      # values the same way viper does before validating them.
+      - cast
       - zerolog
       - lipgloss
       - bubbletea
