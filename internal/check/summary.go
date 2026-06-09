@@ -87,9 +87,9 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 			continue
 		}
 
-		// Category header
+		// Category header (lipgloss.Width measures display cells, not bytes)
 		catHeader := "  " + styles.dim.Render(boxChars.catSeparator+" "+catName)
-		catHeaderWidth := 2 + len(boxChars.catSeparator) + 1 + len(catName) // "  " + separator + " " + name
+		catHeaderWidth := 2 + lipgloss.Width(boxChars.catSeparator) + 1 + lipgloss.Width(catName) // "  " + separator + " " + name
 		padding := contentWidth - catHeaderWidth
 		sb.WriteString(styles.border.Render(boxChars.vertical) + catHeader)
 		if padding > 0 {
@@ -121,12 +121,12 @@ func (e *Executor) printFinalSummary(results []allCheckResult, passed, failed in
 			if r.duration > 0 {
 				durText := fmt.Sprintf("(%s)", r.duration.Round(time.Millisecond))
 				durStr = styles.dim.Render(durText)
-				durLen = len(durText)
+				durLen = lipgloss.Width(durText)
 			}
 
 			// Build line: "  ├── ✓ name              (duration)"
 			line := "  " + styles.dim.Render(connector) + " " + iconStyle.Render(icon) + " " + fmt.Sprintf("%-18s", r.name) + " " + durStr
-			visibleLen := 2 + len(connector) + 1 + len(icon) + 1 + 18 + 1 + durLen
+			visibleLen := 2 + lipgloss.Width(connector) + 1 + lipgloss.Width(icon) + 1 + 18 + 1 + durLen
 			padding := contentWidth - visibleLen
 			sb.WriteString(styles.border.Render(boxChars.vertical) + line)
 			if padding > 0 {

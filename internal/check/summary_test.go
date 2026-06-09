@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -355,6 +357,56 @@ func TestPrintFinalSummary_BoxStructure(t *testing.T) {
 	assert.Contains(t, output, "|", "should contain vertical borders")
 	assert.Contains(t, output, "-", "should contain horizontal borders")
 	assert.Contains(t, output, "Duration:", "should show duration")
+}
+
+func TestPrintFinalSummary_BoxAlignment(t *testing.T) {
+	tests := []struct {
+		name   string
+		useTUI bool
+	}{
+		{
+			name:   "TUI mode with multi-byte box-drawing characters",
+			useTUI: true,
+		},
+		{
+			name:   "CI mode with ASCII box characters",
+			useTUI: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			var buf bytes.Buffer
+			executor := &Executor{
+				writer:   &buf,
+				useTUI:   tt.useTUI,
+				coverage: 91.2,
+			}
+			results := []allCheckResult{
+				{name: "go-version", category: "Development Environment", passed: true, duration: 50 * time.Millisecond},
+				{name: "format", category: "Code Quality", passed: true, duration: 100 * time.Millisecond},
+				{name: "lint", category: "Code Quality", passed: true, duration: 200 * time.Millisecond},
+			}
+
+			// EXECUTION PHASE
+			executor.printFinalSummary(results, 3, 0, 350*time.Millisecond)
+
+			// ASSERTION PHASE
+			// Every box line must render at the same display width as the top
+			// border: box-drawing characters and icons are multi-byte UTF-8 but
+			// single-column, so widths must be measured in display cells, not bytes
+			output := strings.TrimPrefix(buf.String(), "\033[2J\033[H")
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			require.NotEmpty(t, lines, "summary output should contain box lines")
+
+			wantWidth := lipgloss.Width(lines[0]) // top border defines the box width
+			for i, line := range lines {
+				assert.Equal(t, wantWidth, lipgloss.Width(line),
+					"line %d should be %d display columns wide: %q", i, wantWidth, line)
+			}
+		})
+	}
 }
 
 func TestPrintFinalSummary_NegativePaddingHandled(t *testing.T) {
