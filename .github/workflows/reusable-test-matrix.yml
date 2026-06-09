@@ -17,7 +17,7 @@ on:
 permissions: {}
 
 env:
-  TASK_VERSION: '3.39.2'        # keep in sync with ci.yml
+  # TASK_VERSION is read from .github/TASK_VERSION file (SSOT)
   PINNED_TOOLS_VERSION: 'v1'    # keep in sync with ci.yml (cache-busting)
 
 jobs:
@@ -39,6 +39,10 @@ jobs:
 
       - name: Download Dependencies
         run: go mod download
+
+      - name: Read Task version (SSOT)
+        run: echo "TASK_VERSION=$(cat .github/TASK_VERSION)" >> "$GITHUB_ENV"
+        shell: bash
 
       - name: Install Task (Unix)
         if: runner.os != 'Windows'
