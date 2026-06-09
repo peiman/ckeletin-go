@@ -11,19 +11,8 @@ import (
 
 // completionCmd generates shell completion scripts.
 var completionCmd = &cobra.Command{
-	Use:   "completion",
-	Short: "Generate the autocompletion script for the specified shell",
-	Long: fmt.Sprintf(`To load completions:
-
-Bash:
-  source <(%s completion bash)
-Zsh:
-  source <(%s completion zsh)
-Fish:
-  %s completion fish | source
-PowerShell:
-  %s completion powershell | Out-String | Invoke-Expression
-`, binaryName, binaryName, binaryName, binaryName),
+	Use:                   "completion",
+	Short:                 "Generate the autocompletion script for the specified shell",
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
 	Args:                  cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
@@ -49,6 +38,29 @@ PowerShell:
 	},
 }
 
+// completionLong renders the completion help text for the given binary name.
+func completionLong(name string) string {
+	return fmt.Sprintf(`To load completions:
+
+Bash:
+  source <(%s completion bash)
+Zsh:
+  source <(%s completion zsh)
+Fish:
+  %s completion fish | source
+PowerShell:
+  %s completion powershell | Out-String | Invoke-Expression
+`, name, name, name, name)
+}
+
 func init() {
-	RootCmd.AddCommand(completionCmd)
+	// Long cannot be set at var-declaration time or here: binaryName is empty
+	// until root.go's init() resolves it, and init() runs in file-name order
+	// (completion.go before root.go). Render it lazily instead — both
+	// `completion --help` and `help completion` go through HelpFunc.
+	completionCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		cmd.Long = completionLong(cmd.Root().Name())
+		cmd.Root().HelpFunc()(cmd, args)
+	})
+	MustAddToRoot(completionCmd)
 }
