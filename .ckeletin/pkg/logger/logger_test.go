@@ -4,11 +4,13 @@ package logger
 import (
 	"bytes"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -453,6 +455,85 @@ func TestLogSampling(t *testing.T) {
 	// but we can verify the file was created and contains some logs
 	_, err = os.Stat(logFile)
 	assert.False(t, os.IsNotExist(err), "Expected log file to be created")
+}
+
+func TestClampSamplingValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input int
+		want  uint32
+	}{
+		{name: "Negative clamps to one", input: -5, want: 1},
+		{name: "Zero clamps to one", input: 0, want: 1},
+		{name: "One passes through", input: 1, want: 1},
+		{name: "Typical value passes through", input: 100, want: 100},
+		{name: "Max uint32 passes through", input: math.MaxUint32, want: math.MaxUint32},
+		{name: "Above max uint32 clamps to max", input: math.MaxUint32 + 1, want: math.MaxUint32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// EXECUTION PHASE
+			got := clampSamplingValue(tt.input)
+
+			// ASSERTION PHASE
+			assert.Equal(t, tt.want, got,
+				"clampSamplingValue(%d) = %d, want %d", tt.input, got, tt.want)
+		})
+	}
+}
+
+// TestLogSamplingClampsInvalidValues verifies that out-of-range sampling
+// config values are clamped to a safe minimum instead of wrapping around in
+// the uint32 conversion, which would silently drop log messages.
+func TestLogSamplingClampsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name       string
+		initial    int
+		thereafter int
+	}{
+		{name: "Zero values", initial: 0, thereafter: 0},
+		{name: "Zero initial with negative thereafter", initial: 0, thereafter: -1},
+		{name: "Negative values", initial: -5, thereafter: -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			savedLogger, savedLevel := SaveLoggerState()
+			defer RestoreLoggerState(savedLogger, savedLevel)
+
+			viper.Set(config.KeyAppLogConsoleLevel, "info")
+			viper.Set(config.KeyAppLogFileEnabled, false)
+			viper.Set(config.KeyAppLogColorEnabled, "false")
+			viper.Set(config.KeyAppLogSamplingEnabled, true)
+			viper.Set(config.KeyAppLogSamplingInitial, tt.initial)
+			viper.Set(config.KeyAppLogSamplingThereafter, tt.thereafter)
+			defer func() {
+				viper.Set(config.KeyAppLogSamplingEnabled, false)
+				viper.Set(config.KeyAppLogSamplingInitial, 100)
+				viper.Set(config.KeyAppLogSamplingThereafter, 100)
+			}()
+
+			buf := &bytes.Buffer{}
+
+			// EXECUTION PHASE
+			err := Init(buf)
+			require.NoError(t, err, "Init() failed")
+
+			messages := []string{"sample_one", "sample_two", "sample_three"}
+			for _, msg := range messages {
+				log.Info().Msg(msg)
+			}
+
+			// ASSERTION PHASE
+			output := buf.String()
+			for _, msg := range messages {
+				assert.Contains(t, output, msg,
+					"message %q should be logged when sampling values are clamped", msg)
+			}
+		})
+	}
 }
 
 func TestCleanup(t *testing.T) {

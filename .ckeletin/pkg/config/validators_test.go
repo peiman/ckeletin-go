@@ -128,6 +128,80 @@ func TestValidateLogLevel(t *testing.T) {
 	}
 }
 
+func TestValidatePositiveInt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   interface{}
+		wantErr bool
+		errMsg  string
+	}{
+		{name: "One", value: 1, wantErr: false},
+		{name: "Large positive int", value: 100, wantErr: false},
+		{name: "Zero", value: 0, wantErr: true, errMsg: "must be a positive integer"},
+		{name: "Negative int", value: -1, wantErr: true, errMsg: "must be a positive integer"},
+		{name: "Positive numeric string", value: "100", wantErr: false},
+		{name: "Negative numeric string", value: "-5", wantErr: true, errMsg: "must be a positive integer"},
+		{name: "Non-numeric string", value: "abc", wantErr: true, errMsg: "must be an integer"},
+		{name: "Positive float", value: 2.0, wantErr: false},
+		{name: "Nil value is skipped", value: nil, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			validate := ValidatePositiveInt()
+			err := validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateNonNegativeInt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   interface{}
+		wantErr bool
+		errMsg  string
+	}{
+		{name: "Zero", value: 0, wantErr: false},
+		{name: "Positive int", value: 3, wantErr: false},
+		{name: "Negative int", value: -1, wantErr: true, errMsg: "must be a non-negative integer"},
+		{name: "Zero numeric string", value: "0", wantErr: false},
+		{name: "Negative numeric string", value: "-2", wantErr: true, errMsg: "must be a non-negative integer"},
+		{name: "Non-numeric string", value: "xyz", wantErr: true, errMsg: "must be an integer"},
+		{name: "Nil value is skipped", value: nil, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			validate := ValidateNonNegativeInt()
+			err := validate(tt.value)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestValidateColor(t *testing.T) {
 	t.Parallel()
 

@@ -68,6 +68,8 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "true",
+			// Empty is allowed: the logger treats "" as auto-detection
+			Validation: ValidateOneOf([]string{"auto", "true", "false"}, true),
 		},
 		// Log rotation options (lumberjack)
 		{
@@ -77,6 +79,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "100",
+			Validation:   ValidatePositiveInt(),
 		},
 		{
 			Key:          "app.log.file_max_backups",
@@ -85,6 +88,8 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "3",
+			// Zero is meaningful: lumberjack retains all old log files
+			Validation: ValidateNonNegativeInt(),
 		},
 		{
 			Key:          "app.log.file_max_age",
@@ -93,6 +98,8 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "28",
+			// Zero is meaningful: lumberjack skips age-based deletion
+			Validation: ValidateNonNegativeInt(),
 		},
 		{
 			Key:          "app.log.file_compress",
@@ -118,6 +125,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "100",
+			Validation:   ValidatePositiveInt(),
 		},
 		{
 			Key:          "app.log.sampling_thereafter",
@@ -126,6 +134,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "int",
 			Required:     false,
 			Example:      "100",
+			Validation:   ValidatePositiveInt(),
 		},
 		// Output format option (framework-level)
 		{

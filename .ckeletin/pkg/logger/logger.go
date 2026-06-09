@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -121,9 +122,9 @@ func Init(out io.Writer) error {
 		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
 		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
 		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       uint32(initial), //nolint:gosec // Config values are positive
+			Burst:       clampSamplingValue(initial),
 			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
+			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
 		})
 		log.Info().
 			Int("initial", initial).
@@ -221,6 +222,23 @@ func getGlobalLogLevel(consoleLevel zerolog.Level) zerolog.Level {
 	return consoleLevel
 }
 
+// clampSamplingValue converts a sampling config value to the uint32 zerolog
+// requires, clamping out-of-range values to [1, math.MaxUint32]. The registry
+// validators (ValidatePositiveInt) are the primary defense; this clamp is
+// defense in depth for values that bypass config validation (e.g. direct
+// viper.Set), where a negative value would wrap to ~4 billion and zero would
+// make zerolog's BasicSampler drop every event after the burst.
+func clampSamplingValue(n int) uint32 {
+	v := int64(n)
+	if v < 1 {
+		return 1
+	}
+	if v > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(v)
+}
+
 // isColorEnabled determines if colored output should be enabled.
 func isColorEnabled(out io.Writer) bool {
 	colorConfig := viper.GetString(config.KeyAppLogColorEnabled)
@@ -304,9 +322,9 @@ func rebuildLogger() {
 		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
 		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
 		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       uint32(initial), //nolint:gosec // Config values are positive
+			Burst:       clampSamplingValue(initial),
 			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
+			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
 		})
 	}
 
