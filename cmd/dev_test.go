@@ -45,6 +45,41 @@ func TestDevCommandHasSubcommands(t *testing.T) {
 	assert.True(t, subcommandNames["doctor"], "Dev command should have 'doctor' subcommand")
 }
 
+func TestDevProgressCommand(t *testing.T) {
+	// SETUP PHASE
+	devCmd := findCommandByName(RootCmd, "dev")
+	assert.NotNil(t, devCmd, "Dev command must exist for this test")
+
+	// EXECUTION PHASE
+	progressCmd := findCommandByName(devCmd, "progress")
+
+	// ASSERTION PHASE
+	assert.NotNil(t, progressCmd, "Dev command should have 'progress' subcommand")
+	for _, flag := range []string{"ui", "spinner", "bar", "delay"} {
+		assert.NotNil(t, progressCmd.Flags().Lookup(flag), "Progress command should have --%s flag", flag)
+	}
+}
+
+func TestDevProgressCommandRunsSpinnerDemo(t *testing.T) {
+	// SETUP PHASE
+	buf := new(bytes.Buffer)
+	RootCmd.SetOut(buf)
+	RootCmd.SetErr(buf)
+	RootCmd.SetArgs([]string{"dev", "progress", "--spinner", "--delay", "1ms"})
+
+	// EXECUTION PHASE
+	err := RootCmd.Execute()
+
+	// ASSERTION PHASE
+	assert.NoError(t, err, "Progress spinner demo should run without error")
+	output := buf.String()
+	assert.Contains(t, output, "Simulating network request...", "Demo should print spinner start message")
+	assert.Contains(t, output, "Network request completed", "Demo should print spinner completion message")
+
+	// Reset
+	RootCmd.SetArgs([]string{})
+}
+
 func TestDevCommandHelp(t *testing.T) {
 	// SETUP PHASE
 	buf := new(bytes.Buffer)
