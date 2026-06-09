@@ -5,6 +5,7 @@ package docs
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
@@ -40,8 +41,16 @@ func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 		}
 	}
 
-	// Generate YAML
-	for topLevel, options := range groups {
+	// Generate YAML in sorted group order so output is deterministic
+	// (map iteration order is randomized in Go)
+	topLevels := make([]string, 0, len(groups))
+	for topLevel := range groups {
+		topLevels = append(topLevels, topLevel)
+	}
+	sort.Strings(topLevels)
+
+	for _, topLevel := range topLevels {
+		options := groups[topLevel]
 		if topLevel != "" {
 			fmt.Fprintf(w, "%s:\n", topLevel)
 		}
@@ -75,10 +84,16 @@ func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 			fmt.Fprintf(w, "  %s: %s\n\n", key, opt.ExampleValueString())
 		}
 
-		// Process nested groups
-		for nestedKey, nestedOpts := range nestedGroups {
+		// Process nested groups in sorted order for deterministic output
+		nestedKeys := make([]string, 0, len(nestedGroups))
+		for nestedKey := range nestedGroups {
+			nestedKeys = append(nestedKeys, nestedKey)
+		}
+		sort.Strings(nestedKeys)
+
+		for _, nestedKey := range nestedKeys {
 			fmt.Fprintf(w, "  %s:\n", nestedKey)
-			for _, opt := range nestedOpts {
+			for _, opt := range nestedGroups[nestedKey] {
 				// Extract the part after the second dot
 				parts := strings.SplitN(opt.Key, ".", 3)
 				var key string

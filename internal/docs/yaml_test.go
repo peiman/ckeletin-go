@@ -128,6 +128,44 @@ func TestGenerateYAMLContent(t *testing.T) {
 		"Improper key formatting - did not properly convert dots to nesting")
 }
 
+// TestGenerateYAMLContent_DeterministicOutput verifies the generator emits
+// identical output across runs (map iteration order must not leak through)
+func TestGenerateYAMLContent_DeterministicOutput(t *testing.T) {
+	// SETUP PHASE
+	// Multiple top-level groups and nested groups so randomized map iteration
+	// order would be caught with near-certainty if it leaked into the output
+	registry := []config.ConfigOption{
+		{Key: "app.log_level", Description: "Log level", DefaultValue: "info", Type: "string"},
+		{Key: "app.ping.enabled", Description: "Enable ping", DefaultValue: true, Type: "bool"},
+		{Key: "app.ping.message", Description: "Ping message", DefaultValue: "pong", Type: "string"},
+		{Key: "server.port", Description: "Server port", DefaultValue: 8080, Type: "int"},
+		{Key: "server.tls.cert", Description: "TLS certificate", DefaultValue: "cert.pem", Type: "string"},
+		{Key: "telemetry.enabled", Description: "Enable telemetry", DefaultValue: false, Type: "bool"},
+		{Key: "standalone", Description: "A standalone option", DefaultValue: "x", Type: "string"},
+	}
+
+	// EXECUTION PHASE
+	var first bytes.Buffer
+	require.NoError(t, generateYAMLContent(&first, registry), "generateYAMLContent failed")
+
+	// ASSERTION PHASE
+	for i := 0; i < 20; i++ {
+		var buf bytes.Buffer
+		require.NoError(t, generateYAMLContent(&buf, registry), "generateYAMLContent failed on run %d", i+1)
+		require.Equal(t, first.String(), buf.String(),
+			"run %d produced different output - generation must be deterministic", i+1)
+	}
+
+	// Top-level groups should be emitted in sorted order
+	output := first.String()
+	appIdx := strings.Index(output, "app:")
+	serverIdx := strings.Index(output, "server:")
+	telemetryIdx := strings.Index(output, "telemetry:")
+	assert.True(t, appIdx < serverIdx && serverIdx < telemetryIdx,
+		"top-level groups should appear in sorted order, got app=%d server=%d telemetry=%d",
+		appIdx, serverIdx, telemetryIdx)
+}
+
 // TestGenerateYAMLDocs_EmptyRegistry tests handling of an empty registry
 func TestGenerateYAMLDocs_EmptyRegistry(t *testing.T) {
 	// SETUP PHASE
