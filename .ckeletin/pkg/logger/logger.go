@@ -126,10 +126,6 @@ func Init(out io.Writer) error {
 			Period:      time.Second,
 			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
 		})
-		log.Info().
-			Int("initial", initial).
-			Int("thereafter", thereafter).
-			Msg("Log sampling enabled")
 	}
 
 	log.Logger = logger
@@ -138,6 +134,15 @@ func Init(out io.Writer) error {
 	// This allows both writers to filter independently
 	globalLevel := getGlobalLogLevel(consoleLevel)
 	zerolog.SetGlobalLevel(globalLevel)
+
+	// Log sampling status after logger is configured, so the message goes to
+	// the writers configured above instead of the previous global logger
+	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
+		log.Info().
+			Int("initial", viper.GetInt(config.KeyAppLogSamplingInitial)).
+			Int("thereafter", viper.GetInt(config.KeyAppLogSamplingThereafter)).
+			Msg("Log sampling enabled")
+	}
 
 	// Log file logging status after logger is configured
 	if viper.GetBool(config.KeyAppLogFileEnabled) && logFile != nil {
@@ -343,9 +348,11 @@ func rebuildLogger() {
 // This allows adjusting verbosity without restarting the application.
 func SetConsoleLevel(level zerolog.Level) {
 	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	currentConsoleLevel = level
 	rebuildLogger()
-	loggerMu.Unlock()
+	// Logged under loggerMu: log.Logger is rebuilt under this mutex, so
+	// reading it after unlocking would race with concurrent Set*Level calls
 	log.Info().
 		Str("level", level.String()).
 		Msg("Console log level changed")
@@ -355,9 +362,10 @@ func SetConsoleLevel(level zerolog.Level) {
 // This allows adjusting file log verbosity without restarting the application.
 func SetFileLevel(level zerolog.Level) {
 	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	currentFileLevel = level
 	rebuildLogger()
-	loggerMu.Unlock()
+	// Logged under loggerMu: see SetConsoleLevel
 	log.Info().
 		Str("level", level.String()).
 		Msg("File log level changed")

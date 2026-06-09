@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
@@ -534,6 +535,80 @@ func TestLogSamplingClampsInvalidValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInitSamplingStatusUsesConfiguredWriter ensures the "Log sampling
+// enabled" status message is emitted through the logger Init just configured,
+// not through whatever the previous global logger pointed at.
+func TestInitSamplingStatusUsesConfiguredWriter(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	// Point the current global logger at a different buffer to prove the
+	// status message does not land there.
+	previousBuf := &bytes.Buffer{}
+	log.Logger = zerolog.New(previousBuf)
+
+	viper.Set(config.KeyAppLogConsoleLevel, "info")
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, true)
+	viper.Set(config.KeyAppLogSamplingInitial, 100)
+	viper.Set(config.KeyAppLogSamplingThereafter, 100)
+	defer viper.Set(config.KeyAppLogSamplingEnabled, false)
+
+	buf := &bytes.Buffer{}
+
+	// EXECUTION PHASE
+	require.NoError(t, Init(buf), "Init() failed")
+
+	// ASSERTION PHASE
+	assert.Contains(t, buf.String(), "Log sampling enabled",
+		"sampling status should be written to the writer configured by Init")
+	assert.NotContains(t, previousBuf.String(), "Log sampling enabled",
+		"sampling status should not be written to the previous global logger")
+}
+
+// TestSetLevelConcurrency exercises concurrent runtime level changes. Run
+// with -race it fails if the status log reads log.Logger outside loggerMu
+// while another goroutine rebuilds the logger under the lock.
+func TestSetLevelConcurrency(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	viper.Set(config.KeyAppLogConsoleLevel, "info")
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+
+	require.NoError(t, Init(io.Discard), "Init() failed")
+
+	// EXECUTION PHASE
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				SetConsoleLevel(zerolog.DebugLevel)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				SetFileLevel(zerolog.InfoLevel)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// ASSERTION PHASE
+	assert.Equal(t, zerolog.DebugLevel, GetConsoleLevel(),
+		"console level should reflect the last SetConsoleLevel call")
+	assert.Equal(t, zerolog.InfoLevel, GetFileLevel(),
+		"file level should reflect the last SetFileLevel call")
 }
 
 func TestCleanup(t *testing.T) {
