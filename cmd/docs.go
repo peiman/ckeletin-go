@@ -5,6 +5,7 @@ package cmd
 import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/docs"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -44,5 +45,10 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 
 	generator := docs.NewGenerator(cfg)
 	generator.SetAppInfo(docs.NewAppInfo(binaryName, EnvPrefix(), defaultUserConfigDir(ConfigPaths())))
+
+	// JSON mode (CKSPEC-OUT-002): wrap the docs in the standard envelope.
+	if output.IsJSONMode() {
+		return generator.GenerateJSON(cmd.OutOrStdout())
+	}
 	return generator.Generate()
 }
