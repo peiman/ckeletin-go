@@ -39,7 +39,7 @@ func Validate(configPath string) (*Result, error) {
 		result.Errors = append(result.Errors, err)
 	}
 
-	// 4. Try to parse the config file
+	// 3. Try to parse the config file
 	v := viper.New()
 	v.SetConfigFile(configPath)
 	if err := v.ReadInConfig(); err != nil {
@@ -48,8 +48,23 @@ func Validate(configPath string) (*Result, error) {
 		return result, nil // Return partial results
 	}
 
-	// 5. Validate all configuration values
+	// Capture file-only settings before seeding defaults so steps 5-6 see
+	// exactly what the file contains.
 	allSettings := v.AllSettings()
+
+	// 4. Validate registered option values (log levels, colors, formats).
+	// Seed registry defaults so options absent from the file are validated
+	// against their defaults rather than nil.
+	for _, opt := range config.Registry() {
+		v.SetDefault(opt.Key, opt.DefaultValue)
+	}
+	optionErrors := config.ValidateRegisteredOptionsWithViper(v)
+	if len(optionErrors) > 0 {
+		result.Valid = false
+		result.Errors = append(result.Errors, optionErrors...)
+	}
+
+	// 5. Validate all configuration values
 	valueErrors := config.ValidateAllConfigValues(allSettings)
 	if len(valueErrors) > 0 {
 		result.Valid = false
