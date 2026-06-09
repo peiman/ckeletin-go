@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -34,12 +35,19 @@ import (
 )
 
 var (
-	cfgFile          string
-	configPathMode   = ConfigPathModeXDG
-	configPathFlag   *pflag.Flag
-	Version          = "dev"
-	Commit           = ""
-	Date             = ""
+	cfgFile        string
+	configPathMode = ConfigPathModeXDG
+	configPathFlag *pflag.Flag
+	// Build identity vars injected via ldflags (see Taskfile.yml LDFLAGS and
+	// .goreleaser.yml). Without injection they degrade to "unknown" per
+	// CKSPEC-OUT-006 — never empty strings.
+	Version = versionUnknown
+	Commit  = versionUnknown
+	Date    = versionUnknown
+	// Dirty is "true"/"false" when injected (GoReleaser's {{ .IsGitDirty }});
+	// when empty, treeState() derives the state from Version, where Taskfile
+	// builds embed a "-dirty" suffix via `git describe --dirty`.
+	Dirty            = ""
 	binaryName       = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
 	configFileStatus string
 	configFileUsed   string
@@ -59,6 +67,23 @@ const (
 	ConfigPathModeNative = "native"
 	// ConfigPathModeBoth searches both XDG and native directories.
 	ConfigPathModeBoth = "both"
+)
+
+const (
+	// versionUnknown is the graceful-degradation value for build-identity
+	// fields when ldflags are not injected (plain `go build`, CKSPEC-OUT-006).
+	versionUnknown = "unknown"
+	// versionDevFallback is the Taskfile's VERSION fallback when git describe
+	// fails at build time; the working-tree state is unknowable then too.
+	versionDevFallback = "dev"
+	// dirtySuffix is appended to VERSION by `git describe --dirty` (Taskfile
+	// LDFLAGS) when the build came from a modified working tree.
+	dirtySuffix = "-dirty"
+
+	// Working-tree states surfaced in version output (CKSPEC-OUT-006).
+	treeStateDirty   = "dirty"
+	treeStateClean   = "clean"
+	treeStateUnknown = "unknown"
 )
 
 // EnvPrefix returns a sanitized environment variable prefix based on the binary name
@@ -263,8 +288,74 @@ func Execute() error {
 	// Ensure logger cleanup on exit
 	defer logger.Cleanup()
 
-	RootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
+	RootCmd.Version = versionString()
+	// Register the --version flag NOW (cobra normally defers this until after
+	// command lookup): without it, `--version --output json` makes stripFlags
+	// treat the unknown --version as value-taking, swallow --output, and fail
+	// with `unknown command "json"`.
+	RootCmd.InitDefaultVersionFlag()
 	return RootCmd.Execute()
+}
+
+// versionString composes the build identity shown by --version: semantic
+// version, commit, build date, and working-tree state (CKSPEC-OUT-006).
+func versionString() string {
+	return fmt.Sprintf("%s, commit %s, built at %s, tree %s", Version, Commit, Date, treeState())
+}
+
+// treeState resolves whether the build came from a dirty working tree
+// (CKSPEC-OUT-006). Precedence:
+//  1. Explicit Dirty ldflag — GoReleaser injects {{ .IsGitDirty }} ("true"/"false").
+//  2. The "-dirty" suffix `git describe --dirty` embeds in Version (Taskfile builds).
+//  3. Unknown — no build identity was injected (plain `go build`), or the
+//     Taskfile fell back to "dev" because git describe failed.
+func treeState() string {
+	switch strings.ToLower(strings.TrimSpace(Dirty)) {
+	case "true":
+		return treeStateDirty
+	case "false":
+		return treeStateClean
+	}
+	if strings.HasSuffix(Version, dirtySuffix) {
+		return treeStateDirty
+	}
+	if Version == versionUnknown || Version == versionDevFallback {
+		return treeStateUnknown
+	}
+	return treeStateClean
+}
+
+// versionData is the machine-readable --version payload for --output json.
+type versionData struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
+	Tree    string `json:"tree"`
+}
+
+// renderVersion renders the --version output. Cobra handles the version flag
+// BEFORE PersistentPreRunE runs, so JSON mode is detected from the parsed
+// --output flag directly rather than via output.IsJSONMode() (not yet set).
+func renderVersion(cmd *cobra.Command) string {
+	if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Value.String() == "json" {
+		envelope := output.JSONEnvelope{
+			Status:  "success",
+			Command: cmd.Name(),
+			Data: versionData{
+				Version: Version,
+				Commit:  Commit,
+				Date:    Date,
+				Tree:    treeState(),
+			},
+		}
+		var buf bytes.Buffer
+		if err := output.RenderJSON(&buf, envelope); err == nil {
+			return buf.String()
+		}
+		// Unreachable in practice (versionData always marshals); fall through
+		// to text so --version never produces empty output.
+	}
+	return fmt.Sprintf("%s version %s\n", cmd.DisplayName(), cmd.Version)
 }
 
 func init() {
@@ -283,6 +374,12 @@ func init() {
 	RootCmd.Use = binaryName
 	RootCmd.Long = fmt.Sprintf(`%s is a production-ready Go CLI application built with ckeletin-go.
 Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patterns.`, binaryName)
+
+	// Route --version through renderVersion so it honors --output json.
+	// Cobra resolves the version flag before PersistentPreRunE, so the
+	// template func is the only hook that runs early enough.
+	cobra.AddTemplateFunc("ckeletinRenderVersion", renderVersion)
+	RootCmd.SetVersionTemplate(`{{ckeletinRenderVersion .}}`)
 
 	configPaths := ConfigPaths()
 
