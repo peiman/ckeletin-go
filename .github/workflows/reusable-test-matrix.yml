@@ -41,7 +41,10 @@ jobs:
         run: go mod download
 
       - name: Read Task version (SSOT)
-        run: echo "TASK_VERSION=$(cat .github/TASK_VERSION)" >> "$GITHUB_ENV"
+        run: |
+          TASK_VERSION="$(cat .github/TASK_VERSION 2>/dev/null || true)"
+          [ -n "$TASK_VERSION" ] || { echo "::error::.github/TASK_VERSION missing or empty"; exit 1; }
+          echo "TASK_VERSION=${TASK_VERSION}" >> "$GITHUB_ENV"
         shell: bash
 
       - name: Install Task (Unix)

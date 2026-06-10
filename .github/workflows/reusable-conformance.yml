@@ -14,7 +14,9 @@ permissions: {}
 env:
   # TASK_VERSION is read from .github/TASK_VERSION file (SSOT)
   PINNED_TOOLS_VERSION: 'v1'    # keep in sync with ci.yml (cache-busting)
-  YQ_VERSION: '4.44.6'          # conform.sh parses conformance-mapping.yaml with yq
+  # conform.sh parses conformance-mapping.yaml with yq; keep in sync with
+  # TOOL_YQ_VERSION in .ckeletin/Taskfile.yml (same version, no 'v' prefix)
+  YQ_VERSION: '4.44.6'
 
 jobs:
   conformance:
@@ -34,7 +36,10 @@ jobs:
           cache-dependency-path: 'go.sum'
 
       - name: Read Task version (SSOT)
-        run: echo "TASK_VERSION=$(cat .github/TASK_VERSION)" >> "$GITHUB_ENV"
+        run: |
+          TASK_VERSION="$(cat .github/TASK_VERSION 2>/dev/null || true)"
+          [ -n "$TASK_VERSION" ] || { echo "::error::.github/TASK_VERSION missing or empty"; exit 1; }
+          echo "TASK_VERSION=${TASK_VERSION}" >> "$GITHUB_ENV"
 
       - name: Cache Task Binary
         id: cache-task
