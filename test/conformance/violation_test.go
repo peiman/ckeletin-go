@@ -306,7 +306,12 @@ func ckspecViolation() {}
 // ---------------------------------------------------------------------------
 // CKSPEC-ARCH-006: Entry point minimality
 // Enforcement: validate-command-patterns.sh (script level)
-// Violation: command file exceeds 80 lines
+// Violation: a run* function exceeds the 35-line hard limit (the failing
+// gate; whole-file size above 80 lines is advisory-only and cannot prove
+// enforcement). The injected file is named ping_violation.go so the
+// metadata check resolves via the parent config (ping_config.go), and it
+// carries MustNewCommand/MustAddToRoot wiring — every earlier check passes,
+// isolating the line-count gate as the only possible error.
 // ---------------------------------------------------------------------------
 
 func TestViolation_ARCH006_OversizedCommand(t *testing.T) {
@@ -314,19 +319,74 @@ func TestViolation_ARCH006_OversizedCommand(t *testing.T) {
 		t.Skip("violation tests modify the source tree")
 	}
 
-	// Generate a command file that exceeds the 80-line limit
-	var lines string
-	lines = "package cmd\n\n"
-	for i := 0; i < 85; i++ {
-		lines += "// padding line to exceed limit\n"
-	}
+	var b strings.Builder
+	b.WriteString(`// cmd/ping_violation.go
 
-	cleanup := writeViolationFile(t, "cmd/ckspec_violation.go", lines)
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+)
+
+var pingViolationCmd = MustNewCommand(commands.PingMetadata, runPingViolation)
+
+func init() {
+	MustAddToRoot(pingViolationCmd)
+}
+
+func runPingViolation(cmd *cobra.Command, args []string) error {
+`)
+	// func line + 38 padding statements + return + closing brace = 41 lines,
+	// past the 35-line hard limit. Plain assignments keep the business-logic
+	// heuristic (check 6) quiet so the line-count gate is the sole finding.
+	for i := 0; i < 38; i++ {
+		b.WriteString("\t_ = \"padding statement\"\n")
+	}
+	b.WriteString("\treturn nil\n}\n")
+
+	cleanup := writeViolationFile(t, "cmd/ping_violation.go", b.String())
 	defer cleanup()
 
 	output, exitCode := runCheck(t, "bash", scriptPath(t, "validate-command-patterns.sh"))
 	assert.NotEqual(t, 0, exitCode,
-		"validate-command-patterns.sh should fail when command file exceeds 80 lines\nOutput: %s", output)
+		"validate-command-patterns.sh must fail when a run* function exceeds the 35-line hard limit\nOutput: %s", output)
+	assert.Contains(t, output,
+		"ping_violation: runPingViolation() is 41 lines (target 30, hard limit 35) - move logic to internal/",
+		"the failure must come from the run* line-count gate, not another check\nOutput: %s", output)
+	assert.NotContains(t, output, "ping_violation: Missing metadata file",
+		"the injected file must pass the metadata check so the line-count error is isolated\nOutput: %s", output)
+}
+
+// ---------------------------------------------------------------------------
+// CKSPEC-ARCH-006: Entry point minimality (whitelist escape hatch)
+// Enforcement: validate-command-patterns.sh (script level)
+// Violation: a bare // ckeletin:allow-custom-command marker with no
+// justification. The line above is a file-path header comment, which the
+// script explicitly refuses to count as a reason, and the line below is the
+// package clause — so the marker carries no justification anywhere the
+// script looks. The marker makes the script skip every other check for the
+// file, isolating the justification error.
+// ---------------------------------------------------------------------------
+
+func TestViolation_ARCH006_MarkerWithoutJustification(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	cleanup := writeViolationFile(t,
+		"cmd/ckspec_violation.go",
+		`// cmd/ckspec_violation.go
+// ckeletin:allow-custom-command
+package cmd
+`)
+	defer cleanup()
+
+	output, exitCode := runCheck(t, "bash", scriptPath(t, "validate-command-patterns.sh"))
+	assert.NotEqual(t, 0, exitCode,
+		"validate-command-patterns.sh must fail when the whitelist marker has no justification\nOutput: %s", output)
+	assert.Contains(t, output,
+		"ckspec_violation: ckeletin:allow-custom-command marker has no justification (add a short reason on or next to the marker line)",
+		"the failure must come from the marker-justification check\nOutput: %s", output)
 }
 
 // ---------------------------------------------------------------------------

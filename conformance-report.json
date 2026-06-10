@@ -139,7 +139,8 @@
       "status": "met",
       "violation_evidence": null,
       "violation_tests": [
-        "test/conformance/violation_test.go::TestViolation_ARCH006_OversizedCommand"
+        "test/conformance/violation_test.go::TestViolation_ARCH006_OversizedCommand",
+        "test/conformance/violation_test.go::TestViolation_ARCH006_MarkerWithoutJustification"
       ]
     },
     "CKSPEC-ARCH-007": {
