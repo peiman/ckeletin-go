@@ -12,13 +12,18 @@ export PATH="${HOME}/go/bin:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Tool versions are pinned in the framework Taskfile (SSOT); read them from
-# there so this hook installs the same versions as `task setup`
+# there so this hook installs the same versions as `task setup`. A missing
+# pin falls back to latest, with a warning on stderr so the gap is visible.
 FRAMEWORK_TASKFILE="${SCRIPT_DIR}/../Taskfile.yml"
 
 tool_version() {
     local pin
     pin=$(grep -E "^[[:space:]]*TOOL_${1}_VERSION:" "$FRAMEWORK_TASKFILE" 2>/dev/null | head -1 | awk '{print $2}' | tr -d "'\"")
-    echo "${pin:-latest}"
+    if [ -z "$pin" ]; then
+        echo "⚠️  No TOOL_${1}_VERSION pin in ${FRAMEWORK_TASKFILE}; falling back to latest" >&2
+        pin="latest"
+    fi
+    echo "$pin"
 }
 
 # Function to check if a command exists
@@ -26,17 +31,28 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Tools that failed to install; reported (with exit 1) at the end so one
+# failure doesn't hide the others
+FAILED_TOOLS=""
+
 # Function to install a tool if not present
 install_tool() {
     local tool_name=$1
     local tool_package=$2
+    local output
 
     if command_exists "$tool_name"; then
         echo "✅ $tool_name already installed"
     else
         echo "📦 Installing $tool_name..."
-        go install "$tool_package" 2>&1 | grep -v "^go: downloading" || true
-        echo "✅ $tool_name installed"
+        # Capture output so go install's real exit status isn't masked by grep
+        if output=$(go install "$tool_package" 2>&1); then
+            echo "✅ $tool_name installed"
+        else
+            echo "$output" | grep -v "^go: downloading" >&2 || true
+            echo "❌ Failed to install $tool_name ($tool_package)" >&2
+            FAILED_TOOLS="${FAILED_TOOLS} ${tool_name}"
+        fi
     fi
 }
 
@@ -54,7 +70,20 @@ install_tool "yq" "github.com/mikefarah/yq/v4@$(tool_version YQ)"  # mikefarah/y
 # Optional: lefthook (may fail due to network/version issues, not critical)
 if ! command_exists "lefthook"; then
     echo "📦 Installing lefthook (optional)..."
-    go install "github.com/evilmartians/lefthook@$(tool_version LEFTHOOK)" 2>&1 | grep -v "^go: downloading" || echo "⚠️  lefthook skipped (not critical)"
+    # Capture output so go install's real exit status isn't masked by grep
+    if output=$(go install "github.com/evilmartians/lefthook@$(tool_version LEFTHOOK)" 2>&1); then
+        echo "✅ lefthook installed"
+    else
+        echo "$output" | grep -v "^go: downloading" >&2 || true
+        echo "⚠️  lefthook skipped (not critical)"
+    fi
+fi
+
+if [ -n "$FAILED_TOOLS" ]; then
+    echo "" >&2
+    echo "❌ Some tools failed to install:${FAILED_TOOLS}" >&2
+    echo "   Re-run: bash .ckeletin/scripts/install_tools.sh (or: task setup)" >&2
+    exit 1
 fi
 
 echo ""

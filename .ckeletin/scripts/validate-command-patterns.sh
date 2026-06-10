@@ -79,7 +79,12 @@ for cmd_file in $COMMAND_FILES; do
     fi
 
     # Check 1: run* function length (the 30-line contract)
-    # Measured from the `func runX(...)` line through its closing brace
+    # Measured from the `func runX(...)` line through its closing brace.
+    # Known heuristic blind spots (accepted): only column-0 `func run...`
+    # declarations match, so receiver methods (`func (x T) runY(...)`) are
+    # not measured; the end is the next `}` at column 0, which gofmt
+    # guarantees for top-level functions but hand-written or generated
+    # code without gofmt could skew the count.
     run_funcs=$(awk '
         /^func run/ { name = $2; sub(/\(.*/, "", name); start = NR }
         /^}/        { if (start) { print name, NR - start + 1; start = 0 } }

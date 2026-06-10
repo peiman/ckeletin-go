@@ -60,6 +60,9 @@ vars:
   TOOL_GITLEAKS_VERSION: latest
   TOOL_GRYPE_VERSION: latest
   TOOL_GOCOVMERGE_VERSION: latest
+  # Keep in sync with YQ_VERSION in .github/workflows/reusable-conformance.yml
+  # (CI downloads the release binary; install_tools.sh go-installs this tag)
+  TOOL_YQ_VERSION: v4.44.6
 
 tasks:
   default:

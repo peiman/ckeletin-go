@@ -29,16 +29,49 @@ check_files() {
 
     check_header "Checking code formatting"
 
+    # A missing formatter must fail the gate loudly — swallowing it would
+    # turn the check into a silent pass (fail-open)
+    local tool
+    for tool in goimports gofmt; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            check_failure \
+                "Formatting check failed" \
+                "Required formatter '$tool' not found in PATH" \
+                "Run: task setup"
+            exit 1
+        fi
+    done
+
+    # stderr is captured separately so tool errors never masquerade as
+    # "files needing formatting", and a crashing formatter fails the gate
+    local err_file
+    err_file=$(mktemp)
+    trap 'rm -f "$err_file"' EXIT
+
     local unformatted_output=""
 
     # Check goimports
-    local goimports_output=$(goimports -l "${FILES[@]}" 2>/dev/null || true)
+    local goimports_output
+    if ! goimports_output=$(goimports -l "${FILES[@]}" 2>"$err_file"); then
+        check_failure \
+            "goimports failed to run" \
+            "$(cat "$err_file")" \
+            "Fix the goimports error above; if the tool is broken, run: task setup"
+        exit 1
+    fi
     if [ -n "$goimports_output" ]; then
         unformatted_output+="Files need goimports:"$'\n'"$goimports_output"$'\n\n'
     fi
 
     # Check gofmt
-    local gofmt_output=$(gofmt -l "${FILES[@]}" 2>/dev/null || true)
+    local gofmt_output
+    if ! gofmt_output=$(gofmt -l "${FILES[@]}" 2>"$err_file"); then
+        check_failure \
+            "gofmt failed to run" \
+            "$(cat "$err_file")" \
+            "Fix the gofmt error above; if the tool is broken, run: task setup"
+        exit 1
+    fi
     if [ -n "$gofmt_output" ]; then
         unformatted_output+="Files need gofmt:"$'\n'"$gofmt_output"
     fi

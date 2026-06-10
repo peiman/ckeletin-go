@@ -23,7 +23,10 @@ KEYS_FILE=""
 # the script is interrupted mid-run.
 restore_and_cleanup() {
     if [ -n "$KEYS_FILE" ] && [ -s "$TEMP_CURRENT" ] && ! cmp -s "$TEMP_CURRENT" "$KEYS_FILE"; then
-        cp "$TEMP_CURRENT" "$KEYS_FILE"
+        if ! cp "$TEMP_CURRENT" "$KEYS_FILE"; then
+            echo "⚠️  WARNING: failed to restore ${KEYS_FILE}; original kept at ${TEMP_CURRENT}" >&2
+            return
+        fi
     fi
     rm -rf "$TEMP_DIR"
 }
@@ -50,9 +53,20 @@ if ! GEN_OUTPUT=$(CKELETIN_CONSTANTS_OUT="$TEMP_FRESH" go run "$GEN_SCRIPT" 2>&1
     exit 1
 fi
 
-# Legacy generator without CKELETIN_CONSTANTS_OUT support wrote to the real
-# file instead; copy its output and let the EXIT trap restore the original
 if [ ! -s "$TEMP_FRESH" ]; then
+    if grep -q "CKELETIN_CONSTANTS_OUT" "$GEN_SCRIPT"; then
+        # An override-aware generator that wrote nothing is a bug; copying
+        # KEYS_FILE here would diff the working file against itself and the
+        # check would always pass (fail-open)
+        check_failure \
+            "Generator produced no output" \
+            "$GEN_SCRIPT supports CKELETIN_CONSTANTS_OUT but wrote nothing to it" \
+            "Debug the generator: CKELETIN_CONSTANTS_OUT=/tmp/keys.go go run $GEN_SCRIPT"
+        exit 1
+    fi
+    # Legacy generator without CKELETIN_CONSTANTS_OUT support wrote to the
+    # real file instead; copy its output and let the EXIT trap restore the
+    # original
     cp "$KEYS_FILE" "$TEMP_FRESH"
 fi
 
