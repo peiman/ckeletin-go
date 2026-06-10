@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rs/zerolog/log"
 )
 
 // TeaHandler renders progress events using Bubble Tea.
@@ -24,6 +25,10 @@ type TeaHandler struct {
 	model   *teaModel
 	started bool
 	ready   chan struct{} // signals when program is ready to receive messages
+
+	// extraTeaOpts is appended to the default program options. Tests use it
+	// to run the program without a TTY (tea.WithInput(nil)); nil in production.
+	extraTeaOpts []tea.ProgramOption
 }
 
 // NewTeaHandler creates a new Bubble Tea based progress handler.
@@ -75,41 +80,45 @@ func (h *TeaHandler) OnProgress(ctx context.Context, event Event) {
 	h.mu.Unlock()
 
 	// Send the event to the model
-	if program != nil {
-		program.Send(progressEventMsg{event: event})
+	if program == nil {
+		log.Debug().
+			Str("event_type", event.Type.String()).
+			Msg("progress event dropped: no active Bubble Tea program")
+		return
+	}
 
-		// If this is a terminal event, signal completion
-		if event.Type == EventComplete || event.Type == EventError {
-			// Use a short timer instead of sleep to allow for cancellation
-			timer := time.NewTimer(50 * time.Millisecond)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
-			program.Send(tea.Quit())
+	program.Send(progressEventMsg{event: event})
+
+	// If this is a terminal event, signal completion
+	if event.Type == EventComplete || event.Type == EventError {
+		// Use a short timer instead of sleep to allow for cancellation
+		timer := time.NewTimer(50 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 		}
+		program.Send(tea.Quit())
 	}
 }
 
 // start initializes the Bubble Tea program.
 func (h *TeaHandler) start() {
+	// started and program must be published in one critical section:
+	// a Stop() between them would see a nil program, no-op, and the program
+	// would launch anyway, voiding Stop's wait-for-shutdown guarantee.
+	// tea.NewProgram only constructs the program (Run starts it), so it is
+	// safe to call while holding the mutex.
 	h.mu.Lock()
 	if h.started {
 		h.mu.Unlock()
 		return
 	}
 	h.started = true
-	h.mu.Unlock()
-
-	opts := []tea.ProgramOption{
-		tea.WithOutput(h.out),
-	}
-
-	h.mu.Lock()
-	h.program = tea.NewProgram(h.model, opts...)
-	program := h.program
+	opts := append([]tea.ProgramOption{tea.WithOutput(h.out)}, h.extraTeaOpts...)
+	program := tea.NewProgram(h.model, opts...)
+	h.program = program
 	ready := h.ready
 	h.mu.Unlock()
 
@@ -118,8 +127,28 @@ func (h *TeaHandler) start() {
 		// Signal that the program is ready to receive messages
 		// Close the channel to signal all waiting goroutines
 		close(ready)
-		_, _ = program.Run()
+		if _, err := program.Run(); err != nil {
+			// Without a reset, started would stay true forever and every
+			// later OnProgress would silently no-op (dead handler).
+			log.Debug().Err(err).Msg("Bubble Tea program failed; resetting progress handler so it can retry")
+			h.resetAfterRunFailure(program)
+		}
 	}()
+}
+
+// resetAfterRunFailure clears handler state after Run() fails so a later
+// OnProgress can start a fresh program. It only resets if program is still
+// the current one: a Stop() or a newer start() must not be clobbered.
+func (h *TeaHandler) resetAfterRunFailure(program *tea.Program) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.program != program {
+		return
+	}
+	h.program = nil
+	h.started = false
+	// start() closed the old ready channel; closing it twice would panic
+	h.ready = make(chan struct{})
 }
 
 // Stop gracefully stops the Bubble Tea program.
@@ -141,6 +170,10 @@ func (h *TeaHandler) Stop() {
 		// Wait for Run() to return so the renderer goroutine has stopped
 		// writing to h.out before the handler (or caller) reuses the writer.
 		// Waiting outside the mutex keeps OnProgress/start from blocking.
+		// Quit() sends on an unbuffered channel, so it blocks until Run's
+		// event loop is receiving (or the program has died) — that is what
+		// keeps Wait() from hanging when Stop races a just-started program
+		// whose Run has not entered its loop yet.
 		program.Wait()
 	}
 }

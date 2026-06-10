@@ -3,7 +3,10 @@ package progress
 import (
 	"bytes"
 	"context"
+	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -420,7 +423,7 @@ func TestTeaHandler_OnProgress_ContextCancellation(t *testing.T) {
 
 func TestTeaHandler_OnProgress_StartsProgram(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	// Initially not started
@@ -459,7 +462,7 @@ func TestTeaHandler_OnProgress_StartsProgram(t *testing.T) {
 
 func TestTeaHandler_OnProgress_SendsEvent(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	// Start by sending multiple events
@@ -491,7 +494,7 @@ func TestTeaHandler_OnProgress_SendsEvent(t *testing.T) {
 
 func TestTeaHandler_OnProgress_ErrorEvent(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	done := make(chan struct{})
@@ -513,7 +516,7 @@ func TestTeaHandler_OnProgress_ErrorEvent(t *testing.T) {
 
 func TestTeaHandler_OnProgress_ContextCancelDuringWait(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -533,7 +536,7 @@ func TestTeaHandler_OnProgress_ContextCancelDuringWait(t *testing.T) {
 
 func TestTeaHandler_OnProgress_MultipleStart(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	done := make(chan struct{})
@@ -555,7 +558,7 @@ func TestTeaHandler_OnProgress_MultipleStart(t *testing.T) {
 
 func TestTeaHandler_Stop_AfterStart(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	// Start the handler
@@ -583,7 +586,7 @@ func TestTeaHandler_Stop_AfterStart(t *testing.T) {
 func TestTeaHandler_OnProgress_AfterStop_Restarts(t *testing.T) {
 	// SETUP PHASE
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 	ctx := context.Background()
 
 	// First lifecycle: start, then stop
@@ -624,9 +627,60 @@ func TestTeaHandler_OnProgress_AfterStop_Restarts(t *testing.T) {
 	h.Stop()
 }
 
+// postStopWriter is a goroutine-safe io.Writer that records whether any
+// write arrives after the test flips the stopped flag.
+type postStopWriter struct {
+	mu       sync.Mutex
+	buf      bytes.Buffer
+	stopped  atomic.Bool
+	postStop atomic.Bool
+}
+
+func (w *postStopWriter) Write(p []byte) (int, error) {
+	if w.stopped.Load() {
+		w.postStop.Store(true)
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *postStopWriter) Len() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Len()
+}
+
+func TestTeaHandler_Stop_NoWritesAfterStopReturns(t *testing.T) {
+	// SETUP PHASE
+	w := &postStopWriter{}
+	h := newTestTeaHandler(w)
+	ctx := context.Background()
+
+	// Drive the program with real events so the renderer is actively painting
+	h.OnProgress(ctx, NewEvent(EventStart, "working"))
+	h.OnProgress(ctx, NewEvent(EventProgress, "step").WithProgress(1, 2))
+
+	require.Eventually(t, func() bool { return w.Len() > 0 },
+		2*time.Second, 5*time.Millisecond,
+		"renderer never wrote a frame; cannot exercise the shutdown race")
+
+	// EXECUTION PHASE
+	h.Stop()
+	w.stopped.Store(true)
+
+	// Give a leaked renderer goroutine time to write its shutdown sequence
+	// (flush + erase-line happen after Quit is processed)
+	time.Sleep(100 * time.Millisecond)
+
+	// ASSERTION PHASE
+	assert.False(t, w.postStop.Load(),
+		"output written after Stop() returned; Stop must Wait() for Run to finish")
+}
+
 func TestTeaHandler_start_DoubleStart(t *testing.T) {
 	var buf bytes.Buffer
-	h := NewTeaHandler(&buf)
+	h := newTestTeaHandler(&buf)
 
 	// Call start directly multiple times
 	h.start()
@@ -637,4 +691,112 @@ func TestTeaHandler_start_DoubleStart(t *testing.T) {
 	h.mu.Unlock()
 
 	h.Stop()
+}
+
+// newTestTeaHandler returns a handler whose program runs without a TTY so
+// Run() genuinely succeeds under go test/CI (bubbletea's default input
+// expects a terminal).
+func newTestTeaHandler(out io.Writer) *TeaHandler {
+	h := NewTeaHandler(out)
+	h.extraTeaOpts = []tea.ProgramOption{tea.WithInput(nil)}
+	return h
+}
+
+func TestTeaHandler_start_StartedImpliesProgram(t *testing.T) {
+	// SETUP PHASE
+	var buf bytes.Buffer
+	h := newTestTeaHandler(&buf)
+
+	// A concurrent observer hunts for the TOCTOU window where started is
+	// already true but program is still nil: a Stop() landing in that window
+	// no-ops, the program launches anyway, and Stop's "no writes after
+	// return" guarantee is void.
+	var violated atomic.Bool
+	checkerDone := make(chan struct{})
+	stopChecker := make(chan struct{})
+	go func() {
+		defer close(checkerDone)
+		for {
+			select {
+			case <-stopChecker:
+				return
+			default:
+			}
+			h.mu.Lock()
+			if h.started && h.program == nil {
+				violated.Store(true)
+			}
+			h.mu.Unlock()
+		}
+	}()
+
+	// EXECUTION PHASE
+	for i := 0; i < 50; i++ {
+		h.start()
+		h.Stop()
+	}
+	close(stopChecker)
+	<-checkerDone
+
+	// ASSERTION PHASE
+	assert.False(t, violated.Load(),
+		"observed started=true with nil program; start() must publish started and program in one critical section")
+}
+
+func TestTeaHandler_RunFailure_ResetsStateForRetry(t *testing.T) {
+	// SETUP PHASE
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	// A pre-cancelled program context makes Run() return ErrProgramKilled
+	// immediately — the same failure shape as "no TTY available" in CI.
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.extraTeaOpts = []tea.ProgramOption{tea.WithInput(nil), tea.WithContext(cancelled)}
+
+	// EXECUTION PHASE
+	h.OnProgress(context.Background(), NewEvent(EventStart, "doomed"))
+
+	// ASSERTION PHASE
+	// Without the reset, started stays true forever and every later
+	// OnProgress silently no-ops (dead handler).
+	assert.Eventually(t, func() bool {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return !h.started && h.program == nil
+	}, 2*time.Second, 5*time.Millisecond,
+		"Run() failure must reset handler state so a later OnProgress can retry")
+}
+
+func TestTeaHandler_resetAfterRunFailure_IgnoresStaleProgram(t *testing.T) {
+	// SETUP PHASE
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	// tea.NewProgram only constructs; neither program is run
+	stale := tea.NewProgram(newTeaModel(DefaultStyle()), tea.WithInput(nil), tea.WithOutput(&buf))
+	current := tea.NewProgram(newTeaModel(DefaultStyle()), tea.WithInput(nil), tea.WithOutput(&buf))
+	h.mu.Lock()
+	h.started = true
+	h.program = current
+	readyBefore := h.ready
+	h.mu.Unlock()
+
+	// EXECUTION PHASE: a stale program's failure must not clobber the
+	// current program's state
+	h.resetAfterRunFailure(stale)
+
+	// ASSERTION PHASE
+	h.mu.Lock()
+	assert.True(t, h.started, "stale reset must not clear started")
+	assert.Same(t, current, h.program, "stale reset must not clear the current program")
+	assert.True(t, readyBefore == h.ready, "stale reset must not replace the ready channel")
+	h.mu.Unlock()
+
+	// The current program's failure resets everything
+	h.resetAfterRunFailure(current)
+
+	h.mu.Lock()
+	assert.False(t, h.started, "reset must clear started so OnProgress can retry")
+	assert.Nil(t, h.program, "reset must clear the program")
+	assert.True(t, readyBefore != h.ready, "reset must recreate the ready channel; the old one gets closed by start()")
+	h.mu.Unlock()
 }

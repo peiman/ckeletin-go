@@ -20,6 +20,9 @@ const (
 )
 
 // DemoOptions selects which demos to run and how fast they advance.
+// SpinnerOnly and BarOnly are independent selectors, not mutually exclusive:
+// setting both runs the spinner and bar demos but silently skips multi-phase
+// (which only runs when neither is set).
 type DemoOptions struct {
 	// SpinnerOnly runs only the spinner demo.
 	SpinnerOnly bool
