@@ -7,7 +7,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 )
@@ -100,6 +102,55 @@ Maximum allowed: %d bytes (%.2f MB)`,
 		Msg("Config file size validated")
 
 	return nil
+}
+
+// ValidateLogFilePath returns a validation function for log file path config
+// values (ADR-004: configuration as attack surface). It validates the cleaned
+// path, rejecting:
+//   - paths whose cleaned form still escapes upward via ".." components
+//   - paths where an existing file is a symlink (writing through it would
+//     redirect log output to an attacker-chosen location)
+//   - empty paths
+//
+// Known limits of this check:
+//   - Nil and non-string values pass through unvalidated: nothing checks the
+//     declared option type at load time (viper casts at read time).
+//   - Only the final path component is Lstat'd, so a path whose parent
+//     directory is a symlink passes. Intentional: /var on macOS is itself a
+//     symlink.
+//   - Any Lstat error passes, not just a missing file (which is accepted
+//     because the logger creates it on first write).
+func ValidateLogFilePath() func(interface{}) error {
+	return func(value interface{}) error {
+		if value == nil {
+			return nil
+		}
+		path, ok := value.(string)
+		if !ok {
+			return nil
+		}
+		if path == "" {
+			return fmt.Errorf("log file path must not be empty")
+		}
+
+		cleaned := filepath.Clean(path)
+		for _, component := range strings.Split(filepath.ToSlash(cleaned), "/") {
+			if component == ".." {
+				return fmt.Errorf("log file path %q contains a path traversal component (..)", path)
+			}
+		}
+
+		info, err := os.Lstat(cleaned)
+		if err != nil {
+			// Missing file is fine: it is created on first write
+			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("log file path %q is a symlink, which is not allowed for log files", path)
+		}
+
+		return nil
+	}
 }
 
 // ValidateConfigFileSecurity performs comprehensive security validation on a config file.

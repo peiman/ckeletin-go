@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
-// Note: lipgloss import removed - we use p.style() helper for rendering
+// Note: rendering goes through the p.style() helper; lipgloss is imported
+// only for display-width measurement (multibyte icons are wider in bytes
+// than in terminal columns).
 
 // renderCategoryHeader renders a category header with lipgloss styling.
 // Example: " Code Quality " (with colored background)
@@ -99,6 +103,9 @@ func (p *Printer) renderCheckFailure(title, details, remediation string) {
 // renderCheckSummary renders a beautiful summary box with borders.
 func (p *Printer) renderCheckSummary(status Status, title string, items []string) {
 	width := p.theme.SummaryWidth
+	if width < 2 {
+		width = 2
+	}
 
 	// Box drawing characters
 	topLeft := "╭"
@@ -116,6 +123,11 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 		bottomRight = "+"
 		horizontal = "-"
 		vertical = "|"
+	}
+
+	// Theme overrides the horizontal rule character when set
+	if p.theme.SummaryChar != "" {
+		horizontal = p.theme.SummaryChar
 	}
 
 	// Style the box based on status
@@ -154,19 +166,30 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 	// Empty line
 	_, _ = fmt.Fprintf(p.writer, "%s%s%s\n", styledVertical(), strings.Repeat(" ", width-2), styledVertical())
 
+	// The rendered icon depends on status, so measure the matching one
+	// (display columns, not bytes - unicode icons are multibyte)
+	iconLen := lipgloss.Width(p.theme.IconSuccess)
+	if status == StatusFailure {
+		iconLen = lipgloss.Width(p.theme.IconFailure)
+	}
+
 	// Title line centered
 	titleContent := fmt.Sprintf("%s %s", iconStyled, titleStyled)
-	// Calculate visible length (without ANSI codes) - approximate
-	visibleLen := len(p.theme.IconSuccess) + 1 + len(title)
+	// Visible length in display columns (without ANSI codes)
+	visibleLen := iconLen + 1 + lipgloss.Width(title)
 	padding := (width - 2 - visibleLen) / 2
 	if padding < 1 {
 		padding = 1
+	}
+	rightPadding := width - 2 - padding - visibleLen
+	if rightPadding < 0 {
+		rightPadding = 0
 	}
 	_, _ = fmt.Fprintf(p.writer, "%s%s%s%s%s\n",
 		styledVertical(),
 		strings.Repeat(" ", padding),
 		titleContent,
-		strings.Repeat(" ", width-2-padding-visibleLen),
+		strings.Repeat(" ", rightPadding),
 		styledVertical())
 
 	// Items if present
@@ -185,7 +208,9 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 			}
 			styledConnector := p.style(p.theme.TreeStyle, connector)
 			itemLine := fmt.Sprintf("  %s %s %s", styledConnector, itemIcon, item)
-			itemPadding := width - 2 - len(connector) - len(p.theme.IconSuccess) - len(item) - 5
+			// Inner width minus the two-space indent and two separator spaces
+			// (display columns - tree connectors and icons are multibyte)
+			itemPadding := width - 2 - lipgloss.Width(connector) - iconLen - lipgloss.Width(item) - 4
 			if itemPadding < 0 {
 				itemPadding = 0
 			}
@@ -220,7 +245,7 @@ func (p *Printer) renderCheckNote(message string) {
 }
 
 // renderCheckLine renders a single-line check result mimicking TUI output.
-// Example: "format .......................... [OK] 1.451s"
+// Example (MinimalTheme): "format .................................. [OK] 1.451s"
 // In TTY mode: does nothing (animated output handles it).
 // In non-TTY mode: prints the TUI-style single line.
 func (p *Printer) renderCheckLine(name string, status Status, duration time.Duration) {

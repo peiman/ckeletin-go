@@ -13,8 +13,9 @@ type MockCall struct {
 	Args   []interface{}
 }
 
-// MockPrinter records all output for testing.
-// It captures method calls and arguments for verification.
+// MockPrinter records method calls for testing.
+// It captures each printer method invocation with its arguments for
+// verification; it does not render or write any output itself.
 //
 // Example:
 //
@@ -25,10 +26,14 @@ type MockCall struct {
 //	assert.True(t, mock.HasCall("CheckSuccess"))
 //	assert.Equal(t, 1, mock.CallCount("CheckHeader"))
 type MockPrinter struct {
-	// Buffer captures any output written (currently unused but available for future use)
+	// Buffer is user-writable scratch space for tests that want to simulate
+	// captured output. The mock's methods never write to it; it records
+	// method calls instead (see AllCalls, GetCalls).
 	Buffer bytes.Buffer
-	// Calls records all method invocations with their arguments
-	Calls []MockCall
+	// calls records all method invocations with their arguments.
+	// Access it through AllCalls, GetCalls, HasCall, or CallCount,
+	// which synchronize via the mutex.
+	calls []MockCall
 	mu    sync.Mutex
 }
 
@@ -41,28 +46,28 @@ func NewMockPrinter() *MockPrinter {
 func (m *MockPrinter) CategoryHeader(title string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CategoryHeader", Args: []interface{}{title}})
+	m.calls = append(m.calls, MockCall{Method: "CategoryHeader", Args: []interface{}{title}})
 }
 
 // CheckHeader records the call.
 func (m *MockPrinter) CheckHeader(message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CheckHeader", Args: []interface{}{message}})
+	m.calls = append(m.calls, MockCall{Method: "CheckHeader", Args: []interface{}{message}})
 }
 
 // CheckSuccess records the call.
 func (m *MockPrinter) CheckSuccess(message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CheckSuccess", Args: []interface{}{message}})
+	m.calls = append(m.calls, MockCall{Method: "CheckSuccess", Args: []interface{}{message}})
 }
 
 // CheckFailure records the call.
 func (m *MockPrinter) CheckFailure(title, details, remediation string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CheckFailure", Args: []interface{}{title, details, remediation}})
+	m.calls = append(m.calls, MockCall{Method: "CheckFailure", Args: []interface{}{title, details, remediation}})
 }
 
 // CheckSummary records the call.
@@ -73,7 +78,7 @@ func (m *MockPrinter) CheckSummary(status Status, title string, items ...string)
 	for _, item := range items {
 		args = append(args, item)
 	}
-	m.Calls = append(m.Calls, MockCall{Method: "CheckSummary", Args: args})
+	m.calls = append(m.calls, MockCall{Method: "CheckSummary", Args: args})
 }
 
 // CheckInfo records the call.
@@ -84,24 +89,27 @@ func (m *MockPrinter) CheckInfo(lines ...string) {
 	for i, line := range lines {
 		args[i] = line
 	}
-	m.Calls = append(m.Calls, MockCall{Method: "CheckInfo", Args: args})
+	m.calls = append(m.calls, MockCall{Method: "CheckInfo", Args: args})
 }
 
 // CheckNote records the call.
 func (m *MockPrinter) CheckNote(message string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CheckNote", Args: []interface{}{message}})
+	m.calls = append(m.calls, MockCall{Method: "CheckNote", Args: []interface{}{message}})
 }
 
 // CheckLine records the call.
 func (m *MockPrinter) CheckLine(name string, status Status, duration time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = append(m.Calls, MockCall{Method: "CheckLine", Args: []interface{}{name, status, duration}})
+	m.calls = append(m.calls, MockCall{Method: "CheckLine", Args: []interface{}{name, status, duration}})
 }
 
-// Output returns all captured output as a string.
+// Output returns the contents of Buffer, the test-written scratch space.
+// The mock's printer methods never write to Buffer, so this is empty
+// unless the test wrote to it; use AllCalls or GetCalls to inspect what
+// the code under test printed.
 func (m *MockPrinter) Output() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -112,7 +120,7 @@ func (m *MockPrinter) Output() string {
 func (m *MockPrinter) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.Calls = nil
+	m.calls = nil
 	m.Buffer.Reset()
 }
 
@@ -120,7 +128,7 @@ func (m *MockPrinter) Reset() {
 func (m *MockPrinter) HasCall(method string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	for _, call := range m.Calls {
+	for _, call := range m.calls {
 		if call.Method == method {
 			return true
 		}
@@ -133,12 +141,22 @@ func (m *MockPrinter) CallCount(method string) int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	count := 0
-	for _, call := range m.Calls {
+	for _, call := range m.calls {
 		if call.Method == method {
 			count++
 		}
 	}
 	return count
+}
+
+// AllCalls returns a copy of all recorded calls in order.
+// The returned slice is safe to read while other goroutines use the mock.
+func (m *MockPrinter) AllCalls() []MockCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	calls := make([]MockCall, len(m.calls))
+	copy(calls, m.calls)
+	return calls
 }
 
 // GetCalls returns all argument lists for calls to a specific method.
@@ -153,7 +171,7 @@ func (m *MockPrinter) GetCalls(method string) [][]interface{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var calls [][]interface{}
-	for _, call := range m.Calls {
+	for _, call := range m.calls {
 		if call.Method == method {
 			calls = append(calls, call.Args)
 		}

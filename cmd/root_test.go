@@ -4,14 +4,20 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -193,60 +199,115 @@ func TestRootCmd_PersistentPreRunE_Errors(t *testing.T) {
 	assert.Equal(t, "initConfig error", err.Error(), "Error message should match")
 }
 
-// Test the specific status logging in PersistentPreRunE
+// Test the config status logging through the REAL RootCmd.PersistentPreRunE.
+// It runs the full initialization path (bindFlags -> initConfig -> logger.Init)
+// and asserts on the stderr log output PersistentPreRunE actually produces.
 func TestRootCmd_ConfigStatusLogging(t *testing.T) {
-	// Save originals
-	origStatus := configFileStatus
-	origUsed := configFileUsed
-	defer func() {
-		configFileStatus = origStatus
-		configFileUsed = origUsed
-	}()
+	// runPersistentPreRunE executes the real RootCmd.PersistentPreRunE with
+	// os.Stderr captured (logger.Init(nil) inside it writes there), returning
+	// everything it logged plus its error.
+	runPersistentPreRunE := func(t *testing.T) (string, error) {
+		t.Helper()
 
-	tests := []struct {
-		name         string
-		configStatus string
-		configUsed   string
-	}{
-		{
-			name:         "No config file",
-			configStatus: "No config file found",
-			configUsed:   "",
-		},
-		{
-			name:         "With config file",
-			configStatus: "Using config file",
-			configUsed:   "/path/to/config.yaml",
-		},
+		savedLogger, savedLevel := logger.SaveLoggerState()
+		defer logger.RestoreLoggerState(savedLogger, savedLevel)
+
+		r, w, err := os.Pipe()
+		require.NoError(t, err, "Failed to create stderr pipe")
+		origStderr := os.Stderr
+		os.Stderr = w
+		defer func() { os.Stderr = origStderr }()
+
+		preRunErr := RootCmd.PersistentPreRunE(RootCmd, []string{})
+
+		os.Stderr = origStderr
+		require.NoError(t, w.Close(), "Failed to close stderr pipe writer")
+		captured, err := io.ReadAll(r)
+		require.NoError(t, err, "Failed to read captured stderr")
+
+		return string(captured), preRunErr
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// SETUP PHASE
-			// Set up test state
-			configFileStatus = tt.configStatus
-			configFileUsed = tt.configUsed
+	// saveConfigState snapshots the package-level config state mutated by
+	// initConfig and resets it so a stale configFileUsed from a previous test
+	// cannot select the wrong logging branch.
+	saveConfigState := func(t *testing.T) {
+		t.Helper()
 
-			// Mock the cmd so we can capture the check without running logger.Init
-			mockCmd := &cobra.Command{
-				PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-					// This is the core of what we're testing:
-					if configFileStatus != "" {
-						// If we have config status, it should be logged appropriately
-						assert.Equal(t, tt.configStatus, configFileStatus, "Status should match")
-						assert.Equal(t, tt.configUsed, configFileUsed, "ConfigUsed should match")
-					}
-					return nil
-				},
-			}
-
-			// EXECUTION PHASE
-			err := mockCmd.PersistentPreRunE(mockCmd, []string{})
-
-			// ASSERTION PHASE
-			assert.NoError(t, err, "Mock command should not fail")
+		origCfgFile := cfgFile
+		origStatus := configFileStatus
+		origUsed := configFileUsed
+		t.Cleanup(func() {
+			cfgFile = origCfgFile
+			configFileStatus = origStatus
+			configFileUsed = origUsed
 		})
+
+		viper.Reset()
+		cfgFile = ""
+		configFileStatus = ""
+		configFileUsed = ""
 	}
+
+	t.Run("With config file logs status and path at info level", func(t *testing.T) {
+		// SETUP PHASE
+		saveConfigState(t)
+
+		wd, err := os.Getwd()
+		require.NoError(t, err, "Failed to get working directory")
+		cfgFile = filepath.Join(wd, "..", "testdata", "config", "valid.yaml")
+		_, err = os.Stat(cfgFile)
+		require.NoError(t, err, "Test fixture config must exist")
+
+		// EXECUTION PHASE
+		logOutput, preRunErr := runPersistentPreRunE(t)
+
+		// ASSERTION PHASE
+		require.NoError(t, preRunErr, "PersistentPreRunE should succeed with a valid config file")
+		assert.Equal(t, "Using config file", configFileStatus,
+			"real initConfig should set the config file status")
+		assert.Contains(t, configFileUsed, "valid.yaml",
+			"real initConfig should record the config file used")
+		assert.Contains(t, logOutput, "Using config file",
+			"PersistentPreRunE should log the config status to stderr")
+		assert.Contains(t, logOutput, "config_file=",
+			"config file path should be logged as a structured field")
+		assert.Contains(t, logOutput, "valid.yaml",
+			"logged path should reference the actual config file")
+	})
+
+	t.Run("No config file logs status at debug level without path field", func(t *testing.T) {
+		// SETUP PHASE
+		saveConfigState(t)
+
+		oldWd, err := os.Getwd()
+		require.NoError(t, err, "Failed to get working directory")
+		defer func() { os.Chdir(oldWd) }()
+
+		// Isolate config discovery: empty cwd, HOME, and XDG config dir
+		tempDir := t.TempDir()
+		homeDir := filepath.Join(tempDir, "home")
+		require.NoError(t, os.MkdirAll(homeDir, 0755), "Failed to create temp home")
+		t.Setenv("HOME", homeDir)
+		t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+		// The no-config status is logged at debug level, which the default
+		// info console level filters out — raise verbosity via env var.
+		t.Setenv(EnvPrefix()+"_APP_LOG_LEVEL", "debug")
+		require.NoError(t, os.Chdir(tempDir), "Failed to change to temp dir")
+
+		// EXECUTION PHASE
+		logOutput, preRunErr := runPersistentPreRunE(t)
+
+		// ASSERTION PHASE
+		require.NoError(t, preRunErr, "PersistentPreRunE should succeed without a config file")
+		assert.Equal(t, "No config file found, using defaults and environment variables",
+			configFileStatus, "real initConfig should set the no-config status")
+		assert.Empty(t, configFileUsed, "no config file should be recorded")
+		assert.Contains(t, logOutput, "No config file found",
+			"PersistentPreRunE should log the no-config status to stderr")
+		assert.NotContains(t, logOutput, "config_file=",
+			"no config_file field should be logged when no config file is used")
+	})
 }
 
 func TestExecute_ErrorPropagation(t *testing.T) {
@@ -1344,4 +1405,214 @@ func TestConfigFromNativeDirectoryOnDarwin(t *testing.T) {
 	if configFileUsed != "" {
 		assert.Contains(t, configFileUsed, nativeConfigDir, "Expected config from native macOS dir")
 	}
+}
+
+// Env vars guarding the subprocess branches of the JSON-mode E2E tests.
+const (
+	jsonAuditRunEnv        = "CKELETIN_TEST_JSON_AUDIT_RUN"
+	jsonAuditLogPathEnv    = "CKELETIN_TEST_JSON_AUDIT_LOG_PATH"
+	jsonEnvDrivenRunEnv    = "CKELETIN_TEST_JSON_ENV_DRIVEN_RUN"
+	jsonConfigDrivenRunEnv = "CKELETIN_TEST_JSON_CONFIG_DRIVEN_RUN"
+)
+
+// isolateSubprocessEnv builds the environment for a re-exec subprocess with
+// HOME and XDG_CONFIG_HOME pointing into dir, so a developer's real
+// ~/.config/<app>/config.yaml can never leak into the test. os/exec keeps the
+// LAST value for duplicate keys, so appending overrides the inherited ones.
+func isolateSubprocessEnv(dir string, extra ...string) []string {
+	env := append(os.Environ(),
+		"HOME="+dir,
+		"XDG_CONFIG_HOME="+filepath.Join(dir, ".config"),
+	)
+	return append(env, extra...)
+}
+
+// outputFormatEnvVarUnderTest derives the environment variable viper maps to
+// config.KeyAppOutputFormat (SetEnvPrefix + the "." -> "_" key replacer).
+// Derived independently of production code so the mapping contract itself is
+// pinned, not just echoed.
+func outputFormatEnvVarUnderTest() string {
+	return EnvPrefix() + "_" + strings.ToUpper(strings.ReplaceAll(config.KeyAppOutputFormat, ".", "_"))
+}
+
+// writeIsolatedConfigFile places a config file where the subprocess's isolated
+// XDG_CONFIG_HOME will discover it, and returns the home directory.
+func writeIsolatedConfigFile(t *testing.T, content string) string {
+	t.Helper()
+	home := t.TempDir()
+	configDir := filepath.Join(home, ".config", binaryName)
+	require.NoError(t, os.MkdirAll(configDir, 0o700), "failed to create config dir")
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(content), 0o600),
+		"failed to write config file")
+	return home
+}
+
+// assertJSONModeContract asserts the CKSPEC-OUT-004 trio on a finished
+// subprocess: exactly one success envelope on stdout, a silent stderr, and an
+// audit log file that kept receiving Debug+ entries.
+func assertJSONModeContract(t *testing.T, stdout, stderr *bytes.Buffer, logPath string) {
+	t.Helper()
+
+	var envelope output.JSONEnvelope
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope),
+		"stdout must carry exactly one JSON envelope, got: %s", stdout.String())
+	assert.Equal(t, "success", envelope.Status)
+
+	assert.Empty(t, stderr.String(), "stderr must stay silent in JSON mode")
+
+	content, readErr := os.ReadFile(logPath)
+	require.NoError(t, readErr, "audit log file must exist in JSON mode")
+	assert.Contains(t, string(content), "Starting ping execution",
+		"audit log file must keep receiving Debug+ entries in JSON mode (OUT-004 shadow logs)")
+}
+
+// TestJSONMode_EnvDriven_StderrSilent guards CKSPEC-OUT-004 when JSON mode is
+// activated via the environment variable instead of the --output flag: the
+// pre-init security-validation logs that initConfig emits while reading the
+// config file must NOT reach stderr. Pins the env-var leg of the EARLY output
+// mode resolution together with the pre-init log buffering: without buffering
+// the raw zerolog JSON (~700 bytes) leaks to stderr before logger.Init runs.
+func TestJSONMode_EnvDriven_StderrSilent(t *testing.T) {
+	if os.Getenv(jsonEnvDrivenRunEnv) == "1" {
+		// SUBPROCESS BRANCH: JSON mode comes ONLY from the env var (no
+		// --output flag), with file logging to the parent's chosen path.
+		RootCmd.SetArgs([]string{
+			"ping",
+			"--log-file-enabled",
+			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
+			"--log-file-level", "debug",
+		})
+		if err := Execute(); err != nil {
+			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// SETUP PHASE
+	// The discoverable config file makes initConfig emit pre-init security
+	// validation logs — exactly the bytes that must not reach stderr.
+	home := writeIsolatedConfigFile(t, "app:\n  log_level: info\n")
+	logPath := filepath.Join(t.TempDir(), "audit.log")
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestJSONMode_EnvDriven_StderrSilent$")
+	cmd.Dir = home
+	cmd.Env = isolateSubprocessEnv(home,
+		jsonEnvDrivenRunEnv+"=1",
+		jsonAuditLogPathEnv+"="+logPath,
+		outputFormatEnvVarUnderTest()+"=json",
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// EXECUTION PHASE
+	err := cmd.Run()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "env-driven JSON mode ping must succeed\nstdout: %s\nstderr: %s",
+		stdout.String(), stderr.String())
+	assertJSONModeContract(t, &stdout, &stderr, logPath)
+}
+
+// TestJSONMode_ConfigFileDriven_StderrSilent guards CKSPEC-OUT-004 when JSON
+// mode is activated by the config file itself: the mode is unknowable until
+// the config is read, so the pre-init logs emitted while READING that very
+// file must be buffered and discarded once the mode resolves to JSON. Pins
+// the post-initConfig SetOutputMode site (the viper read): without it the
+// mode never becomes JSON, ping renders text to stdout, and logger.Init
+// leaves the console writer enabled.
+func TestJSONMode_ConfigFileDriven_StderrSilent(t *testing.T) {
+	if os.Getenv(jsonConfigDrivenRunEnv) == "1" {
+		// SUBPROCESS BRANCH: JSON mode comes ONLY from the config file.
+		RootCmd.SetArgs([]string{
+			"ping",
+			"--log-file-enabled",
+			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
+			"--log-file-level", "debug",
+		})
+		if err := Execute(); err != nil {
+			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// SETUP PHASE
+	home := writeIsolatedConfigFile(t, "app:\n  output_format: json\n")
+	logPath := filepath.Join(t.TempDir(), "audit.log")
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestJSONMode_ConfigFileDriven_StderrSilent$")
+	cmd.Dir = home
+	cmd.Env = isolateSubprocessEnv(home,
+		jsonConfigDrivenRunEnv+"=1",
+		jsonAuditLogPathEnv+"="+logPath,
+	)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// EXECUTION PHASE
+	err := cmd.Run()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "config-file-driven JSON mode ping must succeed\nstdout: %s\nstderr: %s",
+		stdout.String(), stderr.String())
+	assertJSONModeContract(t, &stdout, &stderr, logPath)
+}
+
+// TestJSONMode_AuditFileStillReceivesLogs guards the --output json logging
+// contract (AGENTS.md "JSON Output Mode", CKSPEC-OUT-004): stdout carries
+// exactly one JSON envelope, stderr stays silent, and ONLY the console is
+// silenced — the audit log file keeps receiving Debug+ entries. Runs in a
+// subprocess because the console writer targets the real os.Stderr, which
+// in-process RootCmd.SetErr buffers cannot observe.
+func TestJSONMode_AuditFileStillReceivesLogs(t *testing.T) {
+	if os.Getenv(jsonAuditRunEnv) == "1" {
+		// SUBPROCESS BRANCH: run ping in JSON mode with file logging to the
+		// path chosen by the parent, then exit before the testing framework
+		// prints PASS to stdout.
+		RootCmd.SetArgs([]string{
+			"ping", "--output", "json",
+			"--log-file-enabled",
+			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
+			"--log-file-level", "debug",
+		})
+		if err := Execute(); err != nil {
+			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// SETUP PHASE
+	// HOME/XDG isolation: without it the subprocess inherits the developer's
+	// real HOME, so a local ~/.config/<app>/config.yaml could alter behavior.
+	home := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "audit.log")
+	cmd := exec.Command(os.Args[0], "-test.run=^TestJSONMode_AuditFileStillReceivesLogs$")
+	cmd.Dir = home
+	cmd.Env = isolateSubprocessEnv(home, jsonAuditRunEnv+"=1", jsonAuditLogPathEnv+"="+logPath)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// EXECUTION PHASE
+	err := cmd.Run()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "ping --output json with file logging must succeed\nstdout: %s\nstderr: %s",
+		stdout.String(), stderr.String())
+
+	var envelope output.JSONEnvelope
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope),
+		"stdout must carry exactly one JSON envelope, got: %s", stdout.String())
+	assert.Equal(t, "success", envelope.Status)
+
+	assert.Empty(t, stderr.String(), "stderr must stay silent in JSON mode")
+
+	content, readErr := os.ReadFile(logPath)
+	require.NoError(t, readErr, "audit log file must exist in JSON mode")
+	assert.Contains(t, string(content), "Starting ping execution",
+		"audit log file must keep receiving Debug+ entries in JSON mode (OUT-004 shadow logs)")
 }

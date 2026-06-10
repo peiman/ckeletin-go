@@ -3,12 +3,17 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -312,6 +317,188 @@ func TestInitWithFileLogging(t *testing.T) {
 	}
 }
 
+// TestInit_JSONModeSilencesConsoleNotFile guards the --output json logging
+// contract (CKSPEC-OUT-004): the console writer is fully silenced while the
+// file (audit) writer keeps receiving entries at its configured level.
+func TestInit_JSONModeSilencesConsoleNotFile(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	logFile := filepath.Join(t.TempDir(), "audit.log")
+
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, logFile)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	defer func() {
+		viper.Set(config.KeyAppLogFileEnabled, false)
+		viper.Set(config.KeyAppLogConsoleLevel, "info")
+	}()
+
+	output.SetOutputMode("json")
+	defer output.SetOutputMode("")
+
+	consoleBuf := &bytes.Buffer{}
+
+	// EXECUTION PHASE
+	require.NoError(t, Init(consoleBuf), "Init() failed")
+
+	log.Debug().Msg("json_mode_debug_entry")
+	log.Info().Msg("json_mode_info_entry")
+	Cleanup()
+
+	// ASSERTION PHASE
+	assert.Empty(t, consoleBuf.String(),
+		"console must stay silent in JSON mode, even at debug console level")
+
+	content, err := os.ReadFile(logFile)
+	require.NoError(t, err, "audit log file must exist in JSON mode")
+	assert.Contains(t, string(content), "json_mode_debug_entry",
+		"audit file must receive Debug entries in JSON mode")
+	assert.Contains(t, string(content), "json_mode_info_entry",
+		"audit file must receive Info entries in JSON mode")
+}
+
+// TestInit_FileLoggingEnabledButUnopenable_FailsClosed guards the audit-trail
+// contract: when file logging is EXPLICITLY enabled and the log file cannot be
+// opened, Init must return an error instead of silently degrading to
+// console-only logging. A requested audit trail that cannot exist is an error
+// — in JSON mode the old Warn-and-continue path lost the warning too (it fired
+// into the pre-init logger before log.Logger was replaced), so the caller got
+// exit 0, a success envelope, and zero audit entries.
+func TestInit_FileLoggingEnabledButUnopenable_FailsClosed(t *testing.T) {
+	tests := []struct {
+		name    string
+		badPath func(t *testing.T) string
+		skip    func(t *testing.T)
+	}{
+		{
+			name: "directory creation fails (path component is a file)",
+			badPath: func(t *testing.T) string {
+				t.Helper()
+				blocker := filepath.Join(t.TempDir(), "blocker")
+				require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600),
+					"failed to create blocker file")
+				return filepath.Join(blocker, "sub", "audit.log")
+			},
+		},
+		{
+			name: "file creation fails (parent directory not writable)",
+			badPath: func(t *testing.T) string {
+				t.Helper()
+				roDir := filepath.Join(t.TempDir(), "readonly")
+				require.NoError(t, os.MkdirAll(roDir, 0o500),
+					"failed to create read-only directory")
+				return filepath.Join(roDir, "audit.log")
+			},
+			skip: func(t *testing.T) {
+				t.Helper()
+				if os.Geteuid() == 0 {
+					t.Skip("root bypasses directory write permissions")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			if tt.skip != nil {
+				tt.skip(t)
+			}
+			savedLogger, savedLevel := SaveLoggerState()
+			defer RestoreLoggerState(savedLogger, savedLevel)
+
+			viper.Set(config.KeyAppLogFileEnabled, true)
+			viper.Set(config.KeyAppLogFilePath, tt.badPath(t))
+			viper.Set(config.KeyAppLogFileLevel, "debug")
+			viper.Set(config.KeyAppLogConsoleLevel, "info")
+			viper.Set(config.KeyAppLogColorEnabled, "false")
+			viper.Set(config.KeyAppLogSamplingEnabled, false)
+			defer func() {
+				viper.Set(config.KeyAppLogFileEnabled, false)
+				viper.Set(config.KeyAppLogFilePath, "")
+			}()
+
+			// EXECUTION PHASE
+			err := Init(io.Discard)
+
+			// ASSERTION PHASE
+			require.Error(t, err,
+				"Init must fail closed when explicitly enabled file logging cannot open its file")
+			assert.Contains(t, err.Error(), "log file",
+				"error must identify the log file as the failure")
+
+			Cleanup()
+		})
+	}
+}
+
+// failingCloser simulates a log file whose Close fails during Cleanup.
+type failingCloser struct{}
+
+func (failingCloser) Close() error { return errors.New("simulated close failure") }
+
+// TestCleanup_CloseFailureRespectsJSONMode guards the JSON-mode stderr
+// contract (CKSPEC-OUT-004) during Cleanup: a close failure must not leak a
+// warning onto stderr in JSON mode, while text mode keeps surfacing it.
+func TestCleanup_CloseFailureRespectsJSONMode(t *testing.T) {
+	tests := []struct {
+		name        string
+		outputMode  string
+		wantWarning bool
+	}{
+		{
+			name:        "JSON mode keeps stderr silent",
+			outputMode:  "json",
+			wantWarning: false,
+		},
+		{
+			name:        "text mode surfaces the close failure on stderr",
+			outputMode:  "",
+			wantWarning: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			output.SetOutputMode(tt.outputMode)
+			defer output.SetOutputMode("")
+
+			origLogFile := logFile
+			defer func() { logFile = origLogFile }()
+			logFile = failingCloser{}
+
+			r, w, err := os.Pipe()
+			require.NoError(t, err, "failed to create stderr pipe")
+			origStderr := os.Stderr
+			os.Stderr = w
+
+			// EXECUTION PHASE
+			Cleanup()
+
+			// ASSERTION PHASE
+			os.Stderr = origStderr
+			require.NoError(t, w.Close(), "failed to close stderr pipe writer")
+			captured, err := io.ReadAll(r)
+			require.NoError(t, err, "failed to read captured stderr")
+
+			assert.Nil(t, logFile, "Cleanup must release the log file handle even when Close fails")
+			if tt.wantWarning {
+				assert.Contains(t, string(captured), "failed to close log file",
+					"text mode must surface the close failure on stderr")
+			} else {
+				assert.Empty(t, string(captured),
+					"JSON mode must keep stderr silent even when log file close fails")
+			}
+		})
+	}
+}
+
 // TestRuntimeLevelAdjustment tests that changing log levels at runtime actually affects filtering
 // This test will initially FAIL - runtime level changes don't affect actual log output
 func TestRuntimeLevelAdjustment(t *testing.T) {
@@ -453,6 +640,159 @@ func TestLogSampling(t *testing.T) {
 	// but we can verify the file was created and contains some logs
 	_, err = os.Stat(logFile)
 	assert.False(t, os.IsNotExist(err), "Expected log file to be created")
+}
+
+func TestClampSamplingValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input int
+		want  uint32
+	}{
+		{name: "Negative clamps to one", input: -5, want: 1},
+		{name: "Zero clamps to one", input: 0, want: 1},
+		{name: "One passes through", input: 1, want: 1},
+		{name: "Typical value passes through", input: 100, want: 100},
+		{name: "Max uint32 passes through", input: math.MaxUint32, want: math.MaxUint32},
+		{name: "Above max uint32 clamps to max", input: math.MaxUint32 + 1, want: math.MaxUint32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// EXECUTION PHASE
+			got := clampSamplingValue(tt.input)
+
+			// ASSERTION PHASE
+			assert.Equal(t, tt.want, got,
+				"clampSamplingValue(%d) = %d, want %d", tt.input, got, tt.want)
+		})
+	}
+}
+
+// TestLogSamplingClampsInvalidValues verifies that out-of-range sampling
+// config values are clamped to a safe minimum instead of wrapping around in
+// the uint32 conversion, which would silently drop log messages.
+func TestLogSamplingClampsInvalidValues(t *testing.T) {
+	tests := []struct {
+		name       string
+		initial    int
+		thereafter int
+	}{
+		{name: "Zero values", initial: 0, thereafter: 0},
+		{name: "Zero initial with negative thereafter", initial: 0, thereafter: -1},
+		{name: "Negative values", initial: -5, thereafter: -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			savedLogger, savedLevel := SaveLoggerState()
+			defer RestoreLoggerState(savedLogger, savedLevel)
+
+			viper.Set(config.KeyAppLogConsoleLevel, "info")
+			viper.Set(config.KeyAppLogFileEnabled, false)
+			viper.Set(config.KeyAppLogColorEnabled, "false")
+			viper.Set(config.KeyAppLogSamplingEnabled, true)
+			viper.Set(config.KeyAppLogSamplingInitial, tt.initial)
+			viper.Set(config.KeyAppLogSamplingThereafter, tt.thereafter)
+			defer func() {
+				viper.Set(config.KeyAppLogSamplingEnabled, false)
+				viper.Set(config.KeyAppLogSamplingInitial, 100)
+				viper.Set(config.KeyAppLogSamplingThereafter, 100)
+			}()
+
+			buf := &bytes.Buffer{}
+
+			// EXECUTION PHASE
+			err := Init(buf)
+			require.NoError(t, err, "Init() failed")
+
+			messages := []string{"sample_one", "sample_two", "sample_three"}
+			for _, msg := range messages {
+				log.Info().Msg(msg)
+			}
+
+			// ASSERTION PHASE
+			output := buf.String()
+			for _, msg := range messages {
+				assert.Contains(t, output, msg,
+					"message %q should be logged when sampling values are clamped", msg)
+			}
+		})
+	}
+}
+
+// TestInitSamplingStatusUsesConfiguredWriter ensures the "Log sampling
+// enabled" status message is emitted through the logger Init just configured,
+// not through whatever the previous global logger pointed at.
+func TestInitSamplingStatusUsesConfiguredWriter(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	// Point the current global logger at a different buffer to prove the
+	// status message does not land there.
+	previousBuf := &bytes.Buffer{}
+	log.Logger = zerolog.New(previousBuf)
+
+	viper.Set(config.KeyAppLogConsoleLevel, "info")
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, true)
+	viper.Set(config.KeyAppLogSamplingInitial, 100)
+	viper.Set(config.KeyAppLogSamplingThereafter, 100)
+	defer viper.Set(config.KeyAppLogSamplingEnabled, false)
+
+	buf := &bytes.Buffer{}
+
+	// EXECUTION PHASE
+	require.NoError(t, Init(buf), "Init() failed")
+
+	// ASSERTION PHASE
+	assert.Contains(t, buf.String(), "Log sampling enabled",
+		"sampling status should be written to the writer configured by Init")
+	assert.NotContains(t, previousBuf.String(), "Log sampling enabled",
+		"sampling status should not be written to the previous global logger")
+}
+
+// TestSetLevelConcurrency exercises concurrent runtime level changes. Run
+// with -race it fails if the status log reads log.Logger outside loggerMu
+// while another goroutine rebuilds the logger under the lock.
+func TestSetLevelConcurrency(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	viper.Set(config.KeyAppLogConsoleLevel, "info")
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+
+	require.NoError(t, Init(io.Discard), "Init() failed")
+
+	// EXECUTION PHASE
+	var wg sync.WaitGroup
+	for i := 0; i < 4; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				SetConsoleLevel(zerolog.DebugLevel)
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 20; j++ {
+				SetFileLevel(zerolog.InfoLevel)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// ASSERTION PHASE
+	assert.Equal(t, zerolog.DebugLevel, GetConsoleLevel(),
+		"console level should reflect the last SetConsoleLevel call")
+	assert.Equal(t, zerolog.InfoLevel, GetFileLevel(),
+		"file level should reflect the last SetFileLevel call")
 }
 
 func TestCleanup(t *testing.T) {

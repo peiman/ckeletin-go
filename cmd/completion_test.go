@@ -45,6 +45,14 @@ func TestCompletionCommandMetadata(t *testing.T) {
 
 	require.NotNil(t, completionCmd, "completion command should be found")
 
+	// Long is rendered lazily at help time (see cmd/completion.go init),
+	// so assert against the rendered help output, not the raw field.
+	var helpBuf bytes.Buffer
+	completionCmd.SetOut(&helpBuf)
+	defer completionCmd.SetOut(nil)
+	require.NoError(t, completionCmd.Help(), "help rendering should succeed")
+	helpText := helpBuf.String()
+
 	// ASSERTION PHASE
 	tests := []struct {
 		name     string
@@ -62,23 +70,23 @@ func TestCompletionCommandMetadata(t *testing.T) {
 			contains: "autocompletion",
 		},
 		{
-			name:     "Long description contains bash",
-			got:      completionCmd.Long,
+			name:     "Help output contains bash",
+			got:      helpText,
 			contains: "Bash:",
 		},
 		{
-			name:     "Long description contains zsh",
-			got:      completionCmd.Long,
+			name:     "Help output contains zsh",
+			got:      helpText,
 			contains: "Zsh:",
 		},
 		{
-			name:     "Long description contains fish",
-			got:      completionCmd.Long,
+			name:     "Help output contains fish",
+			got:      helpText,
 			contains: "Fish:",
 		},
 		{
-			name:     "Long description contains powershell",
-			got:      completionCmd.Long,
+			name:     "Help output contains powershell",
+			got:      helpText,
 			contains: "PowerShell:",
 		},
 	}
@@ -153,6 +161,71 @@ func TestCompletionCommandExecution(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCompletionHelpRendersBinaryName pins that the rendered help examples
+// include the resolved binary name. binaryName is still empty while
+// package-level vars initialize (root.go's init() resolves it afterwards, and
+// init() runs in file-name order), so the Long text must be rendered lazily
+// at help time, not captured at var-declaration time.
+func TestCompletionHelpRendersBinaryName(t *testing.T) {
+	// SETUP PHASE
+	var completionCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "completion" {
+			completionCmd = c
+			break
+		}
+	}
+	require.NotNil(t, completionCmd, "completion command should be found")
+
+	var buf bytes.Buffer
+	RootCmd.SetOut(&buf)
+	RootCmd.SetErr(&bytes.Buffer{})
+	completionCmd.SetOut(&buf)
+	defer completionCmd.SetOut(nil)
+	RootCmd.SetArgs([]string{"completion", "--help"})
+	defer RootCmd.SetArgs(nil)
+
+	// EXECUTION PHASE
+	err := RootCmd.Execute()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "`completion --help` should succeed")
+	require.Equal(t, "ckeletin-go", RootCmd.Name(), "dev builds should resolve the binary name fallback")
+
+	help := buf.String()
+	examples := []string{
+		"source <(ckeletin-go completion bash)",
+		"source <(ckeletin-go completion zsh)",
+		"ckeletin-go completion fish | source",
+		"ckeletin-go completion powershell | Out-String | Invoke-Expression",
+	}
+	for _, example := range examples {
+		assert.Contains(t, help, example,
+			"help should render the binary name in the shell example")
+	}
+	assert.NotContains(t, help, "<( completion",
+		"binary name must not render empty in help examples")
+}
+
+// TestCompletionCommandConfigInheritance pins that completion is registered
+// via MustAddToRoot, which wraps PreRunE through setupCommandConfig like
+// every other command.
+func TestCompletionCommandConfigInheritance(t *testing.T) {
+	// SETUP PHASE
+	var completionCmd *cobra.Command
+	for _, c := range RootCmd.Commands() {
+		if c.Name() == "completion" {
+			completionCmd = c
+			break
+		}
+	}
+	require.NotNil(t, completionCmd, "completion command should be found")
+
+	// ASSERTION PHASE
+	assert.NotNil(t, completionCmd.PreRunE,
+		"completion should get the setupCommandConfig PreRunE wrapper via MustAddToRoot")
 }
 
 // min returns the minimum of two integers

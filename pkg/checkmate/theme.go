@@ -18,12 +18,10 @@ type Theme struct {
 	TreeLine   string // Vertical line (default: │)
 
 	// Separators
-	CategoryChar string // Character for category header line (default: ─)
-	SummaryChar  string // Character for summary box (default: ─)
+	SummaryChar string // Horizontal rule character for the summary box border (default: ─)
 
 	// Widths
-	CategoryWidth int // Width of category header (default: 50)
-	SummaryWidth  int // Width of summary separator (default: 50)
+	SummaryWidth int // Width of the summary box (default: 50)
 
 	// Styles (lipgloss)
 	SuccessStyle  lipgloss.Style
@@ -36,7 +34,13 @@ type Theme struct {
 	TreeStyle     lipgloss.Style // For tree connectors
 
 	// Behavior
-	ForceColors bool // Force colors even in non-TTY (useful for testing)
+
+	// ForceColors retains the configured/default theme on non-TTY writers
+	// instead of degrading to MinimalTheme. It does not force ANSI emission:
+	// color emission is decided by the lipgloss renderer for the writer.
+	// Themes passed via WithTheme are always retained, so this only matters
+	// when the theme was not explicitly chosen.
+	ForceColors bool
 }
 
 // DefaultTheme returns the default lipgloss-style theme.
@@ -55,11 +59,9 @@ func DefaultTheme() *Theme {
 		TreeLast:   "└──",
 		TreeLine:   "│",
 
-		CategoryChar: "─",
-		SummaryChar:  "─",
+		SummaryChar: "─",
 
-		CategoryWidth: 50,
-		SummaryWidth:  50,
+		SummaryWidth: 50,
 
 		// Bold green for success
 		SuccessStyle: lipgloss.NewStyle().
@@ -97,7 +99,7 @@ func DefaultTheme() *Theme {
 	}
 }
 
-// MinimalTheme returns a theme without colors or emojis.
+// MinimalTheme returns a theme without colors or Unicode icons.
 // Suitable for CI environments, piped output, or accessibility needs.
 func MinimalTheme() *Theme {
 	return &Theme{
@@ -111,11 +113,9 @@ func MinimalTheme() *Theme {
 		TreeLast:   "`--",
 		TreeLine:   "|",
 
-		CategoryChar: "-",
-		SummaryChar:  "=",
+		SummaryChar: "=",
 
-		CategoryWidth: 48,
-		SummaryWidth:  45,
+		SummaryWidth: 45,
 
 		SuccessStyle:  lipgloss.NewStyle(),
 		FailureStyle:  lipgloss.NewStyle(),

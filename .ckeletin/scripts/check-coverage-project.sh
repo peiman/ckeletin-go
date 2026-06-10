@@ -40,14 +40,17 @@ fi
 # actual coverage. For accurate threshold enforcement, we generate a separate
 # per-package coverage profile where each package is only instrumented once.
 PERPKG_COV=$(mktemp)
-trap 'rm -f "$PERPKG_COV"' EXIT
+GO_TEST_ERR=$(mktemp)
+trap 'rm -f "$PERPKG_COV" "$GO_TEST_ERR"' EXIT
 
-go test -tags dev -coverprofile="$PERPKG_COV" -covermode=atomic ./... ./.ckeletin/pkg/... 2>/dev/null
-
-if [ ! -s "$PERPKG_COV" ]; then
+# Run inside the if-condition so set -e doesn't abort before we can surface
+# the go test stderr. A failing `go test -tags dev` means the tree is broken;
+# falling back to the primary profile would let a broken tree pass (fail-open)
+if ! go test -tags dev -coverprofile="$PERPKG_COV" -covermode=atomic ./... ./.ckeletin/pkg/... 2> "$GO_TEST_ERR" \
+    || [ ! -s "$PERPKG_COV" ]; then
     echo "❌ Failed to generate per-package coverage profile"
-    echo "Falling back to primary coverage file"
-    PERPKG_COV="$COVERAGE_FILE"
+    cat "$GO_TEST_ERR" >&2
+    exit 1
 fi
 
 total_statements=0

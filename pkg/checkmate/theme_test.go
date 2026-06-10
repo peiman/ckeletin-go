@@ -24,11 +24,9 @@ func TestDefaultTheme(t *testing.T) {
 	assert.Equal(t, "│", theme.TreeLine)
 
 	// Check separators
-	assert.Equal(t, "─", theme.CategoryChar)
 	assert.Equal(t, "─", theme.SummaryChar)
 
 	// Check widths
-	assert.Equal(t, 50, theme.CategoryWidth)
 	assert.Equal(t, 50, theme.SummaryWidth)
 
 	// Check ForceColors default
@@ -52,11 +50,9 @@ func TestMinimalTheme(t *testing.T) {
 	assert.Equal(t, "|", theme.TreeLine)
 
 	// Check separators are ASCII
-	assert.Equal(t, "-", theme.CategoryChar)
 	assert.Equal(t, "=", theme.SummaryChar)
 
 	// Check widths match default
-	assert.Equal(t, 48, theme.CategoryWidth)
 	assert.Equal(t, 45, theme.SummaryWidth)
 
 	// Check ForceColors default
@@ -71,7 +67,6 @@ func TestCITheme(t *testing.T) {
 	assert.Equal(t, minimalTheme.IconPending, ciTheme.IconPending)
 	assert.Equal(t, minimalTheme.IconSuccess, ciTheme.IconSuccess)
 	assert.Equal(t, minimalTheme.IconFailure, ciTheme.IconFailure)
-	assert.Equal(t, minimalTheme.CategoryChar, ciTheme.CategoryChar)
 	assert.Equal(t, minimalTheme.SummaryChar, ciTheme.SummaryChar)
 }
 

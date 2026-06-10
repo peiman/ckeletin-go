@@ -3,7 +3,7 @@
 > **Quick Reference:** This document shows **WHAT** the system is and how components interact.
 > For **WHY** decisions were made, see individual ADRs linked throughout this document.
 
-**Last Updated:** 2025-11-04
+**Last Updated:** 2026-06-10
 **Status:** Living document (updated as architecture evolves)
 
 ---
@@ -28,7 +28,7 @@
 
 **ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer. It provides a complete foundation for building command-line tools with:
 
-- **Ultra-thin command layer** (20-30 lines per command)
+- **Ultra-thin command layer** (run functions ≤30 lines, enforced)
 - **Centralized configuration** with type-safe access
 - **Structured logging** with dual output (console + file)
 - **Interactive terminal UIs** using Bubble Tea
@@ -54,7 +54,7 @@ See [ADR-009](009-layered-architecture-pattern.md) for the rationale, alternativ
                          ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                   Command Layer (cmd/)                       │
-│  - Ultra-thin command definitions (~20-30 lines) → ADR-001   │
+│  - Ultra-thin command definitions (≤30 lines) → ADR-001      │
 │  - Cobra command setup                                       │
 │  - Flag/argument parsing                                     │
 │  - Delegation to business logic                              │
@@ -95,7 +95,7 @@ See [ADR-009](009-layered-architecture-pattern.md) for the rationale, alternativ
    - **Imported by**: Entry layer only
    - **Key Rule**: Only this layer can import Cobra
 
-3. **Business Logic (internal/ping, internal/docs, etc.)**
+3. **Business Logic (internal/ping, internal/docs, internal/check, internal/dev, internal/progress)**
    - Domain-specific functionality
    - Framework-independent implementations
    - **Imports**: Infrastructure layer, standard library
@@ -105,8 +105,11 @@ See [ADR-009](009-layered-architecture-pattern.md) for the rationale, alternativ
      - ❌ No `cmd/` imports (prevents cycles)
      - ❌ Business packages isolated from each other
 
-4. **Infrastructure (internal/config, internal/logger, internal/ui)**
-   - Cross-cutting concerns
+4. **Infrastructure (`.ckeletin/pkg/*`, internal/ui, internal/config/commands, internal/xdg)**
+   - Cross-cutting concerns: config registry (`.ckeletin/pkg/config`), logging
+     (`.ckeletin/pkg/logger`), JSON output (`.ckeletin/pkg/output`), command
+     catalog (`.ckeletin/pkg/catalog`), test helpers (`.ckeletin/pkg/testutil`),
+     terminal UI (`internal/ui`), per-command metadata (`internal/config/commands`)
    - Shared services available to all layers
    - **Imports**: External libraries, standard library
    - **Imported by**: Command layer, Business logic layer
@@ -135,12 +138,12 @@ See [ADR-009](009-layered-architecture-pattern.md) for complete rationale and al
 
 ```go
 // ❌ VIOLATION: Business logic importing command layer
-// internal/ping/executor.go
+// internal/ping/ping.go
 import "github.com/peiman/ckeletin-go/cmd"
 // Error: Component business shouldn't depend on cmd
 
 // ❌ VIOLATION: Business logic importing other business logic
-// internal/ping/executor.go
+// internal/ping/ping.go
 import "github.com/peiman/ckeletin-go/internal/docs"
 // Error: Component business shouldn't depend on internal/docs
 ```
@@ -188,7 +191,7 @@ import "github.com/peiman/ckeletin-go/internal/docs"
 ```
 
 **Fix:** Remove the forbidden import and refactor:
-- Extract shared functionality to infrastructure layer (`internal/config`, `internal/logger`, etc.)
+- Extract shared functionality to infrastructure layer (`.ckeletin/pkg/config`, `.ckeletin/pkg/logger`, `internal/ui`, etc.)
 - Pass data as parameters between business logic packages
 - Use dependency injection for shared services
 
@@ -206,55 +209,70 @@ ckeletin-go/
 ├── main.go                    # Entry point (root command execution)
 │
 ├── cmd/                       # Command Layer → ADR-001
-│   ├── root.go                # Root command setup, global flags, config init
+│   ├── root.go                # Root command, global flags, config init, --version
+│   ├── flags.go               # Flag registration helpers (framework file)
+│   ├── helpers.go             # NewCommand/MustAddToRoot helpers (framework file)
 │   ├── ping.go                # Ping command (example thin command)
-│   ├── version.go             # Version command
 │   ├── docs.go                # Docs command (config documentation)
+│   ├── config.go              # Config validate command
+│   ├── catalog.go             # Machine-readable command catalog
+│   ├── completion.go          # Shell completion scripts
+│   ├── check.go, dev*.go      # Dev-only commands (build tag `dev`) → ADR-012
 │   └── template_command.go.example  # Command template
 │
-├── internal/                  # Private application code
-│   │
-│   ├── config/                # Configuration Management → ADR-002, ADR-005
+├── .ckeletin/                 # Framework layer (updated via task ckeletin:update)
+│   ├── pkg/config/            # Configuration Management → ADR-002, ADR-004, ADR-005
 │   │   ├── registry.go        # Config option definitions (SSOT)
 │   │   ├── keys_generated.go  # Auto-generated type-safe constants
-│   │   ├── loader.go          # Config loading logic
-│   │   ├── validator.go       # Config validation → ADR-004
-│   │   └── commands/          # Per-command config structs
-│   │
-│   ├── logger/                # Logging Infrastructure → ADR-006
-│   │   ├── logger.go          # Logger setup and configuration
-│   │   ├── console.go         # Console output (colored, human-friendly)
-│   │   └── file.go            # File output (JSON, debug level)
-│   │
+│   │   ├── validation.go      # Config validation → ADR-004
+│   │   ├── validators.go      # Per-option validation functions
+│   │   ├── security.go        # Security limits and checks → ADR-004
+│   │   ├── validator/         # Config-file validator (config validate)
+│   │   └── commands/          # Framework command metadata (docs)
+│   ├── pkg/logger/            # Logging Infrastructure → ADR-006
+│   │   ├── logger.go          # Logger setup, dual console + file output
+│   │   ├── filtered_writer.go # Level-filtered writer
+│   │   └── sanitize.go        # Log field sanitization
+│   ├── pkg/output/            # JSON output mode (--output json) → ADR-013
+│   ├── pkg/catalog/           # Command catalog types (CKSPEC-AGENT-006)
+│   ├── pkg/testutil/          # Shared test helpers
+│   ├── scripts/               # Build & Validation Scripts → ADR-000
+│   │   ├── format-go.sh       # Code formatting
+│   │   ├── validate-*.sh      # Pattern enforcement (ADR validation)
+│   │   ├── check-*.sh         # Coverage/quality checks
+│   │   └── scaffold/          # Scaffold customization (go run ./.ckeletin/scripts/scaffold/)
+│   └── docs/adr/              # Framework ADRs (000-099)
+│
+├── internal/                  # Private application code
+│   ├── config/commands/       # Project command metadata + options (ping, check)
 │   ├── ui/                    # Terminal UI Components → ADR-007
-│   │   ├── styles.go          # Lipgloss styles
-│   │   └── models.go          # Bubble Tea models
-│   │
-│   ├── ping/                  # Ping Business Logic
-│   │   ├── executor.go        # Ping execution logic
-│   │   └── executor_test.go   # Tests → ADR-003
-│   │
-│   └── docs/                  # Documentation Generation
-│       └── generator.go       # Config docs generator
+│   │   ├── ui.go, renderer.go # UI runner and output rendering
+│   │   ├── message.go         # Bubble Tea message model
+│   │   ├── colors.go          # Color handling
+│   │   ├── check.go           # Check command UI
+│   │   └── validation.go      # Config-validate JSON rendering
+│   ├── ping/                  # Ping Business Logic (ping.go + tests → ADR-003)
+│   ├── docs/                  # Documentation generation (markdown, yaml, json)
+│   ├── check/                 # Check command business logic
+│   ├── dev/                   # Dev tooling (config inspector, doctor)
+│   ├── progress/              # Progress reporting (spinner, bar, demo)
+│   └── xdg/                   # XDG base directory resolution
 │
-├── test/                      # Integration Tests
-│   └── integration/
-│       └── scaffold_init_test.go
+├── pkg/                       # Public standalone packages → ADR-010
+│   └── checkmate/             # Terminal check-output library (no internal/ imports)
 │
-└── scripts/                   # Build & Validation Scripts → ADR-000
-    ├── format-go.sh           # Code formatting
-    ├── validate-*.sh          # Pattern enforcement (ADR validation)
-    ├── check-*.sh             # Coverage/quality checks
-    └── scaffold/              # Scaffold customization (go run ./.ckeletin/scripts/scaffold/)
+└── test/                      # Integration & conformance tests
+    ├── integration/
+    └── conformance/
 ```
 
 ### Component Interactions
 
 ```
 ┌──────────┐     uses      ┌────────────┐     generates     ┌─────────────┐
-│ cmd/*.go │──────────────>│ registry.go│<──────────────────│ scripts/    │
-│          │               │ (ADR-002)  │                   │ generate-   │
-│          │               └────────────┘                   │ constants.go│
+│ cmd/*.go │──────────────>│ registry.go│<──────────────────│ .ckeletin/  │
+│          │               │ (ADR-002)  │                   │ scripts/    │
+│          │               └────────────┘                   │ generator   │
 │          │                     │                          └─────────────┘
 │          │                     │ produces
 │          │                     ▼
@@ -351,7 +369,9 @@ ckeletin-go uses a **centralized configuration registry** as the single source o
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│ 1. Developer defines config option in registry.go              │
+│ 1. Developer defines config option in the registry             │
+│    (.ckeletin/pkg/config/registry.go or a command options      │
+│    provider in internal/config/commands/)                      │
 │                                                                │
 │    {                                                           │
 │        Key:          "app.ping.timeout",                       │
@@ -364,9 +384,9 @@ ckeletin-go uses a **centralized configuration registry** as the single source o
                             ▼
 ┌────────────────────────────────────────────────────────────────┐
 │ 2. Run: task generate:config:key-constants                     │
-│    → scripts/generate-config-constants.go                      │
-│    → Reads registry.go                                         │
-│    → Generates internal/config/keys_generated.go               │
+│    → .ckeletin/scripts/generate-config-constants.go            │
+│    → Reads the registry                                        │
+│    → Generates .ckeletin/pkg/config/keys_generated.go          │
 │                                                                │
 │    const KeyAppPingTimeout = "app.ping.timeout"                │
 └───────────────────────────┬────────────────────────────────────┘
@@ -419,7 +439,7 @@ See [ADR-005](005-auto-generated-config-constants.md) for details.
 
 ## Command Execution Lifecycle
 
-Commands follow the **ultra-thin pattern** (see [ADR-001](001-ultra-thin-command-pattern.md)). Each command is ~20-30 lines and delegates to business logic.
+Commands follow the **ultra-thin pattern** (see [ADR-001](001-ultra-thin-command-pattern.md)). Every `run*` function targets ≤30 lines (hard limit 35, enforced by `task validate:commands`) and delegates to business logic.
 
 ### Execution Flow
 
@@ -443,7 +463,7 @@ User runs: ./ckeletin-go ping example.com --count 3
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ pingCmd.Run() (cmd/ping.go) ~25 lines                       │
+│ pingCmd.Run() (cmd/ping.go) — run function ≤30 lines        │
 │                                                             │
 │   func(cmd *cobra.Command, args []string) {                 │
 │       target := args[0]  // "example.com"                   │
@@ -467,7 +487,7 @@ User runs: ./ckeletin-go ping example.com --count 3
                 │
                 ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ Business Logic (internal/ping/executor.go)                  │
+│ Business Logic (internal/ping/ping.go)                      │
 │                                                             │
 │ type Executor struct {                                      │
 │     target  string                                          │
@@ -495,7 +515,7 @@ User runs: ./ckeletin-go ping example.com --count 3
 
 ### Why This Pattern?
 
-- ✅ **Commands stay thin** (~20-30 lines)
+- ✅ **Commands stay thin** (run functions ≤30 lines)
 - ✅ **Business logic is testable** without Cobra dependency (see [ADR-003](003-dependency-injection-over-mocking.md))
 - ✅ **Clear separation** of CLI concerns vs business logic
 - ✅ **Validation enforced** by `task validate:commands`
@@ -517,7 +537,7 @@ Testing follows the **dependency injection over mocking** principle. See [ADR-00
 │ - Table-driven tests                                       │
 │ - No mocking frameworks (prefer real implementations)      │
 │                                                            │
-│ Example: internal/ping/executor_test.go                    │
+│ Example: internal/ping/ping_test.go                        │
 │   - Tests Executor.Execute() directly                      │
 │   - Injects test dependencies                              │
 │   - Validates behavior without CLI layer                   │
@@ -540,15 +560,15 @@ Testing follows the **dependency injection over mocking** principle. See [ADR-00
                            │
                            ▼
 ┌────────────────────────────────────────────────────────────┐
-│ Coverage Enforcement (scripts/)                            │
+│ Coverage Enforcement (.ckeletin/scripts/)                  │
 │                                                            │
 │ - check-coverage-project.sh: Project-wide coverage         │
 │ - check-coverage-patch.sh: Changed lines coverage          │
 │                                                            │
 │ Thresholds:                                                │
-│   - Overall: 80% minimum, 85% target                       │
-│   - cmd/*: 80% minimum, 90% target                         │
-│   - internal/config: 80% minimum, 90% target               │
+│   - Overall: 85% minimum, 90%+ target                      │
+│   - cmd/*: 80% minimum, 90%+ target                        │
+│   - .ckeletin/pkg/config: 80% minimum, 90%+ target         │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -570,7 +590,7 @@ task test:watch
 task test:race
 
 # Coverage reports
-task test:coverage:text
+task ckeletin:test:coverage:text
 task test:coverage:html
 
 # Full quality check (includes tests)
@@ -619,13 +639,13 @@ Each ADR has **validation automation** tied to task commands:
 | ADR | Pattern | Enforcement Task | Validation |
 |-----|---------|------------------|------------|
 | ADR-000 | Task-based workflow | `task check` | All checks use task |
-| ADR-001 | Ultra-thin commands | `task validate:commands` | Script checks line count, patterns |
+| ADR-001 | Ultra-thin commands | `task validate:commands` | Run-function line contract (≤30, error >35), patterns |
 | ADR-002 | Config registry | `task validate:defaults` | No viper.SetDefault() calls |
 | ADR-002 | Config consumption | `task validate:config-consumption` | Type-safe config retrieval pattern |
 | ADR-005 | Config constants | `task validate:constants` | Registry ↔ constants sync |
 | ADR-006 | Structured logging | `task check` | Linter rules (no fmt.Println) |
 | ADR-009 | Layered architecture | `task validate:layering` | go-arch-lint checks dependencies |
-| ADR-010 | Package organization | `task validate:package-organization` | Validates CLI-first structure (no pkg/) |
+| ADR-010 | Package organization | `task validate:package-organization` | Validates pkg/ standalone (no `internal/` imports) |
 | ADR-011 | License compliance | `task check:license` | Dual tool verification (source + binary) |
 
 ### Development Cycle
@@ -635,7 +655,7 @@ Each ADR has **validation automation** tied to task commands:
 │ 1. Write Code                                                │
 │    - Follow ADR patterns                                     │
 │    - Use generated constants (config.Key*)                   │
-│    - Keep commands thin (~20-30 lines)                       │
+│    - Keep run functions thin (≤30 lines)                     │
 └──────────────┬───────────────────────────────────────────────┘
                │
                ▼
@@ -651,7 +671,7 @@ Each ADR has **validation automation** tied to task commands:
 │ 3. Test                                                      │
 │    $ task test                                               │
 │    - Run tests with coverage                                 │
-│    - Ensure >80% coverage                                    │
+│    - Ensure ≥85% coverage                                    │
 └──────────────┬───────────────────────────────────────────────┘
                │
                ▼
@@ -704,7 +724,7 @@ This table shows how the ADRs interact to create the overall architecture:
 | **[ADR-007](007-bubble-tea-for-interactive-ui.md)** | UI framework | ADR-001, 006, 009 | Interactive commands use Bubble Tea, log with structured logging, UI is infrastructure layer (009) |
 | **[ADR-008](008-release-automation-with-goreleaser.md)** | Distribution | ADR-000 | Release process uses task commands |
 | **[ADR-009](009-layered-architecture-pattern.md)** | Architecture layers | ADR-001, 002, 006, 007, 010 | Enforces 4-layer pattern with automated validation, commands (001) delegate to business logic, infrastructure includes config (002), logging (006), UI (007), package structure (010) |
-| **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure (no pkg/, all in internal/), complements layering rules (009) |
+| **[ADR-010](010-package-organization-strategy.md)** | Package organization | ADR-009 | Defines CLI-first structure with optional standalone `pkg/` packages (no `internal/` imports), complements layering rules (009) |
 | **[ADR-011](011-license-compliance.md)** | License compliance | ADR-000, 008 | Dual-tool checking (go-licenses + lichen) enforced via task orchestrator (000), integrated with release process (008) |
 | **[ADR-012](012-dev-commands-build-tags.md)** | Dev commands | ADR-000, 001, 008 | Dev-only commands (config, doctor) excluded from production via build tags, uses task orchestrator (000), follows command pattern (001), excluded from releases (008) |
 | **[ADR-013](013-structured-output-and-shadow-logging.md)** | Structured output | ADR-006 | Shadow logging pattern and checkmate library for beautiful terminal output, builds on logging standards (006) |
@@ -766,40 +786,45 @@ This section explains the directory structure for the layers described in [Archi
 ### Why internal/ vs pkg/ vs cmd/?
 
 ```
-cmd/                # Public CLI interface (Cobra commands)
-├── *.go            # Ultra-thin (ADR-001), public API of the tool
-└── Commands are the ONLY public Go API
+cmd/                # CLI interface (Cobra commands)
+├── *.go            # Ultra-thin (ADR-001), wiring only
 
 internal/           # Private implementation (not importable by other projects)
-├── config/         # Configuration management (ADR-002, 005)
-├── logger/         # Logging infrastructure (ADR-006)
+├── config/commands/ # Per-command metadata + options
 ├── ui/             # Terminal UI components (ADR-007)
 └── */              # Business logic (domain-specific)
 
-pkg/                # (Not used - nothing to expose as library)
+.ckeletin/pkg/      # Framework infrastructure (config, logger, output,
+                    # catalog, testutil) — updated via task ckeletin:update
+
+pkg/                # Standalone public packages (e.g., pkg/checkmate)
+                    # Must NOT import internal/ (enforced)
 ```
 
 See [ADR-010](010-package-organization-strategy.md) for the rationale behind this organization strategy.
 
-**Design Decision:** ckeletin-go is a **CLI application**, not a library:
+**Design Decision:** ckeletin-go is **CLI-first**, with optional public packages:
 
-- No `pkg/` directory because nothing is intended for external import
-- All implementation in `internal/` to prevent accidental API surface
-- Only `cmd/` exposes the CLI interface (via Cobra)
+- Application implementation lives in `internal/` to prevent accidental API surface
+- `pkg/` MAY host standalone reusable packages (per ADR-010); `pkg/checkmate` is
+  the current example. They must not import `internal/`, which
+  `task validate:package-organization` enforces
+- `cmd/` exposes the CLI interface (via Cobra)
 
 ### Package Dependency Rules
 
 ```
-cmd/           →  can import  →  internal/* (all)
+cmd/           →  can import  →  internal/*, .ckeletin/pkg/*, pkg/*
 internal/pkg1  →  can import  →  internal/pkg2 (with layering rules)
 internal/*     →  CANNOT import → cmd/* (prevents cycles)
+pkg/*          →  CANNOT import → internal/* (standalone requirement)
 
 Example valid imports in cmd/ping.go:
   ✅ "ckeletin-go/internal/ping"
-  ✅ "ckeletin-go/internal/config"
-  ✅ "ckeletin-go/internal/logger"
+  ✅ "ckeletin-go/.ckeletin/pkg/config"
+  ✅ "ckeletin-go/internal/ui"
 
-Example invalid imports in internal/ping/executor.go:
+Example invalid imports in internal/ping/ping.go:
   ❌ "ckeletin-go/cmd"  (would create cycle)
 ```
 
@@ -813,7 +838,7 @@ While not formally documented in ADRs, these patterns are used consistently:
 
 ### 1. Executor Pattern
 
-**Used in:** Business logic (internal/*/executor.go)
+**Used in:** Business logic (e.g., `internal/ping/ping.go`, `internal/check/executor.go`)
 
 ```go
 type Executor struct {
@@ -859,7 +884,7 @@ See [ADR-002 Implementation Patterns](002-centralized-configuration-registry.md#
 
 ### 3. Registry Pattern
 
-**Used in:** Configuration (internal/config/registry.go)
+**Used in:** Configuration (.ckeletin/pkg/config/registry.go)
 
 See [ADR-002](002-centralized-configuration-registry.md) for details.
 
@@ -911,7 +936,7 @@ All patterns are **enforced through automation** via `task validate:*` commands.
 
 - **ADRs:** See individual ADR files in this directory for decision rationale
 - **Task Commands:** See `Taskfile.yml` for all available development commands
-- **Validation Scripts:** See `scripts/validate-*.sh` for pattern enforcement
+- **Validation Scripts:** See `.ckeletin/scripts/validate-*.sh` for pattern enforcement
 - **Contributing Guide:** See `CONTRIBUTING.md` for development workflow
 - **AI Guidelines:** See `CLAUDE.md` for AI-assisted development guidelines
 

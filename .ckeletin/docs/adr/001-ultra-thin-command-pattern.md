@@ -41,10 +41,17 @@ This leads to:
 
 ## Decision
 
-We adopt an **ultra-thin command pattern** where command files in `cmd/` are kept to ~20-30 lines and serve only as:
+We adopt an **ultra-thin command pattern** where command files in `cmd/` serve only as:
 1. **Thin wrappers** that glue together the CLI framework and business logic
 2. **Configuration retrievers** using `getConfigValueWithFlags[T]()`
 3. **Dependency injectors** passing interfaces to business logic
+
+**The line contract** (automated, see [Enforcement](#enforcement)): every `run*`
+function targets **≤30 lines**, measured from its `func` line through its
+closing brace. 31–35 lines is tolerated with a warning; more than 35 lines
+fails validation. Whole command files draw an advisory warning above 80 lines.
+Files that genuinely cannot follow the pattern carry a
+`// ckeletin:allow-custom-command` marker with a mandatory justification.
 
 All actual logic lives in `internal/` packages:
 - `internal/config/commands/` - Command metadata and config options
@@ -88,22 +95,46 @@ func runPing(cmd *cobra.Command, args []string) error {
 ### Mitigations
 
 - **Documentation**: Clear examples in `cmd/README.md`
-- **Validation Script**: `scripts/validate-command-patterns.sh` enforces pattern
+- **Validation Script**: `.ckeletin/scripts/validate-command-patterns.sh` enforces the line contract (via `task validate:commands`)
 - **Helpers**: `cmd/helpers.go` reduces boilerplate
 - **Code Generation**: Future generators can create command skeletons
 
-## Compliance Validation
+## Enforcement
 
-Command files are validated to ensure they follow the ultra-thin pattern:
+Automated via `task validate:commands`
+(`.ckeletin/scripts/validate-command-patterns.sh`), which runs as part of
+`task check` and in CI. Per ADR-014, this section is the precise statement of
+what is enforced — the script and this table must stay in sync.
 
-```bash
-task validate:commands
-```
+| Check | Threshold | Result |
+|-------|-----------|--------|
+| `run*` function length (from `func` line through closing brace, inclusive) | ≤30 lines | Pass |
+| | 31–35 lines | Warning |
+| | >35 lines | **Error** (exit 1) |
+| Whole-file length | >80 lines | Warning (advisory) |
+| Command metadata file (`internal/config/commands/` or `.ckeletin/pkg/config/commands/`) | missing | **Error** |
+| Uses `NewCommand()` helper | missing | Warning |
+| Uses `MustAddToRoot()` helper | manual root wiring | Warning |
+| Business-logic heuristic (control flow outside `run*` functions) | match | Warning |
+| `// ckeletin:allow-custom-command` marker | no justification on or adjacent to the marker line | **Error** |
 
-This checks that command files:
-- Use the helper functions (MustNewCommand, MustAddToRoot)
-- Don't contain direct viper.SetDefault() calls
-- Don't exceed reasonable line counts
+Errors fail the build; warnings do not.
+
+**Escape hatch**: files that genuinely cannot follow the pattern (e.g.
+cobra-specific introspection, shell completion) may carry
+`// ckeletin:allow-custom-command — <short reason>`. The marker skips the
+pattern checks, but the justification is mandatory — it must appear on the
+marker line or in a comment directly above/below it (a file-path header
+comment like `// cmd/foo.go` does not count). A bare marker fails validation.
+
+**Honor-system gaps**:
+- The business-logic heuristic is grep-based and cannot prove logic is absent;
+  layering enforcement (ADR-009, `validate:layering`) is the structural backstop.
+- Exempted files are validated only for marker justification; their size and
+  structure rely on code review.
+
+Related: the semgrep rule `ckeletin-no-os-exit` (ADR-001 metadata) keeps
+`os.Exit()` out of `internal/` packages so errors return to the cmd layer.
 
 ## Implementation Patterns
 
@@ -185,7 +216,7 @@ func runPing(cmd *cobra.Command, args []string) error {
 
 **Pattern Enforced By**:
 - **ADR-009** (Layered Architecture): Business logic cannot import cmd/
-- **ADR-001** (This ADR): Commands must be thin (~20-30 lines)
+- **ADR-001** (This ADR): `run*` functions ≤30 lines (hard limit 35, see [Enforcement](#enforcement))
 - Natural consequence: Logic must live elsewhere → Executor pattern emerges
 
 **Validation**: `task validate:commands` checks command files stay thin, which implicitly requires delegation pattern.

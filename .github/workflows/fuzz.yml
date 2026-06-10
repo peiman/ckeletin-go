@@ -21,10 +21,16 @@ jobs:
         with:
           go-version-file: '.go-version'
 
+      - name: Read Task version (SSOT)
+        run: |
+          TASK_VERSION="$(cat .github/TASK_VERSION 2>/dev/null || true)"
+          [ -n "$TASK_VERSION" ] || { echo "::error::.github/TASK_VERSION missing or empty"; exit 1; }
+          echo "TASK_VERSION=${TASK_VERSION}" >> "$GITHUB_ENV"
+
       - name: Install Task
         uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611  # v2.0.0
         with:
-          version: '3.39.2'
+          version: ${{ env.TASK_VERSION }}
 
       - name: Run fuzz tests
         run: task test:fuzz FUZZTIME=60s

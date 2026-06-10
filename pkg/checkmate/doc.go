@@ -14,11 +14,15 @@
 // # Themes
 //
 // Checkmate includes two built-in themes:
-//   - DefaultTheme(): Colorful output with emojis for interactive terminals
+//   - DefaultTheme(): Unicode icons (○ ✓ ✗ • !) and tree connectors with
+//     colors for interactive terminals
 //   - MinimalTheme(): Plain ASCII for CI/CD pipelines and piped output
 //
-// TTY detection is automatic - when output is piped or redirected, checkmate
-// automatically switches to MinimalTheme unless ForceColors is set.
+// TTY detection is automatic - when no theme was chosen explicitly and
+// output is piped or redirected, checkmate switches to MinimalTheme.
+// A non-nil theme passed via WithTheme is always honored. Color emission
+// is decided by the lipgloss renderer for the writer, so colorful themes
+// still print without ANSI codes on writers that do not support them.
 //
 //	// Force a specific theme
 //	p := checkmate.New(checkmate.WithTheme(checkmate.MinimalTheme()))
@@ -52,37 +56,64 @@
 //
 // # Output Examples
 //
-// CategoryHeader("Code Quality"):
+// The examples below show the default theme (colors omitted).
 //
-//	─── Code Quality ────────────────────────
+// CategoryHeader("Code Quality") prints the title surrounded by blank
+// lines, with a colored background on terminals:
 //
-// CheckHeader("Checking formatting"):
+//	Code Quality
 //
-//	🔍 Checking formatting...
+// CheckHeader("format") prints an in-progress line on terminals only,
+// without a trailing newline so the final result overwrites it; piped
+// or redirected output gets nothing:
+//
+//	├── ○ format
 //
 // CheckSuccess("All files formatted"):
 //
-//	✅ All files formatted
+//	├── ✓ All files formatted
 //
-// CheckFailure with details:
+// CheckFailure("Format check failed", "main.go:10: line too long", "Run: task format"):
 //
-//	❌ Format check failed
+//	├── ✗ Format check failed
+//	│   Details:
+//	│     main.go:10: line too long
+//	│   How to fix:
+//	│     • Run: task format
+//	│
 //
-//	Details:
-//	  main.go:10: line too long
+// CheckSummary(StatusSuccess, "All checks passed (5/5)", "Formatting", "Linting", "Tests"):
 //
-//	How to fix:
-//	  • Run: task format
+//	╭────────────────────────────────────────────────╮
+//	│                                                │
+//	│           ✓ All checks passed (5/5)            │
+//	│                                                │
+//	│  ├── ✓ Formatting                              │
+//	│  ├── ✓ Linting                                 │
+//	│  └── ✓ Tests                                   │
+//	│                                                │
+//	╰────────────────────────────────────────────────╯
 //
-// CheckSummary:
+// With MinimalTheme the same calls render plain ASCII:
 //
-//	━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//	✅ All checks passed (5/5)
+//	|-- [OK] All files formatted
 //
-//	• Formatting
-//	• Linting
-//	• Tests
-//	━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//	|-- [FAIL] Format check failed
+//	|   Details:
+//	|     main.go:10: line too long
+//	|   How to fix:
+//	|     * Run: task format
+//	|
+//
+//	+===========================================+
+//	|                                           |
+//	|       [OK] All checks passed (5/5)        |
+//	|                                           |
+//	|  |-- [OK] Formatting                      |
+//	|  |-- [OK] Linting                         |
+//	|  `-- [OK] Tests                           |
+//	|                                           |
+//	+===========================================+
 //
 // # Check Runner
 //

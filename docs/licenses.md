@@ -3,7 +3,7 @@
 > **tl;dr**: ckeletin-go automatically checks dependency licenses to prevent legal issues. Run `task check:license:source` after adding dependencies. Conservative permissive-only policy by default (MIT, Apache-2.0, BSD, ISC allowed; GPL/AGPL denied).
 
 **See also:**
-- [ADR-011](adr/011-license-compliance.md) - Full strategy and rationale
+- [ADR-011](../.ckeletin/docs/adr/011-license-compliance.md) - Full strategy and rationale
 - [CLAUDE.md](../CLAUDE.md#license-compliance) - Quick reference for developers
 - [.lichen.yaml](../.lichen.yaml) - Binary check configuration
 
@@ -341,7 +341,7 @@ task check:license:source
 **Note:** The `go-licenses` tool only supports `--allowed_licenses` (not `--disallowed_types` simultaneously). Use the `LICENSE_ALLOWED` environment variable to customize the list of permitted licenses.
 
 **Make permanent:**
-Edit `scripts/check-licenses-source.sh`:
+Edit `.ckeletin/scripts/check-licenses-source.sh`:
 ```bash
 ALLOWED_LICENSES="${LICENSE_ALLOWED:-MIT,Apache-2.0,BSD-3-Clause,MPL-2.0}"
 ```
@@ -608,7 +608,7 @@ License checks run automatically in CI (`.github/workflows/ci.yml`):
 
 ## Additional Resources
 
-- **ADR-011:** [License Compliance Strategy](adr/011-license-compliance.md) - Full rationale
+- **ADR-011:** [License Compliance Strategy](../.ckeletin/docs/adr/011-license-compliance.md) - Full rationale
 - **CLAUDE.md:** [License Compliance Section](../CLAUDE.md#license-compliance) - Developer quick reference
 - **Taskfile.yml:** Search for `check:license` tasks
 - **SPDX:** [License List](https://spdx.org/licenses/) - Standard license identifiers
@@ -629,4 +629,4 @@ License checks run automatically in CI (`.github/workflows/ci.yml`):
 
 **Default Policy:** Permissive only (MIT, Apache-2.0, BSD, ISC)
 **Customization:** `.lichen.yaml` or environment variables
-**Help:** See [ADR-011](adr/011-license-compliance.md) for full details
+**Help:** See [ADR-011](../.ckeletin/docs/adr/011-license-compliance.md) for full details

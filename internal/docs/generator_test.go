@@ -110,6 +110,28 @@ func TestGenerate_FileError(t *testing.T) {
 		"Expected 'failed to create output file' in error, got %s", err.Error())
 }
 
+// TestGenerate_WriteError verifies that write failures during generation
+// propagate through Generate instead of reporting success over a truncated
+// artifact.
+func TestGenerate_WriteError(t *testing.T) {
+	// SETUP PHASE
+	cfg := Config{
+		Writer:       &failAfterWriter{limit: 64},
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "",
+		Registry:     config.Registry,
+	}
+	generator := NewGenerator(cfg)
+	generator.SetAppInfo(AppInfo{BinaryName: "test"})
+
+	// EXECUTION PHASE
+	err := generator.Generate()
+
+	// ASSERTION PHASE
+	require.Error(t, err, "a failing writer must surface an error")
+	assert.ErrorIs(t, err, errWriteFailed)
+}
+
 func TestGenerate_CloseError(t *testing.T) {
 	// REGRESSION TEST: Verify that close errors are properly propagated
 	// Bug: The deferred closeErr assignment happens after the function returns,

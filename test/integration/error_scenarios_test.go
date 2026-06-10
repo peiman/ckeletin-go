@@ -190,10 +190,13 @@ func TestInvalidFlagValues(t *testing.T) {
 			wantStderrContains: "unknown flag",
 		},
 		{
-			name:               "Invalid docs format",
-			args:               []string{"docs", "config", "--format", "invalid"},
+			name: "Invalid docs format",
+			args: []string{"docs", "config", "--format", "invalid"},
+			// The registry validator rejects the value at startup with the
+			// key name and valid options (fail-fast per ADR-004), replacing
+			// the generator's late "unsupported format" error.
 			wantExitCode:       1,
-			wantStderrContains: "unsupported format",
+			wantStderrContains: "valid options: markdown, yaml",
 		},
 	}
 

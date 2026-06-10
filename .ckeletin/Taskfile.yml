@@ -60,6 +60,9 @@ vars:
   TOOL_GITLEAKS_VERSION: latest
   TOOL_GRYPE_VERSION: latest
   TOOL_GOCOVMERGE_VERSION: latest
+  # Keep in sync with YQ_VERSION in .github/workflows/reusable-conformance.yml
+  # (CI downloads the release binary; install_tools.sh go-installs this tag)
+  TOOL_YQ_VERSION: v4.44.6
 
 tasks:
   default:
@@ -1181,6 +1184,10 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
+      # validate:security is a sub-second grep script (ADR-004) — fast mode
+      # runs the same validate:* set as check:common, only skipping the
+      # heavyweight stages (race detection, integration tests, dep scans).
+      - task: validate:security
       - task: validate:dev-build-tags
       - task: validate:hook-forwardings
       - cmd: |

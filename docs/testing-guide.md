@@ -20,10 +20,10 @@ Key principles:
 1. **Dependency Injection**: Use interface-based DI instead of mocking frameworks
 2. **Test Real Behavior**: Focus on observable behavior, not implementation details
 3. **Simple Test Implementations**: Create simple test implementations of interfaces
-4. **High Coverage**: Maintain 80%+ test coverage across all packages
+4. **High Coverage**: Maintain 85%+ overall test coverage
 5. **Integration Tests**: Complement unit tests with end-to-end integration tests
 
-See [ADR-003](adr/003-testing-strategy.md) for full rationale.
+See [ADR-003](../.ckeletin/docs/adr/003-dependency-injection-over-mocking.md) for full rationale.
 
 ## Test Organization
 
@@ -34,9 +34,9 @@ ckeletin-go/
 ├── cmd/                      # Command tests
 │   ├── ping_test.go         # Unit tests for ping command
 │   └── root_test.go         # Root command and config tests
-├── internal/
+├── .ckeletin/pkg/           # Framework package tests
 │   ├── config/
-│   │   ├── config_test.go   # Config package tests
+│   │   ├── registry_test.go # Config package tests
 │   │   └── validator/
 │   │       └── validator_test.go
 │   ├── logger/
@@ -44,6 +44,7 @@ ckeletin-go/
 │   └── testutil/            # Shared test utilities
 │       ├── helpers.go       # Test helpers (platform skips, etc.)
 │       └── helpers_test.go
+├── internal/                # Business logic tests (*_test.go per package)
 └── test/
     └── integration/         # End-to-end integration tests
         ├── integration_test.go
@@ -448,7 +449,7 @@ func getExitCode(err error) int {
 **Use the testutil helpers for consistent platform skipping:**
 
 ```go
-import "github.com/peiman/ckeletin-go/internal/testutil"
+import "github.com/peiman/ckeletin-go/.ckeletin/pkg/testutil"
 
 func TestFilePermissions(t *testing.T) {
     testutil.SkipOnWindowsWithReason(t, "file permissions require Unix")
@@ -674,7 +675,7 @@ task test  # Coverage is automatic
 
 # Run specific package tests
 go test ./cmd/...
-go test ./internal/config/...
+go test ./.ckeletin/pkg/config/...
 
 # Run specific test
 go test ./cmd -run TestPingCommand
@@ -701,7 +702,7 @@ task check  # Runs: format, lint, tests, coverage, validation
 - Code formatting (goimports, gofmt)
 - Linting (golangci-lint)
 - All tests pass
-- Coverage thresholds met (80%+)
+- Coverage thresholds met (85%+ overall)
 - ADR compliance validation
 
 ### Integration Tests
@@ -720,10 +721,10 @@ go test -short ./...
 
 | Package Type | Minimum | Target |
 |-------------|---------|--------|
-| Overall | 80% | 85%+ |
+| Overall | 85% | 90%+ |
 | `cmd/*` | 80% | 90%+ |
-| `internal/config` | 80% | 90%+ |
-| `internal/logger` | 80% | 90%+ |
+| `.ckeletin/pkg/config` | 80% | 90%+ |
+| `.ckeletin/pkg/logger` | 80% | 90%+ |
 | Other packages | 70% | 80%+ |
 
 **View coverage report:**
@@ -738,8 +739,8 @@ go tool cover -html=coverage.out
 
 ## Additional Resources
 
-- [ADR-003: Testing Strategy](adr/003-testing-strategy.md) - Testing philosophy and rationale
-- [ADR-001: Command Pattern](adr/001-command-pattern.md) - How to write thin, testable commands
+- [ADR-003: Dependency Injection Over Mocking](../.ckeletin/docs/adr/003-dependency-injection-over-mocking.md) - Testing philosophy and rationale
+- [ADR-001: Ultra-Thin Command Pattern](../.ckeletin/docs/adr/001-ultra-thin-command-pattern.md) - How to write thin, testable commands
 - [Go Testing Package](https://pkg.go.dev/testing) - Official Go testing docs
 - [Testify Documentation](https://pkg.go.dev/github.com/stretchr/testify) - Assertion library docs
 - [Table-Driven Tests in Go](https://dave.cheney.net/2019/05/07/prefer-table-driven-tests) - Dave Cheney's guide

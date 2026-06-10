@@ -18,8 +18,8 @@ task bench
 
 # Run benchmarks for specific package
 go test -bench=. -benchmem ./cmd -run=^$
-go test -bench=. -benchmem ./internal/config -run=^$
-go test -bench=. -benchmem ./internal/logger -run=^$
+go test -bench=. -benchmem ./.ckeletin/pkg/config -run=^$
+go test -bench=. -benchmem ./.ckeletin/pkg/logger -run=^$
 
 # Run with custom benchmark time
 go test -bench=. -benchmem -benchtime=5s ./cmd -run=^$
@@ -55,7 +55,7 @@ These functions are called during flag registration for each command.
 - Zero allocations for primitive type conversions
 - Flag registration averages ~2.6µs per command (20 allocs)
 
-### Configuration System (internal/config/)
+### Configuration System (.ckeletin/pkg/config/)
 
 | Function | Time/op | Allocs/op | Memory/op | Notes |
 |----------|---------|-----------|-----------|-------|
@@ -72,7 +72,7 @@ These functions are called during flag registration for each command.
 - Registry() and SetDefaults() are called once at startup
 - Per-value validation is extremely cheap (~3ns)
 
-### Logger Sanitization (internal/logger/)
+### Logger Sanitization (.ckeletin/pkg/logger/)
 
 These functions are called for every log message to prevent injection attacks.
 

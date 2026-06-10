@@ -3,6 +3,7 @@ package logger
 import (
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/mattn/go-isatty"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -45,6 +47,13 @@ var (
 //   - app.log.file_level: File log level (default: debug)
 //   - app.log.color_enabled: Color output (auto/true/false, default: auto)
 //
+// When JSON output mode is active (output.IsJSONMode), the console writer is
+// disabled entirely; only the file (audit) writer receives entries.
+//
+// Init fails closed when file logging is explicitly enabled but the log file
+// cannot be opened: a requested audit trail that cannot exist is an error,
+// not a degradation.
+//
 // Example:
 //
 //	if err := logger.Init(nil); err != nil {
@@ -64,6 +73,15 @@ func Init(out io.Writer) error {
 
 	// Get console log level (with backward compatibility)
 	consoleLevel := getConsoleLogLevel()
+	if output.IsJSONMode() {
+		// JSON mode contract (CKSPEC-OUT-004): stdout carries exactly one
+		// JSON envelope and stderr stays silent, so the console writer is
+		// fully disabled. The file (audit) writer below is unaffected and
+		// keeps receiving entries at its configured level. Disabling here,
+		// before the writers are built, also keeps Init's own status logs
+		// off the console.
+		consoleLevel = zerolog.Disabled
+	}
 	currentConsoleLevel = consoleLevel
 
 	// Determine if color should be enabled
@@ -91,23 +109,31 @@ func Init(out io.Writer) error {
 		filePath := viper.GetString(config.KeyAppLogFilePath)
 
 		fileWriter, err := openLogFileWithRotation(filePath)
-		if err != nil {
-			// Log warning but continue with console-only logging
-			log.Warn().
-				Err(err).
-				Str("path", SanitizePath(filePath)).
-				Msg("Failed to open log file, continuing with console-only logging")
-		} else {
-			logFile = fileWriter
-			currentFileWriter = fileWriter // Store for rebuilding
-
-			filteredFile := FilteredWriter{
-				Writer:   fileWriter,
-				MinLevel: fileLevel,
-			}
-
-			writers = append(writers, filteredFile)
+		if err == nil {
+			// lumberjack opens the file lazily on FIRST write and swallows
+			// later write errors, so probe now: an unwritable path must fail
+			// Init instead of silently dropping every audit entry.
+			_, err = fileWriter.Write(nil)
 		}
+		if err != nil {
+			// Fail closed: file logging was EXPLICITLY enabled, so an audit
+			// trail that cannot exist is an error, not a degradation. The old
+			// Warn-and-continue path was unobservable in JSON mode (the
+			// warning fired into the pre-init logger before log.Logger was
+			// replaced), yielding exit 0 with zero audit entries.
+			return fmt.Errorf("file logging enabled but log file %s cannot be opened: %w",
+				SanitizePath(filePath), err)
+		}
+
+		logFile = fileWriter
+		currentFileWriter = fileWriter // Store for rebuilding
+
+		filteredFile := FilteredWriter{
+			Writer:   fileWriter,
+			MinLevel: fileLevel,
+		}
+
+		writers = append(writers, filteredFile)
 	}
 
 	// Create multi-writer
@@ -121,14 +147,10 @@ func Init(out io.Writer) error {
 		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
 		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
 		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       uint32(initial), //nolint:gosec // Config values are positive
+			Burst:       clampSamplingValue(initial),
 			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
+			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
 		})
-		log.Info().
-			Int("initial", initial).
-			Int("thereafter", thereafter).
-			Msg("Log sampling enabled")
 	}
 
 	log.Logger = logger
@@ -137,6 +159,15 @@ func Init(out io.Writer) error {
 	// This allows both writers to filter independently
 	globalLevel := getGlobalLogLevel(consoleLevel)
 	zerolog.SetGlobalLevel(globalLevel)
+
+	// Log sampling status after logger is configured, so the message goes to
+	// the writers configured above instead of the previous global logger
+	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
+		log.Info().
+			Int("initial", viper.GetInt(config.KeyAppLogSamplingInitial)).
+			Int("thereafter", viper.GetInt(config.KeyAppLogSamplingThereafter)).
+			Msg("Log sampling enabled")
+	}
 
 	// Log file logging status after logger is configured
 	if viper.GetBool(config.KeyAppLogFileEnabled) && logFile != nil {
@@ -157,8 +188,11 @@ func Cleanup() {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
 	if logFile != nil {
-		if err := logFile.Close(); err != nil {
-			// Can't use logger here as it might be cleaning up
+		if err := logFile.Close(); err != nil && !output.IsJSONMode() {
+			// Can't use logger here as it might be cleaning up. In JSON mode
+			// stderr must stay silent (CKSPEC-OUT-004), so the warning is
+			// suppressed — the close failure cannot reach the audit file
+			// either, since that is the very file that failed to close.
 			fmt.Fprintf(os.Stderr, "Warning: failed to close log file: %v\n", err)
 		}
 		logFile = nil
@@ -219,6 +253,23 @@ func getGlobalLogLevel(consoleLevel zerolog.Level) zerolog.Level {
 	}
 
 	return consoleLevel
+}
+
+// clampSamplingValue converts a sampling config value to the uint32 zerolog
+// requires, clamping out-of-range values to [1, math.MaxUint32]. The registry
+// validators (ValidatePositiveInt) are the primary defense; this clamp is
+// defense in depth for values that bypass config validation (e.g. direct
+// viper.Set), where a negative value would wrap to ~4 billion and zero would
+// make zerolog's BasicSampler drop every event after the burst.
+func clampSamplingValue(n int) uint32 {
+	v := int64(n)
+	if v < 1 {
+		return 1
+	}
+	if v > math.MaxUint32 {
+		return math.MaxUint32
+	}
+	return uint32(v)
 }
 
 // isColorEnabled determines if colored output should be enabled.
@@ -304,9 +355,9 @@ func rebuildLogger() {
 		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
 		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
 		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       uint32(initial), //nolint:gosec // Config values are positive
+			Burst:       clampSamplingValue(initial),
 			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: uint32(thereafter)}, //nolint:gosec // Config values are positive
+			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
 		})
 	}
 
@@ -325,9 +376,11 @@ func rebuildLogger() {
 // This allows adjusting verbosity without restarting the application.
 func SetConsoleLevel(level zerolog.Level) {
 	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	currentConsoleLevel = level
 	rebuildLogger()
-	loggerMu.Unlock()
+	// Logged under loggerMu: log.Logger is rebuilt under this mutex, so
+	// reading it after unlocking would race with concurrent Set*Level calls
 	log.Info().
 		Str("level", level.String()).
 		Msg("Console log level changed")
@@ -337,9 +390,10 @@ func SetConsoleLevel(level zerolog.Level) {
 // This allows adjusting file log verbosity without restarting the application.
 func SetFileLevel(level zerolog.Level) {
 	loggerMu.Lock()
+	defer loggerMu.Unlock()
 	currentFileLevel = level
 	rebuildLogger()
-	loggerMu.Unlock()
+	// Logged under loggerMu: see SetConsoleLevel
 	log.Info().
 		Str("level", level.String()).
 		Msg("File log level changed")

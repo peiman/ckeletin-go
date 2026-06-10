@@ -133,10 +133,14 @@ issues:
         - nilerr
         - nilnil
 
-    # Exclude gosec for command files (often have subprocess calls)
+    # Allow subprocess launches (G204) in command files; all other gosec
+    # rules (hardcoded credentials, weak crypto, file permissions) still apply
     - path: ^cmd/
+      text: "G204"
       linters:
         - gosec
+    - path: ^cmd/
+      linters:
         - revive        # Command files have standard Cobra patterns
 
     # Allow integer conversions - Go's type system is strict, these are often safe

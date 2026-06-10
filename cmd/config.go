@@ -1,6 +1,8 @@
 // cmd/config.go
 //
-// ckeletin:allow-custom-command
+// ckeletin:allow-custom-command — parent + subcommand wiring with a local
+// --file flag, not config-registry-driven, so the NewCommand/metadata pattern
+// does not apply (cmd/catalog.go cites this same exemption).
 
 package cmd
 
@@ -10,6 +12,7 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/validator"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
+	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -59,25 +62,7 @@ func init() {
 }
 
 func runConfigValidate(cmd *cobra.Command, args []string) error {
-	// Determine which config file to validate
-	configPath := validateConfigFile
-	if configPath == "" {
-		// Use the config file viper already found, or the global --config flag
-		if configFileUsed != "" {
-			configPath = configFileUsed
-		} else if cfgFile != "" {
-			configPath = cfgFile
-		} else {
-			// Default to the selected user config directory for validation target
-			configPaths := ConfigPaths()
-			if defaultDir := defaultUserConfigDir(configPaths); defaultDir != "" {
-				configPath = filepath.Join(defaultDir, "config.yaml")
-			}
-		}
-	}
-
-	// Run validation
-	result, err := validator.Validate(configPath)
+	result, err := validator.Validate(resolveValidateConfigPath())
 	if err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}
@@ -85,34 +70,12 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 	exitErr := validator.ExitCodeForResult(result)
 
 	// JSON mode: emit exactly one envelope (no human text). Like the `check`
-	// command, return nil afterward so main.go does not emit a second envelope —
-	// the envelope's status communicates success/failure.
+	// command, return output.ErrRendered on failure so main.go signals a
+	// non-zero exit without emitting a second envelope.
 	if output.IsJSONMode() {
-		status := "success"
-		var jsonErr *output.JSONError
-		if exitErr != nil {
-			status = "error"
-			jsonErr = &output.JSONError{Message: exitErr.Error()}
+		if rerr := ui.RenderValidationJSON(cmd.OutOrStdout(), result, exitErr); rerr != nil {
+			return rerr
 		}
-		errMsgs := make([]string, len(result.Errors))
-		for i, e := range result.Errors {
-			errMsgs[i] = e.Error()
-		}
-		if rerr := output.RenderJSON(cmd.OutOrStdout(), output.JSONEnvelope{
-			Status:  status,
-			Command: output.CommandName(),
-			Data: map[string]any{
-				"valid":       result.Valid,
-				"config_file": result.ConfigFile,
-				"errors":      errMsgs,
-				"warnings":    result.Warnings,
-			},
-			Error: jsonErr,
-		}); rerr != nil {
-			return fmt.Errorf("failed to write JSON output: %w", rerr)
-		}
-		// The single envelope is written; signal a non-zero exit on failure
-		// (errors or warnings) without main.go emitting a second envelope.
 		if exitErr != nil {
 			cmd.SilenceUsage = true
 			return output.ErrRendered
@@ -126,6 +89,24 @@ func runConfigValidate(cmd *cobra.Command, args []string) error {
 		cmd.SilenceUsage = true
 		return exitErr
 	}
-
 	return nil
+}
+
+// resolveValidateConfigPath picks the file `config validate` targets: the
+// --file flag, the config file viper already loaded, the global --config flag,
+// or the default user config location — in that order.
+func resolveValidateConfigPath() string {
+	if validateConfigFile != "" {
+		return validateConfigFile
+	}
+	if configFileUsed != "" {
+		return configFileUsed
+	}
+	if cfgFile != "" {
+		return cfgFile
+	}
+	if defaultDir := defaultUserConfigDir(ConfigPaths()); defaultDir != "" {
+		return filepath.Join(defaultDir, "config.yaml")
+	}
+	return ""
 }

@@ -5,6 +5,7 @@ package docs
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
@@ -25,9 +26,9 @@ func (g *Generator) GenerateYAMLDocs(w io.Writer) error {
 
 // generateYAMLContent generates YAML content for the given registry
 // this function is shared by both YAML and Markdown generators
-//
-//nolint:errcheck // YAML generation - errors from fmt.Fprintf are acceptable
 func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
+	ew := &errWriter{w: w}
+
 	// Group options by top-level key for a nicer YAML structure
 	groups := make(map[string][]config.ConfigOption)
 	for _, opt := range registry {
@@ -40,10 +41,18 @@ func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 		}
 	}
 
-	// Generate YAML
-	for topLevel, options := range groups {
+	// Generate YAML in sorted group order so output is deterministic
+	// (map iteration order is randomized in Go)
+	topLevels := make([]string, 0, len(groups))
+	for topLevel := range groups {
+		topLevels = append(topLevels, topLevel)
+	}
+	sort.Strings(topLevels)
+
+	for _, topLevel := range topLevels {
+		options := groups[topLevel]
 		if topLevel != "" {
-			fmt.Fprintf(w, "%s:\n", topLevel)
+			ew.printf("%s:\n", topLevel)
 		}
 
 		// Process options
@@ -71,14 +80,20 @@ func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 				key = parts[1]
 			}
 
-			fmt.Fprintf(w, "  # %s\n", opt.Description)
-			fmt.Fprintf(w, "  %s: %s\n\n", key, opt.ExampleValueString())
+			ew.printf("  # %s\n", opt.Description)
+			ew.printf("  %s: %s\n\n", key, opt.ExampleValueString())
 		}
 
-		// Process nested groups
-		for nestedKey, nestedOpts := range nestedGroups {
-			fmt.Fprintf(w, "  %s:\n", nestedKey)
-			for _, opt := range nestedOpts {
+		// Process nested groups in sorted order for deterministic output
+		nestedKeys := make([]string, 0, len(nestedGroups))
+		for nestedKey := range nestedGroups {
+			nestedKeys = append(nestedKeys, nestedKey)
+		}
+		sort.Strings(nestedKeys)
+
+		for _, nestedKey := range nestedKeys {
+			ew.printf("  %s:\n", nestedKey)
+			for _, opt := range nestedGroups[nestedKey] {
 				// Extract the part after the second dot
 				parts := strings.SplitN(opt.Key, ".", 3)
 				var key string
@@ -89,11 +104,14 @@ func generateYAMLContent(w io.Writer, registry []config.ConfigOption) error {
 					key = opt.Key
 				}
 
-				fmt.Fprintf(w, "    # %s\n", opt.Description)
-				fmt.Fprintf(w, "    %s: %s\n\n", key, opt.ExampleValueString())
+				ew.printf("    # %s\n", opt.Description)
+				ew.printf("    %s: %s\n\n", key, opt.ExampleValueString())
 			}
 		}
 	}
 
+	if ew.err != nil {
+		return fmt.Errorf("failed to write YAML content: %w", ew.err)
+	}
 	return nil
 }

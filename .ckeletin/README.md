@@ -8,9 +8,10 @@ This directory contains the ckeletin framework - reusable infrastructure for bui
 .ckeletin/
 ├── Taskfile.yml           # Framework tasks (quality checks, builds, etc.)
 ├── pkg/                   # Framework Go packages
+│   ├── catalog/           # Command catalog types (CKSPEC-AGENT-006)
 │   ├── config/            # Configuration registry and validation
 │   ├── logger/            # Zerolog dual-output logging
-│   ├── ui/                # Bubble Tea UI utilities
+│   ├── output/            # JSON output mode (--output json)
 │   └── testutil/          # Test helpers
 ├── scripts/               # Build, validation, and check scripts
 ├── configs/               # Documentation for config file strategy
@@ -29,12 +30,14 @@ This directory contains the ckeletin framework - reusable infrastructure for bui
 When ckeletin releases updates, pull them in:
 
 ```bash
-# Simple way
-task ckeletin:update
-
-# Manual way (if you need more control)
-git subtree pull --prefix=.ckeletin https://github.com/peiman/ckeletin-go.git main --squash
+task ckeletin:update:dry-run             # Preview changes (safe)
+task ckeletin:update:check-compatibility # Test build compatibility (safe)
+task ckeletin:update                     # Apply update (creates a commit)
 ```
+
+Under the hood, `task ckeletin:update` fetches the upstream repo into a
+`ckeletin-upstream` remote, replaces the `.ckeletin/` directory from it, and
+rewrites module paths and binary names to match your project.
 
 Your project files (cmd/, internal/, configs in root) are never touched by framework updates.
 

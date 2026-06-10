@@ -106,6 +106,23 @@ func TestDocsOptions(t *testing.T) {
 		assert.False(t, found.Required, "output_format should not be required")
 	})
 
+	t.Run("output_format has validation", func(t *testing.T) {
+		var found *config.ConfigOption
+		for i := range opts {
+			if opts[i].Key == "app.docs.output_format" {
+				found = &opts[i]
+				break
+			}
+		}
+
+		require.NotNil(t, found, "app.docs.output_format not found in options")
+		require.NotNil(t, found.Validation, "output_format should have a Validation function")
+		assert.NoError(t, found.Validation("markdown"), "markdown should be valid")
+		assert.NoError(t, found.Validation("yaml"), "yaml should be valid")
+		assert.Error(t, found.Validation("html"), "html should be invalid")
+		assert.Error(t, found.Validation(""), "empty format should be invalid")
+	})
+
 	t.Run("Specific option: output_file", func(t *testing.T) {
 		var found *config.ConfigOption
 		for i := range opts {

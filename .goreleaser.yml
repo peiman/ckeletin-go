@@ -81,6 +81,10 @@ builds:
       - -X '{{ .ModulePath }}/cmd.Version={{ .Version }}'
       - -X '{{ .ModulePath }}/cmd.Commit={{ .Commit }}'
       - -X '{{ .ModulePath }}/cmd.Date={{ .Date }}'
+      # GoReleaser versions carry no "-dirty" suffix, so the dirty-tree state
+      # (CKSPEC-OUT-006) is injected explicitly; Taskfile builds embed it in
+      # cmd.Version via `git describe --dirty` instead.
+      - -X '{{ .ModulePath }}/cmd.Dirty={{ .IsGitDirty }}'
 
     # Ensure reproducible builds
     env:

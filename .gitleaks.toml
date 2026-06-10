@@ -21,7 +21,6 @@ paths = [
     '''test/integration/testdata/''',
     '''third_party/''',
     '''reports/''',
-    '''\.github/workflows/''',
 ]
 
 # Allow specific patterns that are false positives

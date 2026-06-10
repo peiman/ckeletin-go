@@ -44,6 +44,7 @@ func DocsOptions() []config.ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "yaml",
+			Validation:   config.ValidateOneOf([]string{"markdown", "yaml"}, false),
 		},
 		{
 			Key:          "app.docs.output_file",

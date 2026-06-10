@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -19,28 +20,43 @@ type AppInfo struct {
 	}
 }
 
+// NewAppInfo assembles the AppInfo the docs generator embeds. defaultConfigDir
+// is the user config directory ("" when none applies); the default config path
+// is derived from it.
+func NewAppInfo(binaryName, envPrefix, defaultConfigDir string) AppInfo {
+	info := AppInfo{
+		BinaryName: binaryName,
+		EnvPrefix:  envPrefix,
+	}
+	if defaultConfigDir != "" {
+		info.ConfigPaths.DefaultPath = filepath.Join(defaultConfigDir, "config.yaml")
+	}
+	info.ConfigPaths.DefaultFullName = "config.yaml" // local project config
+	return info
+}
+
 // GenerateMarkdownDocs generates Markdown documentation for all configuration options
-//
-//nolint:errcheck // Documentation generation - errors from fmt.Fprintf are acceptable
 func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
+	ew := &errWriter{w: w}
+
 	// Write header
-	fmt.Fprintf(w, "# %s Configuration\n\n", appInfo.BinaryName)
-	fmt.Fprintf(w, "This document describes all available configuration options for %s.\n\n", appInfo.BinaryName)
+	ew.printf("# %s Configuration\n\n", appInfo.BinaryName)
+	ew.printf("This document describes all available configuration options for %s.\n\n", appInfo.BinaryName)
 
 	// Configuration sources
-	fmt.Fprintf(w, "## Configuration Sources\n\n")
-	fmt.Fprintf(w, "Configuration can be provided in multiple ways, in order of precedence:\n\n")
-	fmt.Fprintf(w, "1. Command-line flags\n")
-	fmt.Fprintf(w, "2. Environment variables (with prefix `%s_`)\n", appInfo.EnvPrefix)
-	fmt.Fprintf(w, "3. Configuration file (%s)\n", sanitizeConfigPath(appInfo.ConfigPaths.DefaultPath))
-	fmt.Fprintf(w, "4. Default values\n\n")
+	ew.printf("## Configuration Sources\n\n")
+	ew.printf("Configuration can be provided in multiple ways, in order of precedence:\n\n")
+	ew.printf("1. Command-line flags\n")
+	ew.printf("2. Environment variables (with prefix `%s_`)\n", appInfo.EnvPrefix)
+	ew.printf("3. Configuration file (%s)\n", sanitizeConfigPath(appInfo.ConfigPaths.DefaultPath))
+	ew.printf("4. Default values\n\n")
 
 	// Configuration options
-	fmt.Fprintf(w, "## Configuration Options\n\n")
+	ew.printf("## Configuration Options\n\n")
 
 	// Table header
-	fmt.Fprintf(w, "| Key | Type | Default | Environment Variable | Description |\n")
-	fmt.Fprintf(w, "|-----|------|---------|---------------------|-------------|\n")
+	ew.printf("| Key | Type | Default | Environment Variable | Description |\n")
+	ew.printf("|-----|------|---------|---------------------|-------------|\n")
 
 	// Table rows for each option
 	registry := g.cfg.Registry()
@@ -51,7 +67,7 @@ func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 			required = " (Required)"
 		}
 
-		fmt.Fprintf(w, "| `%s` | %s | %s | `%s` | %s%s |\n",
+		ew.printf("| `%s` | %s | %s | `%s` | %s%s |\n",
 			opt.Key,
 			opt.Type,
 			defaultVal,
@@ -62,26 +78,31 @@ func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 	}
 
 	// Example configuration file
-	fmt.Fprintf(w, "\n## Example Configuration\n\n")
-	fmt.Fprintf(w, "### YAML Configuration File (%s)\n\n", appInfo.ConfigPaths.DefaultFullName)
-	fmt.Fprintf(w, "```yaml\n")
+	ew.printf("\n## Example Configuration\n\n")
+	ew.printf("### YAML Configuration File (%s)\n\n", appInfo.ConfigPaths.DefaultFullName)
+	ew.printf("```yaml\n")
 
 	// Group options by top-level key for a nicer YAML structure
-	if err := generateYAMLContentFunc(w, registry); err != nil {
-		return fmt.Errorf("failed to generate YAML content: %w", err)
+	if ew.err == nil {
+		if err := generateYAMLContentFunc(w, registry); err != nil {
+			return fmt.Errorf("failed to generate YAML content: %w", err)
+		}
 	}
 
-	fmt.Fprintf(w, "```\n\n")
+	ew.printf("```\n\n")
 
 	// Environment variables
-	fmt.Fprintf(w, "### Environment Variables\n\n")
-	fmt.Fprintf(w, "```bash\n")
+	ew.printf("### Environment Variables\n\n")
+	ew.printf("```bash\n")
 	for _, opt := range registry {
-		fmt.Fprintf(w, "# %s\n", opt.Description)
-		fmt.Fprintf(w, "export %s=%s\n\n", opt.EnvVarName(appInfo.EnvPrefix), opt.ExampleValueString())
+		ew.printf("# %s\n", opt.Description)
+		ew.printf("export %s=%s\n\n", opt.EnvVarName(appInfo.EnvPrefix), opt.ExampleValueString())
 	}
-	fmt.Fprintf(w, "```\n")
+	ew.printf("```\n")
 
+	if ew.err != nil {
+		return fmt.Errorf("failed to write markdown documentation: %w", ew.err)
+	}
 	return nil
 }
 

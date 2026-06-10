@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,15 +32,77 @@ func TestNew_WithWriter(t *testing.T) {
 
 func TestNew_WithTheme(t *testing.T) {
 	theme := MinimalTheme()
-	theme.ForceColors = true // Prevent auto-switching
 	p := New(WithTheme(theme), WithWriter(&bytes.Buffer{}))
 
 	assert.Equal(t, "[OK]", p.theme.IconSuccess)
 }
 
+func TestNew_WithTheme_ExplicitThemeRetainedOnNonTTY(t *testing.T) {
+	var buf bytes.Buffer
+	theme := DefaultTheme()
+
+	p := New(WithWriter(&buf), WithTheme(theme))
+
+	assert.Same(t, theme, p.theme,
+		"a theme explicitly chosen via WithTheme must not be replaced on non-TTY writers")
+}
+
+func TestEnsureInit_NonExplicitTheme_NonTTY(t *testing.T) {
+	// The auto-degrade only applies when no theme was explicitly chosen.
+	// Printer fields are unexported, so a pre-set theme without WithTheme
+	// can only happen in-package (e.g. a zero-value Printer).
+	t.Run("degrades to MinimalTheme by default", func(t *testing.T) {
+		var buf bytes.Buffer
+		p := Printer{writer: &buf, theme: DefaultTheme()}
+
+		p.CheckSuccess("test")
+
+		assert.Equal(t, "[OK]", p.theme.IconSuccess,
+			"non-explicit theme should degrade to MinimalTheme on non-TTY writers")
+	})
+
+	t.Run("ForceColors retains the theme", func(t *testing.T) {
+		var buf bytes.Buffer
+		theme := DefaultTheme()
+		theme.ForceColors = true
+		p := Printer{writer: &buf, theme: theme}
+
+		p.CheckSuccess("test")
+
+		assert.Same(t, theme, p.theme,
+			"ForceColors should retain a non-explicit theme on non-TTY writers")
+	})
+}
+
 func TestNew_WithStderr(t *testing.T) {
 	p := New(WithStderr())
 	assert.Equal(t, os.Stderr, p.writer)
+}
+
+func TestNew_WithNilTheme(t *testing.T) {
+	var buf bytes.Buffer
+
+	var p *Printer
+	assert.NotPanics(t, func() {
+		p = New(WithTheme(nil), WithWriter(&buf))
+	})
+
+	p.CheckSuccess("still works")
+	assert.Contains(t, buf.String(), "still works")
+}
+
+func TestPrinter_ZeroValue(t *testing.T) {
+	// A zero-value Printer (constructed without New) must not panic;
+	// it lazily applies the same defaults New provides.
+	var buf bytes.Buffer
+	p := Printer{writer: &buf}
+
+	assert.NotPanics(t, func() {
+		p.CheckSuccess("zero value")
+		p.CheckSummary(StatusSuccess, "Done")
+	})
+	assert.Contains(t, buf.String(), "zero value")
+	assert.Contains(t, buf.String(), "Done")
 }
 
 func TestNew_AutoDetectNonTTY(t *testing.T) {
@@ -66,7 +129,7 @@ func TestCategoryHeader(t *testing.T) {
 		{
 			name:     "default theme",
 			title:    "Code Quality",
-			theme:    forceColorTheme(DefaultTheme()),
+			theme:    DefaultTheme(),
 			contains: []string{"Code Quality"},
 		},
 		{
@@ -181,7 +244,7 @@ func TestCheckFailure(t *testing.T) {
 			title:       "Test failed",
 			details:     "main.go:10: error",
 			remediation: "Fix the error",
-			theme:       forceColorTheme(DefaultTheme()),
+			theme:       DefaultTheme(),
 			contains:    []string{"├──", "✗", "Test failed", "Details:", "main.go:10", "How to fix:", "Fix the error"},
 		},
 		{
@@ -244,7 +307,7 @@ func TestCheckSummary(t *testing.T) {
 			status:   StatusSuccess,
 			title:    "All checks passed",
 			items:    []string{"Formatting", "Linting"},
-			theme:    forceColorTheme(DefaultTheme()),
+			theme:    DefaultTheme(),
 			contains: []string{"─", "✓", "All checks passed", "Formatting", "Linting"},
 		},
 		{
@@ -276,6 +339,175 @@ func TestCheckSummary(t *testing.T) {
 			for _, expected := range tt.contains {
 				assert.Contains(t, output, expected)
 			}
+		})
+	}
+}
+
+func TestCheckSummary_LongTitle_NoPanic(t *testing.T) {
+	tests := []struct {
+		name  string
+		theme *Theme
+		title string
+	}{
+		{
+			name:  "title longer than summary width",
+			theme: MinimalTheme(),
+			title: strings.Repeat("x", 60),
+		},
+		{
+			name:  "title just over inner width",
+			theme: MinimalTheme(),
+			title: strings.Repeat("x", 43),
+		},
+		{
+			name: "tiny summary width",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryWidth = 1
+				return th
+			}(),
+			title: "Done",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			p := New(WithWriter(&buf), WithTheme(tt.theme))
+
+			assert.NotPanics(t, func() {
+				p.CheckSummary(StatusFailure, tt.title, "item")
+			})
+			assert.Contains(t, buf.String(), tt.title)
+		})
+	}
+}
+
+func TestCheckSummary_BoxAlignment(t *testing.T) {
+	tests := []struct {
+		name   string
+		status Status
+		title  string
+		items  []string
+	}{
+		{
+			name:   "success box lines are flush",
+			status: StatusSuccess,
+			title:  "All checks passed",
+			items:  []string{"Build", "Test"},
+		},
+		{
+			name:   "failure box lines are flush",
+			status: StatusFailure,
+			title:  "2 checks failed",
+			items:  []string{"Build", "Test"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			theme := MinimalTheme()
+			p := New(WithWriter(&buf), WithTheme(theme))
+
+			p.CheckSummary(tt.status, tt.title, tt.items...)
+
+			// Minimal theme output is pure ASCII with no escape codes,
+			// so every box line must be exactly SummaryWidth chars wide.
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if line == "" {
+					continue
+				}
+				assert.Len(t, line, theme.SummaryWidth, "line %q", line)
+			}
+		})
+	}
+}
+
+func TestCheckSummary_BoxAlignment_UnicodeTheme(t *testing.T) {
+	tests := []struct {
+		name   string
+		status Status
+		title  string
+		items  []string
+	}{
+		{
+			name:   "success box lines are flush with multibyte icons",
+			status: StatusSuccess,
+			title:  "All checks passed",
+			items:  []string{"Build", "Test"},
+		},
+		{
+			name:   "failure box lines are flush with multibyte icons",
+			status: StatusFailure,
+			title:  "2 checks failed",
+			items:  []string{"Build", "Test"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP: default theme uses multibyte icons (✓/✗) whose byte
+			// length differs from their single-column display width;
+			// WithTheme retains the unicode theme on a non-TTY buffer
+			var buf bytes.Buffer
+			theme := DefaultTheme()
+			p := New(WithWriter(&buf), WithTheme(theme))
+
+			// EXECUTION
+			p.CheckSummary(tt.status, tt.title, tt.items...)
+
+			// ASSERTION: every box line must occupy exactly SummaryWidth
+			// display columns (lipgloss.Width ignores ANSI codes)
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if line == "" {
+					continue
+				}
+				assert.Equal(t, theme.SummaryWidth, lipgloss.Width(line), "line %q", line)
+			}
+		})
+	}
+}
+
+func TestCheckSummary_UsesSummaryChar(t *testing.T) {
+	tests := []struct {
+		name     string
+		theme    *Theme
+		contains string
+	}{
+		{
+			name:     "minimal theme summary char",
+			theme:    MinimalTheme(),
+			contains: "+" + strings.Repeat("=", 43) + "+",
+		},
+		{
+			name: "custom summary char",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryChar = "~"
+				return th
+			}(),
+			contains: "+" + strings.Repeat("~", 43) + "+",
+		},
+		{
+			name: "empty summary char falls back to ASCII default",
+			theme: func() *Theme {
+				th := MinimalTheme()
+				th.SummaryChar = ""
+				return th
+			}(),
+			contains: "+" + strings.Repeat("-", 43) + "+",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			p := New(WithWriter(&buf), WithTheme(tt.theme))
+
+			p.CheckSummary(StatusSuccess, "Done")
+
+			assert.Contains(t, buf.String(), tt.contains)
 		})
 	}
 }
@@ -385,16 +617,10 @@ func TestCheckLine(t *testing.T) {
 	}
 }
 
-// Helper to force colors in theme (prevents auto-switch to minimal)
-func forceColorTheme(t *Theme) *Theme {
-	t.ForceColors = true
-	return t
-}
-
 // newTTYPrinter creates a Printer that simulates TTY mode for testing
 // the terminal escape code branches.
 func newTTYPrinter(buf *bytes.Buffer) *Printer {
-	p := New(WithWriter(buf), WithTheme(forceColorTheme(DefaultTheme())))
+	p := New(WithWriter(buf), WithTheme(DefaultTheme()))
 	p.isTerminal = true
 	return p
 }

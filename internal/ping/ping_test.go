@@ -43,50 +43,6 @@ func setupTestLogger(t *testing.T) (*bytes.Buffer, func()) {
 	return logBuf, cleanup
 }
 
-func TestConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		cfg      Config
-		expected Config
-	}{
-		{
-			name: "Basic config",
-			cfg: Config{
-				Message: "Hello",
-				Color:   "white",
-				UI:      false,
-			},
-			expected: Config{
-				Message: "Hello",
-				Color:   "white",
-				UI:      false,
-			},
-		},
-		{
-			name: "Custom config",
-			cfg: Config{
-				Message: "Custom",
-				Color:   "red",
-				UI:      true,
-			},
-			expected: Config{
-				Message: "Custom",
-				Color:   "red",
-				UI:      true,
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.expected.Message, tt.cfg.Message)
-			assert.Equal(t, tt.expected.Color, tt.cfg.Color)
-			assert.Equal(t, tt.expected.UI, tt.cfg.UI)
-		})
-	}
-}
-
 func TestExecutor_Execute_NonUIMode(t *testing.T) {
 	// SETUP PHASE: Setup logging with cleanup to prevent race conditions
 	_, cleanup := setupTestLogger(t)

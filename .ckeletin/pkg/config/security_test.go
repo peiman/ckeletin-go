@@ -308,3 +308,114 @@ func TestValidateConfigFileSecurity_NonexistentFile(t *testing.T) {
 	assert.True(t, strings.Contains(err.Error(), "failed to stat"),
 		"Expected error message to contain 'failed to stat', got: %v", err)
 }
+
+func TestValidateLogFilePath(t *testing.T) {
+	t.Parallel()
+	validate := ValidateLogFilePath()
+
+	tests := []struct {
+		name        string
+		value       interface{}
+		wantErr     bool
+		errContains string
+	}{
+		{
+			name:    "Default relative path",
+			value:   "./logs/ckeletin-go.log",
+			wantErr: false,
+		},
+		{
+			name:    "Absolute path",
+			value:   "/var/log/ckeletin-go/app.log",
+			wantErr: false,
+		},
+		{
+			name:    "Relative path without leading dot",
+			value:   "logs/app.log",
+			wantErr: false,
+		},
+		{
+			name:        "Parent directory traversal",
+			value:       "../escape.log",
+			wantErr:     true,
+			errContains: "traversal",
+		},
+		{
+			name:        "Nested traversal escaping the tree",
+			value:       "logs/../../escape.log",
+			wantErr:     true,
+			errContains: "traversal",
+		},
+		{
+			name:    "Inner traversal that stays inside cleans away",
+			value:   "logs/../app.log",
+			wantErr: false,
+		},
+		{
+			name:    "Component with leading dots is not traversal",
+			value:   "logs/..hidden/app.log",
+			wantErr: false,
+		},
+		{
+			name:        "Empty path",
+			value:       "",
+			wantErr:     true,
+			errContains: "empty",
+		},
+		{
+			name:    "Nil value is skipped",
+			value:   nil,
+			wantErr: false,
+		},
+		{
+			name:    "Non-string value is skipped",
+			value:   42,
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validate(tt.value)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.True(t, strings.Contains(err.Error(), tt.errContains),
+						"ValidateLogFilePath() error = %v, should contain %q", err, tt.errContains)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateLogFilePath_ExistingFiles(t *testing.T) {
+	t.Parallel()
+	testutil.SkipOnWindowsWithReason(t, "symlink creation requires elevated privileges on Windows")
+
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "real.log")
+	require.NoError(t,
+		os.WriteFile(target, []byte("log line\n"), 0600),
+		"Failed to create target file")
+
+	link := filepath.Join(tmpDir, "link.log")
+	require.NoError(t, os.Symlink(target, link), "Failed to create symlink")
+
+	validate := ValidateLogFilePath()
+
+	assert.NoError(t, validate(target),
+		"existing regular file should be accepted")
+
+	err := validate(link)
+	require.Error(t, err, "existing symlink should be rejected")
+	assert.True(t, strings.Contains(err.Error(), "symlink"),
+		"ValidateLogFilePath() error = %v, should contain %q", err, "symlink")
+
+	missing := filepath.Join(tmpDir, "missing", "app.log")
+	assert.NoError(t, validate(missing),
+		"missing file should be accepted (it is created on first write)")
+}

@@ -45,7 +45,7 @@ concurrency:
 env:
   # GO_VERSION is read from .go-version file (SSOT)
   # Use setup-go's go-version-file parameter instead of hardcoding
-  TASK_VERSION: '3.39.2'     # Define Task version here
+  # TASK_VERSION is read from .github/TASK_VERSION file (SSOT) in each job
   # Pinned tool versions for cache key (must match .ckeletin/Taskfile.yml)
   PINNED_TOOLS_VERSION: 'v1'  # Bump to invalidate cache when tool versions change
 
@@ -120,6 +120,12 @@ jobs:
 
       - name: Download Dependencies
         run: go mod download
+
+      - name: Read Task version (SSOT)
+        run: |
+          TASK_VERSION="$(cat .github/TASK_VERSION 2>/dev/null || true)"
+          [ -n "$TASK_VERSION" ] || { echo "::error::.github/TASK_VERSION missing or empty"; exit 1; }
+          echo "TASK_VERSION=${TASK_VERSION}" >> "$GITHUB_ENV"
 
       - name: Install Task
         run: |
@@ -204,6 +210,12 @@ jobs:
         with:
           go-version-file: '.go-version'  # SSOT for Go version
           cache-dependency-path: 'go.sum'
+
+      - name: Read Task version (SSOT)
+        run: |
+          TASK_VERSION="$(cat .github/TASK_VERSION 2>/dev/null || true)"
+          [ -n "$TASK_VERSION" ] || { echo "::error::.github/TASK_VERSION missing or empty"; exit 1; }
+          echo "TASK_VERSION=${TASK_VERSION}" >> "$GITHUB_ENV"
 
       - name: Cache Task Binary
         id: cache-task

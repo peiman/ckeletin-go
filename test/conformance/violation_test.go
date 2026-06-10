@@ -306,7 +306,12 @@ func ckspecViolation() {}
 // ---------------------------------------------------------------------------
 // CKSPEC-ARCH-006: Entry point minimality
 // Enforcement: validate-command-patterns.sh (script level)
-// Violation: command file exceeds 80 lines
+// Violation: a run* function exceeds the 35-line hard limit (the failing
+// gate; whole-file size above 80 lines is advisory-only and cannot prove
+// enforcement). The injected file is named ping_violation.go so the
+// metadata check resolves via the parent config (ping_config.go), and it
+// carries MustNewCommand/MustAddToRoot wiring — every earlier check passes,
+// isolating the line-count gate as the only possible error.
 // ---------------------------------------------------------------------------
 
 func TestViolation_ARCH006_OversizedCommand(t *testing.T) {
@@ -314,19 +319,74 @@ func TestViolation_ARCH006_OversizedCommand(t *testing.T) {
 		t.Skip("violation tests modify the source tree")
 	}
 
-	// Generate a command file that exceeds the 80-line limit
-	var lines string
-	lines = "package cmd\n\n"
-	for i := 0; i < 85; i++ {
-		lines += "// padding line to exceed limit\n"
-	}
+	var b strings.Builder
+	b.WriteString(`// cmd/ping_violation.go
 
-	cleanup := writeViolationFile(t, "cmd/ckspec_violation.go", lines)
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+)
+
+var pingViolationCmd = MustNewCommand(commands.PingMetadata, runPingViolation)
+
+func init() {
+	MustAddToRoot(pingViolationCmd)
+}
+
+func runPingViolation(cmd *cobra.Command, args []string) error {
+`)
+	// func line + 38 padding statements + return + closing brace = 41 lines,
+	// past the 35-line hard limit. Plain assignments keep the business-logic
+	// heuristic (check 6) quiet so the line-count gate is the sole finding.
+	for i := 0; i < 38; i++ {
+		b.WriteString("\t_ = \"padding statement\"\n")
+	}
+	b.WriteString("\treturn nil\n}\n")
+
+	cleanup := writeViolationFile(t, "cmd/ping_violation.go", b.String())
 	defer cleanup()
 
 	output, exitCode := runCheck(t, "bash", scriptPath(t, "validate-command-patterns.sh"))
 	assert.NotEqual(t, 0, exitCode,
-		"validate-command-patterns.sh should fail when command file exceeds 80 lines\nOutput: %s", output)
+		"validate-command-patterns.sh must fail when a run* function exceeds the 35-line hard limit\nOutput: %s", output)
+	assert.Contains(t, output,
+		"ping_violation: runPingViolation() is 41 lines (target 30, hard limit 35) - move logic to internal/",
+		"the failure must come from the run* line-count gate, not another check\nOutput: %s", output)
+	assert.NotContains(t, output, "ping_violation: Missing metadata file",
+		"the injected file must pass the metadata check so the line-count error is isolated\nOutput: %s", output)
+}
+
+// ---------------------------------------------------------------------------
+// CKSPEC-ARCH-006: Entry point minimality (whitelist escape hatch)
+// Enforcement: validate-command-patterns.sh (script level)
+// Violation: a bare // ckeletin:allow-custom-command marker with no
+// justification. The line above is a file-path header comment, which the
+// script explicitly refuses to count as a reason, and the line below is the
+// package clause — so the marker carries no justification anywhere the
+// script looks. The marker makes the script skip every other check for the
+// file, isolating the justification error.
+// ---------------------------------------------------------------------------
+
+func TestViolation_ARCH006_MarkerWithoutJustification(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	cleanup := writeViolationFile(t,
+		"cmd/ckspec_violation.go",
+		`// cmd/ckspec_violation.go
+// ckeletin:allow-custom-command
+package cmd
+`)
+	defer cleanup()
+
+	output, exitCode := runCheck(t, "bash", scriptPath(t, "validate-command-patterns.sh"))
+	assert.NotEqual(t, 0, exitCode,
+		"validate-command-patterns.sh must fail when the whitelist marker has no justification\nOutput: %s", output)
+	assert.Contains(t, output,
+		"ckspec_violation: ckeletin:allow-custom-command marker has no justification (add a short reason on or next to the marker line)",
+		"the failure must come from the marker-justification check\nOutput: %s", output)
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +474,9 @@ func TestViolation_CL001_MissingChangelogMd(t *testing.T) {
 
 // ---------------------------------------------------------------------------
 // CKSPEC-ENF-005: Conformance mapping completeness
-// Enforcement: task conform validates all 38 IDs present
+// Enforcement: task conform validates every requirement ID from the spec's
+// requirements.json is present in the mapping (count is machine-derived, not
+// hand-maintained — see the ENF-008 drift guard)
 // Violation: mapping file missing a requirement
 // ---------------------------------------------------------------------------
 
@@ -458,9 +520,9 @@ func TestViolation_ENF006_MissingViolationTestFlagged(t *testing.T) {
 
 	// Verify ENF-006 enforcement: the conform script contains logic that
 	// flags requirements claiming enforcement above honor-system but
-	// lacking violation tests. We verify this by checking that the script
-	// has the detection logic AND that the current mapping has violation
-	// tests for requirements with enforcement claims.
+	// lacking proof. We verify this by checking that the script has the
+	// detection logic AND that the current mapping carries proof for every
+	// enforcement claim above honor-system.
 	//
 	// We can't run conform.sh here because it runs `go test -tags conformance`
 	// which would recursively invoke this test. Instead, verify the mechanism
@@ -475,29 +537,39 @@ func TestViolation_ENF006_MissingViolationTestFlagged(t *testing.T) {
 	assert.Contains(t, string(script), "FEEDBACK_FILE",
 		"conform.sh must collect feedback signals")
 
-	// 2. The mapping has violation tests for all linter/script/sast claims
+	// 2. Every enforcement claim above honor-system (linter, sast, script,
+	// ci, test) must carry proof: a violation test or, per spec v0.4.0+, a
+	// written violation_evidence analysis. This mirrors what conform.sh
+	// enforces (lines under "ENF-006" there) so the two cannot drift apart.
 	mapping, err := os.ReadFile(filepath.Join(root, "conformance-mapping.yaml"))
 	require.NoError(t, err)
 	content := string(mapping)
 
-	// Every requirement with enforcement_level: linter should have a violation_test
-	// Count mismatches: linter claims without violation tests
+	needsProof := func(level string) bool {
+		return level != "" && level != "honor-system"
+	}
+
 	lines := strings.Split(content, "\n")
 	currentReq := ""
 	currentLevel := ""
 	hasViolationTest := false
+	hasViolationEvidence := false
 	mismatches := []string{}
+
+	flush := func() {
+		if currentReq != "" && needsProof(currentLevel) && !hasViolationTest && !hasViolationEvidence {
+			mismatches = append(mismatches, currentReq+" ("+currentLevel+")")
+		}
+	}
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "CKSPEC-") && strings.HasSuffix(trimmed, ":") {
-			// Save previous requirement check
-			if currentReq != "" && (currentLevel == "linter" || currentLevel == "sast") && !hasViolationTest {
-				mismatches = append(mismatches, currentReq+" ("+currentLevel+")")
-			}
+			flush() // close out the previous requirement
 			currentReq = strings.TrimSuffix(trimmed, ":")
 			currentLevel = ""
 			hasViolationTest = false
+			hasViolationEvidence = false
 		}
 		if strings.HasPrefix(trimmed, "enforcement_level:") {
 			currentLevel = strings.TrimSpace(strings.TrimPrefix(trimmed, "enforcement_level:"))
@@ -505,14 +577,14 @@ func TestViolation_ENF006_MissingViolationTestFlagged(t *testing.T) {
 		if strings.Contains(trimmed, "TestViolation_") {
 			hasViolationTest = true
 		}
+		if strings.HasPrefix(trimmed, "violation_evidence:") {
+			hasViolationEvidence = true
+		}
 	}
-	// Check last requirement
-	if currentReq != "" && (currentLevel == "linter" || currentLevel == "sast") && !hasViolationTest {
-		mismatches = append(mismatches, currentReq+" ("+currentLevel+")")
-	}
+	flush() // close out the last requirement
 
 	assert.Empty(t, mismatches,
-		"Requirements claiming linter/sast enforcement must have violation tests: %v", mismatches)
+		"Enforcement claims above honor-system must have a violation test or violation_evidence: %v", mismatches)
 }
 
 // ---------------------------------------------------------------------------
@@ -691,4 +763,63 @@ func TestViolation_AGENT006_CatalogCommandRemoved(t *testing.T) {
 		"conform.sh must fail when the catalog command (CKSPEC-AGENT-006) is removed\nOutput: %s", output)
 	assert.Contains(t, output, "CKSPEC-AGENT-006",
 		"conform.sh must name the failed requirement\nOutput: %s", output)
+}
+
+// ---------------------------------------------------------------------------
+// CKSPEC-AGENT-002: No provider-specific content in universal guide
+// Enforcement: grep-level conform check (script level) — provider names in
+// AGENTS.md are rejected unless the line is a provider-file reference or
+// cross-reference (CLAUDE.md, .cursorrules, copilot-instructions.md, ...).
+// Violation: a provider-specific instruction line must be caught.
+// The check runs against a doctored COPY of AGENTS.md in a temp dir, so this
+// test neither mutates the real guide nor re-runs conform.sh (no recursion).
+// ---------------------------------------------------------------------------
+
+func TestViolation_AGENT002_ProviderInstructionCaught(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests shell out to the conform check")
+	}
+
+	root := projectRoot(t)
+
+	// Pull the AGENT-002 check from the mapping (SSOT) so this test exercises
+	// the exact command conform.sh runs, not a re-implementation of it.
+	rawCheck, exitCode := runCheck(t, "yq",
+		`.requirements["CKSPEC-AGENT-002"].checks[0] // ""`,
+		filepath.Join(root, "conformance-mapping.yaml"))
+	require.Equal(t, 0, exitCode, "yq must read the mapping")
+	checkCmd := strings.TrimSpace(rawCheck)
+	require.NotEmpty(t, checkCmd,
+		"CKSPEC-AGENT-002 must declare a grep-level check in the mapping")
+
+	agents, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	require.NoError(t, err)
+
+	// runAgainst runs the mapping's check in a temp dir holding the given
+	// AGENTS.md content, returning the check's exit code.
+	// `bash -c` is deliberate and safe here: checkCmd comes from the repo's
+	// own conformance-mapping.yaml (developer-controlled, allowlisted), and
+	// conform.sh executes the very same string the very same way.
+	runAgainst := func(t *testing.T, content []byte) int {
+		t.Helper()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "AGENTS.md"), content, 0644))
+		cmd := exec.Command("bash", "-c", checkCmd) //nolint:gosec // repo-controlled check from the mapping, mirrors conform.sh
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			exitErr, ok := err.(*exec.ExitError)
+			require.True(t, ok, "failed to run AGENT-002 check: %v (output: %s)", err, out)
+			return exitErr.ExitCode()
+		}
+		return 0
+	}
+
+	assert.Equal(t, 0, runAgainst(t, agents),
+		"the AGENT-002 check must pass on the current AGENTS.md")
+
+	violated := append(append([]byte{}, agents...),
+		[]byte("\nClaude should always run `task check` before committing.\n")...)
+	assert.NotEqual(t, 0, runAgainst(t, violated),
+		"the AGENT-002 check must catch a provider-specific instruction line")
 }

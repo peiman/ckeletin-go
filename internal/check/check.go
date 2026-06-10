@@ -39,6 +39,18 @@ type Config struct {
 	BinaryName string   // Binary name for license-binary check (e.g., "myapp")
 }
 
+// ParseCategories splits a comma-separated category list, trimming whitespace
+// and dropping empty elements. An empty input yields nil.
+func ParseCategories(s string) []string {
+	var categories []string
+	for _, c := range strings.Split(s, ",") {
+		if c = strings.TrimSpace(c); c != "" {
+			categories = append(categories, c)
+		}
+	}
+	return categories
+}
+
 // ValidateCategories checks if all provided categories are valid
 func ValidateCategories(categories []string) error {
 	validSet := make(map[string]bool)

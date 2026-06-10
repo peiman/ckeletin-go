@@ -52,6 +52,29 @@ app:
   # Output format: text (human-readable) or json (machine-readable)
   output_format: json
 
+  check:
+    # Stop on first failed check
+    fail_fast: true
+
+    # Show verbose output including command details
+    verbose: true
+
+    # Run checks within each category in parallel (disable with --parallel=false)
+    parallel: false
+
+    # Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)
+    category: security,tests
+
+    # Show duration for each check in the output
+    timing: false
+
+  docs:
+    # Output format for documentation (markdown, yaml)
+    output_format: yaml
+
+    # Output file for documentation (defaults to stdout)
+    output_file: /path/to/output.md
+
   log:
     # Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.
     console_level: info
@@ -88,29 +111,6 @@ app:
 
     # Number of messages to log thereafter per second
     sampling_thereafter: 100
-
-  docs:
-    # Output format for documentation (markdown, yaml)
-    output_format: yaml
-
-    # Output file for documentation (defaults to stdout)
-    output_file: /path/to/output.md
-
-  check:
-    # Stop on first failed check
-    fail_fast: true
-
-    # Show verbose output including command details
-    verbose: true
-
-    # Run checks within each category in parallel (disable with --parallel=false)
-    parallel: false
-
-    # Filter to specific categories (comma-separated: environment,quality,architecture,security,dependencies,tests)
-    category: security,tests
-
-    # Show duration for each check in the output
-    timing: false
 
   ping:
     # Default message to display for the ping command

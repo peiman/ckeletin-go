@@ -14,7 +14,7 @@ import (
 func TestMockPrinter_NewMockPrinter(t *testing.T) {
 	mock := NewMockPrinter()
 	require.NotNil(t, mock)
-	assert.Empty(t, mock.Calls)
+	assert.Empty(t, mock.AllCalls())
 }
 
 func TestMockPrinter_RecordsCalls(t *testing.T) {
@@ -28,7 +28,24 @@ func TestMockPrinter_RecordsCalls(t *testing.T) {
 	mock.CheckInfo("line1", "line2")
 	mock.CheckNote("A note")
 
-	assert.Len(t, mock.Calls, 7)
+	assert.Len(t, mock.AllCalls(), 7)
+}
+
+func TestMockPrinter_AllCalls(t *testing.T) {
+	mock := NewMockPrinter()
+
+	mock.CheckSuccess("first")
+	mock.CheckFailure("second", "", "")
+
+	calls := mock.AllCalls()
+	require.Len(t, calls, 2)
+	assert.Equal(t, "CheckSuccess", calls[0].Method)
+	assert.Equal(t, "CheckFailure", calls[1].Method)
+
+	// AllCalls returns a copy - mutating it must not affect the mock
+	calls[0].Method = "Mutated"
+	assert.True(t, mock.HasCall("CheckSuccess"))
+	assert.Equal(t, "CheckSuccess", mock.AllCalls()[0].Method)
 }
 
 func TestMockPrinter_HasCall(t *testing.T) {
@@ -71,10 +88,10 @@ func TestMockPrinter_Reset(t *testing.T) {
 	mock := NewMockPrinter()
 
 	mock.CheckSuccess("test")
-	assert.Len(t, mock.Calls, 1)
+	assert.Len(t, mock.AllCalls(), 1)
 
 	mock.Reset()
-	assert.Empty(t, mock.Calls)
+	assert.Empty(t, mock.AllCalls())
 	assert.Empty(t, mock.Output())
 }
 
@@ -90,28 +107,29 @@ func TestMockPrinter_Arguments(t *testing.T) {
 	mock.CheckNote("Note Message")
 
 	// Verify arguments were captured correctly
-	assert.Equal(t, "Category Title", mock.Calls[0].Args[0])
-	assert.Equal(t, "Header Message", mock.Calls[1].Args[0])
-	assert.Equal(t, "Success Message", mock.Calls[2].Args[0])
+	calls := mock.AllCalls()
+	assert.Equal(t, "Category Title", calls[0].Args[0])
+	assert.Equal(t, "Header Message", calls[1].Args[0])
+	assert.Equal(t, "Success Message", calls[2].Args[0])
 
 	// CheckFailure has 3 args
-	assert.Equal(t, "Fail Title", mock.Calls[3].Args[0])
-	assert.Equal(t, "Fail Details", mock.Calls[3].Args[1])
-	assert.Equal(t, "Fail Fix", mock.Calls[3].Args[2])
+	assert.Equal(t, "Fail Title", calls[3].Args[0])
+	assert.Equal(t, "Fail Details", calls[3].Args[1])
+	assert.Equal(t, "Fail Fix", calls[3].Args[2])
 
 	// CheckSummary has status, title, and items
-	assert.Equal(t, StatusFailure, mock.Calls[4].Args[0])
-	assert.Equal(t, "Summary Title", mock.Calls[4].Args[1])
-	assert.Equal(t, "item1", mock.Calls[4].Args[2])
-	assert.Equal(t, "item2", mock.Calls[4].Args[3])
+	assert.Equal(t, StatusFailure, calls[4].Args[0])
+	assert.Equal(t, "Summary Title", calls[4].Args[1])
+	assert.Equal(t, "item1", calls[4].Args[2])
+	assert.Equal(t, "item2", calls[4].Args[3])
 
 	// CheckInfo has variadic args
-	assert.Equal(t, "info1", mock.Calls[5].Args[0])
-	assert.Equal(t, "info2", mock.Calls[5].Args[1])
-	assert.Equal(t, "info3", mock.Calls[5].Args[2])
+	assert.Equal(t, "info1", calls[5].Args[0])
+	assert.Equal(t, "info2", calls[5].Args[1])
+	assert.Equal(t, "info3", calls[5].Args[2])
 
 	// CheckNote
-	assert.Equal(t, "Note Message", mock.Calls[6].Args[0])
+	assert.Equal(t, "Note Message", calls[6].Args[0])
 }
 
 func TestMockPrinter_ConcurrentAccess(t *testing.T) {
@@ -136,6 +154,7 @@ func TestMockPrinter_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			_ = mock.HasCall("CheckSuccess")
 			_ = mock.CallCount("CheckSuccess")
+			_ = mock.AllCalls()
 		}()
 	}
 

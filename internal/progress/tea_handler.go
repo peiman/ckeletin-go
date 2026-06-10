@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rs/zerolog/log"
 )
 
 // TeaHandler renders progress events using Bubble Tea.
@@ -23,7 +24,42 @@ type TeaHandler struct {
 	program *tea.Program
 	model   *teaModel
 	started bool
-	ready   chan struct{} // signals when program is ready to receive messages
+
+	// ready signals that the current program can receive messages.
+	//
+	// Ownership invariant: start() mints a fresh channel for each program in
+	// the same critical section that publishes started and program, and that
+	// program's run goroutine closes it exactly once, before calling Run().
+	// Stop() and resetAfterRunFailure never replace or close it: the closed
+	// channel stays in place so in-flight OnProgress waiters fall through,
+	// observe program == nil, and drop their event. Replacing it would
+	// strand any waiter that snapshots between the reset and a future
+	// start() on a channel nobody will ever close — a permanent hang for
+	// callers with non-cancellable contexts. The channel from NewTeaHandler
+	// is never closed and never waited on (a waiter only reaches its wait
+	// after a start() critical section has replaced it); it only keeps the
+	// field non-nil from construction.
+	ready chan struct{}
+
+	// runDone is closed by the current program's run goroutine once Run()
+	// has returned and its failure bookkeeping has finished. Stop() waits on
+	// it instead of program.Wait(): Wait reads p.finished, which Run() itself
+	// initializes, so Wait racing a not-yet-begun Run is a data race — and a
+	// permanent hang when the program context is already cancelled, because
+	// Quit() then short-circuits without synchronizing with Run. Minted in
+	// start() alongside program; non-nil whenever program is non-nil.
+	runDone chan struct{}
+
+	// failureWarned tracks whether the current Run-failure streak has been
+	// surfaced at Warn yet. The first failure of a streak warns (visible at
+	// the default info console level); retry failures log at Debug so a
+	// persistently broken terminal does not warn once per progress event. A
+	// clean Run clears it: the next failure is a new incident.
+	failureWarned bool
+
+	// extraTeaOpts is appended to the default program options. Tests use it
+	// to run the program without a TTY (tea.WithInput(nil)); nil in production.
+	extraTeaOpts []tea.ProgramOption
 }
 
 // NewTeaHandler creates a new Bubble Tea based progress handler.
@@ -57,11 +93,18 @@ func (h *TeaHandler) OnProgress(ctx context.Context, event Event) {
 		h.start()
 	}
 
+	// Snapshot the channel under the mutex. If the program already failed or
+	// was stopped, this is the closed channel its start() minted: we fall
+	// through immediately and the program == nil check below drops the event.
+	h.mu.Lock()
+	ready := h.ready
+	h.mu.Unlock()
+
 	// Wait for program to be ready (with context cancellation support)
 	select {
 	case <-ctx.Done():
 		return
-	case <-h.ready:
+	case <-ready:
 		// Program is ready
 	}
 
@@ -70,61 +113,127 @@ func (h *TeaHandler) OnProgress(ctx context.Context, event Event) {
 	h.mu.Unlock()
 
 	// Send the event to the model
-	if program != nil {
-		program.Send(progressEventMsg{event: event})
+	if program == nil {
+		log.Debug().
+			Str("event_type", event.Type.String()).
+			Msg("progress event dropped: no active Bubble Tea program")
+		return
+	}
 
-		// If this is a terminal event, signal completion
-		if event.Type == EventComplete || event.Type == EventError {
-			// Use a short timer instead of sleep to allow for cancellation
-			timer := time.NewTimer(50 * time.Millisecond)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C:
-			}
-			program.Send(tea.Quit())
+	program.Send(progressEventMsg{event: event})
+
+	// If this is a terminal event, signal completion
+	if event.Type == EventComplete || event.Type == EventError {
+		// Use a short timer instead of sleep to allow for cancellation
+		timer := time.NewTimer(50 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
 		}
+		program.Send(tea.Quit())
 	}
 }
 
 // start initializes the Bubble Tea program.
 func (h *TeaHandler) start() {
+	// started, program, ready, and runDone must be published in one critical
+	// section: a Stop() between them would see a nil program, no-op, and the
+	// program would launch anyway, voiding Stop's wait-for-shutdown guarantee.
+	// tea.NewProgram only constructs the program (Run starts it), so it is
+	// safe to call while holding the mutex.
 	h.mu.Lock()
 	if h.started {
 		h.mu.Unlock()
 		return
 	}
 	h.started = true
-	h.mu.Unlock()
-
-	opts := []tea.ProgramOption{
-		tea.WithOutput(h.out),
-	}
-
-	h.mu.Lock()
-	h.program = tea.NewProgram(h.model, opts...)
-	program := h.program
+	opts := append([]tea.ProgramOption{tea.WithOutput(h.out)}, h.extraTeaOpts...)
+	program := tea.NewProgram(h.model, opts...)
+	h.program = program
+	// Fresh channels for this program; see the ready and runDone invariants.
+	ready := make(chan struct{})
+	h.ready = ready
+	runDone := make(chan struct{})
+	h.runDone = runDone
 	h.mu.Unlock()
 
 	// Run in goroutine so OnProgress doesn't block
 	go func() {
-		// Signal that the program is ready to receive messages
-		// Close the channel to signal all waiting goroutines
-		close(h.ready)
-		_, _ = program.Run()
+		defer close(runDone)
+		// Release the ready waiters. Each minted ready channel is closed
+		// exactly once, here, even when Run fails immediately.
+		close(ready)
+		if _, err := program.Run(); err != nil {
+			// Without a reset, started would stay true forever and every
+			// later OnProgress would silently no-op (dead handler).
+			h.resetAfterRunFailure(program, err)
+			return
+		}
+		// A clean Run proves the renderer works: the next failure, if any,
+		// is a new incident that deserves a fresh warning.
+		h.mu.Lock()
+		h.failureWarned = false
+		h.mu.Unlock()
 	}()
 }
 
-// Stop gracefully stops the Bubble Tea program.
-func (h *TeaHandler) Stop() {
+// resetAfterRunFailure clears handler state after Run() fails so a later
+// OnProgress can start a fresh program. It only resets if program is still
+// the current one: a Stop() or a newer start() must not be clobbered.
+// The first failure of a streak logs at Warn — at the default info console
+// level a Debug entry is invisible and the user would only see a silently
+// dead progress bar. Retries stay at Debug to avoid one warning per event.
+func (h *TeaHandler) resetAfterRunFailure(program *tea.Program, err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	if h.program != program {
+		// Superseded by Stop() or a newer start(): nothing to reset, and the
+		// late failure of an abandoned program needs no user-facing warning.
+		log.Debug().Err(err).Msg("superseded Bubble Tea program exited with error")
+		return
+	}
+	h.program = nil
+	h.started = false
+	// h.ready stays as the closed channel this program's start() minted, so
+	// in-flight OnProgress waiters fall through, observe program == nil, and
+	// drop their event; see the ready field invariant.
+	if h.failureWarned {
+		log.Debug().Err(err).Msg("Bubble Tea program failed again; progress rendering still degraded, will retry on next event")
+		return
+	}
+	h.failureWarned = true
+	log.Warn().Err(err).Msg("Bubble Tea program failed; progress rendering degraded, will retry on next event")
+}
 
-	if h.program != nil {
-		h.program.Quit()
+// Stop gracefully stops the Bubble Tea program.
+// The handler can be reused after Stop: the next OnProgress starts a new program.
+func (h *TeaHandler) Stop() {
+	h.mu.Lock()
+	program := h.program
+	runDone := h.runDone
+	if program != nil {
 		h.program = nil
 		h.started = false
+		// h.ready stays as the closed (or soon-closed) channel this
+		// program's start() minted; replacing it would strand in-flight
+		// waiters. The next start() mints a fresh one. See the ready
+		// field invariant.
+	}
+	h.mu.Unlock()
+
+	if program != nil {
+		program.Quit()
+		// Wait for Run() to return so the renderer goroutine has stopped
+		// writing to h.out before the handler (or caller) reuses the writer.
+		// Waiting outside the mutex keeps OnProgress/start from blocking.
+		// We wait on our own runDone channel rather than program.Wait():
+		// Wait reads p.finished, which Run() itself initializes, so Wait
+		// racing a Run that has not begun yet is a data race — and a
+		// permanent hang when the program context is already dead, because
+		// then Quit() short-circuits and synchronizes with nothing.
+		<-runDone
 	}
 }
 

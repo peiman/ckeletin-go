@@ -19,10 +19,10 @@ Run `task --list` for the complete reference.
 Pinned tool versions for reproducible builds:
 
 ```bash
-task doctor                    # Check environment and tool versions
-task check:tools:installed     # Fast existence check
-task check:tools:version       # Strict version verification (CI)
-task check:tools:updates       # Discover available updates
+task doctor                          # Check environment and tool versions
+task check:tools:installed           # Fast existence check
+task ckeletin:check:tools:version    # Strict version verification (CI)
+task check:deps:outdated             # Discover available dependency updates
 ```
 
 ## License Compliance

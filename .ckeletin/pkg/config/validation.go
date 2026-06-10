@@ -2,11 +2,12 @@
 //
 // Config-time validation for registered options.
 //
-// This file provides ValidateRegisteredOptions(), which iterates over all
-// registered ConfigOption entries that have a Validation function and runs
-// them against the current Viper values. This catches invalid user-facing
-// values (colors, log levels, etc.) at config load time rather than during
-// command execution.
+// This file provides ValidateRegisteredOptions() and
+// ValidateRegisteredOptionsWithViper(), which iterate over all registered
+// ConfigOption entries that have a Validation function and run them against
+// the Viper values (global instance or a provided one). This catches invalid
+// user-facing values (colors, log levels, etc.) at config load time rather
+// than during command execution.
 
 package config
 
@@ -16,10 +17,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ValidateRegisteredOptions validates all registered config options that have
-// a Validation function. It returns a slice of errors for any values that fail
-// validation. An empty slice means all validations passed.
-func ValidateRegisteredOptions() []error {
+// ValidateRegisteredOptionsWithViper validates all registered config options
+// that have a Validation function against the provided Viper instance. It
+// returns a slice of errors for any values that fail validation. An empty
+// slice means all validations passed.
+func ValidateRegisteredOptionsWithViper(v *viper.Viper) []error {
 	var errs []error
 
 	for _, opt := range Registry() {
@@ -27,11 +29,19 @@ func ValidateRegisteredOptions() []error {
 			continue
 		}
 
-		value := viper.Get(opt.Key)
+		value := v.Get(opt.Key)
 		if err := opt.Validation(value); err != nil {
 			errs = append(errs, fmt.Errorf("config %q: %w", opt.Key, err))
 		}
 	}
 
 	return errs
+}
+
+// ValidateRegisteredOptions validates all registered config options that have
+// a Validation function against the global Viper instance. It returns a slice
+// of errors for any values that fail validation. An empty slice means all
+// validations passed.
+func ValidateRegisteredOptions() []error {
+	return ValidateRegisteredOptionsWithViper(viper.GetViper())
 }

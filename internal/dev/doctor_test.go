@@ -2,6 +2,8 @@ package dev
 
 import (
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -351,6 +353,185 @@ func TestCheckToolNotFound(t *testing.T) {
 			"Should fail when tool not found")
 		assert.Contains(t, results[0].Message, "not found in PATH",
 			"Should report tool not found in PATH")
+	})
+}
+
+func TestGoVersionLess(t *testing.T) {
+	tests := []struct {
+		name string
+		a    string
+		b    string
+		want bool
+	}{
+		{
+			name: "single-digit minor below double-digit minor (lexicographic trap)",
+			a:    "1.9",
+			b:    "1.26",
+			want: true,
+		},
+		{
+			name: "minor below minimum",
+			a:    "1.24",
+			b:    "1.25",
+			want: true,
+		},
+		{
+			name: "equal versions",
+			a:    "1.25",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "minor above minimum",
+			a:    "1.26",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "newer major wins regardless of minor",
+			a:    "2.0",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "patch release of minimum is not less",
+			a:    "1.25.3",
+			b:    "1.25",
+			want: false,
+		},
+		{
+			name: "old version with patch is less",
+			a:    "1.9.9",
+			b:    "1.26",
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// EXECUTION PHASE
+			result := goVersionLess(tt.a, tt.b)
+
+			// ASSERTION PHASE
+			assert.Equal(t, tt.want, result,
+				"goVersionLess(%q, %q) should be %v", tt.a, tt.b, tt.want)
+		})
+	}
+}
+
+func TestMinGoVersion(t *testing.T) {
+	t.Run("reads .go-version as SSOT", func(t *testing.T) {
+		// SETUP PHASE
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err)
+		defer os.Chdir(currentDir)
+
+		tmpDir := t.TempDir()
+		err = os.WriteFile(filepath.Join(tmpDir, goVersionFile), []byte("9.99.9\n"), 0o644)
+		assert.NoError(t, err)
+		err = os.Chdir(tmpDir)
+		assert.NoError(t, err)
+
+		// EXECUTION + ASSERTION PHASE
+		assert.Equal(t, "9.99.9", minGoVersion(),
+			"Should read the pinned version from .go-version")
+	})
+
+	t.Run("falls back when .go-version is missing", func(t *testing.T) {
+		// SETUP PHASE
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err)
+		defer os.Chdir(currentDir)
+
+		err = os.Chdir(t.TempDir())
+		assert.NoError(t, err)
+
+		// EXECUTION + ASSERTION PHASE
+		assert.Equal(t, minGoVersionFallback, minGoVersion(),
+			"Should fall back to the constant when .go-version is unreadable")
+	})
+
+	t.Run("fallback constant tracks the repo .go-version", func(t *testing.T) {
+		// Guards against the drift this fallback caused before: the
+		// constant said 1.25 while .go-version pinned 1.26.4.
+		data, err := os.ReadFile(filepath.Join("..", "..", goVersionFile))
+		assert.NoError(t, err, ".go-version should exist at the project root")
+		assert.Equal(t, strings.TrimSpace(string(data)), minGoVersionFallback,
+			"Bump minGoVersionFallback when .go-version changes")
+	})
+
+	t.Run("falls back when .go-version is empty", func(t *testing.T) {
+		// SETUP PHASE
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err)
+		defer os.Chdir(currentDir)
+
+		tmpDir := t.TempDir()
+		err = os.WriteFile(filepath.Join(tmpDir, goVersionFile), []byte("  \n"), 0o644)
+		assert.NoError(t, err)
+		err = os.Chdir(tmpDir)
+		assert.NoError(t, err)
+
+		// EXECUTION + ASSERTION PHASE
+		assert.Equal(t, minGoVersionFallback, minGoVersion(),
+			"Should fall back to the constant when .go-version is empty")
+	})
+}
+
+func TestCheckGoVersionAgainstGoVersionFile(t *testing.T) {
+	t.Run("warns when toolchain is below the pinned version", func(t *testing.T) {
+		// SETUP PHASE
+		doctor := NewDoctor()
+
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err)
+		defer os.Chdir(currentDir)
+
+		tmpDir := t.TempDir()
+		err = os.WriteFile(filepath.Join(tmpDir, goVersionFile), []byte("9.99.9\n"), 0o644)
+		assert.NoError(t, err)
+		err = os.Chdir(tmpDir)
+		assert.NoError(t, err)
+
+		// EXECUTION PHASE
+		doctor.checkGoVersion()
+
+		// ASSERTION PHASE
+		results := doctor.GetResults()
+		assert.Len(t, results, 1)
+		assert.Equal(t, CheckWarning, results[0].Status,
+			"Should warn when the installed toolchain is below .go-version")
+		assert.Contains(t, results[0].Details, "Project requires Go 9.99.9 or higher",
+			"Details should cite the pinned version from .go-version")
+	})
+
+	t.Run("passes when toolchain matches the pinned patch version", func(t *testing.T) {
+		// SETUP PHASE
+		doctor := NewDoctor()
+
+		currentDir, err := os.Getwd()
+		assert.NoError(t, err)
+		defer os.Chdir(currentDir)
+
+		// Pin .go-version to the exact running toolchain (e.g. "1.26.4"):
+		// the doctor must parse the full patch version from `go version`,
+		// not truncate it to major.minor and warn on its own toolchain.
+		pinned := strings.TrimPrefix(runtime.Version(), "go")
+		tmpDir := t.TempDir()
+		err = os.WriteFile(filepath.Join(tmpDir, goVersionFile), []byte(pinned+"\n"), 0o644)
+		assert.NoError(t, err)
+		err = os.Chdir(tmpDir)
+		assert.NoError(t, err)
+
+		// EXECUTION PHASE
+		doctor.checkGoVersion()
+
+		// ASSERTION PHASE
+		results := doctor.GetResults()
+		assert.Len(t, results, 1)
+		assert.Equal(t, CheckPassed, results[0].Status,
+			"Toolchain equal to the pinned version must pass, patch included")
+		assert.Contains(t, results[0].Message, "meets requirements")
 	})
 }
 

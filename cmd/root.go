@@ -14,6 +14,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -34,12 +35,19 @@ import (
 )
 
 var (
-	cfgFile          string
-	configPathMode   = ConfigPathModeXDG
-	configPathFlag   *pflag.Flag
-	Version          = "dev"
-	Commit           = ""
-	Date             = ""
+	cfgFile        string
+	configPathMode = ConfigPathModeXDG
+	configPathFlag *pflag.Flag
+	// Build identity vars injected via ldflags (see Taskfile.yml LDFLAGS and
+	// .goreleaser.yml). Without injection they degrade to "unknown" per
+	// CKSPEC-OUT-006 — never empty strings.
+	Version = versionUnknown
+	Commit  = versionUnknown
+	Date    = versionUnknown
+	// Dirty is "true"/"false" when injected (GoReleaser's {{ .IsGitDirty }});
+	// when empty, treeState() derives the state from Version, where Taskfile
+	// builds embed a "-dirty" suffix via `git describe --dirty`.
+	Dirty            = ""
 	binaryName       = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
 	configFileStatus string
 	configFileUsed   string
@@ -59,6 +67,23 @@ const (
 	ConfigPathModeNative = "native"
 	// ConfigPathModeBoth searches both XDG and native directories.
 	ConfigPathModeBoth = "both"
+)
+
+const (
+	// versionUnknown is the graceful-degradation value for build-identity
+	// fields when ldflags are not injected (plain `go build`, CKSPEC-OUT-006).
+	versionUnknown = "unknown"
+	// versionDevFallback is the Taskfile's VERSION fallback when git describe
+	// fails at build time; the working-tree state is unknowable then too.
+	versionDevFallback = "dev"
+	// dirtySuffix is appended to VERSION by `git describe --dirty` (Taskfile
+	// LDFLAGS) when the build came from a modified working tree.
+	dirtySuffix = "-dirty"
+
+	// Working-tree states surfaced in version output (CKSPEC-OUT-006).
+	treeStateDirty   = "dirty"
+	treeStateClean   = "clean"
+	treeStateUnknown = "unknown"
 )
 
 // EnvPrefix returns a sanitized environment variable prefix based on the binary name
@@ -217,54 +242,200 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
-		// Activate JSON output mode early so errors during config/logger init
-		// are properly routed through the JSON error handler in main.go.
-		// The flag value is available via viper after bindFlags.
-		if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Changed {
-			output.SetOutputMode(outputFlag.Value.String())
-		}
+		// Activate JSON output mode as early as it is knowable (flag, then
+		// env var) so errors raised DURING config/logger init are routed
+		// through the JSON error handler in main.go instead of plain text.
+		output.SetOutputMode(earlyOutputMode(cmd))
 		output.SetCommandName(cmd.Name())
+
+		// Config-file-driven JSON mode is unknowable until the config is
+		// read, so buffer all pre-init log output and resolve it after the
+		// final mode is known: discarded in JSON mode, replayed to stderr in
+		// text mode.
+		preInit := bufferPreInitLogs()
 
 		// Initialize configuration
 		if err := initConfig(); err != nil {
+			preInit.flush(false)
 			return err
 		}
 
+		// Apply the final output mode (flag > env > config file) BEFORE the
+		// logger is initialized: in JSON mode logger.Init silences ONLY the
+		// console writer, so stdout carries exactly one JSON envelope and
+		// stderr stays silent, while the audit log file (if enabled) keeps
+		// receiving entries (CKSPEC-OUT-004). This second site covers
+		// config-file-driven JSON mode, which earlyOutputMode cannot see.
+		output.SetOutputMode(viper.GetString(config.KeyAppOutputFormat))
+
 		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
+			preInit.flush(false)
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
+		preInit.flush(true)
 
-		// Now apply full JSON mode: read final config value (flag > env > config file)
-		// and suppress stderr if JSON mode is active.
-		outputFormat := viper.GetString(config.KeyAppOutputFormat)
-		output.SetOutputMode(outputFormat)
-
-		if output.IsJSONMode() {
-			// Suppress all stderr output — agents want clean stdout only.
-			// The audit log file is unaffected (initialized separately by logger.Init).
-			zerolog.SetGlobalLevel(zerolog.Disabled)
-		}
-
-		// Log config status after logger is initialized
-		if configFileStatus != "" {
-			if configFileUsed != "" {
-				log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
-			} else {
-				log.Debug().Msg(configFileStatus)
-			}
-		}
-
+		logConfigStatus()
 		return nil
 	},
+}
+
+// earlyOutputMode resolves the output mode from the sources knowable BEFORE
+// initConfig runs: the --output flag (highest precedence), then the env var
+// mirror of config.KeyAppOutputFormat. A config file can still switch the
+// mode afterwards — the post-initConfig SetOutputMode site covers that.
+// Resolving early matters for errors raised during init itself: main.go must
+// already know it is in JSON mode to emit the error envelope, because the
+// post-initConfig site is never reached on those error paths.
+func earlyOutputMode(cmd *cobra.Command) string {
+	if f := cmd.Root().PersistentFlags().Lookup("output"); f != nil && f.Changed {
+		return f.Value.String()
+	}
+	return strings.TrimSpace(os.Getenv(outputFormatEnvVar()))
+}
+
+// outputFormatEnvVar mirrors config.KeyAppOutputFormat through viper's env
+// mapping (SetEnvPrefix plus the "." -> "_" key replacer in initConfig): the
+// same variable viper itself reads, knowable before initConfig runs.
+func outputFormatEnvVar() string {
+	return EnvPrefix() + "_" + strings.ToUpper(strings.ReplaceAll(config.KeyAppOutputFormat, ".", "_"))
+}
+
+// preInitLogBuffer captures log output emitted before logger.Init installs
+// the real writers. Until then zerolog's default logger writes raw JSON to
+// stderr, but whether stderr may carry those lines depends on the FINAL
+// output mode, which env- or config-file-driven JSON can change after the
+// logs were emitted (CKSPEC-OUT-004 keeps stderr silent in JSON mode).
+// Buffering defers the decision until flush.
+type preInitLogBuffer struct {
+	buf  bytes.Buffer
+	prev zerolog.Logger
+}
+
+// bufferPreInitLogs swaps the global logger for one writing into a buffer and
+// returns the buffer for a later flush. Re-entrant: each call snapshots the
+// logger it replaces, so repeated Execute() runs (tests) stay independent.
+func bufferPreInitLogs() *preInitLogBuffer {
+	b := &preInitLogBuffer{prev: log.Logger}
+	log.Logger = zerolog.New(&b.buf).With().Timestamp().Logger()
+	return b
+}
+
+// flush resolves the buffered pre-init logs once the output mode is final:
+// JSON mode discards them (stderr must stay silent; no audit file captured
+// them, so nothing the file could have kept is lost), text mode replays the
+// raw bytes to stderr — exactly the raw-JSON lines text mode printed before
+// buffering existed. realLoggerInstalled reports whether logger.Init
+// succeeded; when it did not, the previously installed logger is restored so
+// later log calls cannot write into an already-flushed buffer.
+func (b *preInitLogBuffer) flush(realLoggerInstalled bool) {
+	if !realLoggerInstalled {
+		log.Logger = b.prev
+	}
+	if output.IsJSONMode() || b.buf.Len() == 0 {
+		return
+	}
+	_, _ = os.Stderr.Write(b.buf.Bytes())
+}
+
+// logConfigStatus reports how configuration was resolved, once the real
+// logger is installed; in JSON mode this reaches only the audit log file
+// (the console writer is disabled).
+func logConfigStatus() {
+	if configFileStatus == "" {
+		return
+	}
+	if configFileUsed != "" {
+		log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
+		return
+	}
+	log.Debug().Msg(configFileStatus)
 }
 
 func Execute() error {
 	// Ensure logger cleanup on exit
 	defer logger.Cleanup()
 
-	RootCmd.Version = fmt.Sprintf("%s, commit %s, built at %s", Version, Commit, Date)
+	RootCmd.Version = versionString()
+	// Register the --version flag NOW (cobra normally defers this until after
+	// command lookup): without it, `--version --output json` makes stripFlags
+	// treat the unknown --version as value-taking, swallow --output, and fail
+	// with `unknown command "json"`.
+	RootCmd.InitDefaultVersionFlag()
 	return RootCmd.Execute()
+}
+
+// orUnknown backstops build-identity fields at runtime: a pipeline that
+// injects EMPTY strings via ldflags overrides the package-var "unknown"
+// defaults, and CKSPEC-OUT-006 forbids empty fields in version output.
+func orUnknown(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return versionUnknown
+	}
+	return value
+}
+
+// versionString composes the build identity shown by --version: semantic
+// version, commit, build date, and working-tree state (CKSPEC-OUT-006).
+func versionString() string {
+	return fmt.Sprintf("%s, commit %s, built at %s, tree %s",
+		orUnknown(Version), orUnknown(Commit), orUnknown(Date), treeState())
+}
+
+// treeState resolves whether the build came from a dirty working tree
+// (CKSPEC-OUT-006). Precedence:
+//  1. Explicit Dirty ldflag — GoReleaser injects {{ .IsGitDirty }} ("true"/"false").
+//  2. The "-dirty" suffix `git describe --dirty` embeds in Version (Taskfile builds).
+//  3. Unknown — no build identity was injected (plain `go build`), or the
+//     Taskfile fell back to "dev" because git describe failed.
+func treeState() string {
+	switch strings.ToLower(strings.TrimSpace(Dirty)) {
+	case "true":
+		return treeStateDirty
+	case "false":
+		return treeStateClean
+	}
+	version := orUnknown(Version)
+	if strings.HasSuffix(version, dirtySuffix) {
+		return treeStateDirty
+	}
+	if version == versionUnknown || version == versionDevFallback {
+		return treeStateUnknown
+	}
+	return treeStateClean
+}
+
+// versionData is the machine-readable --version payload for --output json.
+type versionData struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
+	Tree    string `json:"tree"`
+}
+
+// renderVersion renders the --version output. Cobra handles the version flag
+// BEFORE PersistentPreRunE runs, so JSON mode is detected from the parsed
+// --output flag directly rather than via output.IsJSONMode() (not yet set).
+func renderVersion(cmd *cobra.Command) string {
+	if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Value.String() == "json" {
+		envelope := output.JSONEnvelope{
+			Status:  "success",
+			Command: cmd.Name(),
+			Data: versionData{
+				Version: orUnknown(Version),
+				Commit:  orUnknown(Commit),
+				Date:    orUnknown(Date),
+				Tree:    treeState(),
+			},
+		}
+		var buf bytes.Buffer
+		if err := output.RenderJSON(&buf, envelope); err == nil {
+			return buf.String()
+		}
+		// Unreachable in practice (versionData always marshals); fall through
+		// to text so --version never produces empty output.
+	}
+	return fmt.Sprintf("%s version %s\n", cmd.DisplayName(), cmd.Version)
 }
 
 func init() {
@@ -283,6 +454,12 @@ func init() {
 	RootCmd.Use = binaryName
 	RootCmd.Long = fmt.Sprintf(`%s is a production-ready Go CLI application built with ckeletin-go.
 Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patterns.`, binaryName)
+
+	// Route --version through renderVersion so it honors --output json.
+	// Cobra resolves the version flag before PersistentPreRunE, so the
+	// template func is the only hook that runs early enough.
+	cobra.AddTemplateFunc("ckeletinRenderVersion", renderVersion)
+	RootCmd.SetVersionTemplate(`{{ckeletinRenderVersion .}}`)
 
 	configPaths := ConfigPaths()
 
