@@ -11,6 +11,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -651,6 +653,12 @@ func (w *postStopWriter) Len() int {
 	return w.buf.Len()
 }
 
+func (w *postStopWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
+
 func TestTeaHandler_Stop_NoWritesAfterStopReturns(t *testing.T) {
 	// SETUP PHASE
 	w := &postStopWriter{}
@@ -698,8 +706,107 @@ func TestTeaHandler_start_DoubleStart(t *testing.T) {
 // expects a terminal).
 func newTestTeaHandler(out io.Writer) *TeaHandler {
 	h := NewTeaHandler(out)
-	h.extraTeaOpts = []tea.ProgramOption{tea.WithInput(nil)}
+	h.extraTeaOpts = workingTeaOpts()
 	return h
+}
+
+// workingTeaOpts are options for a program that runs successfully without a
+// TTY under go test/CI.
+func workingTeaOpts() []tea.ProgramOption {
+	return []tea.ProgramOption{tea.WithInput(nil)}
+}
+
+// doomedTeaOpts returns options whose pre-cancelled program context makes
+// Run() fail immediately with ErrProgramKilled — the same failure shape as
+// "no TTY available" in CI. Send() on such a program never blocks: bubbletea
+// derives the program context from the external one at construction time.
+func doomedTeaOpts() []tea.ProgramOption {
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	return []tea.ProgramOption{tea.WithInput(nil), tea.WithContext(cancelled)}
+}
+
+// setExtraTeaOpts swaps program options mid-test under the mutex; start()
+// reads extraTeaOpts while holding it, so an unlocked write would race.
+func setExtraTeaOpts(h *TeaHandler, opts []tea.ProgramOption) {
+	h.mu.Lock()
+	h.extraTeaOpts = opts
+	h.mu.Unlock()
+}
+
+// Log-line tokens asserted by the Run-failure logging tests. The prefix is
+// shared by the first-failure Warn and the repeat-failure Debug so a count
+// observes "a failure was logged" independently of its level.
+const (
+	runFailureLogToken = "Bubble Tea program failed"
+	warnLevelToken     = `"level":"warn"`
+)
+
+// captureHandlerLogs redirects the global zerolog logger (which TeaHandler
+// logs through) into a goroutine-safe sink for the duration of the test.
+// Safe because no test in this package runs in parallel.
+func captureHandlerLogs(t *testing.T) *postStopWriter {
+	t.Helper()
+	sink := &postStopWriter{}
+	prev := log.Logger
+	log.Logger = zerolog.New(sink)
+	t.Cleanup(func() { log.Logger = prev })
+	return sink
+}
+
+// goOnProgress runs OnProgress in a tracked goroutine. Tests that use it must
+// call drainHandler before returning: an in-flight OnProgress (or its
+// program's run goroutine) that logs after the test ends races the next
+// test's swap of the global logger.
+func goOnProgress(wg *sync.WaitGroup, h *TeaHandler, event Event) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		h.OnProgress(context.Background(), event)
+	}()
+}
+
+// waitGroupSettled reports whether wg.Wait() returned within timeout. Tests
+// use it as a phase boundary between a failed program and a restart: a
+// caller from the previous phase that is still in flight could deliver its
+// stale event to the next phase's program (OnProgress re-reads h.program
+// after the ready gate, so a late waiter sends to whatever program is
+// current) and repaint the new program with old content.
+func waitGroupSettled(wg *sync.WaitGroup, timeout time.Duration) bool {
+	settled := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(settled)
+	}()
+	select {
+	case <-settled:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
+
+// drainHandler waits, bounded, for the tracked OnProgress goroutines and then
+// for the current program's run goroutine (h.runDone) to finish, so no
+// handler goroutine can log across the test boundary. It logs rather than
+// fails on timeout: a leak here only happens in already-failing scenarios.
+func drainHandler(t *testing.T, h *TeaHandler, wg *sync.WaitGroup) {
+	t.Helper()
+	if !waitGroupSettled(wg, 2*time.Second) {
+		t.Log("tracked OnProgress goroutines did not finish; skipping run-goroutine drain")
+		return
+	}
+	h.mu.Lock()
+	runDone := h.runDone
+	h.mu.Unlock()
+	if runDone == nil {
+		return
+	}
+	select {
+	case <-runDone:
+	case <-time.After(2 * time.Second):
+		t.Log("handler run goroutine did not finish within 2s")
+	}
 }
 
 func TestTeaHandler_start_StartedImpliesProgram(t *testing.T) {
@@ -745,13 +852,12 @@ func TestTeaHandler_start_StartedImpliesProgram(t *testing.T) {
 
 func TestTeaHandler_RunFailure_ResetsStateForRetry(t *testing.T) {
 	// SETUP PHASE
+	captureHandlerLogs(t)
 	var buf bytes.Buffer
 	h := NewTeaHandler(&buf)
 	// A pre-cancelled program context makes Run() return ErrProgramKilled
 	// immediately — the same failure shape as "no TTY available" in CI.
-	cancelled, cancel := context.WithCancel(context.Background())
-	cancel()
-	h.extraTeaOpts = []tea.ProgramOption{tea.WithInput(nil), tea.WithContext(cancelled)}
+	h.extraTeaOpts = doomedTeaOpts()
 
 	// EXECUTION PHASE
 	h.OnProgress(context.Background(), NewEvent(EventStart, "doomed"))
@@ -769,6 +875,7 @@ func TestTeaHandler_RunFailure_ResetsStateForRetry(t *testing.T) {
 
 func TestTeaHandler_resetAfterRunFailure_IgnoresStaleProgram(t *testing.T) {
 	// SETUP PHASE
+	captureHandlerLogs(t)
 	var buf bytes.Buffer
 	h := NewTeaHandler(&buf)
 	// tea.NewProgram only constructs; neither program is run
@@ -782,21 +889,269 @@ func TestTeaHandler_resetAfterRunFailure_IgnoresStaleProgram(t *testing.T) {
 
 	// EXECUTION PHASE: a stale program's failure must not clobber the
 	// current program's state
-	h.resetAfterRunFailure(stale)
+	h.resetAfterRunFailure(stale, assert.AnError)
 
 	// ASSERTION PHASE
 	h.mu.Lock()
 	assert.True(t, h.started, "stale reset must not clear started")
 	assert.Same(t, current, h.program, "stale reset must not clear the current program")
-	assert.True(t, readyBefore == h.ready, "stale reset must not replace the ready channel")
+	assert.True(t, readyBefore == h.ready, "stale reset must not touch the ready channel")
 	h.mu.Unlock()
 
-	// The current program's failure resets everything
-	h.resetAfterRunFailure(current)
+	// The current program's failure resets started/program but must leave
+	// the ready channel in place: replacing it would strand any in-flight
+	// OnProgress waiter that snapshots it before the next start()
+	h.resetAfterRunFailure(current, assert.AnError)
 
 	h.mu.Lock()
 	assert.False(t, h.started, "reset must clear started so OnProgress can retry")
 	assert.Nil(t, h.program, "reset must clear the program")
-	assert.True(t, readyBefore != h.ready, "reset must recreate the ready channel; the old one gets closed by start()")
+	assert.True(t, readyBefore == h.ready, "reset must leave the closed ready channel in place; see the ready field invariant")
 	h.mu.Unlock()
+}
+
+func TestTeaHandler_OnProgress_NotStrandedByFailureReset(t *testing.T) {
+	// SETUP PHASE
+	// Deterministically reproduce the stranded-waiter interleaving:
+	//   1. a concurrent OnProgress observes started == true while the program
+	//      is still alive, so it skips start(),
+	//   2. the program's Run() fails fast and resetAfterRunFailure lands,
+	//   3. only then does the waiter snapshot h.ready and wait on it.
+	// If the reset replaces h.ready with a fresh channel, that waiter blocks
+	// on a channel nobody will ever close — with a non-cancellable context
+	// that is a permanent hang, strictly worse than dropping the event.
+	captureHandlerLogs(t)
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	h.extraTeaOpts = doomedTeaOpts()
+
+	// Steps 1+2 for real: run a doomed program and wait for its failure
+	// reset to land.
+	h.start()
+	require.Eventually(t, func() bool {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return !h.started && h.program == nil
+	}, 2*time.Second, 5*time.Millisecond, "doomed program never failed and reset")
+
+	// Recreate the waiter's stale observation (white-box state forcing, same
+	// style as TestTeaHandler_resetAfterRunFailure_IgnoresStaleProgram): it
+	// saw started == true before the reset landed, so this OnProgress must
+	// skip start() and go straight to the ready-channel wait.
+	h.mu.Lock()
+	h.started = true
+	h.mu.Unlock()
+
+	// EXECUTION PHASE: step 3
+	returned := make(chan struct{})
+	go func() {
+		h.OnProgress(context.Background(), NewEvent(EventStart, "stale waiter"))
+		close(returned)
+	}()
+
+	// ASSERTION PHASE
+	select {
+	case <-returned:
+		// The waiter fell through the closed ready channel, saw no program,
+		// and dropped the event instead of blocking.
+	case <-time.After(3 * time.Second):
+		t.Fatal("OnProgress hung: the failure reset stranded a ready-channel waiter that nothing will ever wake")
+	}
+}
+
+func TestTeaHandler_OnProgress_ConcurrentWithRunFailures_AllReturn(t *testing.T) {
+	// SETUP PHASE
+	// Real-flow version of the stranded-waiter regression: many OnProgress
+	// callers race genuine Run() failures and their resets on non-cancellable
+	// contexts. Every call must return; one stranded waiter fails the test.
+	// This also hammers double-start and restart-after-failure under -race:
+	// any double-close of a ready channel would panic here.
+	captureHandlerLogs(t) // the failure churn would spam stderr otherwise
+	const (
+		iterations = 8
+		callers    = 4
+		callsEach  = 3
+	)
+	for i := 0; i < iterations; i++ {
+		var buf bytes.Buffer
+		h := NewTeaHandler(&buf)
+		h.extraTeaOpts = doomedTeaOpts()
+
+		// EXECUTION PHASE
+		var wg sync.WaitGroup
+		for c := 0; c < callers; c++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for k := 0; k < callsEach; k++ {
+					h.OnProgress(context.Background(), NewEvent(EventStart, "churn"))
+				}
+			}()
+		}
+		allReturned := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(allReturned)
+		}()
+
+		// ASSERTION PHASE
+		select {
+		case <-allReturned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("OnProgress hung during Run-failure churn: a reset stranded a ready-channel waiter")
+		}
+		h.Stop()
+	}
+}
+
+func TestTeaHandler_RunFailure_WarnsOnceAcrossFailureStreak(t *testing.T) {
+	// SETUP PHASE
+	// At the default info console level Debug is invisible, so a Debug-only
+	// Run failure leaves users with a silently dead progress bar. The first
+	// failure of a streak must surface at Warn; retry failures stay at Debug
+	// so a persistently broken terminal does not warn once per event.
+	sink := captureHandlerLogs(t)
+	var buf bytes.Buffer
+	h := NewTeaHandler(&buf)
+	h.extraTeaOpts = doomedTeaOpts()
+
+	// EXECUTION PHASE: two failures back to back. OnProgress runs in tracked
+	// goroutines so a regression that strands the caller cannot hang the
+	// test; the log sink is the synchronization point.
+	var wg sync.WaitGroup
+	defer drainHandler(t, h, &wg)
+	goOnProgress(&wg, h, NewEvent(EventStart, "doomed once"))
+	require.Eventually(t, func() bool {
+		return strings.Count(sink.String(), runFailureLogToken) >= 1
+	}, 2*time.Second, 5*time.Millisecond, "first Run() failure was never logged")
+	require.Eventually(t, func() bool {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return !h.started && h.program == nil
+	}, 2*time.Second, 5*time.Millisecond, "failure must reset state before the retry")
+
+	goOnProgress(&wg, h, NewEvent(EventStart, "doomed twice"))
+	require.Eventually(t, func() bool {
+		return strings.Count(sink.String(), runFailureLogToken) >= 2
+	}, 2*time.Second, 5*time.Millisecond, "second Run() failure was never logged")
+
+	// ASSERTION PHASE
+	assert.Equal(t, 1, strings.Count(sink.String(), warnLevelToken),
+		"a failure streak must produce exactly one Warn: zero hides the failure, one per retry is spam")
+}
+
+func TestTeaHandler_RunFailure_WarnsAgainAfterSuccessfulRun(t *testing.T) {
+	// SETUP PHASE
+	// A clean Run proves the renderer works again, so the next failure is a
+	// new incident: it must Warn afresh, not stay demoted to Debug forever.
+	sink := captureHandlerLogs(t)
+	w := &postStopWriter{}
+	h := NewTeaHandler(w)
+	h.extraTeaOpts = doomedTeaOpts()
+	var wg sync.WaitGroup
+	defer drainHandler(t, h, &wg)
+
+	// First failure: the streak's one Warn.
+	goOnProgress(&wg, h, NewEvent(EventStart, "doomed"))
+	require.Eventually(t, func() bool {
+		return strings.Count(sink.String(), warnLevelToken) >= 1
+	}, 2*time.Second, 5*time.Millisecond, "first Run() failure never warned")
+	require.Eventually(t, func() bool {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return !h.started && h.program == nil
+	}, 2*time.Second, 5*time.Millisecond, "failure must reset state before the retry")
+
+	// EXECUTION PHASE: a healthy program runs to completion...
+	setExtraTeaOpts(h, workingTeaOpts())
+	healthy := make(chan struct{})
+	go func() {
+		h.OnProgress(context.Background(), NewEvent(EventStart, "healed"))
+		h.OnProgress(context.Background(), NewEvent(EventComplete, "done"))
+		close(healthy)
+	}()
+	select {
+	case <-healthy:
+	case <-time.After(5 * time.Second):
+		t.Fatal("healthy lifecycle after a Run() failure did not complete")
+	}
+	h.Stop()
+
+	// ...then the renderer breaks again. The clean run's bookkeeping races
+	// Stop's return (it happens in the run goroutine just after Run returns),
+	// so keep attempting doomed starts until the new failure streak warns.
+	setExtraTeaOpts(h, doomedTeaOpts())
+	require.Eventually(t, func() bool {
+		goOnProgress(&wg, h, NewEvent(EventStart, "doomed again"))
+		return strings.Count(sink.String(), warnLevelToken) >= 2
+	}, 5*time.Second, 50*time.Millisecond,
+		"a failure after a successful run must Warn again; it is a new incident")
+
+	// ASSERTION PHASE
+	assert.Equal(t, 2, strings.Count(sink.String(), warnLevelToken),
+		"exactly one Warn per failure streak: one for each streak, none for retries")
+}
+
+func TestTeaHandler_RestartAfterRunFailure_RendersEndToEnd(t *testing.T) {
+	// SETUP PHASE: the first program is doomed and fails fast.
+	sink := captureHandlerLogs(t)
+	w := &postStopWriter{}
+	h := NewTeaHandler(w)
+	h.extraTeaOpts = doomedTeaOpts()
+	var wg sync.WaitGroup
+	defer drainHandler(t, h, &wg)
+
+	goOnProgress(&wg, h, NewEvent(EventStart, "doomed"))
+	// Gate on the failure log, not on "!started && program == nil" alone:
+	// that state predicate also matches the handler's INITIAL state, so it
+	// can pass before the asynchronous doomed caller has started a program
+	// at all — phase 2 would then race a live phase-1 caller (a real flake
+	// observed under -race -count=10). The failure log is only written by
+	// resetAfterRunFailure for the current program, after the reset, while
+	// the mutex is still held, so seeing it proves both that the doomed
+	// Run() genuinely failed and that the reset has landed.
+	require.Eventually(t, func() bool {
+		return strings.Count(sink.String(), runFailureLogToken) >= 1
+	}, 2*time.Second, 5*time.Millisecond, "doomed Run() never failed and logged")
+	h.mu.Lock()
+	require.False(t, h.started, "failure log implies the reset already landed")
+	require.Nil(t, h.program, "failure log implies the reset already landed")
+	h.mu.Unlock()
+	// Phase boundary: the doomed caller must have returned before the
+	// restart, or its stale "doomed" event could land on the restarted
+	// program and repaint over "second life". It returns promptly: its
+	// ready channel is closed and its program is either dead (Send drops
+	// via the killed program context) or already nil.
+	require.True(t, waitGroupSettled(&wg, 2*time.Second),
+		"doomed OnProgress caller never returned")
+
+	// EXECUTION PHASE: with working options, the next event must start a
+	// fresh program that genuinely runs.
+	setExtraTeaOpts(h, workingTeaOpts())
+	returned := make(chan struct{})
+	go func() {
+		h.OnProgress(context.Background(), NewEvent(EventStart, "second life"))
+		close(returned)
+	}()
+	select {
+	case <-returned:
+	case <-time.After(5 * time.Second):
+		t.Fatal("OnProgress after a Run() failure never returned; the handler is not retryable")
+	}
+
+	// ASSERTION PHASE: end-to-end proof — the restarted program paints the
+	// event to the writer rather than just flipping state bits.
+	require.Eventually(t, func() bool {
+		return strings.Contains(w.String(), "second life")
+	}, 2*time.Second, 5*time.Millisecond,
+		"restarted program never rendered the event; restart is not working end-to-end")
+
+	h.mu.Lock()
+	started := h.started
+	program := h.program
+	h.mu.Unlock()
+	assert.True(t, started, "restart must mark the handler started")
+	assert.NotNil(t, program, "restart must install a live program")
+
+	h.Stop()
 }
