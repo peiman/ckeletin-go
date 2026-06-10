@@ -50,6 +50,10 @@ var (
 // When JSON output mode is active (output.IsJSONMode), the console writer is
 // disabled entirely; only the file (audit) writer receives entries.
 //
+// Init fails closed when file logging is explicitly enabled but the log file
+// cannot be opened: a requested audit trail that cannot exist is an error,
+// not a degradation.
+//
 // Example:
 //
 //	if err := logger.Init(nil); err != nil {
@@ -105,23 +109,31 @@ func Init(out io.Writer) error {
 		filePath := viper.GetString(config.KeyAppLogFilePath)
 
 		fileWriter, err := openLogFileWithRotation(filePath)
-		if err != nil {
-			// Log warning but continue with console-only logging
-			log.Warn().
-				Err(err).
-				Str("path", SanitizePath(filePath)).
-				Msg("Failed to open log file, continuing with console-only logging")
-		} else {
-			logFile = fileWriter
-			currentFileWriter = fileWriter // Store for rebuilding
-
-			filteredFile := FilteredWriter{
-				Writer:   fileWriter,
-				MinLevel: fileLevel,
-			}
-
-			writers = append(writers, filteredFile)
+		if err == nil {
+			// lumberjack opens the file lazily on FIRST write and swallows
+			// later write errors, so probe now: an unwritable path must fail
+			// Init instead of silently dropping every audit entry.
+			_, err = fileWriter.Write(nil)
 		}
+		if err != nil {
+			// Fail closed: file logging was EXPLICITLY enabled, so an audit
+			// trail that cannot exist is an error, not a degradation. The old
+			// Warn-and-continue path was unobservable in JSON mode (the
+			// warning fired into the pre-init logger before log.Logger was
+			// replaced), yielding exit 0 with zero audit entries.
+			return fmt.Errorf("file logging enabled but log file %s cannot be opened: %w",
+				SanitizePath(filePath), err)
+		}
+
+		logFile = fileWriter
+		currentFileWriter = fileWriter // Store for rebuilding
+
+		filteredFile := FilteredWriter{
+			Writer:   fileWriter,
+			MinLevel: fileLevel,
+		}
+
+		writers = append(writers, filteredFile)
 	}
 
 	// Create multi-writer
@@ -176,8 +188,11 @@ func Cleanup() {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
 	if logFile != nil {
-		if err := logFile.Close(); err != nil {
-			// Can't use logger here as it might be cleaning up
+		if err := logFile.Close(); err != nil && !output.IsJSONMode() {
+			// Can't use logger here as it might be cleaning up. In JSON mode
+			// stderr must stay silent (CKSPEC-OUT-004), so the warning is
+			// suppressed — the close failure cannot reach the audit file
+			// either, since that is the very file that failed to close.
 			fmt.Fprintf(os.Stderr, "Warning: failed to close log file: %v\n", err)
 		}
 		logFile = nil

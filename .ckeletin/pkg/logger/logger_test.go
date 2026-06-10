@@ -3,6 +3,7 @@ package logger
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"math"
 	"os"
@@ -359,6 +360,143 @@ func TestInit_JSONModeSilencesConsoleNotFile(t *testing.T) {
 		"audit file must receive Debug entries in JSON mode")
 	assert.Contains(t, string(content), "json_mode_info_entry",
 		"audit file must receive Info entries in JSON mode")
+}
+
+// TestInit_FileLoggingEnabledButUnopenable_FailsClosed guards the audit-trail
+// contract: when file logging is EXPLICITLY enabled and the log file cannot be
+// opened, Init must return an error instead of silently degrading to
+// console-only logging. A requested audit trail that cannot exist is an error
+// — in JSON mode the old Warn-and-continue path lost the warning too (it fired
+// into the pre-init logger before log.Logger was replaced), so the caller got
+// exit 0, a success envelope, and zero audit entries.
+func TestInit_FileLoggingEnabledButUnopenable_FailsClosed(t *testing.T) {
+	tests := []struct {
+		name    string
+		badPath func(t *testing.T) string
+		skip    func(t *testing.T)
+	}{
+		{
+			name: "directory creation fails (path component is a file)",
+			badPath: func(t *testing.T) string {
+				t.Helper()
+				blocker := filepath.Join(t.TempDir(), "blocker")
+				require.NoError(t, os.WriteFile(blocker, []byte("x"), 0o600),
+					"failed to create blocker file")
+				return filepath.Join(blocker, "sub", "audit.log")
+			},
+		},
+		{
+			name: "file creation fails (parent directory not writable)",
+			badPath: func(t *testing.T) string {
+				t.Helper()
+				roDir := filepath.Join(t.TempDir(), "readonly")
+				require.NoError(t, os.MkdirAll(roDir, 0o500),
+					"failed to create read-only directory")
+				return filepath.Join(roDir, "audit.log")
+			},
+			skip: func(t *testing.T) {
+				t.Helper()
+				if os.Geteuid() == 0 {
+					t.Skip("root bypasses directory write permissions")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			if tt.skip != nil {
+				tt.skip(t)
+			}
+			savedLogger, savedLevel := SaveLoggerState()
+			defer RestoreLoggerState(savedLogger, savedLevel)
+
+			viper.Set(config.KeyAppLogFileEnabled, true)
+			viper.Set(config.KeyAppLogFilePath, tt.badPath(t))
+			viper.Set(config.KeyAppLogFileLevel, "debug")
+			viper.Set(config.KeyAppLogConsoleLevel, "info")
+			viper.Set(config.KeyAppLogColorEnabled, "false")
+			viper.Set(config.KeyAppLogSamplingEnabled, false)
+			defer func() {
+				viper.Set(config.KeyAppLogFileEnabled, false)
+				viper.Set(config.KeyAppLogFilePath, "")
+			}()
+
+			// EXECUTION PHASE
+			err := Init(io.Discard)
+
+			// ASSERTION PHASE
+			require.Error(t, err,
+				"Init must fail closed when explicitly enabled file logging cannot open its file")
+			assert.Contains(t, err.Error(), "log file",
+				"error must identify the log file as the failure")
+
+			Cleanup()
+		})
+	}
+}
+
+// failingCloser simulates a log file whose Close fails during Cleanup.
+type failingCloser struct{}
+
+func (failingCloser) Close() error { return errors.New("simulated close failure") }
+
+// TestCleanup_CloseFailureRespectsJSONMode guards the JSON-mode stderr
+// contract (CKSPEC-OUT-004) during Cleanup: a close failure must not leak a
+// warning onto stderr in JSON mode, while text mode keeps surfacing it.
+func TestCleanup_CloseFailureRespectsJSONMode(t *testing.T) {
+	tests := []struct {
+		name        string
+		outputMode  string
+		wantWarning bool
+	}{
+		{
+			name:        "JSON mode keeps stderr silent",
+			outputMode:  "json",
+			wantWarning: false,
+		},
+		{
+			name:        "text mode surfaces the close failure on stderr",
+			outputMode:  "",
+			wantWarning: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			output.SetOutputMode(tt.outputMode)
+			defer output.SetOutputMode("")
+
+			origLogFile := logFile
+			defer func() { logFile = origLogFile }()
+			logFile = failingCloser{}
+
+			r, w, err := os.Pipe()
+			require.NoError(t, err, "failed to create stderr pipe")
+			origStderr := os.Stderr
+			os.Stderr = w
+
+			// EXECUTION PHASE
+			Cleanup()
+
+			// ASSERTION PHASE
+			os.Stderr = origStderr
+			require.NoError(t, w.Close(), "failed to close stderr pipe writer")
+			captured, err := io.ReadAll(r)
+			require.NoError(t, err, "failed to read captured stderr")
+
+			assert.Nil(t, logFile, "Cleanup must release the log file handle even when Close fails")
+			if tt.wantWarning {
+				assert.Contains(t, string(captured), "failed to close log file",
+					"text mode must surface the close failure on stderr")
+			} else {
+				assert.Empty(t, string(captured),
+					"JSON mode must keep stderr silent even when log file close fails")
+			}
+		})
+	}
 }
 
 // TestRuntimeLevelAdjustment tests that changing log levels at runtime actually affects filtering

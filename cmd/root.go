@@ -242,17 +242,21 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
-		// Activate JSON output mode early so errors during config/logger init
-		// are properly routed through the JSON error handler in main.go.
-		// The flag value is available via viper after bindFlags.
-		if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Changed {
-			output.SetOutputMode(outputFlag.Value.String())
-		}
+		// Activate JSON output mode as early as it is knowable (flag, then
+		// env var) so errors raised DURING config/logger init are routed
+		// through the JSON error handler in main.go instead of plain text.
+		output.SetOutputMode(earlyOutputMode(cmd))
 		output.SetCommandName(cmd.Name())
-		silencePreInitLogsInJSONMode()
+
+		// Config-file-driven JSON mode is unknowable until the config is
+		// read, so buffer all pre-init log output and resolve it after the
+		// final mode is known: discarded in JSON mode, replayed to stderr in
+		// text mode.
+		preInit := bufferPreInitLogs()
 
 		// Initialize configuration
 		if err := initConfig(); err != nil {
+			preInit.flush(false)
 			return err
 		}
 
@@ -260,41 +264,92 @@ var RootCmd = &cobra.Command{
 		// logger is initialized: in JSON mode logger.Init silences ONLY the
 		// console writer, so stdout carries exactly one JSON envelope and
 		// stderr stays silent, while the audit log file (if enabled) keeps
-		// receiving entries (CKSPEC-OUT-004). The second silencing call
-		// covers env/config-file-driven JSON mode, which the early
-		// flag-based site cannot see.
+		// receiving entries (CKSPEC-OUT-004). This second site covers
+		// config-file-driven JSON mode, which earlyOutputMode cannot see.
 		output.SetOutputMode(viper.GetString(config.KeyAppOutputFormat))
-		silencePreInitLogsInJSONMode()
 
 		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
+			preInit.flush(false)
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
+		preInit.flush(true)
 
-		// Log config status after logger is initialized; in JSON mode this
-		// reaches only the audit log file (console writer is disabled).
-		if configFileStatus != "" {
-			if configFileUsed != "" {
-				log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
-			} else {
-				log.Debug().Msg(configFileStatus)
-			}
-		}
-
+		logConfigStatus()
 		return nil
 	},
 }
 
-// silencePreInitLogsInJSONMode drops logs emitted before logger.Init installs
-// the real writers: until then zerolog's default logger writes raw JSON to
-// stderr, which JSON output mode requires to stay silent. No audit log file
-// is open yet, so nothing is lost that the file could have captured.
-// logger.Init replaces the Nop logger with the configured writers (console
-// disabled in JSON mode, audit file unaffected).
-func silencePreInitLogsInJSONMode() {
-	if output.IsJSONMode() {
-		log.Logger = zerolog.Nop()
+// earlyOutputMode resolves the output mode from the sources knowable BEFORE
+// initConfig runs: the --output flag (highest precedence), then the env var
+// mirror of config.KeyAppOutputFormat. A config file can still switch the
+// mode afterwards — the post-initConfig SetOutputMode site covers that.
+// Resolving early matters for errors raised during init itself: main.go must
+// already know it is in JSON mode to emit the error envelope, because the
+// post-initConfig site is never reached on those error paths.
+func earlyOutputMode(cmd *cobra.Command) string {
+	if f := cmd.Root().PersistentFlags().Lookup("output"); f != nil && f.Changed {
+		return f.Value.String()
 	}
+	return strings.TrimSpace(os.Getenv(outputFormatEnvVar()))
+}
+
+// outputFormatEnvVar mirrors config.KeyAppOutputFormat through viper's env
+// mapping (SetEnvPrefix plus the "." -> "_" key replacer in initConfig): the
+// same variable viper itself reads, knowable before initConfig runs.
+func outputFormatEnvVar() string {
+	return EnvPrefix() + "_" + strings.ToUpper(strings.ReplaceAll(config.KeyAppOutputFormat, ".", "_"))
+}
+
+// preInitLogBuffer captures log output emitted before logger.Init installs
+// the real writers. Until then zerolog's default logger writes raw JSON to
+// stderr, but whether stderr may carry those lines depends on the FINAL
+// output mode, which env- or config-file-driven JSON can change after the
+// logs were emitted (CKSPEC-OUT-004 keeps stderr silent in JSON mode).
+// Buffering defers the decision until flush.
+type preInitLogBuffer struct {
+	buf  bytes.Buffer
+	prev zerolog.Logger
+}
+
+// bufferPreInitLogs swaps the global logger for one writing into a buffer and
+// returns the buffer for a later flush. Re-entrant: each call snapshots the
+// logger it replaces, so repeated Execute() runs (tests) stay independent.
+func bufferPreInitLogs() *preInitLogBuffer {
+	b := &preInitLogBuffer{prev: log.Logger}
+	log.Logger = zerolog.New(&b.buf).With().Timestamp().Logger()
+	return b
+}
+
+// flush resolves the buffered pre-init logs once the output mode is final:
+// JSON mode discards them (stderr must stay silent; no audit file captured
+// them, so nothing the file could have kept is lost), text mode replays the
+// raw bytes to stderr — exactly the raw-JSON lines text mode printed before
+// buffering existed. realLoggerInstalled reports whether logger.Init
+// succeeded; when it did not, the previously installed logger is restored so
+// later log calls cannot write into an already-flushed buffer.
+func (b *preInitLogBuffer) flush(realLoggerInstalled bool) {
+	if !realLoggerInstalled {
+		log.Logger = b.prev
+	}
+	if output.IsJSONMode() || b.buf.Len() == 0 {
+		return
+	}
+	_, _ = os.Stderr.Write(b.buf.Bytes())
+}
+
+// logConfigStatus reports how configuration was resolved, once the real
+// logger is installed; in JSON mode this reaches only the audit log file
+// (the console writer is disabled).
+func logConfigStatus() {
+	if configFileStatus == "" {
+		return
+	}
+	if configFileUsed != "" {
+		log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
+		return
+	}
+	log.Debug().Msg(configFileStatus)
 }
 
 func Execute() error {

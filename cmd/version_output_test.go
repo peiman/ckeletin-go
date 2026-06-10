@@ -330,8 +330,12 @@ func TestVersionFlag_JSONOutput_ColdStart(t *testing.T) {
 	}
 
 	// SETUP PHASE
+	// HOME/XDG isolation: without it the subprocess inherits the developer's
+	// real HOME, so a local ~/.config/<app>/config.yaml could alter behavior.
+	home := t.TempDir()
 	cmd := exec.Command(os.Args[0], "-test.run=^TestVersionFlag_JSONOutput_ColdStart$")
-	cmd.Env = append(os.Environ(), versionColdStartEnv+"=1")
+	cmd.Dir = home
+	cmd.Env = isolateSubprocessEnv(home, versionColdStartEnv+"=1")
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
