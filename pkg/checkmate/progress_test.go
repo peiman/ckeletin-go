@@ -300,9 +300,11 @@ func TestProgressModel_View_OutOfRangeProgress(t *testing.T) {
 			m.checks[0].Status = CheckRunning
 			m.checks[0].Progress = tt.progress
 
+			var view string
 			assert.NotPanics(t, func() {
-				_ = m.View()
+				view = m.View()
 			})
+			assert.NotEmpty(t, view, "view should still render with out-of-range progress")
 		})
 	}
 }
@@ -313,9 +315,11 @@ func TestProgressModel_ViewDone_OutOfRangeCoverage(t *testing.T) {
 	m.coverage = 150.0
 	m.done = true
 
+	var view string
 	assert.NotPanics(t, func() {
-		_ = m.View()
+		view = m.View()
 	})
+	assert.NotEmpty(t, view, "summary view should still render with out-of-range coverage")
 }
 
 func TestProgressModel_ViewDone(t *testing.T) {

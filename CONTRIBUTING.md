@@ -176,6 +176,11 @@ This creates:
 
 Edit `internal/config/commands/mycommand_config.go`:
 
+> **Where config metadata lives:** project-owned commands (like yours) keep
+> their config in `internal/config/commands/`. Framework-owned commands
+> (e.g. `docs`) live in `.ckeletin/pkg/config/commands/` and are updated via
+> framework sync — don't add yours there.
+
 ```go
 package commands
 

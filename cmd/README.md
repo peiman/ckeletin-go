@@ -169,7 +169,7 @@ The justification must appear on the marker line or in a comment directly above/
 ## Examples
 
 - **Simple command**: `cmd/ping.go` (~30 lines)
-- **Command with subcommands**: `cmd/docs.go` (~48 lines)
+- **Command with subcommands**: `cmd/docs.go`
 
 ## Architecture Benefits
 

@@ -34,7 +34,9 @@ type Result struct {
 // error envelope, preserving the one-envelope-per-command contract.
 func (g *Generator) GenerateJSON(w io.Writer) error {
 	var buf bytes.Buffer
+	savedWriter := g.cfg.Writer
 	g.cfg.Writer = &buf
+	defer func() { g.cfg.Writer = savedWriter }()
 	if err := g.Generate(); err != nil {
 		return err
 	}

@@ -66,6 +66,7 @@ func TestDevProgressCommandRunsSpinnerDemo(t *testing.T) {
 	RootCmd.SetOut(buf)
 	RootCmd.SetErr(buf)
 	RootCmd.SetArgs([]string{"dev", "progress", "--spinner", "--delay", "1ms"})
+	t.Cleanup(func() { RootCmd.SetArgs([]string{}) })
 
 	// EXECUTION PHASE
 	err := RootCmd.Execute()
@@ -75,9 +76,6 @@ func TestDevProgressCommandRunsSpinnerDemo(t *testing.T) {
 	output := buf.String()
 	assert.Contains(t, output, "Simulating network request...", "Demo should print spinner start message")
 	assert.Contains(t, output, "Network request completed", "Demo should print spinner completion message")
-
-	// Reset
-	RootCmd.SetArgs([]string{})
 }
 
 func TestDevCommandHelp(t *testing.T) {

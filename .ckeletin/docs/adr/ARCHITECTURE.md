@@ -252,7 +252,7 @@ ckeletin-go/
 │   │   ├── check.go           # Check command UI
 │   │   └── validation.go      # Config-validate JSON rendering
 │   ├── ping/                  # Ping Business Logic (ping.go + tests → ADR-003)
-│   ├── docs/                  # Documentation generation (markdown, yaml)
+│   ├── docs/                  # Documentation generation (markdown, yaml, json)
 │   ├── check/                 # Check command business logic
 │   ├── dev/                   # Dev tooling (config inspector, doctor)
 │   ├── progress/              # Progress reporting (spinner, bar, demo)

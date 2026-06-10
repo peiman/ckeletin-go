@@ -2,6 +2,7 @@ package ui
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"testing"
 
@@ -52,17 +53,43 @@ func TestNewCheckPrinterWithWriter_AdditionalOptions(t *testing.T) {
 }
 
 func TestStdoutCheckPrinter(t *testing.T) {
+	// SETUP: swap os.Stdout for a pipe so the factory captures it
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = origStdout })
+
+	// EXECUTION
 	p := StdoutCheckPrinter()
 	require.NotNil(t, p)
-	// Can't easily test stdout output, but verify it doesn't panic
+	p.CheckSuccess("stdout-bound")
+	require.NoError(t, w.Close())
+
+	// ASSERTION: output landed on the swapped stdout
+	captured, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Contains(t, string(captured), "stdout-bound")
 }
 
 func TestStderrCheckPrinter(t *testing.T) {
+	// SETUP: swap os.Stderr for a pipe so the factory captures it
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stderr = w
+	t.Cleanup(func() { os.Stderr = origStderr })
+
+	// EXECUTION
 	p := StderrCheckPrinter()
 	require.NotNil(t, p)
-	// Verify it's configured for stderr by checking the writer
-	// (internal detail, but validates the function works)
-	_ = os.Stderr // Just ensure we reference stderr
+	p.CheckSuccess("stderr-bound")
+	require.NoError(t, w.Close())
+
+	// ASSERTION: output landed on the swapped stderr
+	captured, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Contains(t, string(captured), "stderr-bound")
 }
 
 func TestCheckPrinter_Integration(t *testing.T) {
