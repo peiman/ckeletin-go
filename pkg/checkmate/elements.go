@@ -4,9 +4,13 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
-// Note: lipgloss import removed - we use p.style() helper for rendering
+// Note: rendering goes through the p.style() helper; lipgloss is imported
+// only for display-width measurement (multibyte icons are wider in bytes
+// than in terminal columns).
 
 // renderCategoryHeader renders a category header with lipgloss styling.
 // Example: " Code Quality " (with colored background)
@@ -163,15 +167,16 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 	_, _ = fmt.Fprintf(p.writer, "%s%s%s\n", styledVertical(), strings.Repeat(" ", width-2), styledVertical())
 
 	// The rendered icon depends on status, so measure the matching one
-	iconLen := len(p.theme.IconSuccess)
+	// (display columns, not bytes - unicode icons are multibyte)
+	iconLen := lipgloss.Width(p.theme.IconSuccess)
 	if status == StatusFailure {
-		iconLen = len(p.theme.IconFailure)
+		iconLen = lipgloss.Width(p.theme.IconFailure)
 	}
 
 	// Title line centered
 	titleContent := fmt.Sprintf("%s %s", iconStyled, titleStyled)
-	// Calculate visible length (without ANSI codes) - approximate
-	visibleLen := iconLen + 1 + len(title)
+	// Visible length in display columns (without ANSI codes)
+	visibleLen := iconLen + 1 + lipgloss.Width(title)
 	padding := (width - 2 - visibleLen) / 2
 	if padding < 1 {
 		padding = 1
@@ -204,7 +209,8 @@ func (p *Printer) renderCheckSummary(status Status, title string, items []string
 			styledConnector := p.style(p.theme.TreeStyle, connector)
 			itemLine := fmt.Sprintf("  %s %s %s", styledConnector, itemIcon, item)
 			// Inner width minus the two-space indent and two separator spaces
-			itemPadding := width - 2 - len(connector) - iconLen - len(item) - 4
+			// (display columns - tree connectors and icons are multibyte)
+			itemPadding := width - 2 - lipgloss.Width(connector) - iconLen - lipgloss.Width(item) - 4
 			if itemPadding < 0 {
 				itemPadding = 0
 			}

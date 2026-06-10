@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -383,6 +384,52 @@ func TestCheckSummary_BoxAlignment(t *testing.T) {
 					continue
 				}
 				assert.Len(t, line, theme.SummaryWidth, "line %q", line)
+			}
+		})
+	}
+}
+
+func TestCheckSummary_BoxAlignment_UnicodeTheme(t *testing.T) {
+	tests := []struct {
+		name   string
+		status Status
+		title  string
+		items  []string
+	}{
+		{
+			name:   "success box lines are flush with multibyte icons",
+			status: StatusSuccess,
+			title:  "All checks passed",
+			items:  []string{"Build", "Test"},
+		},
+		{
+			name:   "failure box lines are flush with multibyte icons",
+			status: StatusFailure,
+			title:  "2 checks failed",
+			items:  []string{"Build", "Test"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP: default theme uses multibyte icons (✓/✗) whose byte
+			// length differs from their single-column display width;
+			// ForceColors keeps the unicode theme on a non-TTY buffer
+			var buf bytes.Buffer
+			theme := DefaultTheme()
+			theme.ForceColors = true
+			p := New(WithWriter(&buf), WithTheme(theme))
+
+			// EXECUTION
+			p.CheckSummary(tt.status, tt.title, tt.items...)
+
+			// ASSERTION: every box line must occupy exactly SummaryWidth
+			// display columns (lipgloss.Width ignores ANSI codes)
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if line == "" {
+					continue
+				}
+				assert.Equal(t, theme.SummaryWidth, lipgloss.Width(line), "line %q", line)
 			}
 		})
 	}
