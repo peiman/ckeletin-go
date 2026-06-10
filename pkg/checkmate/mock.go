@@ -13,8 +13,9 @@ type MockCall struct {
 	Args   []interface{}
 }
 
-// MockPrinter records all output for testing.
-// It captures method calls and arguments for verification.
+// MockPrinter records method calls for testing.
+// It captures each printer method invocation with its arguments for
+// verification; it does not render or write any output itself.
 //
 // Example:
 //
@@ -105,7 +106,10 @@ func (m *MockPrinter) CheckLine(name string, status Status, duration time.Durati
 	m.calls = append(m.calls, MockCall{Method: "CheckLine", Args: []interface{}{name, status, duration}})
 }
 
-// Output returns all captured output as a string.
+// Output returns the contents of Buffer, the test-written scratch space.
+// The mock's printer methods never write to Buffer, so this is empty
+// unless the test wrote to it; use AllCalls or GetCalls to inspect what
+// the code under test printed.
 func (m *MockPrinter) Output() string {
 	m.mu.Lock()
 	defer m.mu.Unlock()

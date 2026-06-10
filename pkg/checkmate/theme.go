@@ -34,7 +34,13 @@ type Theme struct {
 	TreeStyle     lipgloss.Style // For tree connectors
 
 	// Behavior
-	ForceColors bool // Force colors even in non-TTY (useful for testing)
+
+	// ForceColors retains the configured/default theme on non-TTY writers
+	// instead of degrading to MinimalTheme. It does not force ANSI emission:
+	// color emission is decided by the lipgloss renderer for the writer.
+	// Themes passed via WithTheme are always retained, so this only matters
+	// when the theme was not explicitly chosen.
+	ForceColors bool
 }
 
 // DefaultTheme returns the default lipgloss-style theme.
@@ -93,7 +99,7 @@ func DefaultTheme() *Theme {
 	}
 }
 
-// MinimalTheme returns a theme without colors or emojis.
+// MinimalTheme returns a theme without colors or Unicode icons.
 // Suitable for CI environments, piped output, or accessibility needs.
 func MinimalTheme() *Theme {
 	return &Theme{

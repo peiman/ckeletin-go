@@ -8,8 +8,8 @@ import (
 )
 
 // IsTerminal determines if the given writer is an interactive terminal.
-// This is used to decide whether to use colors and emojis (terminal) or
-// plain ASCII output (non-terminal).
+// This is used to decide whether to use colors and Unicode icons (terminal)
+// or plain ASCII output (non-terminal).
 //
 // Returns false for:
 // - Piped output

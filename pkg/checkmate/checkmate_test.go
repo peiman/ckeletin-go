@@ -32,10 +32,46 @@ func TestNew_WithWriter(t *testing.T) {
 
 func TestNew_WithTheme(t *testing.T) {
 	theme := MinimalTheme()
-	theme.ForceColors = true // Prevent auto-switching
 	p := New(WithTheme(theme), WithWriter(&bytes.Buffer{}))
 
 	assert.Equal(t, "[OK]", p.theme.IconSuccess)
+}
+
+func TestNew_WithTheme_ExplicitThemeRetainedOnNonTTY(t *testing.T) {
+	var buf bytes.Buffer
+	theme := DefaultTheme()
+
+	p := New(WithWriter(&buf), WithTheme(theme))
+
+	assert.Same(t, theme, p.theme,
+		"a theme explicitly chosen via WithTheme must not be replaced on non-TTY writers")
+}
+
+func TestEnsureInit_NonExplicitTheme_NonTTY(t *testing.T) {
+	// The auto-degrade only applies when no theme was explicitly chosen.
+	// Printer fields are unexported, so a pre-set theme without WithTheme
+	// can only happen in-package (e.g. a zero-value Printer).
+	t.Run("degrades to MinimalTheme by default", func(t *testing.T) {
+		var buf bytes.Buffer
+		p := Printer{writer: &buf, theme: DefaultTheme()}
+
+		p.CheckSuccess("test")
+
+		assert.Equal(t, "[OK]", p.theme.IconSuccess,
+			"non-explicit theme should degrade to MinimalTheme on non-TTY writers")
+	})
+
+	t.Run("ForceColors retains the theme", func(t *testing.T) {
+		var buf bytes.Buffer
+		theme := DefaultTheme()
+		theme.ForceColors = true
+		p := Printer{writer: &buf, theme: theme}
+
+		p.CheckSuccess("test")
+
+		assert.Same(t, theme, p.theme,
+			"ForceColors should retain a non-explicit theme on non-TTY writers")
+	})
 }
 
 func TestNew_WithStderr(t *testing.T) {
@@ -93,7 +129,7 @@ func TestCategoryHeader(t *testing.T) {
 		{
 			name:     "default theme",
 			title:    "Code Quality",
-			theme:    forceColorTheme(DefaultTheme()),
+			theme:    DefaultTheme(),
 			contains: []string{"Code Quality"},
 		},
 		{
@@ -208,7 +244,7 @@ func TestCheckFailure(t *testing.T) {
 			title:       "Test failed",
 			details:     "main.go:10: error",
 			remediation: "Fix the error",
-			theme:       forceColorTheme(DefaultTheme()),
+			theme:       DefaultTheme(),
 			contains:    []string{"├──", "✗", "Test failed", "Details:", "main.go:10", "How to fix:", "Fix the error"},
 		},
 		{
@@ -271,7 +307,7 @@ func TestCheckSummary(t *testing.T) {
 			status:   StatusSuccess,
 			title:    "All checks passed",
 			items:    []string{"Formatting", "Linting"},
-			theme:    forceColorTheme(DefaultTheme()),
+			theme:    DefaultTheme(),
 			contains: []string{"─", "✓", "All checks passed", "Formatting", "Linting"},
 		},
 		{
@@ -328,7 +364,6 @@ func TestCheckSummary_LongTitle_NoPanic(t *testing.T) {
 			theme: func() *Theme {
 				th := MinimalTheme()
 				th.SummaryWidth = 1
-				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
 				return th
 			}(),
 			title: "Done",
@@ -414,10 +449,9 @@ func TestCheckSummary_BoxAlignment_UnicodeTheme(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP: default theme uses multibyte icons (✓/✗) whose byte
 			// length differs from their single-column display width;
-			// ForceColors keeps the unicode theme on a non-TTY buffer
+			// WithTheme retains the unicode theme on a non-TTY buffer
 			var buf bytes.Buffer
 			theme := DefaultTheme()
-			theme.ForceColors = true
 			p := New(WithWriter(&buf), WithTheme(theme))
 
 			// EXECUTION
@@ -451,7 +485,6 @@ func TestCheckSummary_UsesSummaryChar(t *testing.T) {
 			theme: func() *Theme {
 				th := MinimalTheme()
 				th.SummaryChar = "~"
-				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
 				return th
 			}(),
 			contains: "+" + strings.Repeat("~", 43) + "+",
@@ -461,7 +494,6 @@ func TestCheckSummary_UsesSummaryChar(t *testing.T) {
 			theme: func() *Theme {
 				th := MinimalTheme()
 				th.SummaryChar = ""
-				th.ForceColors = true // Prevent auto-switch to a fresh MinimalTheme
 				return th
 			}(),
 			contains: "+" + strings.Repeat("-", 43) + "+",
@@ -585,16 +617,10 @@ func TestCheckLine(t *testing.T) {
 	}
 }
 
-// Helper to force colors in theme (prevents auto-switch to minimal)
-func forceColorTheme(t *Theme) *Theme {
-	t.ForceColors = true
-	return t
-}
-
 // newTTYPrinter creates a Printer that simulates TTY mode for testing
 // the terminal escape code branches.
 func newTTYPrinter(buf *bytes.Buffer) *Printer {
-	p := New(WithWriter(buf), WithTheme(forceColorTheme(DefaultTheme())))
+	p := New(WithWriter(buf), WithTheme(DefaultTheme()))
 	p.isTerminal = true
 	return p
 }

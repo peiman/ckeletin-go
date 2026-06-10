@@ -245,7 +245,7 @@ func (p *Printer) renderCheckNote(message string) {
 }
 
 // renderCheckLine renders a single-line check result mimicking TUI output.
-// Example: "format .......................... [OK] 1.451s"
+// Example (MinimalTheme): "format .................................. [OK] 1.451s"
 // In TTY mode: does nothing (animated output handles it).
 // In non-TTY mode: prints the TUI-style single line.
 func (p *Printer) renderCheckLine(name string, status Status, duration time.Duration) {
