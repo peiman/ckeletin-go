@@ -16,7 +16,7 @@ env:
   PINNED_TOOLS_VERSION: 'v1'    # keep in sync with ci.yml (cache-busting)
   # conform.sh parses conformance-mapping.yaml with yq; keep in sync with
   # TOOL_YQ_VERSION in .ckeletin/Taskfile.yml (same version, no 'v' prefix)
-  YQ_VERSION: '4.44.6'
+  YQ_VERSION: '4.53.3'
 
 jobs:
   conformance:
