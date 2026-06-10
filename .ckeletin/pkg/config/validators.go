@@ -15,18 +15,24 @@ import (
 	"github.com/spf13/cast"
 )
 
-// ValidLogLevels defines the set of valid log level strings.
-// This matches zerolog's accepted level names.
-var ValidLogLevels = map[string]bool{
-	"trace":    true,
-	"debug":    true,
-	"info":     true,
-	"warn":     true,
-	"error":    true,
-	"fatal":    true,
-	"panic":    true,
-	"disabled": true,
+// validLogLevelOrder lists the valid log level strings in the order they are
+// presented in error messages. It matches zerolog's accepted level names and
+// is the single source of truth for log level validation; ValidLogLevels is
+// derived from it.
+var validLogLevelOrder = []string{
+	"trace", "debug", "info", "warn", "error", "fatal", "panic", "disabled",
 }
+
+// ValidLogLevels is the lookup-set form of validLogLevelOrder, kept exported
+// for API compatibility (this framework package is synced into downstream
+// projects).
+var ValidLogLevels = func() map[string]bool {
+	set := make(map[string]bool, len(validLogLevelOrder))
+	for _, level := range validLogLevelOrder {
+		set[level] = true
+	}
+	return set
+}()
 
 // ValidateOneOf returns a validation function that checks whether the string
 // value is one of the allowed values. Empty strings are allowed when
@@ -40,7 +46,8 @@ func ValidateOneOf(allowed []string, allowEmpty bool) func(interface{}) error {
 	return func(value interface{}) error {
 		s, ok := value.(string)
 		if !ok {
-			// Non-string values are skipped (type validation is separate)
+			// Non-string values pass through unvalidated: nothing checks the
+			// declared option type at load time (viper casts at read time)
 			return nil
 		}
 
@@ -62,11 +69,7 @@ func ValidateOneOf(allowed []string, allowEmpty bool) func(interface{}) error {
 // If allowEmpty is true, empty string is accepted (for optional log level
 // fields that fall back to a default).
 func ValidateLogLevel(allowEmpty bool) func(interface{}) error {
-	levels := make([]string, 0, len(ValidLogLevels))
-	for k := range ValidLogLevels {
-		levels = append(levels, k)
-	}
-	return ValidateOneOf(levels, allowEmpty)
+	return ValidateOneOf(validLogLevelOrder, allowEmpty)
 }
 
 // ValidateColor returns a validation function that checks whether a color
@@ -94,7 +97,9 @@ func ValidateNonNegativeInt() func(interface{}) error {
 func validateMinInt(minValue int64, requirement string) func(interface{}) error {
 	return func(value interface{}) error {
 		if value == nil {
-			// Nil values are skipped (presence is enforced by Required)
+			// Nil values pass through: nothing enforces presence at load
+			// time (the Required flag is only checked by the dev-build
+			// config inspector)
 			return nil
 		}
 

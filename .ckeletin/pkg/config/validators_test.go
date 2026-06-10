@@ -128,6 +128,21 @@ func TestValidateLogLevel(t *testing.T) {
 	}
 }
 
+// TestValidateLogLevel_DeterministicErrorMessage pins the full error text:
+// the valid options must always appear in the same documented order, not in
+// randomized map-iteration order.
+func TestValidateLogLevel_DeterministicErrorMessage(t *testing.T) {
+	t.Parallel()
+
+	validate := ValidateLogLevel(false)
+	err := validate("verbose")
+
+	assert.Error(t, err)
+	assert.Equal(t,
+		`invalid value "verbose" (valid options: trace, debug, info, warn, error, fatal, panic, disabled)`,
+		err.Error())
+}
+
 func TestValidatePositiveInt(t *testing.T) {
 	t.Parallel()
 

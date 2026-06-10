@@ -143,10 +143,12 @@ func ValidateAllConfigValues(values map[string]interface{}) []error {
 	return errors
 }
 
-// truncateString truncates a string to at most maxLen bytes with an ellipsis,
-// cutting on a rune boundary so valid UTF-8 input never yields invalid UTF-8
-// output. Mirrors the truncation in the logger package's SanitizeLogString;
-// the code cannot be shared because logger already imports config.
+// truncateString cuts a string to at most maxLen bytes and appends an
+// ellipsis, so the result can exceed maxLen by the three ellipsis bytes. The
+// cut lands on a rune boundary so valid UTF-8 input never yields invalid
+// UTF-8 output. Mirrors the truncation in the logger package's
+// SanitizeLogString; the code cannot be shared because logger already
+// imports config.
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s

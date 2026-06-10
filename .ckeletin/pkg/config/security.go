@@ -112,9 +112,14 @@ Maximum allowed: %d bytes (%.2f MB)`,
 //     redirect log output to an attacker-chosen location)
 //   - empty paths
 //
-// A missing file is accepted: the logger creates it on first write. Nil and
-// non-string values are skipped (type validation is handled separately),
-// matching the other validators in this package.
+// Known limits of this check:
+//   - Nil and non-string values pass through unvalidated: nothing checks the
+//     declared option type at load time (viper casts at read time).
+//   - Only the final path component is Lstat'd, so a path whose parent
+//     directory is a symlink passes. Intentional: /var on macOS is itself a
+//     symlink.
+//   - Any Lstat error passes, not just a missing file (which is accepted
+//     because the logger creates it on first write).
 func ValidateLogFilePath() func(interface{}) error {
 	return func(value interface{}) error {
 		if value == nil {

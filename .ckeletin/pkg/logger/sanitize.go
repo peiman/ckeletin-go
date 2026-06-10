@@ -2,8 +2,10 @@
 //
 // Sanitization functions for log output. Scope:
 //   - SanitizeLogString strips control characters (log injection) and
-//     truncates overly long strings (log flooding)
+//     truncates overly long strings (log flooding); truncated output exceeds
+//     the configured byte limit by the appended truncation marker
 //   - SanitizePath additionally masks the home directory in paths
+//   - SanitizeError applies SanitizeLogString to an error's message
 //
 // These functions do NOT redact secret values (tokens, passwords, API keys).
 // Callers are responsible for never passing secrets to the logger.

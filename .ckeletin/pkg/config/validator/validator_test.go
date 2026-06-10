@@ -1,4 +1,4 @@
-// internal/config/validator/validator_test.go
+// .ckeletin/pkg/config/validator/validator_test.go
 
 package validator
 
@@ -20,6 +20,14 @@ import (
 // so the test registers its own option instead.
 const testColorKey = "test.color"
 
+// testBadDefaultKey is a test-only config key whose registry default is
+// invalid. Its provider is gated by badDefaultActive so the broken option
+// only exists while the attribution test runs; otherwise every Validate
+// call in this package would report its error.
+const testBadDefaultKey = "test.bad_default"
+
+var badDefaultActive bool
+
 func init() {
 	config.RegisterOptionsProvider(func() []config.ConfigOption {
 		return []config.ConfigOption{
@@ -27,6 +35,20 @@ func init() {
 				Key:          testColorKey,
 				DefaultValue: "white",
 				Description:  "Test-only color option",
+				Type:         "string",
+				Validation:   config.ValidateColor([]string{"red", "green", "blue", "white"}),
+			},
+		}
+	})
+	config.RegisterOptionsProvider(func() []config.ConfigOption {
+		if !badDefaultActive {
+			return nil
+		}
+		return []config.ConfigOption{
+			{
+				Key:          testBadDefaultKey,
+				DefaultValue: "chartreuse",
+				Description:  "Test-only option with an invalid registry default",
 				Type:         "string",
 				Validation:   config.ValidateColor([]string{"red", "green", "blue", "white"}),
 			},
@@ -224,6 +246,89 @@ func TestValidate_RegisteredOptionValues(t *testing.T) {
 				"Validate() should report exactly one error. Errors: %v", result.Errors)
 			assert.Contains(t, result.Errors[0].Error(), fmt.Sprintf("config %q", tt.wantErrKey),
 				"Validate() error should reference the offending key")
+		})
+	}
+}
+
+// TestValidate_RegistryDefaultErrorAttribution pins error attribution for a
+// bad registry default: when the offending key is absent from the user's
+// file, the error must say the value came from the registry default instead
+// of blaming the file. Intentionally not parallel: it toggles
+// badDefaultActive, which parallel tests reading the registry would race
+// with.
+func TestValidate_RegistryDefaultErrorAttribution(t *testing.T) {
+	badDefaultActive = true
+	defer func() { badDefaultActive = false }()
+
+	const defaultAttribution = "(registry default, not set in file)"
+
+	tests := []struct {
+		name          string
+		configContent string
+		wantValid     bool
+		wantPrefix    bool // defaultAttribution expected in the error
+	}{
+		{
+			name: "Bad default for key absent from file is attributed to the registry",
+			configContent: `app:
+  log_level: info
+`,
+			wantValid:  false,
+			wantPrefix: true,
+		},
+		{
+			name: "Bad value present in file is attributed to the file",
+			configContent: `test:
+  bad_default: chartreuse
+`,
+			wantValid:  false,
+			wantPrefix: false,
+		},
+		{
+			name: "Valid file value overrides the bad registry default",
+			configContent: `test:
+  bad_default: white
+`,
+			wantValid: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP: create config file with secure permissions
+			tmpDir := t.TempDir()
+			configFile := filepath.Join(tmpDir, "config.yaml")
+			require.NoError(t,
+				os.WriteFile(configFile, []byte(tt.configContent), 0600),
+				"Failed to create test file")
+
+			// EXECUTION
+			result, err := Validate(configFile)
+			require.NoError(t, err, "Validate() unexpected error")
+
+			// ASSERTION
+			assert.Equal(t, tt.wantValid, result.Valid,
+				"Validate() valid = %v, want %v. Errors: %v",
+				result.Valid, tt.wantValid, result.Errors)
+
+			if tt.wantValid {
+				assert.Empty(t, result.Errors,
+					"Validate() should report no errors for valid values")
+				return
+			}
+
+			require.Len(t, result.Errors, 1,
+				"Validate() should report exactly one error. Errors: %v", result.Errors)
+			msg := result.Errors[0].Error()
+			assert.Contains(t, msg, fmt.Sprintf("config %q", testBadDefaultKey),
+				"error should reference the offending key")
+			if tt.wantPrefix {
+				assert.Contains(t, msg, defaultAttribution,
+					"a bad registry default for a key absent from the file must be attributed to the registry")
+			} else {
+				assert.NotContains(t, msg, defaultAttribution,
+					"a bad value written in the file must not be attributed to the registry default")
+			}
 		})
 	}
 }
