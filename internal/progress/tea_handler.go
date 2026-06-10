@@ -126,15 +126,22 @@ func (h *TeaHandler) start() {
 // The handler can be reused after Stop: the next OnProgress starts a new program.
 func (h *TeaHandler) Stop() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if h.program != nil {
-		h.program.Quit()
+	program := h.program
+	if program != nil {
 		h.program = nil
 		h.started = false
 		// Recreate the ready channel so the handler can be restarted;
 		// start() closed the old one, and closing twice would panic
 		h.ready = make(chan struct{})
+	}
+	h.mu.Unlock()
+
+	if program != nil {
+		program.Quit()
+		// Wait for Run() to return so the renderer goroutine has stopped
+		// writing to h.out before the handler (or caller) reuses the writer.
+		// Waiting outside the mutex keeps OnProgress/start from blocking.
+		program.Wait()
 	}
 }
 
