@@ -17,8 +17,28 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// minGoVersion is the minimum Go version recommended for this project
-const minGoVersion = "1.25"
+// goVersionFile pins the project's Go toolchain and is the SSOT for the
+// minimum version. Like the doctor's other file checks, it is resolved
+// relative to the working directory (the project root).
+const goVersionFile = ".go-version"
+
+// minGoVersionFallback is used only when goVersionFile is unreadable —
+// fallback; SSOT is .go-version.
+const minGoVersionFallback = "1.26.4"
+
+// minGoVersion returns the project's minimum Go version from .go-version,
+// falling back to minGoVersionFallback when the file is unreadable or empty.
+func minGoVersion() string {
+	data, err := os.ReadFile(goVersionFile)
+	if err != nil {
+		return minGoVersionFallback
+	}
+	version := strings.TrimSpace(string(data))
+	if version == "" {
+		return minGoVersionFallback
+	}
+	return version
+}
 
 // HealthCheck represents a single health check result
 type HealthCheck struct {
@@ -247,8 +267,10 @@ func (d *Doctor) checkGoVersion() {
 	}
 
 	versionStr := string(output)
-	// Extract version number (e.g., "go1.25.3" from "go version go1.25.3 darwin/arm64")
-	re := regexp.MustCompile(`go(\d+\.\d+)`)
+	// Extract the full version, patch included (e.g., "go1.26.4" from
+	// "go version go1.26.4 darwin/arm64") — .go-version pins a patch
+	// version, so truncating to major.minor would compare incorrectly
+	re := regexp.MustCompile(`go(\d+\.\d+(?:\.\d+)?)`)
 	matches := re.FindStringSubmatch(versionStr)
 	if len(matches) < 2 {
 		d.checks = append(d.checks, HealthCheck{
@@ -261,13 +283,14 @@ func (d *Doctor) checkGoVersion() {
 	}
 
 	version := matches[1]
+	minimum := minGoVersion()
 	// Check if version meets the minimum requirement
-	if goVersionLess(version, minGoVersion) {
+	if goVersionLess(version, minimum) {
 		d.checks = append(d.checks, HealthCheck{
 			Name:    "Go version",
 			Status:  CheckWarning,
-			Message: fmt.Sprintf("Go %s found, but %s+ recommended", version, minGoVersion),
-			Details: fmt.Sprintf("Project requires Go %s or higher", minGoVersion),
+			Message: fmt.Sprintf("Go %s found, but %s+ recommended", version, minimum),
+			Details: fmt.Sprintf("Project requires Go %s or higher", minimum),
 		})
 		return
 	}
