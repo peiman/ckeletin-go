@@ -5,6 +5,8 @@ package docs
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,6 +111,63 @@ func TestGenerateJSON_YAMLFormat(t *testing.T) {
 	_, result := decodeEnvelope(t, buf.Bytes())
 	assert.Equal(t, FormatYAML, result.Format)
 	assert.NotEmpty(t, result.Content)
+}
+
+// TestGenerateJSON_OutputFileOpenError verifies an output-file open failure
+// surfaces as an error and leaves the envelope writer untouched.
+func TestGenerateJSON_OutputFileOpenError(t *testing.T) {
+	// SETUP PHASE
+	origOpenOutputFile := openOutputFile
+	defer func() { openOutputFile = origOpenOutputFile }()
+	openOutputFile = func(path string) (io.WriteCloser, error) {
+		return nil, errors.New("permission denied")
+	}
+
+	var buf bytes.Buffer
+	generator := NewGenerator(Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "docs.md",
+		Registry:     config.Registry,
+	})
+
+	// EXECUTION PHASE
+	err := generator.GenerateJSON(&buf)
+
+	// ASSERTION PHASE
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to create output file")
+	assert.Zero(t, buf.Len(),
+		"no envelope may be written on error — main.go renders the error envelope")
+}
+
+// TestGenerateJSON_OutputFileWriteError verifies a write failure on the
+// output file propagates as an error (no success envelope over a truncated
+// artifact) and leaves the envelope writer untouched.
+func TestGenerateJSON_OutputFileWriteError(t *testing.T) {
+	// SETUP PHASE
+	origOpenOutputFile := openOutputFile
+	defer func() { openOutputFile = origOpenOutputFile }()
+	openOutputFile = func(path string) (io.WriteCloser, error) {
+		return &failAfterWriter{limit: 64}, nil
+	}
+
+	var buf bytes.Buffer
+	generator := NewGenerator(Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		OutputFile:   "docs.md",
+		Registry:     config.Registry,
+	})
+
+	// EXECUTION PHASE
+	err := generator.GenerateJSON(&buf)
+
+	// ASSERTION PHASE
+	require.Error(t, err, "a failing output file must surface an error")
+	assert.ErrorIs(t, err, errWriteFailed)
+	assert.Zero(t, buf.Len(),
+		"no envelope may be written on error — main.go renders the error envelope")
 }
 
 func TestGenerateJSON_UnsupportedFormat(t *testing.T) {

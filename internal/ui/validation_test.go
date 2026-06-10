@@ -38,7 +38,15 @@ func TestRenderValidationJSON_Success(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, true, dataMap["valid"])
 	assert.Equal(t, "/tmp/config.yaml", dataMap["config_file"])
-	assert.Empty(t, dataMap["errors"])
+
+	// Both slices must marshal as JSON arrays, never null, so consumers can
+	// iterate data.errors / data.warnings without a null check.
+	errs, ok := dataMap["errors"].([]interface{})
+	require.True(t, ok, "errors must marshal as a JSON array, not null")
+	assert.Empty(t, errs)
+	warnings, ok := dataMap["warnings"].([]interface{})
+	require.True(t, ok, "warnings must marshal as a JSON array, not null")
+	assert.Empty(t, warnings)
 }
 
 func TestRenderValidationJSON_Failure(t *testing.T) {

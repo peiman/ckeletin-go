@@ -15,6 +15,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// failAfterWriter accepts writes until limit bytes have been written, then
+// fails every subsequent write. Close is a no-op so the type doubles as an
+// io.WriteCloser for output-file tests.
+type failAfterWriter struct {
+	limit int
+	n     int
+}
+
+var errWriteFailed = errors.New("write failed: device full")
+
+func (w *failAfterWriter) Write(p []byte) (int, error) {
+	if w.n+len(p) > w.limit {
+		return 0, errWriteFailed
+	}
+	w.n += len(p)
+	return len(p), nil
+}
+
+func (w *failAfterWriter) Close() error { return nil }
+
+// TestGenerateMarkdownDocs_WriteError verifies write failures propagate
+// instead of being silently swallowed (a truncated artifact must not look
+// like a success).
+func TestGenerateMarkdownDocs_WriteError(t *testing.T) {
+	// SETUP PHASE
+	appInfo := AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"}
+	cfg := Config{OutputFormat: FormatMarkdown, Registry: config.Registry}
+	generator := NewGenerator(cfg)
+
+	// Fails after the header, partway through the document
+	w := &failAfterWriter{limit: 64}
+
+	// EXECUTION PHASE
+	err := generator.GenerateMarkdownDocs(w, appInfo)
+
+	// ASSERTION PHASE
+	require.Error(t, err, "a failing writer must surface an error")
+	assert.ErrorIs(t, err, errWriteFailed)
+}
+
 // TestGenerateMarkdownDocs tests the basic structure of generated markdown documentation
 func TestGenerateMarkdownDocs(t *testing.T) {
 	// SETUP PHASE

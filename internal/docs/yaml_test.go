@@ -166,6 +166,42 @@ func TestGenerateYAMLContent_DeterministicOutput(t *testing.T) {
 		appIdx, serverIdx, telemetryIdx)
 }
 
+// TestGenerateYAMLContent_WriteError verifies write failures propagate
+// instead of being silently swallowed.
+func TestGenerateYAMLContent_WriteError(t *testing.T) {
+	// SETUP PHASE
+	registry := []config.ConfigOption{
+		{Key: "app.log_level", Description: "Log level", DefaultValue: "info", Type: "string"},
+		{Key: "app.ping.enabled", Description: "Enable ping", DefaultValue: true, Type: "bool"},
+	}
+
+	// Fails partway through the document
+	w := &failAfterWriter{limit: 16}
+
+	// EXECUTION PHASE
+	err := generateYAMLContent(w, registry)
+
+	// ASSERTION PHASE
+	require.Error(t, err, "a failing writer must surface an error")
+	assert.ErrorIs(t, err, errWriteFailed)
+}
+
+// TestGenerateYAMLDocs_WriteError verifies the write error reaches the
+// public entry point.
+func TestGenerateYAMLDocs_WriteError(t *testing.T) {
+	// SETUP PHASE
+	cfg := Config{OutputFormat: FormatYAML, Registry: config.Registry}
+	generator := NewGenerator(cfg)
+	w := &failAfterWriter{limit: 16}
+
+	// EXECUTION PHASE
+	err := generator.GenerateYAMLDocs(w)
+
+	// ASSERTION PHASE
+	require.Error(t, err, "a failing writer must surface an error")
+	assert.ErrorIs(t, err, errWriteFailed)
+}
+
 // TestGenerateYAMLDocs_EmptyRegistry tests handling of an empty registry
 func TestGenerateYAMLDocs_EmptyRegistry(t *testing.T) {
 	// SETUP PHASE

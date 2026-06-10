@@ -18,6 +18,21 @@ type Generator struct {
 	appInfo AppInfo
 }
 
+// errWriter wraps an io.Writer and captures the first write error so long
+// sequences of writes can be checked once at the end. After a write fails,
+// subsequent printf calls are no-ops.
+type errWriter struct {
+	w   io.Writer
+	err error
+}
+
+func (ew *errWriter) printf(format string, args ...any) {
+	if ew.err != nil {
+		return
+	}
+	_, ew.err = fmt.Fprintf(ew.w, format, args...)
+}
+
 // NewGenerator creates a new document generator with the given configuration
 func NewGenerator(cfg Config) *Generator {
 	return &Generator{

@@ -26,11 +26,11 @@ type Result struct {
 }
 
 // GenerateJSON produces the documentation and emits it to w as the data of a
-// standard success envelope (CKSPEC-OUT-002). When an output file is
+// standard success envelope (CKSPEC-OUT-003). When an output file is
 // configured, the documentation is written to that file as in text mode and
 // the envelope reports the file path instead of inlining the content.
 //
-// On error nothing is written to w: the caller (main.go) renders the single
+// On error nothing is written to w: the error path in main renders the single
 // error envelope, preserving the one-envelope-per-command contract.
 func (g *Generator) GenerateJSON(w io.Writer) error {
 	var buf bytes.Buffer
