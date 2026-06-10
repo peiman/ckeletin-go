@@ -100,6 +100,12 @@ func TestTreeState(t *testing.T) {
 			want:    treeStateUnknown,
 		},
 		{
+			name:    "empty version (pipeline injected empty ldflags) is unknown",
+			version: "",
+			dirty:   "",
+			want:    treeStateUnknown,
+		},
+		{
 			name:    "Taskfile dev fallback (git describe failed) is unknown",
 			version: "dev",
 			dirty:   "",
@@ -131,6 +137,104 @@ func TestVersionString_SurfacesAllFourFields(t *testing.T) {
 	// ASSERTION PHASE
 	assert.Equal(t, "v1.2.3, commit abc1234, built at 2026-01-02_03:04:05, tree clean", got,
 		"version string must carry semver, commit, date, and tree state")
+}
+
+// TestVersionString_EmptyLdflagsDegradeToUnknown guards the CKSPEC-OUT-006
+// "never empty" backstop at runtime: a release pipeline that injects EMPTY
+// strings via ldflags overrides the package-var "unknown" defaults, so each
+// field needs its own normalization.
+func TestVersionString_EmptyLdflagsDegradeToUnknown(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		commit  string
+		date    string
+		want    string
+	}{
+		{
+			name:    "empty version",
+			version: "",
+			commit:  "abc1234",
+			date:    "2026-01-02_03:04:05",
+			want:    "unknown, commit abc1234, built at 2026-01-02_03:04:05, tree unknown",
+		},
+		{
+			name:    "empty commit",
+			version: "v1.2.3",
+			commit:  "",
+			date:    "2026-01-02_03:04:05",
+			want:    "v1.2.3, commit unknown, built at 2026-01-02_03:04:05, tree clean",
+		},
+		{
+			name:    "empty date",
+			version: "v1.2.3",
+			commit:  "abc1234",
+			date:    "",
+			want:    "v1.2.3, commit abc1234, built at unknown, tree clean",
+		},
+		{
+			name:    "whitespace-only fields",
+			version: "  ",
+			commit:  "\t",
+			date:    " ",
+			want:    "unknown, commit unknown, built at unknown, tree unknown",
+		},
+		{
+			name:    "all fields empty",
+			version: "",
+			commit:  "",
+			date:    "",
+			want:    "unknown, commit unknown, built at unknown, tree unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// SETUP PHASE
+			setBuildIdentity(t, tt.version, tt.commit, tt.date, "")
+
+			// EXECUTION PHASE
+			got := versionString()
+
+			// ASSERTION PHASE
+			assert.Equal(t, tt.want, got,
+				"empty ldflags injection must degrade to unknown, never empty (CKSPEC-OUT-006)")
+		})
+	}
+}
+
+// TestRenderVersion_JSONNeverEmitsEmptyFields covers the machine-readable
+// --version path: empty ldflags injection must surface "unknown" in every
+// envelope field, never "" (CKSPEC-OUT-006).
+func TestRenderVersion_JSONNeverEmitsEmptyFields(t *testing.T) {
+	// SETUP PHASE
+	setBuildIdentity(t, "", "", "", "")
+
+	outputFlag := RootCmd.PersistentFlags().Lookup("output")
+	require.NotNil(t, outputFlag, "--output flag must exist on RootCmd")
+	origValue, origChanged := outputFlag.Value.String(), outputFlag.Changed
+	t.Cleanup(func() {
+		outputFlag.Value.Set(origValue) //nolint:errcheck // restoring saved state
+		outputFlag.Changed = origChanged
+	})
+	require.NoError(t, outputFlag.Value.Set("json"))
+
+	// EXECUTION PHASE
+	got := renderVersion(RootCmd)
+
+	// ASSERTION PHASE
+	var envelope output.JSONEnvelope
+	require.NoError(t, json.Unmarshal([]byte(got), &envelope),
+		"renderVersion should emit a JSON envelope, got: %s", got)
+
+	data, ok := envelope.Data.(map[string]interface{})
+	require.True(t, ok, "envelope data should be an object, got: %T", envelope.Data)
+	for _, field := range []string{"version", "commit", "date"} {
+		assert.Equal(t, versionUnknown, data[field],
+			"JSON %q must degrade to unknown, never empty (CKSPEC-OUT-006)", field)
+	}
+	assert.Equal(t, treeStateUnknown, data["tree"],
+		"tree state must be unknown when no build identity was injected")
 }
 
 func TestVersionFlag_TextOutput(t *testing.T) {

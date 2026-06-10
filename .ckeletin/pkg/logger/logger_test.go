@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -313,6 +314,51 @@ func TestInitWithFileLogging(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestInit_JSONModeSilencesConsoleNotFile guards the --output json logging
+// contract (CKSPEC-OUT-004): the console writer is fully silenced while the
+// file (audit) writer keeps receiving entries at its configured level.
+func TestInit_JSONModeSilencesConsoleNotFile(t *testing.T) {
+	// SETUP PHASE
+	savedLogger, savedLevel := SaveLoggerState()
+	defer RestoreLoggerState(savedLogger, savedLevel)
+
+	logFile := filepath.Join(t.TempDir(), "audit.log")
+
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, logFile)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	defer func() {
+		viper.Set(config.KeyAppLogFileEnabled, false)
+		viper.Set(config.KeyAppLogConsoleLevel, "info")
+	}()
+
+	output.SetOutputMode("json")
+	defer output.SetOutputMode("")
+
+	consoleBuf := &bytes.Buffer{}
+
+	// EXECUTION PHASE
+	require.NoError(t, Init(consoleBuf), "Init() failed")
+
+	log.Debug().Msg("json_mode_debug_entry")
+	log.Info().Msg("json_mode_info_entry")
+	Cleanup()
+
+	// ASSERTION PHASE
+	assert.Empty(t, consoleBuf.String(),
+		"console must stay silent in JSON mode, even at debug console level")
+
+	content, err := os.ReadFile(logFile)
+	require.NoError(t, err, "audit log file must exist in JSON mode")
+	assert.Contains(t, string(content), "json_mode_debug_entry",
+		"audit file must receive Debug entries in JSON mode")
+	assert.Contains(t, string(content), "json_mode_info_entry",
+		"audit file must receive Info entries in JSON mode")
 }
 
 // TestRuntimeLevelAdjustment tests that changing log levels at runtime actually affects filtering

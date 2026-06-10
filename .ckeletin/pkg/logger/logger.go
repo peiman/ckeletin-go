@@ -11,6 +11,7 @@ import (
 
 	"github.com/mattn/go-isatty"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -46,6 +47,9 @@ var (
 //   - app.log.file_level: File log level (default: debug)
 //   - app.log.color_enabled: Color output (auto/true/false, default: auto)
 //
+// When JSON output mode is active (output.IsJSONMode), the console writer is
+// disabled entirely; only the file (audit) writer receives entries.
+//
 // Example:
 //
 //	if err := logger.Init(nil); err != nil {
@@ -65,6 +69,15 @@ func Init(out io.Writer) error {
 
 	// Get console log level (with backward compatibility)
 	consoleLevel := getConsoleLogLevel()
+	if output.IsJSONMode() {
+		// JSON mode contract (CKSPEC-OUT-004): stdout carries exactly one
+		// JSON envelope and stderr stays silent, so the console writer is
+		// fully disabled. The file (audit) writer below is unaffected and
+		// keeps receiving entries at its configured level. Disabling here,
+		// before the writers are built, also keeps Init's own status logs
+		// off the console.
+		consoleLevel = zerolog.Disabled
+	}
 	currentConsoleLevel = consoleLevel
 
 	// Determine if color should be enabled

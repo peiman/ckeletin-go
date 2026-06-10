@@ -4,15 +4,18 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -1400,4 +1403,62 @@ func TestConfigFromNativeDirectoryOnDarwin(t *testing.T) {
 	if configFileUsed != "" {
 		assert.Contains(t, configFileUsed, nativeConfigDir, "Expected config from native macOS dir")
 	}
+}
+
+// Env vars guarding the subprocess branch of the JSON-mode audit-log test.
+const (
+	jsonAuditRunEnv     = "CKELETIN_TEST_JSON_AUDIT_RUN"
+	jsonAuditLogPathEnv = "CKELETIN_TEST_JSON_AUDIT_LOG_PATH"
+)
+
+// TestJSONMode_AuditFileStillReceivesLogs guards the --output json logging
+// contract (AGENTS.md "JSON Output Mode", CKSPEC-OUT-004): stdout carries
+// exactly one JSON envelope, stderr stays silent, and ONLY the console is
+// silenced — the audit log file keeps receiving Debug+ entries. Runs in a
+// subprocess because the console writer targets the real os.Stderr, which
+// in-process RootCmd.SetErr buffers cannot observe.
+func TestJSONMode_AuditFileStillReceivesLogs(t *testing.T) {
+	if os.Getenv(jsonAuditRunEnv) == "1" {
+		// SUBPROCESS BRANCH: run ping in JSON mode with file logging to the
+		// path chosen by the parent, then exit before the testing framework
+		// prints PASS to stdout.
+		RootCmd.SetArgs([]string{
+			"ping", "--output", "json",
+			"--log-file-enabled",
+			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
+			"--log-file-level", "debug",
+		})
+		if err := Execute(); err != nil {
+			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	// SETUP PHASE
+	logPath := filepath.Join(t.TempDir(), "audit.log")
+	cmd := exec.Command(os.Args[0], "-test.run=^TestJSONMode_AuditFileStillReceivesLogs$")
+	cmd.Env = append(os.Environ(), jsonAuditRunEnv+"=1", jsonAuditLogPathEnv+"="+logPath)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// EXECUTION PHASE
+	err := cmd.Run()
+
+	// ASSERTION PHASE
+	require.NoError(t, err, "ping --output json with file logging must succeed\nstdout: %s\nstderr: %s",
+		stdout.String(), stderr.String())
+
+	var envelope output.JSONEnvelope
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope),
+		"stdout must carry exactly one JSON envelope, got: %s", stdout.String())
+	assert.Equal(t, "success", envelope.Status)
+
+	assert.Empty(t, stderr.String(), "stderr must stay silent in JSON mode")
+
+	content, readErr := os.ReadFile(logPath)
+	require.NoError(t, readErr, "audit log file must exist in JSON mode")
+	assert.Contains(t, string(content), "Starting ping execution",
+		"audit log file must keep receiving Debug+ entries in JSON mode (OUT-004 shadow logs)")
 }

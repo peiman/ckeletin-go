@@ -249,29 +249,30 @@ var RootCmd = &cobra.Command{
 			output.SetOutputMode(outputFlag.Value.String())
 		}
 		output.SetCommandName(cmd.Name())
+		silencePreInitLogsInJSONMode()
 
 		// Initialize configuration
 		if err := initConfig(); err != nil {
 			return err
 		}
 
+		// Apply the final output mode (flag > env > config file) BEFORE the
+		// logger is initialized: in JSON mode logger.Init silences ONLY the
+		// console writer, so stdout carries exactly one JSON envelope and
+		// stderr stays silent, while the audit log file (if enabled) keeps
+		// receiving entries (CKSPEC-OUT-004). The second silencing call
+		// covers env/config-file-driven JSON mode, which the early
+		// flag-based site cannot see.
+		output.SetOutputMode(viper.GetString(config.KeyAppOutputFormat))
+		silencePreInitLogsInJSONMode()
+
 		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
 
-		// Now apply full JSON mode: read final config value (flag > env > config file)
-		// and suppress stderr if JSON mode is active.
-		outputFormat := viper.GetString(config.KeyAppOutputFormat)
-		output.SetOutputMode(outputFormat)
-
-		if output.IsJSONMode() {
-			// Suppress all stderr output — agents want clean stdout only.
-			// The audit log file is unaffected (initialized separately by logger.Init).
-			zerolog.SetGlobalLevel(zerolog.Disabled)
-		}
-
-		// Log config status after logger is initialized
+		// Log config status after logger is initialized; in JSON mode this
+		// reaches only the audit log file (console writer is disabled).
 		if configFileStatus != "" {
 			if configFileUsed != "" {
 				log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
@@ -282,6 +283,18 @@ var RootCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+// silencePreInitLogsInJSONMode drops logs emitted before logger.Init installs
+// the real writers: until then zerolog's default logger writes raw JSON to
+// stderr, which JSON output mode requires to stay silent. No audit log file
+// is open yet, so nothing is lost that the file could have captured.
+// logger.Init replaces the Nop logger with the configured writers (console
+// disabled in JSON mode, audit file unaffected).
+func silencePreInitLogsInJSONMode() {
+	if output.IsJSONMode() {
+		log.Logger = zerolog.Nop()
+	}
 }
 
 func Execute() error {
@@ -297,10 +310,21 @@ func Execute() error {
 	return RootCmd.Execute()
 }
 
+// orUnknown backstops build-identity fields at runtime: a pipeline that
+// injects EMPTY strings via ldflags overrides the package-var "unknown"
+// defaults, and CKSPEC-OUT-006 forbids empty fields in version output.
+func orUnknown(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return versionUnknown
+	}
+	return value
+}
+
 // versionString composes the build identity shown by --version: semantic
 // version, commit, build date, and working-tree state (CKSPEC-OUT-006).
 func versionString() string {
-	return fmt.Sprintf("%s, commit %s, built at %s, tree %s", Version, Commit, Date, treeState())
+	return fmt.Sprintf("%s, commit %s, built at %s, tree %s",
+		orUnknown(Version), orUnknown(Commit), orUnknown(Date), treeState())
 }
 
 // treeState resolves whether the build came from a dirty working tree
@@ -316,10 +340,11 @@ func treeState() string {
 	case "false":
 		return treeStateClean
 	}
-	if strings.HasSuffix(Version, dirtySuffix) {
+	version := orUnknown(Version)
+	if strings.HasSuffix(version, dirtySuffix) {
 		return treeStateDirty
 	}
-	if Version == versionUnknown || Version == versionDevFallback {
+	if version == versionUnknown || version == versionDevFallback {
 		return treeStateUnknown
 	}
 	return treeStateClean
@@ -342,9 +367,9 @@ func renderVersion(cmd *cobra.Command) string {
 			Status:  "success",
 			Command: cmd.Name(),
 			Data: versionData{
-				Version: Version,
-				Commit:  Commit,
-				Date:    Date,
+				Version: orUnknown(Version),
+				Commit:  orUnknown(Commit),
+				Date:    orUnknown(Date),
 				Tree:    treeState(),
 			},
 		}
