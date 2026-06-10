@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dependency and tooling refresh**: Module updates (`golang.org/x/sys` 0.46, `x/text` 0.38, `go-runewidth` 0.0.24 with fresher Unicode width tables, `go-toml` 2.3.1, `locafero` 0.12.0 — direct dependencies were already current); tool pins bumped to golangci-lint 2.12.2, lefthook 2.1.9 (**v2 module path** `github.com/evilmartians/lefthook/v2` — install commands updated; run `lefthook install` once after syncing), goimports 0.45.0, yq 4.53.3, syft 1.45.1, and Task 3.51.1 in CI.
 - **BREAKING — `pkg/checkmate` public API**: The exported `MockPrinter.Calls` field is replaced by the thread-safe `AllCalls()` accessor, and the unused `Theme.CategoryWidth`/`Theme.CategoryChar` fields are removed. `Theme.SummaryChar` is now actually applied to the summary-box border.
 - **`pkg/checkmate` honors explicit themes on non-TTY writers**: A theme passed via `WithTheme` is no longer silently replaced by `MinimalTheme` when the writer is not a terminal; `ForceColors` now only retains a *default* theme and is documented as not forcing ANSI emission (color output is decided by the renderer for the writer).
 - **The 30-line command rule is now a failing gate**: `run*` functions in `cmd/` pass at ≤30 lines, warn at 31–35, and fail `task check` above 35 (previously only an advisory warning at 80 lines per file); `ckeletin:allow-custom-command` markers without a justification also fail. ADR-001 documents the enforced contract; downstream projects inherit it via framework sync.

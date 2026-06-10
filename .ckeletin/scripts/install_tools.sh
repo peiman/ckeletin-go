@@ -71,7 +71,7 @@ install_tool "yq" "github.com/mikefarah/yq/v4@$(tool_version YQ)"  # mikefarah/y
 if ! command_exists "lefthook"; then
     echo "📦 Installing lefthook (optional)..."
     # Capture output so go install's real exit status isn't masked by grep
-    if output=$(go install "github.com/evilmartians/lefthook@$(tool_version LEFTHOOK)" 2>&1); then
+    if output=$(go install "github.com/evilmartians/lefthook/v2@$(tool_version LEFTHOOK)" 2>&1); then
         echo "✅ lefthook installed"
     else
         echo "$output" | grep -v "^go: downloading" >&2 || true
