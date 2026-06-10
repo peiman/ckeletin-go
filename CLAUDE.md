@@ -6,7 +6,7 @@
 
 1. **TDD: write tests FIRST, commit together** — Always write failing tests before implementation code. Test + implementation go in one atomic commit. Never commit tests without the code that makes them pass, or code without its tests
 2. **`task check` before every commit** — Non-negotiable, runs all quality checks
-3. **Commands ≤30 lines** — `cmd/*.go` files wire things together; logic goes in `internal/`
+3. **Run functions ≤30 lines** (31–35 tolerated, >35 fails the gate) — `cmd/*.go` files wire things together; logic goes in `internal/`
 4. **Use `config.Key*` constants** — Never hardcode config strings; run `task generate:config:key-constants` after registry changes
 5. **Never reduce test coverage** — 85% minimum overall, use `testify/assert`
 6. **Check licenses after `go get`** — Run `task check:license:source` immediately

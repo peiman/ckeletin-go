@@ -16,11 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **BREAKING — `pkg/checkmate` public API**: The exported `MockPrinter.Calls` field is replaced by the thread-safe `AllCalls()` accessor, and the unused `Theme.CategoryWidth`/`Theme.CategoryChar` fields are removed. `Theme.SummaryChar` is now actually applied to the summary-box border.
+- **`pkg/checkmate` honors explicit themes on non-TTY writers**: A theme passed via `WithTheme` is no longer silently replaced by `MinimalTheme` when the writer is not a terminal; `ForceColors` now only retains a *default* theme and is documented as not forcing ANSI emission (color output is decided by the renderer for the writer).
 - **The 30-line command rule is now a failing gate**: `run*` functions in `cmd/` pass at ≤30 lines, warn at 31–35, and fail `task check` above 35 (previously only an advisory warning at 80 lines per file); `ckeletin:allow-custom-command` markers without a justification also fail. ADR-001 documents the enforced contract; downstream projects inherit it via framework sync.
 
 ### Fixed
 
-- **`config validate` runs semantic per-option validation**: Invalid values — e.g. a bad log level, color, or output format — now fail validation; previously this step was skipped entirely, so such configs passed.
+- **JSON output mode keeps the audit log alive**: `--output json` previously disabled zerolog globally, silencing the audit log file along with stderr — contradicting the documented contract and dropping the shadow logs cited as CKSPEC-OUT-004 evidence. Only the console writer is disabled now; the audit file receives all entries.
+- **`config validate` runs semantic per-option validation**: Invalid values — e.g. a bad log level, color, or output format — now fail validation; previously this step was skipped entirely, so such configs passed. Errors caused by registry defaults (not present in the user's file) are labeled as such.
+- **`docs config` propagates write errors**: Generators previously discarded write failures, so a truncated artifact (disk full, I/O error) could be reported as success — including a `success` JSON envelope. Write errors now fail the command.
+- **`dev doctor` reads the minimum Go version from `.go-version`**: The hardcoded minimum had drifted behind the project requirement, green-lighting toolchains that could not build the module.
+- **Progress UI failures are no longer silent**: If the interactive renderer cannot start (e.g. no TTY), the handler logs the error and resets instead of permanently swallowing all subsequent progress events.
 - **`completion` help shows the actual binary name**: Shell examples previously rendered with an empty binary name because the help text was captured before the name was injected.
 - **`docs config` YAML output is deterministic**: Group keys are sorted instead of relying on Go map iteration order, so regenerated documentation is byte-stable.
 - **`pkg/checkmate` rendering no longer panics**: Negative padding from long summary titles and out-of-range progress percentages are clamped, failure-icon alignment uses visible width, and `New(WithTheme(nil))` and zero-value printers are safe.

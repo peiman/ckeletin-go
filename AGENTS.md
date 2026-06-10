@@ -184,7 +184,7 @@ Use `log.Error()` only for unrecoverable failures where no error can be returned
 
 Every command supports `--output json` for machine-readable output. When active:
 - Stdout emits exactly one JSON envelope
-- Stderr is silenced (zerolog disabled)
+- Stderr is silenced (console log writer disabled)
 - Audit log file continues unchanged
 
 **JSON envelope structure:**
