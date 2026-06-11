@@ -8,14 +8,25 @@
 
 set -eo pipefail
 
-# Source standard output functions (only for check mode)
+# Source standard output functions and the scanner-exclusion SSOT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/check-output.sh
+source "${SCRIPT_DIR}/lib/check-output.sh"
 
 MODE="${1:-fix}"
 shift || true
 FILES=("$@")
 if [ ${#FILES[@]} -eq 0 ]; then
-    FILES=(".")
+    # goimports/gofmt given "." descend into EVERYTHING, including other
+    # worktrees' checkouts under .claude/worktrees/ — enumerate the tree
+    # ourselves with the shared exclusions instead
+    while IFS= read -r f; do
+        FILES+=("$f")
+    done < <(ckeletin_go_files .)
+    if [ ${#FILES[@]} -eq 0 ]; then
+        echo "No Go files to format"
+        exit 0
+    fi
 fi
 
 format_files() {
@@ -24,9 +35,6 @@ format_files() {
 }
 
 check_files() {
-    # shellcheck source=lib/check-output.sh
-    source "${SCRIPT_DIR}/lib/check-output.sh"
-
     check_header "Checking code formatting"
 
     # A missing formatter must fail the gate loudly — swallowing it would

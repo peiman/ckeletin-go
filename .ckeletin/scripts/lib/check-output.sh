@@ -135,3 +135,40 @@ run_check() {
     local exit_code=$?
     return $exit_code
 }
+
+# ─────────────────────────────────────────────────────────────────────
+# Scanner exclusions (SSOT)
+#
+# Directories that file-walking checks must never descend into.
+# Claude Code's worktree feature creates full nested module checkouts
+# under .claude/worktrees/; stale copies there break tree-walking
+# scanners — and a scanner that errors on code it cannot build may
+# silently SKIP it, degrading coverage behind a green summary.
+#
+# Mirrored (static configs cannot read this list):
+#   - .go-arch-lint.yml excludeFiles has a /\.claude/.* entry
+#   - semgrep is covered via .gitignore (.claude/* is ignored); no
+#     .semgrepignore on purpose — creating one would REPLACE semgrep's
+#     built-in default ignores and lose more than it adds
+# The contract for all of them is pinned by
+# test/integration/scanner_exclusion_test.go.
+CKELETIN_SCAN_EXCLUDED_DIRS=(
+    ".claude/worktrees"
+)
+
+# ckeletin_go_files: print Go files under a root (default .), pruning
+# CKELETIN_SCAN_EXCLUDED_DIRS and any directory that carries its own
+# go.mod (a nested module — e.g. another worktree's checkout — is never
+# part of this module's scan surface).
+ckeletin_go_files() {
+    local root="${1:-.}"
+    local prunes=()
+    local d
+    for d in "${CKELETIN_SCAN_EXCLUDED_DIRS[@]}"; do
+        prunes+=(-path "${root}/${d}" -prune -o)
+    done
+    while IFS= read -r d; do
+        prunes+=(-path "$d" -prune -o)
+    done < <(find "$root" -mindepth 2 -name go.mod -exec dirname {} \; 2>/dev/null)
+    find "$root" "${prunes[@]}" -type f -name '*.go' -print 2>/dev/null
+}

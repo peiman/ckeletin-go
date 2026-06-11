@@ -44,6 +44,9 @@ excludeFiles:
   - /test/.*
   - /main\.go$
   - /main_test\.go$
+  # Claude Code worktrees are nested module checkouts, never part of this
+  # module's architecture (scanner-exclusion SSOT: .ckeletin/scripts/lib/check-output.sh)
+  - /\.claude/.*
 
 components:
   # -------------------------------------------------------------------------
