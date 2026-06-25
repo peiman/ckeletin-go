@@ -107,3 +107,24 @@ if [ -f ".go-arch-lint.yml" ]; then
         echo "   to prevent 'not attached to any component' errors."
     fi
 fi
+
+# Migration 5: Exclude Claude Code worktrees from go-arch-lint
+# When: .go-arch-lint.yml has an excludeFiles list but no .claude entry.
+# Claude Code creates nested module checkouts under .claude/worktrees/;
+# without the exclusion, stale copies there fail validate:layering with
+# "not attached to any component" (scanner-exclusion SSOT:
+# .ckeletin/scripts/lib/check-output.sh).
+if [ -f ".go-arch-lint.yml" ] \
+    && grep -q "^excludeFiles:" .go-arch-lint.yml \
+    && ! grep -q '\\.claude' .go-arch-lint.yml; then
+    echo "   ✓ Excluding .claude/ worktrees from .go-arch-lint.yml"
+    tmpfile=$(mktemp)
+    awk '
+    { print }
+    /^excludeFiles:/ {
+        print "  # Claude Code worktrees are nested module checkouts, not part of the"
+        print "  # module architecture (scanner-exclusion SSOT: .ckeletin/scripts/lib/check-output.sh)"
+        print "  - /\\.claude/.*"
+    }
+    ' .go-arch-lint.yml > "$tmpfile" && mv "$tmpfile" .go-arch-lint.yml
+fi

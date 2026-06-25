@@ -382,7 +382,13 @@ func TestScaffoldInit(t *testing.T) {
 		t.Log("Running: task check")
 		cmd := exec.Command("task", "check")
 		cmd.Dir = tmpDir
-		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1")
+		// Isolated lint cache: golangci-lint (v2.12) replays cached
+		// diagnostics for identical file content analyzed at a different
+		// path, bypassing nolint processing — the user-level cache
+		// poisoned by the repo's own lint runs makes the scaffolded
+		// project's lint fail with phantom gosec findings.
+		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1",
+			"GOLANGCI_LINT_CACHE="+filepath.Join(tmpDir, ".golangci-cache"))
 		output, err := cmd.CombinedOutput()
 
 		assert.NoError(t, err,
@@ -763,7 +769,9 @@ func TestFrameworkUpdate(t *testing.T) {
 		t.Log("Running: task check")
 		cmd := exec.Command("task", "check")
 		cmd.Dir = tmpDir
-		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1")
+		// Isolated lint cache — see the matching comment in TestScaffoldInit.
+		cmd.Env = append(os.Environ(), "CI=true", "SKIP_SECRET_SCAN=1",
+			"GOLANGCI_LINT_CACHE="+filepath.Join(tmpDir, ".golangci-cache"))
 		output, err := cmd.CombinedOutput()
 
 		assert.NoError(t, err,
