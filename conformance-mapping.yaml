@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.8.0"
+spec_version: "0.9.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -190,7 +190,7 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 40 requirement IDs are present in
+      task conform validates all 41 requirement IDs are present in
       conformance-mapping.yaml before running checks. Missing IDs
       cause the generator to fail with a non-zero exit code. The count is
       machine-verified by the ENF-008 drift guard, not hand-maintained.
@@ -274,12 +274,20 @@ requirements:
       .github/workflows/ci.yml defines a CKSPEC Conformance job that
       runs task conform; the release job declares
       needs: [test-matrix, build, conformance], so no release can
-      publish while conformance fails. A scheduled run opens a
-      deduplicated drift issue. Verified end-to-end via
-      workflow_dispatch with the conformance job green.
+      publish while conformance fails. The gate declares its SUBJECT
+      (CKSPEC-ENF-009 v0.9.0): conform.sh runs the full check in the
+      ckeletin-go reference repo, but in a derived project (go.mod module
+      is not the reference) it announces "subject: derived project ... no
+      implementation-conformance to verify ... no-op by design" and exits 0
+      — so an inherited gate neither blocks the derived project's release
+      nor silently passes as proven conformance. A scheduled run opens a
+      deduplicated drift issue. Verified end-to-end via workflow_dispatch
+      with the conformance job green, and by the subject-gate no-op subtest
+      in test/integration/scaffold_init_test.go.
     checks:
       - "grep -q 'CKSPEC Conformance' .github/workflows/ci.yml"
       - "grep -qE 'needs:.*conformance' .github/workflows/ci.yml"
+      - "grep -q 'subject: derived project' .ckeletin/scripts/conform.sh"
     violation_tests: []
     violation_evidence: >
       Enforcement is CI-structural — a job dependency in the release
@@ -428,14 +436,23 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      JSONEnvelope struct in .ckeletin/pkg/output/json.go with Status,
-      Command, Data, Error fields. JSONResponder interface for custom
-      payloads. Verified by unit tests, not a targeted enforcement check.
+      JSONEnvelope struct in .ckeletin/pkg/output/json.go emits the TOTAL
+      envelope (CKSPEC-OUT-003 v0.9.0): all four keys — status, command,
+      data, error — carry no `omitempty`, so every key is present in every
+      envelope and an absent value (data on error, error on success) is
+      emitted as JSON null rather than omitted. JSONResponder interface for
+      custom payloads. Verified by unit tests. (The error object's optional
+      code field is the deferred structured-error shape called out in the
+      OUT-003 spec notes — out of scope for the total top-level envelope.)
     checks:
       - "grep -rq 'type JSONEnvelope' .ckeletin/pkg/output"
+      - |-
+        ! grep -qE 'json:"(status|command|data|error)[^"]*,omitempty"' .ckeletin/pkg/output/json.go
     violation_tests: []
     violation_evidence: >
-      Removing the JSONEnvelope struct fails the grep check.
+      Removing the JSONEnvelope struct fails the first grep check; adding
+      `omitempty` to any of the four envelope keys (which would drop a key
+      when absent instead of emitting null) fails the second.
 
   CKSPEC-OUT-004:
     title: "Shadow logging"
@@ -622,6 +639,43 @@ requirements:
       - "grep -q 'MustAddToRoot(catalogCmd)' cmd/catalog.go"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_AGENT006_CatalogCommandRemoved"
+
+  CKSPEC-AGENT-007:
+    title: "Scaffold artifact ownership boundary"
+    status: met
+    enforcement_level: script
+    evidence: >
+      A project scaffolded from ckeletin-go never inherits ckeletin-go's own
+      conformance truth. `task init` runs removeFrameworkOnlyArtifacts
+      (.ckeletin/scripts/scaffold/helpers.go), which deletes the
+      generated-evidence and upstream-only conformance artifacts that live
+      outside the framework area — conformance-mapping.yaml,
+      conformance-report.json, and test/conformance/ — so a derived project
+      carries neither go's generated evidence nor its reference-only
+      conformance prose (delete over stamp: a stale inherited report is worse
+      than its absence). The framework area (.ckeletin/) is kept wholesale and
+      replaced on update, with its upstream-only gate guarded INERT rather than
+      stripped file-by-file: conform.sh is subject-gated (CKSPEC-ENF-009) — in
+      a derived project (go.mod module is not the ckeletin-go reference) it
+      declares its subject and exits 0 instead of hard-failing, so an inherited
+      gate never blocks the derived project's release. The strip and the
+      subject-gate no-op are verified end-to-end by
+      test/integration/scaffold_init_test.go (TestScaffoldInit).
+    checks:
+      - "grep -q 'removeFrameworkOnlyArtifacts' .ckeletin/scripts/scaffold/main.go"
+      - "grep -q 'conformance-mapping.yaml' .ckeletin/scripts/scaffold/helpers.go"
+      - "grep -q 'subject: derived project' .ckeletin/scripts/conform.sh"
+    violation_tests: []
+    violation_evidence: >
+      Each check guards a distinct part of the mechanism. Removing the
+      removeFrameworkOnlyArtifacts call from scaffold/main.go drops the strip
+      entirely — check 1 (the main.go call-site grep) fails. Removing
+      conformance-mapping.yaml from the artifact list in helpers.go makes init
+      leak go's evidence into a derived project — check 2 (the helpers.go
+      artifact grep) fails. Removing the subject-gate from conform.sh makes the
+      inherited gate hard-fail in a derived project and block its release —
+      check 3 fails, and TestScaffoldInit's "conformance gate subject-gated"
+      subtest fails.
 
   # ═══════════════════════════════════════════════════════════════
   # Changelog (CKSPEC-CL-001 through CKSPEC-CL-007)
