@@ -343,6 +343,26 @@ func TestScaffoldInit(t *testing.T) {
 			"binary output should contain expected name")
 	})
 
+	// Verify: the conformance gate is subject-gated in a derived project
+	// (CKSPEC-AGENT-007 / CKSPEC-ENF-009). task init strips the conformance
+	// mapping/report and changes the module, so `task conform` MUST no-op
+	// (exit 0) and declare its subject — never hard-fail and block the derived
+	// project's own release.
+	t.Run("conformance gate subject-gated (no-op in derived project)", func(t *testing.T) {
+		if useTaskFallback {
+			t.Skip("task command not available")
+		}
+		t.Log("Running: task conform")
+		cmd := exec.Command("task", "conform")
+		cmd.Dir = tmpDir
+		output, err := cmd.CombinedOutput()
+		require.NoError(t, err,
+			"task conform must no-op (exit 0) in a derived project, not hard-fail\nOutput:\n%s",
+			string(output))
+		assert.Contains(t, string(output), "subject: derived project",
+			"conform should declare its subject in a derived project")
+	})
+
 	// Run: task check (the real user workflow — everything should pass)
 	// This catches issues like #72 (binary name in check scripts), #73 (arch-lint
 	// stale references), #74 (validator too strict). Skipped when task is not

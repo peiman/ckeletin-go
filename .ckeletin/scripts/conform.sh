@@ -7,8 +7,28 @@
 #   CKSPEC-ENF-005 — mapping completeness (fail on unmapped requirements)
 #   CKSPEC-ENF-006 — violation test verification
 #   CKSPEC-ENF-007 — automatic feedback signals
+#   CKSPEC-AGENT-007 / CKSPEC-ENF-009 — subject-gated: no-op in a derived project
 
 set -euo pipefail
+
+# ── Subject gate (CKSPEC-AGENT-007 / CKSPEC-ENF-009) ────────────────────────
+# This gate verifies ckeletin-go's OWN implementation-conformance. A project
+# scaffolded from ckeletin-go is NOT the reference implementation — `task init`
+# strips its conformance mapping/report (CKSPEC-AGENT-007), so running the gate
+# there would assert nothing about that project. Per CKSPEC-AGENT-007 an
+# inherited upstream-only gate MUST be subject-gated and MUST NOT hard-fail or
+# block the derived project's release: it declares its subject and exits 0.
+# Detection is by module identity (robust to the mapping being present/absent),
+# mirroring ckeletin-rust's repository-identity gate.
+REFERENCE_MODULE="github.com/peiman/ckeletin-go"
+CURRENT_MODULE="$(awk '$1 == "module" { print $2; exit }' go.mod 2>/dev/null || true)"
+if [ "$CURRENT_MODULE" != "$REFERENCE_MODULE" ]; then
+    echo "ckeletin conformance gate — subject: derived project (${CURRENT_MODULE:-unknown})."
+    echo "  This repository is not the ckeletin-go reference implementation, so there is"
+    echo "  no implementation-conformance to verify here (CKSPEC-AGENT-007, CKSPEC-ENF-009)."
+    echo "  Gate is a no-op by design — not a failure — so it never blocks the release."
+    exit 0
+fi
 
 MAPPING_FILE="conformance-mapping.yaml"
 FAIL_FILE=$(mktemp)
