@@ -361,6 +361,10 @@ func TestScaffoldInit(t *testing.T) {
 			string(output))
 		assert.Contains(t, string(output), "subject: derived project",
 			"conform should declare its subject in a derived project")
+		assert.Contains(t, string(output), testModule,
+			"conform should name the derived module as the subject")
+		assert.NotContains(t, string(output), "ENF-005: PASS",
+			"the no-op gate must not fall through into the full conformance check")
 	})
 
 	// Run: task check (the real user workflow — everything should pass)

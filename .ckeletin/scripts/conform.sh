@@ -20,10 +20,28 @@ set -euo pipefail
 # block the derived project's release: it declares its subject and exits 0.
 # Detection is by module identity (robust to the mapping being present/absent),
 # mirroring ckeletin-rust's repository-identity gate.
+#
+# A missing/unreadable/module-less go.mod is NOT a derived project — it means the
+# gate cannot determine its subject (e.g. conform run from the wrong directory),
+# which is an error to surface, not a no-op to skip. Only a readable go.mod whose
+# module differs from the reference is a genuine derived project (always a Go
+# project, so its go.mod always exists). So "can't read the subject" hard-fails;
+# "the subject is a different module" no-ops. This keeps the failure that matters
+# (a reference run that skips real verification) from hiding behind the no-op.
 REFERENCE_MODULE="github.com/peiman/ckeletin-go"
-CURRENT_MODULE="$(awk '$1 == "module" { print $2; exit }' go.mod 2>/dev/null || true)"
+if [ ! -r go.mod ]; then
+    echo "FAILED — conform.sh: go.mod not found or unreadable in '$(pwd)'." >&2
+    echo "  Run conform from the project root; the gate cannot determine its subject" >&2
+    echo "  without go.mod and must not silently skip conformance." >&2
+    exit 1
+fi
+CURRENT_MODULE="$(awk '$1 == "module" { print $2; exit }' go.mod)"
+if [ -z "$CURRENT_MODULE" ]; then
+    echo "FAILED — conform.sh: no 'module' directive parsed from go.mod." >&2
+    exit 1
+fi
 if [ "$CURRENT_MODULE" != "$REFERENCE_MODULE" ]; then
-    echo "ckeletin conformance gate — subject: derived project (${CURRENT_MODULE:-unknown})."
+    echo "ckeletin conformance gate — subject: derived project (${CURRENT_MODULE})."
     echo "  This repository is not the ckeletin-go reference implementation, so there is"
     echo "  no implementation-conformance to verify here (CKSPEC-AGENT-007, CKSPEC-ENF-009)."
     echo "  Gate is a no-op by design — not a failure — so it never blocks the release."

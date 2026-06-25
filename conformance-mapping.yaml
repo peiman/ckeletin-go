@@ -442,8 +442,8 @@ requirements:
       envelope and an absent value (data on error, error on success) is
       emitted as JSON null rather than omitted. JSONResponder interface for
       custom payloads. Verified by unit tests. (The error object's optional
-      code field is the deferred structured-error shape — OUT-003 notes /
-      issue #40 — out of scope for the total top-level envelope.)
+      code field is the deferred structured-error shape called out in the
+      OUT-003 spec notes — out of scope for the total top-level envelope.)
     checks:
       - "grep -rq 'type JSONEnvelope' .ckeletin/pkg/output"
       - |-
@@ -667,13 +667,15 @@ requirements:
       - "grep -q 'subject: derived project' .ckeletin/scripts/conform.sh"
     violation_tests: []
     violation_evidence: >
-      Removing the conformance artifacts from removeFrameworkOnlyArtifacts
-      (helpers.go) makes init leak go's conformance-mapping.yaml /
-      conformance-report.json into a derived project — the first two checks
-      fail. Removing the subject-gate from conform.sh makes the inherited gate
-      hard-fail in a derived project and block its release — the third check
-      fails, and TestScaffoldInit's "conformance gate subject-gated" subtest
-      fails.
+      Each check guards a distinct part of the mechanism. Removing the
+      removeFrameworkOnlyArtifacts call from scaffold/main.go drops the strip
+      entirely — check 1 (the main.go call-site grep) fails. Removing
+      conformance-mapping.yaml from the artifact list in helpers.go makes init
+      leak go's evidence into a derived project — check 2 (the helpers.go
+      artifact grep) fails. Removing the subject-gate from conform.sh makes the
+      inherited gate hard-fail in a derived project and block its release —
+      check 3 fails, and TestScaffoldInit's "conformance gate subject-gated"
+      subtest fails.
 
   # ═══════════════════════════════════════════════════════════════
   # Changelog (CKSPEC-CL-001 through CKSPEC-CL-007)
