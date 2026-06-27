@@ -283,7 +283,7 @@
         "test -f .ckeletin/scripts/conform.sh"
       ],
       "enforcement_level": "script",
-      "evidence": "task conform validates all 41 requirement IDs are present in conformance-mapping.yaml before running checks. Missing IDs cause the generator to fail with a non-zero exit code. The count is machine-verified by the ENF-008 drift guard, not hand-maintained.\n",
+      "evidence": "task conform validates all 42 requirement IDs are present in conformance-mapping.yaml before running checks. Missing IDs cause the generator to fail with a non-zero exit code. The count is machine-verified by the ENF-008 drift guard, not hand-maintained.\n",
       "status": "met",
       "violation_evidence": null,
       "violation_tests": [
@@ -307,7 +307,7 @@
         "grep -q 'Feedback signals' .ckeletin/scripts/conform.sh"
       ],
       "enforcement_level": "script",
-      "evidence": "task conform automatically reports feedback signals when checkable requirements lack violation tests or enforcement level is above honor-system without proof. Signals are structural, not volitional.\n",
+      "evidence": "task conform automatically reports feedback signals when a requirement's enforcement_level is above honor-system without a violation test or violation evidence. Signals are structural, not volitional.\n",
       "status": "met",
       "violation_evidence": "The violation test verifies the conform script contains feedback signal logic (string presence), not that it produces correct output \u2014 running conform.sh from within the conformance test suite causes infinite recursion. Behavioral proof: task conform output shows feedback signals when enforcement claims lack violation tests. File: .ckeletin/scripts/conform.sh (FEEDBACK_FILE logic). File: test/conformance/violation_test.go (TestViolation_ENF007).\n",
       "violation_tests": []
@@ -348,6 +348,18 @@
       "violation_tests": [
         "test/conformance/violation_test.go::TestViolation_ConformReport_OutOfSyncRejected"
       ]
+    },
+    "CKSPEC-ENF-011": {
+      "checks": [
+        "grep -q '.claude/worktrees' .ckeletin/scripts/lib/check-output.sh",
+        "grep -qi 'worktree' .go-arch-lint.yml",
+        "test -f test/integration/scanner_exclusion_test.go"
+      ],
+      "enforcement_level": "test",
+      "evidence": "ckeletin-go's tree-walking scanners bound their traversal to the project's own sources and do not descend into nested repository or worktree checkouts. The shared exclusion lives in .ckeletin/scripts/lib/check-output.sh (skips .claude/worktrees/ and any directory carrying its own go.mod \u2014 a nested module is never part of this module's walk); the formatter (format-go.sh) and the architecture linter (.go-arch-lint.yml) apply the same bound. Surfaced by #123 (reported by daana-cli): a scanner descended into Claude Code's worktree directory and broke on stale nested module checkouts. Verified by test/integration/scanner_exclusion_test.go (TestScannersExcludeClaudeWorktrees): format check, format fix, layering validation, and the SAST scan each ignore a stale worktree.\n",
+      "status": "met",
+      "violation_evidence": "Removing the .claude/worktrees exclusion from check-output.sh (or the arch-lint config) lets the scanners descend into nested worktree checkouts again \u2014 the corresponding grep check fails, and TestScannersExcludeClaudeWorktrees fails (a stale worktree's unbuildable code is walked and flagged, or breaks the scan).\n",
+      "violation_tests": []
     },
     "CKSPEC-OUT-001": {
       "checks": [
@@ -461,12 +473,12 @@
       "violation_tests": []
     }
   },
-  "spec_version": "0.9.0",
+  "spec_version": "0.10.0",
   "summary": {
     "deferred": 0,
-    "met": 41,
+    "met": 42,
     "partial": 0,
     "passed": true,
-    "total": 41
+    "total": 42
   }
 }

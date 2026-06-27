@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.9.0"
+spec_version: "0.10.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -190,7 +190,7 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 41 requirement IDs are present in
+      task conform validates all 42 requirement IDs are present in
       conformance-mapping.yaml before running checks. Missing IDs
       cause the generator to fail with a non-zero exit code. The count is
       machine-verified by the ENF-008 drift guard, not hand-maintained.
@@ -226,10 +226,10 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform automatically reports feedback signals when
-      checkable requirements lack violation tests or enforcement
-      level is above honor-system without proof. Signals are
-      structural, not volitional.
+      task conform automatically reports feedback signals when a
+      requirement's enforcement_level is above honor-system without a
+      violation test or violation evidence. Signals are structural, not
+      volitional.
     checks:
       - "grep -q 'Feedback signals' .ckeletin/scripts/conform.sh"
     violation_tests: []
@@ -314,6 +314,35 @@ requirements:
       - "grep -q 'out of sync' .ckeletin/scripts/conform.sh"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_ConformReport_OutOfSyncRejected"
+
+  CKSPEC-ENF-011:
+    title: "Tooling robustness to nested checkouts"
+    status: met
+    enforcement_level: test
+    evidence: >
+      ckeletin-go's tree-walking scanners bound their traversal to the
+      project's own sources and do not descend into nested repository or
+      worktree checkouts. The shared exclusion lives in
+      .ckeletin/scripts/lib/check-output.sh (skips .claude/worktrees/ and any
+      directory carrying its own go.mod — a nested module is never part of
+      this module's walk); the formatter (format-go.sh) and the architecture
+      linter (.go-arch-lint.yml) apply the same bound. Surfaced by #123
+      (reported by daana-cli): a scanner descended into Claude Code's worktree
+      directory and broke on stale nested module checkouts. Verified by
+      test/integration/scanner_exclusion_test.go
+      (TestScannersExcludeClaudeWorktrees): format check, format fix, layering
+      validation, and the SAST scan each ignore a stale worktree.
+    checks:
+      - "grep -q '.claude/worktrees' .ckeletin/scripts/lib/check-output.sh"
+      - "grep -qi 'worktree' .go-arch-lint.yml"
+      - "test -f test/integration/scanner_exclusion_test.go"
+    violation_tests: []
+    violation_evidence: >
+      Removing the .claude/worktrees exclusion from check-output.sh (or the
+      arch-lint config) lets the scanners descend into nested worktree
+      checkouts again — the corresponding grep check fails, and
+      TestScannersExcludeClaudeWorktrees fails (a stale worktree's unbuildable
+      code is walked and flagged, or breaks the scan).
 
   # ═══════════════════════════════════════════════════════════════
   # Testing (CKSPEC-TEST-001 through CKSPEC-TEST-004)
