@@ -325,16 +325,18 @@ requirements:
       worktree checkouts. The shared exclusion lives in
       .ckeletin/scripts/lib/check-output.sh (skips .claude/worktrees/ and any
       directory carrying its own go.mod — a nested module is never part of
-      this module's walk); the formatter (format-go.sh) and the architecture
-      linter (.go-arch-lint.yml) apply the same bound. Surfaced by #123
-      (reported by daana-cli): a scanner descended into Claude Code's worktree
-      directory and broke on stale nested module checkouts. Verified by
-      test/integration/scanner_exclusion_test.go
+      this module's walk); the formatter (format-go.sh) shares that exclusion,
+      and the architecture linter (.go-arch-lint.yml) excludes .claude/ as well.
+      Surfaced by #123 (reported by daana-cli): a scanner descended into Claude
+      Code's worktree directory and broke on stale nested module checkouts.
+      Verified by test/integration/scanner_exclusion_test.go
       (TestScannersExcludeClaudeWorktrees): format check, format fix, layering
-      validation, and the SAST scan each ignore a stale worktree.
+      validation, and — in CI, where semgrep is present — the SAST scan each
+      ignore a stale worktree.
     checks:
       - "grep -q '.claude/worktrees' .ckeletin/scripts/lib/check-output.sh"
-      - "grep -qi 'worktree' .go-arch-lint.yml"
+      - |-
+        grep -q '\.claude' .go-arch-lint.yml
       - "test -f test/integration/scanner_exclusion_test.go"
     violation_tests: []
     violation_evidence: >
