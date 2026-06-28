@@ -303,10 +303,20 @@ for req_id in $REQ_IDS; do
             echo "$req_id: claims $enforcement but has no violation test or evidence" >> "$FEEDBACK_FILE"
         elif [[ -n "$vtests" ]]; then
             echo "$vtests" | while IFS= read -r vt; do
-                # Strip test function reference (file.go::TestFunc -> file.go)
+                [[ -z "$vt" ]] && continue
+                # ENF-008 (anchor validity): an anchor MUST resolve, not merely
+                # be present. A file::symbol violation_test must name a file that
+                # exists AND (when a symbol is given) a symbol defined in it. A
+                # dangling anchor — e.g. a renamed test still cited by its old
+                # name — is no better than no anchor, so it HARD-FAILS the
+                # generator rather than emitting a stale claim.
                 vt_file="${vt%%::*}"
+                vt_symbol="${vt#*::}"
                 if [[ -n "$vt_file" && ! -f "$vt_file" ]]; then
-                    echo "$req_id: violation test file not found: $vt_file" >> "$FEEDBACK_FILE"
+                    echo "$req_id: dangling anchor — violation test file not found: $vt_file (ENF-008)" >> "$FAIL_FILE"
+                elif [[ "$vt_symbol" != "$vt" && -n "$vt_symbol" ]] && \
+                     ! grep -qE "func[[:space:]]+${vt_symbol}\b" "$vt_file"; then
+                    echo "$req_id: dangling anchor — symbol '$vt_symbol' not found in $vt_file (ENF-008)" >> "$FAIL_FILE"
                 fi
             done
         fi

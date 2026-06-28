@@ -28,9 +28,13 @@ type JSONEnvelope struct {
 }
 
 // JSONError represents a structured error in the JSON envelope.
+// Per CKSPEC-OUT-003 the error object is a TOTAL schema {code, message}: both
+// keys are always present. Code is a *string so an absent classification
+// serializes as JSON null (present-and-null), never omitted — `omitempty` would
+// drop the key and break the fixed-key-set contract.
 type JSONError struct {
-	Message string `json:"message"`
-	Code    string `json:"code,omitempty"` // optional error classification
+	Message string  `json:"message"`
+	Code    *string `json:"code"` // error classification; nil → JSON null
 }
 
 // JSONResponder can be implemented by data types passed to RenderSuccess
