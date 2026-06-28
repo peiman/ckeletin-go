@@ -72,9 +72,12 @@ func TestRenderJSON_ErrorCodeNullWhenAbsent(t *testing.T) {
 	err := RenderJSON(&buf, env)
 	require.NoError(t, err)
 
-	// The raw JSON MUST contain "code":null — present, not omitted.
+	// The error object is total {code, message}: both keys always present,
+	// code emitted as null (present, never omitted) when there's no code.
 	assert.Contains(t, buf.String(), `"code": null`,
 		"error object must emit code as present-and-null, never omit it")
+	assert.Contains(t, buf.String(), `"message": "boom"`,
+		"error object must always carry message")
 }
 
 func TestRenderJSON_NilData(t *testing.T) {

@@ -263,12 +263,15 @@ requirements:
       - "grep -q 'dangling anchor' .ckeletin/scripts/conform.sh"
     violation_tests: []
     violation_evidence: >
-      The anchoring gate is conform.sh itself; a violation test that
-      ran conform.sh from inside the conformance suite would recurse
-      (same constraint as ENF-007). Behavioral proof: stripping a met
-      requirement's checks and violation_evidence makes task conform fail with
-      "met but unanchored"; citing a renamed or nonexistent test symbol makes
-      it fail with "dangling anchor — symbol ... not found".
+      The anchoring gate is conform.sh itself, so it is not cited as an
+      in-mapping violation_test (that would re-run the generator from inside
+      the suite — recursion). An external fixture test — run conform against a
+      mapping with a deliberately dangling anchor, outside the suite — is the
+      regression guard and is tracked as a follow-up. Behavioral proof
+      (verified): stripping a met requirement's checks and violation_evidence
+      makes task conform fail with "met but unanchored"; citing a renamed or
+      nonexistent test symbol makes it fail with "dangling anchor ... not
+      found"; a `file::` anchor with an empty symbol fails too.
       File: .ckeletin/scripts/conform.sh (ENF-008 anchoring gate + the
       automated-vs-analysis tally + the anchor-resolution check).
 

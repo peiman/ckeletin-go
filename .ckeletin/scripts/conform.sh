@@ -314,8 +314,14 @@ for req_id in $REQ_IDS; do
                 vt_symbol="${vt#*::}"
                 if [[ -n "$vt_file" && ! -f "$vt_file" ]]; then
                     echo "$req_id: dangling anchor — violation test file not found: $vt_file (ENF-008)" >> "$FAIL_FILE"
-                elif [[ "$vt_symbol" != "$vt" && -n "$vt_symbol" ]] && \
-                     ! grep -qE "func[[:space:]]+${vt_symbol}\b" "$vt_file"; then
+                elif [[ "$vt" == *::* && -z "$vt_symbol" ]]; then
+                    # A '::' was written but no symbol followed — a garbled anchor
+                    # must not pass as file-only.
+                    echo "$req_id: dangling anchor — empty symbol after '::' in '$vt' (ENF-008)" >> "$FAIL_FILE"
+                elif [[ -n "$vt_symbol" && "$vt_symbol" != "$vt" ]] && \
+                     ! grep -qE "func[[:space:]]+(\([^)]*\)[[:space:]]+)?${vt_symbol}\b" "$vt_file"; then
+                    # The optional (receiver) group also resolves method-style
+                    # tests, func (s *Suite) TestX, not just free functions.
                     echo "$req_id: dangling anchor — symbol '$vt_symbol' not found in $vt_file (ENF-008)" >> "$FAIL_FILE"
                 fi
             done
