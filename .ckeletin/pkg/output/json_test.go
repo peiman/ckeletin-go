@@ -34,11 +34,12 @@ func TestRenderJSON_Success(t *testing.T) {
 
 func TestRenderJSON_Error(t *testing.T) {
 	var buf bytes.Buffer
+	code := "CONFIG_VALIDATION"
 	env := JSONEnvelope{
 		Status:  "error",
 		Command: "ping",
 		Data:    nil,
-		Error:   &JSONError{Message: "invalid color", Code: "CONFIG_VALIDATION"},
+		Error:   &JSONError{Message: "invalid color", Code: &code},
 	}
 
 	err := RenderJSON(&buf, env)
@@ -52,7 +53,31 @@ func TestRenderJSON_Error(t *testing.T) {
 	assert.Nil(t, decoded.Data)
 	assert.NotNil(t, decoded.Error)
 	assert.Equal(t, "invalid color", decoded.Error.Message)
-	assert.Equal(t, "CONFIG_VALIDATION", decoded.Error.Code)
+	require.NotNil(t, decoded.Error.Code)
+	assert.Equal(t, "CONFIG_VALIDATION", *decoded.Error.Code)
+}
+
+// TestRenderJSON_ErrorCodeNullWhenAbsent locks the CKSPEC-OUT-003 total
+// error-object contract (#40): an error with no classification MUST still emit
+// the `code` key as JSON null — never omit it.
+func TestRenderJSON_ErrorCodeNullWhenAbsent(t *testing.T) {
+	var buf bytes.Buffer
+	env := JSONEnvelope{
+		Status:  "error",
+		Command: "ping",
+		Data:    nil,
+		Error:   &JSONError{Message: "boom"}, // no Code
+	}
+
+	err := RenderJSON(&buf, env)
+	require.NoError(t, err)
+
+	// The error object is total {code, message}: both keys always present,
+	// code emitted as null (present, never omitted) when there's no code.
+	assert.Contains(t, buf.String(), `"code": null`,
+		"error object must emit code as present-and-null, never omit it")
+	assert.Contains(t, buf.String(), `"message": "boom"`,
+		"error object must always carry message")
 }
 
 func TestRenderJSON_NilData(t *testing.T) {

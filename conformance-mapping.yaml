@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.10.0"
+spec_version: "0.11.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -250,21 +250,30 @@ requirements:
     evidence: >
       conform.sh fails if any requirement claimed met lacks both an
       automated check and a violation_evidence anchor — no unanchored
-      met-claims. Met requirements are tallied as machine-anchored vs
-      analysis-with-evidence and the split is printed. The same gate
-      also catches prose count drift ("all N requirement").
+      met-claims. Anchors must also RESOLVE, not merely be present (#15,
+      v0.11.0): a violation_test `file::symbol` anchor hard-fails when the file
+      is missing or the named symbol is not defined in it — a renamed/removed
+      test still cited by its old name is a dangling anchor and is rejected, so
+      a stale anchor can never pass as proof. Met requirements are tallied as
+      machine-anchored vs analysis-with-evidence and the split is printed. The
+      same gate also catches prose count drift ("all N requirement").
     checks:
       - "grep -q 'machine-anchored' .ckeletin/scripts/conform.sh"
       - "grep -q 'met but unanchored' .ckeletin/scripts/conform.sh"
+      - "grep -q 'dangling anchor' .ckeletin/scripts/conform.sh"
     violation_tests: []
     violation_evidence: >
-      The anchoring gate is conform.sh itself; a violation test that
-      ran conform.sh from inside the conformance suite would recurse
-      (same constraint as ENF-007). Behavioral proof: stripping a met
-      requirement's checks and violation_evidence makes task conform
-      fail with "met but unanchored".
+      The anchoring gate is conform.sh itself, so it is not cited as an
+      in-mapping violation_test (that would re-run the generator from inside
+      the suite — recursion). An external fixture test — run conform against a
+      mapping with a deliberately dangling anchor, outside the suite — is the
+      regression guard and is tracked as a follow-up. Behavioral proof
+      (verified): stripping a met requirement's checks and violation_evidence
+      makes task conform fail with "met but unanchored"; citing a renamed or
+      nonexistent test symbol makes it fail with "dangling anchor ... not
+      found"; a `file::` anchor with an empty symbol fails too.
       File: .ckeletin/scripts/conform.sh (ENF-008 anchoring gate + the
-      automated-vs-analysis tally).
+      automated-vs-analysis tally + the anchor-resolution check).
 
   CKSPEC-ENF-009:
     title: "Conformance gate on release"
@@ -468,22 +477,24 @@ requirements:
     enforcement_level: script
     evidence: >
       JSONEnvelope struct in .ckeletin/pkg/output/json.go emits the TOTAL
-      envelope (CKSPEC-OUT-003 v0.9.0): all four keys — status, command,
-      data, error — carry no `omitempty`, so every key is present in every
-      envelope and an absent value (data on error, error on success) is
-      emitted as JSON null rather than omitted. JSONResponder interface for
-      custom payloads. Verified by unit tests. (The error object's optional
-      code field is the deferred structured-error shape called out in the
-      OUT-003 spec notes — out of scope for the total top-level envelope.)
+      envelope: all four top-level keys — status, command, data, error — carry
+      no `omitempty`, so every key is present in every envelope and an absent
+      value (data on error, error on success) is emitted as JSON null rather
+      than omitted. The error object is itself total {code, message} (#40, v0.11.0):
+      JSONError.Code is a *string with `json:"code"` (no omitempty), so an error
+      with no classification still emits "code": null — present, never dropped.
+      JSONResponder interface for custom payloads. Verified by unit tests,
+      including TestRenderJSON_ErrorCodeNullWhenAbsent which asserts a
+      code-less error serializes "code": null.
     checks:
       - "grep -rq 'type JSONEnvelope' .ckeletin/pkg/output"
       - |-
-        ! grep -qE 'json:"(status|command|data|error)[^"]*,omitempty"' .ckeletin/pkg/output/json.go
+        ! grep -qE 'json:"(status|command|data|error|code)[^"]*,omitempty"' .ckeletin/pkg/output/json.go
     violation_tests: []
     violation_evidence: >
       Removing the JSONEnvelope struct fails the first grep check; adding
-      `omitempty` to any of the four envelope keys (which would drop a key
-      when absent instead of emitting null) fails the second.
+      `omitempty` to any of the four envelope keys or to JSONError.Code (which
+      would drop a key when absent instead of emitting null) fails the second.
 
   CKSPEC-OUT-004:
     title: "Shadow logging"
