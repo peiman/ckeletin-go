@@ -823,3 +823,49 @@ func TestViolation_AGENT002_ProviderInstructionCaught(t *testing.T) {
 	assert.NotEqual(t, 0, runAgainst(t, violated),
 		"the AGENT-002 check must catch a provider-specific instruction line")
 }
+
+// TestViolation_ENF008_AnchorResolution proves the ENF-008 anchor-resolution
+// gate flags a dangling violation_test anchor — the regression guard for #15
+// (issue #127). It exercises the real shell helper
+// .ckeletin/scripts/lib/anchor.sh::anchor_resolve against fixtures, so it tests
+// the actual gate logic (not a copy) and never invokes conform.sh — no
+// recursion. anchor_resolve appends to the same FAIL_FILE the "met but
+// unanchored" gate uses, which conform turns into a non-zero exit.
+func TestViolation_ENF008_AnchorResolution(t *testing.T) {
+	lib := filepath.Join(projectRoot(t), ".ckeletin", "scripts", "lib", "anchor.sh")
+	require.FileExists(t, lib)
+
+	dir := t.TempDir()
+	fixture := filepath.Join(dir, "fixture.go")
+	require.NoError(t, os.WriteFile(fixture,
+		[]byte("package x\nfunc TestReal(t *T) {}\nfunc (s *S) TestMethod(t *T) {}\n"), 0o644))
+
+	// run sources anchor.sh, calls anchor_resolve on the anchor, and returns
+	// what was recorded to the fail file (empty == resolved, no failure).
+	// Values are passed as bash positional args ($1/$2/$3), never interpolated
+	// into the script string — no shell-injection surface.
+	const script = `source "$1"; anchor_resolve "$2" "$3" REQ`
+	run := func(anchor string) string {
+		ff := filepath.Join(dir, "fail")
+		_ = os.Remove(ff)
+		out, err := exec.Command("bash", "-c", script, "_", lib, anchor, ff).CombinedOutput()
+		require.NoError(t, err, "anchor_resolve must not error: %s", out)
+		require.Empty(t, strings.TrimSpace(string(out)),
+			"anchor_resolve records to the fail file, not stdout")
+		b, _ := os.ReadFile(ff)
+		return string(b)
+	}
+
+	// Resolving anchors record nothing.
+	assert.Empty(t, run(fixture+"::TestReal"), "existing free function resolves")
+	assert.Empty(t, run(fixture+"::TestMethod"), "method-style test resolves")
+	assert.Empty(t, run(fixture), "bare existing file (no symbol) resolves")
+
+	// Dangling anchors are flagged as such — the regression the gate exists to catch.
+	assert.Contains(t, run(filepath.Join(dir, "missing.go")+"::TestReal"), "file not found",
+		"missing file must be flagged dangling")
+	assert.Contains(t, run(fixture+"::TestGone"), "not found",
+		"missing symbol must be flagged dangling")
+	assert.Contains(t, run(fixture+"::"), "empty symbol",
+		"empty symbol after :: must be flagged dangling")
+}

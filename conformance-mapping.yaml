@@ -254,26 +254,23 @@ requirements:
       v0.11.0): a violation_test `file::symbol` anchor hard-fails when the file
       is missing or the named symbol is not defined in it — a renamed/removed
       test still cited by its old name is a dangling anchor and is rejected, so
-      a stale anchor can never pass as proof. Met requirements are tallied as
+      a stale anchor can never pass as proof. The resolution logic is extracted
+      to .ckeletin/scripts/lib/anchor.sh (anchor_resolve) and unit-tested across
+      all branches by the violation_test below. Met requirements are tallied as
       machine-anchored vs analysis-with-evidence and the split is printed. The
       same gate also catches prose count drift ("all N requirement").
     checks:
       - "grep -q 'machine-anchored' .ckeletin/scripts/conform.sh"
       - "grep -q 'met but unanchored' .ckeletin/scripts/conform.sh"
-      - "grep -q 'dangling anchor' .ckeletin/scripts/conform.sh"
-    violation_tests: []
+      - "grep -q 'dangling anchor' .ckeletin/scripts/lib/anchor.sh"
+      - "grep -q 'anchor_resolve' .ckeletin/scripts/conform.sh"
+    violation_tests:
+      - "test/conformance/violation_test.go::TestViolation_ENF008_AnchorResolution"
     violation_evidence: >
-      The anchoring gate is conform.sh itself, so it is not cited as an
-      in-mapping violation_test (that would re-run the generator from inside
-      the suite — recursion). An external fixture test — run conform against a
-      mapping with a deliberately dangling anchor, outside the suite — is the
-      regression guard and is tracked as a follow-up. Behavioral proof
-      (verified): stripping a met requirement's checks and violation_evidence
-      makes task conform fail with "met but unanchored"; citing a renamed or
-      nonexistent test symbol makes it fail with "dangling anchor ... not
-      found"; a `file::` anchor with an empty symbol fails too.
-      File: .ckeletin/scripts/conform.sh (ENF-008 anchoring gate + the
-      automated-vs-analysis tally + the anchor-resolution check).
+      The presence/tally half: stripping a met requirement's checks and
+      violation_evidence makes task conform fail with "met but unanchored".
+      File: .ckeletin/scripts/conform.sh (anchoring gate + tally) +
+      .ckeletin/scripts/lib/anchor.sh (resolution).
 
   CKSPEC-ENF-009:
     title: "Conformance gate on release"
