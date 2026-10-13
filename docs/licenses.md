@@ -340,6 +340,19 @@ task check:license:source
 
 **Note:** The `go-licenses` tool only supports `--allowed_licenses` (not `--disallowed_types` simultaneously). Use the `LICENSE_ALLOWED` environment variable to customize the list of permitted licenses.
 
+### Skip a module go-licenses cannot classify
+
+`LICENSE_ALLOWED` matches license names. It does nothing for a module whose license file go-licenses cannot classify: the module never gets a name, and the source check fails with `Did not find license for library`. MIT-0 (`github.com/segmentio/asm`) is one case.
+
+List that module in `.license-ignore` at the repository root, one path per line. Blank lines and lines starting with `#` are comments. Text after the path is a comment too. Each path is an extra `--ignore` for `go-licenses check`. Dependencies of an ignored module are still checked. A module that is not listed still fails the check. Do not list a module to keep a license this policy denies.
+
+```
+# MIT-0. go-licenses reports "Did not find license".
+github.com/segmentio/asm MIT-0, pulled in by the MCP Go SDK
+```
+
+This repository has no `.license-ignore`. Add one in a derived project only for a module the tool cannot classify. `task ckeletin:update` does not overwrite it.
+
 **Make permanent:**
 Edit `.ckeletin/scripts/check-licenses-source.sh`:
 ```bash

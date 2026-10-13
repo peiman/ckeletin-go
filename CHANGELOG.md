@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`.license-ignore` for the source license check**: A module go-licenses cannot classify (for example MIT-0) never gets a license name, so `LICENSE_ALLOWED` cannot allow it. List its module path, one per line, in a repo-root `.license-ignore`. Each path is an extra `--ignore`. A module that is not listed still fails the check. This repository does not ship that file.
 - **`catalog` command (CKSPEC-AGENT-006)**: Emits the CLI's command surface — commands, flags, and globals — as machine-readable JSON derived from the live Cobra command tree, so agents discover capabilities without parsing `--help` text. Conformance published against spec v0.8.0 (40/40 requirements met).
 - **Complete `--version` output (CKSPEC-OUT-006)**: Now reports four fields — version, commit, build date, and working-tree state (clean/dirty/unknown) — and supports `--version --output json` (previously a latent `unknown command` error). Uninjected builds degrade to `unknown` instead of empty strings.
 - **Validators for numeric and constrained config options**: Positive-integer validation for the `app.log.sampling_*` and `app.log.file_max_*` options, plus validators for `app.log.color_enabled` and `app.docs.output_format`, catch invalid values at startup.
