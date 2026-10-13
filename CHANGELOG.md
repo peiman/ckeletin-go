@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Go toolchain bumped to 1.26.9**: `.go-version` and `go.mod` pick up the standard-library fixes through 1.26.9, including the reachable `net/http` advisories present on 1.26.4. CI installs this version from `.go-version`, so `task setup:latest` can build current tools such as grype.
+
 ### Changed
 
 - **Agent guides**: `AGENTS.md` is the only project guide. `CLAUDE.md` imports it and keeps only Claude Code behavior. `.cursorrules`, `.github/copilot-instructions.md`, and `.claude/rules/task-commands.md` point at `AGENTS.md` instead of restating the rules.

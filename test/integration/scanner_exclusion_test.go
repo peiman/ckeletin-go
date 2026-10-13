@@ -30,7 +30,7 @@ func plantStaleWorktree(t *testing.T, root string) string {
 	require.NoError(t, os.MkdirAll(filepath.Join(dir, "cmd"), 0o755))
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
-	goMod := "module github.com/peiman/ckeletin-go\n\ngo 1.26.4\n"
+	goMod := "module github.com/peiman/ckeletin-go\n\ngo 1.26.9\n"
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte(goMod), 0o644))
 
 	// Unformatted (bad indentation) AND uncompilable: trips both a formatter

@@ -24,7 +24,7 @@ const goVersionFile = ".go-version"
 
 // minGoVersionFallback is used only when goVersionFile is unreadable —
 // fallback; SSOT is .go-version.
-const minGoVersionFallback = "1.26.4"
+const minGoVersionFallback = "1.26.9"
 
 // minGoVersion returns the project's minimum Go version from .go-version,
 // falling back to minGoVersionFallback when the file is unreadable or empty.
@@ -267,8 +267,8 @@ func (d *Doctor) checkGoVersion() {
 	}
 
 	versionStr := string(output)
-	// Extract the full version, patch included (e.g., "go1.26.4" from
-	// "go version go1.26.4 darwin/arm64") — .go-version pins a patch
+	// Extract the full version, patch included (e.g., "go1.26.9" from
+	// "go version go1.26.9 darwin/arm64") — .go-version pins a patch
 	// version, so truncating to major.minor would compare incorrectly
 	re := regexp.MustCompile(`go(\d+\.\d+(?:\.\d+)?)`)
 	matches := re.FindStringSubmatch(versionStr)
