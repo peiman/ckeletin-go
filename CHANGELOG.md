@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **Dependency updates**: Go modules `go-isatty` 0.0.24, `testify` 1.12.1, `golang.org/x/text` 0.43.0, and `golang.org/x/sys` 0.49.0. GitHub Actions moved to current tags, including `actions/cache` v6 and `actions/setup-go` v7. `arduino/setup-task` stays on v2: v3 is GPL-3.0 and its July dependency-review failure could not be reproduced from expired logs. Dependabot now groups minor and patch updates and allows 10 open PRs, so one major bump cannot block the queue.
 - **Go toolchain bumped to 1.26.9**: `.go-version` and `go.mod` pick up the standard-library fixes through 1.26.9, including the reachable `net/http` advisories present on 1.26.4. CI installs this version from `.go-version`, so `task setup:latest` can build current tools such as grype.
 
 ### Changed
