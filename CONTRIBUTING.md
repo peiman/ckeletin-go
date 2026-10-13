@@ -22,7 +22,7 @@ Be respectful, professional, and constructive in all interactions. This project 
 
 ### Prerequisites
 
-- Go — the exact required version is pinned in `.go-version` (the single source of truth; also reflected in `go.mod`)
+- Go — `.go-version` is the minimum (also reflected in `go.mod`). CI installs that version. A newer toolchain passes `task check`.
 - Git
 - A GitHub account
 

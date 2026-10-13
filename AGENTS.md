@@ -111,6 +111,8 @@ User-facing changes go in `CHANGELOG.md` under `[Unreleased]`. New features also
 | License check fails | A copyleft dependency was added | `go get pkg@none`, then `task tidy`, then an allowed replacement |
 | `golangci-lint` timeout | The machine is slow | `task lint` |
 | Validate commands fails | A `run*` function is over 35 lines, or an exemption marker has no justification | Move the logic to `internal/` |
+| Go version too old | The installed Go is older than `.go-version` | Install that version or newer. A newer toolchain passes |
+| SBOM scan fails on an old report | `reports/sbom/` is gitignored and can hold a stale CycloneDX file | `task check` regenerates it when it is older than the module |
 
 Local pass, CI fail:
 

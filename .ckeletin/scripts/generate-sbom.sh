@@ -52,6 +52,19 @@ check_syft() {
     fi
 }
 
+# binary_needs_rebuild is true when the binary is missing or older than
+# go.mod, go.sum, or .go-version.
+binary_needs_rebuild() {
+    local src
+    [[ -n "$BINARY_PATH" && -f "$BINARY_PATH" ]] || return 0
+    for src in go.mod go.sum .go-version; do
+        if [[ -f "$src" && "$src" -nt "$BINARY_PATH" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 syft_source() {
     # Scan the binary (accurate: only what ships) or fall back to directory
     if [ -n "$BINARY_PATH" ] && [ -f "$BINARY_PATH" ]; then
@@ -132,13 +145,14 @@ main() {
     echo "  Output:  ${OUTPUT_DIR}/"
     echo ""
 
-    # Build binary if it doesn't exist (SBOM scans the artifact, not the source)
-    if [ ! -f "$BINARY_PATH" ]; then
+    # Scan the binary we would ship. Rebuild when it is missing or older
+    # than the module, so a leftover binary cannot produce a stale SBOM.
+    if binary_needs_rebuild; then
         echo "  Building binary for SBOM scanning..."
-        go build -o "$BINARY_PATH" . 2>/dev/null || {
+        if ! go build -o "$BINARY_PATH" . 2>/dev/null; then
             echo "  ⚠ Binary build failed — falling back to directory scan"
             BINARY_PATH=""
-        }
+        fi
     fi
 
     # Create output directory

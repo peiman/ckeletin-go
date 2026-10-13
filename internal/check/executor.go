@@ -78,7 +78,7 @@ func NewExecutor(cfg Config, writer io.Writer) *Executor {
 func (e *Executor) buildCategories(methods *checkMethods) []categoryDef {
 	return []categoryDef{
 		{name: "Development Environment", checks: []checkItem{
-			{"go-version", methods.shellCheck("check-go-version.sh"), "Ensure Go version matches .go-version"},
+			{"go-version", methods.shellCheck("check-go-version.sh"), "Install the Go version in .go-version or newer"},
 			{"tools", methods.shellCheck("install_tools.sh", "--check"), "Run: task setup"},
 		}},
 		{name: "Code Quality", checks: []checkItem{
