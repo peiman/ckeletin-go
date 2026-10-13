@@ -1,370 +1,138 @@
 # ckeletin-go — Project Guide for AI Agents
 
-> **This file is a reference implementation.** The pattern — structured project
-> guide, behavioral rules, automated hooks, machine-checkable enforcement — works
-> in any codebase. See the README for how the pieces fit together.
+ckeletin-go is a Go CLI scaffold. `.ckeletin/` is the updatable framework (config, logging, validators, ADRs 000-099). Application code lives in `cmd/`, `internal/`, and `pkg/`. `task ckeletin:update` replaces the framework and does not touch application code.
 
-## About This Project
-
-**ckeletin-go** is a production-ready Go CLI scaffold powered by an updatable framework layer — built for humans and AI agents alike.
-
-The `.ckeletin/` directory contains the **framework** — config registry, logging, validation scripts, task definitions, and ADRs (000-099). Your code lives in `cmd/`, `internal/`, `pkg/`. Framework updates via `task ckeletin:update` without touching your code.
-
-Every architectural rule in this project is machine-checkable. `task check` is the single gateway — run it before every commit. If it passes, the code is correct regardless of who wrote it.
-
-Key characteristics:
-- Ultra-thin command pattern (run functions ≤30 lines, logic in `internal/`)
-- Centralized configuration registry with auto-generated constants
-- Structured logging with Zerolog (dual console + file output)
-- Framework-level `--output json` flag for machine-readable output
-- Bubble Tea for interactive UIs
-- Test-driven development (TDD) — tests first, always
-- Dependency injection over mocking
-- 85% minimum test coverage, enforced by CI
-- Public reusable packages in `pkg/` (e.g., `checkmate` for beautiful CLI output)
-
-**Platform:** macOS and Linux (primary). Windows is supported for core functionality; interactive features (TUI, colored output) may have limitations.
+Every architectural rule is machine-checkable. `task check` is the gate before every commit.
 
 ## Commands
 
-Use `task` commands for all standard workflows. The `task` runner wraps Go tooling with correct flags, coverage settings, and checks.
+Use `task` for standard workflows. It wraps Go tooling with the flags, coverage, and checks this repo expects.
 
 | Scenario | Command |
 |----------|---------|
 | Build | `task build` |
 | Run all tests | `task test` |
-| Format code | `task format` |
-| Lint code | `task lint` |
-| Before commits | `task check` |
-| Trivial changes only | `task check:fast` |
+| Format | `task format` |
+| Lint | `task lint` |
+| Before every commit | `task check` |
+| Docs, comments, typos only | `task check:fast` |
 | Debug one test | `go test -v -run TestName ./path/...` |
-| Quick compile check | `go build ./...` |
-| Run benchmarks | `task bench` |
+| Quick compile | `go build ./...` |
+| Tidy modules | `task tidy` |
+| Benchmarks | `task bench` |
 | Integration tests | `task test:integration` |
 | Vulnerability check | `task check:vuln` |
 | Regenerate config constants | `task generate:config:key-constants` |
 | Generate config JSON Schema | `task generate:config:schema` |
 
-**Daily workflow:** `task format` → `task test` → `task lint` → `task check`
+`task check:fast` skips race detection and integration tests. Any logic change uses full `task check`.
 
-**`task check:fast`** skips race detection and integration tests. Use only for docs, comments, or typo fixes. Use full `task check` for any code logic changes.
+`task check` runs, in order: format and lint; architecture validators (defaults, commands, constants, task naming, architecture, layering, package organization, config consumption, output, security, dev build tags); secrets and SAST; dependency, license, and SBOM checks; then `test:full` (unit, integration, race).
 
-**What `task check` runs (in order):**
-```
-Code Quality        → format, lint
-Architecture        → validate:defaults, commands, constants, task-naming,
-                      architecture, layering, package-organization,
-                      config-consumption, output, security, dev-build-tags
-Security Scanning   → check:secrets, check:sast
-Dependencies        → check:deps, check:license, check:sbom:vulns
-Tests               → test:full (unit + integration + race detection)
-```
+When it fails, fix the cause. Format → `task format`. Lint → fix the finding. Tests → fix tests or code. Coverage → add tests. See Troubleshooting for the order when several fail at once.
 
-**If `task check` fails:** Fix the issue, don't work around it.
-- Format issues → `task format`
-- Lint issues → Read output and fix code
-- Test failures → Debug and fix tests
-- Coverage drops → Add more tests
+## Where code goes
 
-## Code Organization
+| Path | What belongs there |
+|------|--------------------|
+| `cmd/` | Wiring only. `run*` functions ≤30 lines. |
+| `internal/` | Business logic. |
+| `pkg/` | Public libraries importable by other modules. |
+| `.ckeletin/` | Framework. Do not edit it in a derived project; updates overwrite it. |
+| `docs/adr/` | Project ADRs, numbered 100+. |
+| `test/integration/` | Integration tests. |
 
-```
-ckeletin-go/
-├── .ckeletin/             # Framework layer (upstream template)
-│   ├── docs/adr/          # Framework ADRs (000-014)
-│   ├── pkg/config/        # Config registry, constants, validation
-│   │   ├── registry.go    # Config option definitions
-│   │   └── keys_generated.go  # Auto-generated constants
-│   ├── pkg/logger/        # Logging infrastructure (Zerolog)
-│   ├── pkg/output/        # JSON output mode (--output json)
-│   ├── pkg/catalog/       # Command catalog types (CKSPEC-AGENT-006)
-│   ├── pkg/testutil/      # Shared test helpers
-│   ├── scripts/           # Build, validation, and utility scripts
-│   └── Taskfile.yml       # Framework task definitions
-├── cmd/                   # Commands (ultra-thin, run funcs ≤30 lines)
-│   ├── root.go            # Root command setup
-│   └── *.go               # Feature commands
-├── internal/              # Private application code
-│   ├── check/             # Check command (executor, timing, checks)
-│   ├── dev/               # Dev command logic
-│   ├── ping/              # Ping command logic
-│   └── */                 # Other internal packages
-├── pkg/                   # Public reusable libraries (importable by others)
-│   └── checkmate/         # Beautiful terminal output for check results
-├── test/integration/      # Integration tests
-├── docs/adr/              # Project-specific ADRs
-├── Taskfile.yml           # Project tasks (includes .ckeletin/Taskfile.yml)
-├── AGENTS.md              # This file (universal project guide)
-└── CLAUDE.md              # Claude Code-specific behavioral rules
-```
+`task validate:commands` measures each `run*` function from the `func` line through its closing brace. ≤30 passes, 31–35 warns, >35 fails. A `// ckeletin:allow-custom-command` marker needs a justification on that line. See [ADR-001](.ckeletin/docs/adr/001-ultra-thin-command-pattern.md).
 
-**Key principles:**
-1. **Ultra-thin commands**: `cmd/*.go` files are wiring only (run functions ≤30 lines, enforced) — read config, create structs, call `internal/`. Loops, conditionals, or string manipulation → move to `internal/`.
-2. **Business logic in `internal/`**: Private implementation packages.
-3. **Framework code in `.ckeletin/`**: Config registry, logger, scripts, validators.
-4. **Public libraries in `pkg/`**: Importable by external consumers.
+Loops, conditionals, and string manipulation belong in `internal/`. `cmd/` reads config, builds a struct, and calls it.
 
-**30-line contract (enforced):** `task validate:commands` measures every `run*` function from its `func` line through its closing brace: ≤30 lines passes, 31-35 warns, >35 **fails the build**. Whole files >80 lines draw an advisory warning. Exemptions require a `// ckeletin:allow-custom-command` marker **with a justification** (a bare marker fails validation). See ADR-001 → Enforcement. Example:
-```go
-// cmd/ping.go — wiring only, no business logic
-func runPing(cmd *cobra.Command, args []string) error {
-    cfg := ping.Config{
-        Message: getConfigValueWithFlags[string](cmd, "message", config.KeyAppPingOutputMessage),
-        Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
-    }
-    return ping.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
-}
-```
+## Hard rules
 
-## Architecture Decision Records (ADRs)
+- TDD. Write the failing test first. Test and implementation land in one commit.
+- `task check` passes before every commit.
+- Never hardcode config keys. Define them in `.ckeletin/pkg/config/registry.go`, run `task generate:config:key-constants`, and read `config.Key*`.
+- Coverage does not go down. Overall minimum 85%. Use `testify/assert` or `testify/require`. Per-package floors are in `.ckeletin/scripts/check-coverage-project.sh`.
+- After adding a dependency, run `task check:license:source`. Allowed and denied licenses are in [docs/licenses.md](docs/licenses.md) ([ADR-011](.ckeletin/docs/adr/011-license-compliance.md)).
+- Conventional Commits (`feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore`). Branch prefixes match: `feat/`, `fix/`, `refactor/`, `docs/`.
+- Normal merge. Do not squash. Atomic commits are the history.
+- Do not pass `--no-verify` unless the user has approved it after seeing why the hook itself is broken.
 
-Read `.ckeletin/docs/adr/*.md` before making architectural changes.
+Conflict order: security, then license, then correctness, then coverage, then style.
 
-| ADR | Topic | Key Principle |
-|-----|-------|---------------|
-| ADR-000 | Task-Based Workflow | Single source of truth for dev commands |
-| ADR-001 | Command Pattern | Commands are ultra-thin (run functions ≤30 lines) |
-| ADR-002 | Config Registry | Centralized config with type safety |
-| ADR-003 | Testing Strategy | Dependency injection over mocking |
-| ADR-004 | Security | Input validation and safe defaults |
-| ADR-005 | Config Constants | Auto-generated from registry |
-| ADR-006 | Logging | Structured logging with Zerolog |
-| ADR-007 | UI Framework | Bubble Tea for interactive UIs |
-| ADR-008 | Release Automation | Multi-platform releases with GoReleaser |
-| ADR-009 | Layered Architecture | 4-layer dependency rules |
-| ADR-010 | Package Organization | pkg/ for public, internal/ for private |
-| ADR-011 | License Compliance | Dual-tool license checking |
-| ADR-012 | Dev Commands | Build tags for dev-only commands |
-| ADR-013 | Structured Output | Shadow logging and checkmate patterns |
-| ADR-014 | Enforcement Policy | Every ADR must have automated enforcement |
+## Logging
 
-**Quick lookup — "I'm working on..."**
+Zerolog. Console is INFO and above. The file is DEBUG and above, JSON. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
 
-| Task | Read |
-|------|------|
-| Adding a command | ADR-001, ADR-009 |
-| Adding config option | ADR-002, ADR-005 |
-| Writing tests | ADR-003 |
-| Adding logging | ADR-006 |
-| Adding dependency | ADR-011 |
-| Creating UI | ADR-007 |
-| Adding/modifying an ADR | ADR-014 |
+- Can return the error? `log.Debug()` and return it.
+- User input error? Formatted output only.
+- Normal flow worth recording? `log.Info()`.
+- Recoverable? `log.Warn()`.
+- Unrecoverable, and nothing can be returned? `log.Error()`.
 
-Every ADR must have an `## Enforcement` section ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md)).
+Semgrep rule `ckeletin-log-error-and-return` rejects `log.Error()` followed by a returned error.
 
-## Conventions
+## JSON Output Mode
 
-### Configuration Management
+`--output json` writes exactly one JSON envelope to stdout and silences the console logger. The audit log file still receives entries. Config key `config.KeyAppOutputFormat` (`app.output_format`, `text` or `json`). Commands that call `ui.RenderSuccess` get the envelope for free. Custom shapes implement `output.JSONResponder`. Types live in `.ckeletin/pkg/output/json.go`.
 
-1. **Define** in `.ckeletin/pkg/config/registry.go`
-2. **Generate** constants: `task generate:config:key-constants` → creates `keys_generated.go`
-3. **Use** type-safe retrieval: `viper.GetBool(config.KeyAppFeatureEnabled)`
+## Testing
 
-Rules:
-- Never hardcode config keys as strings — use `config.Key*` constants
-- Always run `task generate:config:key-constants` after registry changes
-- Add validation functions for complex config values
+Table-driven tests. Unit tests sit next to the code. Integration tests live in `test/integration/`. Inject dependencies; do not mock by default ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md)).
 
-### Logging
+Golden files: `task test:golden`, and `task test:golden:update` only after reviewing `git diff test/integration/testdata/`. See [docs/testing.md](docs/testing.md).
 
-Zerolog structured logging with dual output:
-- **Console**: INFO+ level, colored, human-friendly
-- **File**: DEBUG+ level, JSON format
+## ADRs
 
-Log level rules:
-- Can return this error? → `log.Debug()` + `return err`
-- User input error? → Formatted output only (no log)
-- Important normal flow event? → `log.Info()`
-- Recoverable issue? → `log.Warn()`
-- Unrecoverable system failure? → `log.Error()`
+Read the ADR before changing the architecture it records. Each one has an `## Enforcement` section ([ADR-014](.ckeletin/docs/adr/014-adr-enforcement-policy.md)).
 
-Use `log.Error()` only for unrecoverable failures where no error can be returned. Semgrep rule `ckeletin-log-error-and-return` enforces this. See [ADR-006](.ckeletin/docs/adr/006-structured-logging-with-zerolog.md).
+| Working on | Read |
+|------------|------|
+| A command | ADR-001, ADR-009 |
+| A config option | ADR-002, ADR-005 |
+| Tests | ADR-003 |
+| Logging | ADR-006 |
+| A dependency | ADR-011 |
+| A TUI | ADR-007 |
+| An ADR | ADR-014 |
 
-### JSON Output Mode (`--output json`)
-
-Every command supports `--output json` for machine-readable output. When active:
-- Stdout emits exactly one JSON envelope
-- Stderr is silenced (console log writer disabled)
-- Audit log file continues unchanged
-
-**JSON envelope structure:**
-```json
-{
-  "status": "success",
-  "command": "ping",
-  "data": { "message": "Hello", "color": "white", "timestamp": "now" },
-  "error": null
-}
-```
-
-On error:
-```json
-{
-  "status": "error",
-  "command": "ping",
-  "data": null,
-  "error": { "message": "invalid color value", "code": "CONFIG_VALIDATION" }
-}
-```
-
-**Config:** `app.output_format` (default: `"text"`, valid: `"text"` or `"json"`)
-**Env var:** `CKELETINGO_APP_OUTPUT_FORMAT=json`
-**Constant:** `config.KeyAppOutputFormat`
-
-**How it works for command authors:**
-- Commands that call `ui.RenderSuccess(out, message, data)` get JSON for free — the `data` argument becomes the envelope's `.data` field
-- For custom JSON shapes, implement `output.JSONResponder` on your data type:
-  ```go
-  type MyResult struct { /* fields */ }
-  func (r MyResult) JSONResponse() interface{} { return r }
-  ```
-- The `check` command uses `JSONResponder` to emit a flat list of results instead of its internal state
-
-**Types (in `.ckeletin/pkg/output/json.go`):**
-- `output.JSONEnvelope` — the standard envelope wrapper
-- `output.JSONError` — structured error with message and optional code
-- `output.JSONResponder` — interface for custom JSON data shapes
-- `output.IsJSONMode()` — check if JSON mode is active
-- `output.RenderJSON(out, envelope)` — marshal envelope to writer
-
-### Testing
-
-- **TDD is mandatory** — Write failing tests FIRST, then implement to make them pass. Test + implementation are committed together as one atomic unit. Never commit tests without the code that makes them pass, or code without its tests
-- All tests must use `testify/assert` or `testify/require`
-- Use table-driven tests for multiple scenarios
-- Unit tests: `*_test.go` in same package
-- Integration tests: `test/integration/`
-- Dependency injection over mocking ([ADR-003](.ckeletin/docs/adr/003-dependency-injection-over-mocking.md))
-
-### Golden File Testing
-
-Golden files are reference snapshots of CLI output. Never blindly update them.
-
-```bash
-task test:golden         # Run golden tests
-task test:golden:update  # Update (then review with git diff!)
-```
-
-After updating: `git diff test/integration/testdata/` — review every change. See [docs/testing.md](docs/testing.md).
-
-### Checkmate Library (pkg/checkmate/)
-
-Beautiful terminal output for CLI check results. Thread-safe, auto-detects TTY (colors in terminal, plain in CI), customizable themes.
-
-```go
-p := checkmate.New()
-p.CategoryHeader("Code Quality")
-p.CheckSuccess("lint passed")
-p.CheckFailure("format", "2 files need formatting", "Run: task format")
-```
-
-## Git Workflow
-
-[Conventional Commits](https://www.conventionalcommits.org/) format:
-```
-<type>: <concise summary>
-
-- <bullet point details>
-```
-
-**Types:** `feat`, `fix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore`
-
-**Branch naming:** `feat/`, `fix/`, `refactor/`, `docs/` prefixes (e.g., `feat/add-user-auth`)
-
-**Atomic commits:** Tests and the implementation they cover go in the same commit. Every commit should be a complete, passing unit. Never split tests from their implementation across separate commits.
-
-**Normal merge, never squash.** This project uses normal merge (merge commits) — not squash merge. Every atomic commit is preserved on main. This is why atomic commits matter: they survive the merge and keep `git bisect`, `git log`, and the TDD narrative intact. Do not squash when merging branches or PRs.
-
-`task check` must pass before every commit.
-
-## Code Quality
-
-### Test Coverage Requirements
-
-| Package Type | Minimum | Target |
-|-------------|---------|--------|
-| Overall | 85% | 90%+ |
-| `cmd/*` | 80% | 90%+ |
-| `.ckeletin/pkg/config` | 80% | 90%+ |
-| `.ckeletin/pkg/logger` | 80% | 90%+ |
-| Other packages | 70% | 80%+ |
-
-Both per-package and overall thresholds must pass. CI runs `.ckeletin/scripts/check-coverage-project.sh`.
-
-**Exclusions:** TUI code (`*_tui.go`, `internal/check/executor.go`, `internal/check/summary.go`) and `/demo/` directories.
-
-During refactoring, temporary drops up to 2% acceptable if restored before PR merges.
-
-### New Command Checklist
-
-```
-[ ] Create cmd/<name>.go (wiring only, run functions ≤30 lines)
-[ ] Create internal/<name>/ package for business logic
-[ ] Add config options to .ckeletin/pkg/config/registry.go
-[ ] Run: task generate:config:key-constants
-[ ] Write failing tests FIRST in internal/<name>/*_test.go (TDD)
-[ ] Implement code to make tests pass
-[ ] Add integration test in test/integration/ (if needed)
-[ ] Update CHANGELOG.md
-[ ] Run: task check (must pass)
-```
-
-## License Compliance
-
-Run `task check:license:source` before committing new dependencies.
-
-| Allowed | Denied |
-|---------|--------|
-| MIT, Apache-2.0, BSD-2/3-Clause, ISC, 0BSD, Unlicense | GPL, AGPL, SSPL, LGPL, MPL |
-
-| Task | When | Speed |
-|------|------|-------|
-| `task check:license:source` | Before committing deps | ~2-5s |
-| `task check:license:binary` | Before release | ~10-15s |
-
-Transitive dependencies matter — if a MIT package depends on GPL code, your project is contaminated. Always run checks after `go mod tidy`.
-
-To remove a violating dependency: `go get pkg@none && go mod tidy`
-
-Details: [docs/licenses.md](docs/licenses.md) and [ADR-011](.ckeletin/docs/adr/011-license-compliance.md)
+Index: [.ckeletin/docs/adr/](.ckeletin/docs/adr/).
 
 ## Documentation
 
-- **CHANGELOG.md**: Every user-facing change, [Keep a Changelog](https://keepachangelog.com/) format, under `[Unreleased]`
-- **README.md**: Update for new features and major changes
-- **ADRs**: New ADR for significant architectural changes, numbered sequentially
+User-facing changes go in `CHANGELOG.md` under `[Unreleased]`. New features also update `README.md`. A new architectural decision gets the next ADR number.
 
 ## Troubleshooting
 
 | Error | Cause | Solution |
 |-------|-------|----------|
-| `task: command not found` | Task not installed | `bash .ckeletin/scripts/install_tools.sh` |
-| `go-licenses: package does not have module info` | Tools built with old Go | `task setup` |
-| Coverage below 85% | Missing tests | `go tool cover -html=coverage.out` to find gaps |
-| License check fails | Copyleft dep added | `go get pkg@none && go mod tidy`, find MIT alternative |
-| `golangci-lint` timeout | Slow machine | `task lint` (has proper timeout) |
-| Validate commands fails | `run*` function >35 lines or bare exemption marker | Move logic to `internal/` (run functions ≤30 lines); justify any `allow-custom-command` marker |
+| `task: command not found` | Task is not installed | `bash .ckeletin/scripts/install_tools.sh` |
+| `go-licenses: package does not have module info` | Tools were built with an older Go | `task setup` |
+| Coverage below 85% | Missing tests | `go tool cover -html=coverage.out` |
+| License check fails | A copyleft dependency was added | `go get pkg@none`, then `task tidy`, then an allowed replacement |
+| `golangci-lint` timeout | The machine is slow | `task lint` |
+| Validate commands fails | A `run*` function is over 35 lines, or an exemption marker has no justification | Move the logic to `internal/` |
 
-**Local passes but CI fails:**
-1. Go version mismatch — check `.go-version`
-2. Stale tools — `task setup`
-3. Missing deps — `go mod tidy`
-4. Race conditions — `task test:race` locally
+Local pass, CI fail:
 
-**Cascading failures — fix in this order:**
-1. License violation → remove/replace dep, `go mod tidy && task check:license:source`
-2. Build failure → fix compilation, `go build ./...`
-3. Lint/format → `task format`, fix remaining manually
-4. Test failures → `task test`, fix tests or code
-5. Coverage drop → `go tool cover -html=coverage.out`, add tests
+1. Go version — `.go-version` is the source of truth.
+2. Stale tools — `task setup`.
+3. Missing modules — `task tidy`.
+4. A race — `task test:race`.
 
-Each step depends on the previous. Don't fix coverage for code that fails lint.
+Cascading failures, in this order:
 
-## Key Resources
+1. License — replace the module, `task tidy`, `task check:license:source`.
+2. Build — `go build ./...`.
+3. Lint and format — `task format`, then fix what remains.
+4. Tests — `task test`.
+5. Coverage — `go tool cover -html=coverage.out`.
 
-- **.ckeletin/docs/adr/ARCHITECTURE.md** — System structure
-- **.ckeletin/docs/adr/*.md** — Architectural decisions
-- **.semgrep.yml** — Custom SAST rules
-- **Taskfile.yml** — All commands and implementations
-- **CHANGELOG.md** — History of changes
-- **README.md** — Project overview and usage
+Do not fix coverage for code that does not lint.
+
+## Key resources
+
+- [.ckeletin/docs/adr/ARCHITECTURE.md](.ckeletin/docs/adr/ARCHITECTURE.md)
+- [Taskfile.yml](Taskfile.yml) and [.ckeletin/Taskfile.yml](.ckeletin/Taskfile.yml)
+- [.semgrep.yml](.semgrep.yml)
+- [CHANGELOG.md](CHANGELOG.md)
+- [README.md](README.md)

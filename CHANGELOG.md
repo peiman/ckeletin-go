@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Agent guides**: `AGENTS.md` is the only project guide. `CLAUDE.md` imports it and keeps only Claude Code behavior. `.cursorrules`, `.github/copilot-instructions.md`, and `.claude/rules/task-commands.md` point at `AGENTS.md` instead of restating the rules.
+
 ### Added
 
 - **`catalog` command (CKSPEC-AGENT-006)**: Emits the CLI's command surface — commands, flags, and globals — as machine-readable JSON derived from the live Cobra command tree, so agents discover capabilities without parsing `--help` text. Conformance published against spec v0.8.0 (40/40 requirements met).

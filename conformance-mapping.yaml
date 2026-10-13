@@ -574,9 +574,8 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      AGENTS.md exists (358+ lines). Covers project purpose, directory
-      structure, all task commands, coding conventions, ADR lookup,
-      testing strategy, troubleshooting.
+      AGENTS.md exists. Covers project purpose, where code goes, task
+      commands, hard rules, ADR lookup, testing strategy, troubleshooting.
     checks:
       - "test -f AGENTS.md"
     violation_tests:
@@ -614,9 +613,10 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      CLAUDE.md references AGENTS.md first. No project knowledge
-      duplicated. .cursorrules and copilot-instructions.md also
-      reference AGENTS.md.
+      CLAUDE.md imports AGENTS.md and holds only Claude Code behavior
+      (editor, hooks, unused variables). .cursorrules and
+      copilot-instructions.md point at AGENTS.md and do not restate
+      project rules.
     checks:
       - |-
         grep -qE 'AGENTS\.md' CLAUDE.md
