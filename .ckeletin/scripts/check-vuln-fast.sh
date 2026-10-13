@@ -48,27 +48,30 @@ fi
 
 # Run govulncheck
 # Use -show verbose to get more info, but parse for just the summary
-if run_check "govulncheck ./... 2>&1"; then
+vuln_code=0
+run_check "govulncheck ./... 2>&1" || vuln_code=$?
+if [[ "$vuln_code" -eq 0 ]]; then
     # No vulnerabilities found
     date +%s > "$CACHE_FILE"
     echo "0" > "$CACHE_RESULT"
     check_success "No vulnerabilities found"
     exit 0
-else
-    # Check if it's a network error
-    if echo "$CHECK_OUTPUT" | grep -qi "no such host\|connection refused\|timeout\|network is unreachable\|dial tcp"; then
+fi
+
+case "$(classify_govulncheck "$vuln_code" "$CHECK_OUTPUT")" in
+    network)
         echo "  Warning: Vulnerability check skipped (network unavailable)"
         echo "  Run 'task check:vuln' when online"
         # Don't cache network errors - retry next time
         exit 0
-    fi
+        ;;
+esac
 
-    # Real vulnerabilities found
-    date +%s > "$CACHE_FILE"
-    echo "1" > "$CACHE_RESULT"
-    check_failure \
-        "Security vulnerabilities detected" \
-        "$CHECK_OUTPUT" \
-        "Run: task check:vuln for details"$'\n'"Update vulnerable dependencies before committing"
-    exit 1
-fi
+# Real vulnerabilities found
+date +%s > "$CACHE_FILE"
+echo "1" > "$CACHE_RESULT"
+check_failure \
+    "Security vulnerabilities detected" \
+    "$CHECK_OUTPUT" \
+    "Run: task check:vuln for details"$'\n'"Update vulnerable dependencies before committing"
+exit 1
