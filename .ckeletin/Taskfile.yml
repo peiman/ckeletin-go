@@ -190,37 +190,17 @@ tasks:
         echo "   Updating module paths (AST-based import rewriting)..."
         go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
 
-        # Replace upstream binary name in .ckeletin/ Go string literals
-        # (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log")
-        # NOTE: String split prevents scaffold-init from replacing this name
+        # Re-apply the names task init wrote. Checkout brings the upstream
+        # module path and binary name back into markdown, YAML, and Go files
+        # (including tests). Leaving those names is a framework diff with no
+        # changelog edit, so task check fails after a same-version update.
+        # NOTE: String split prevents scaffold-init from replacing this name.
         UPSTREAM_NAME="ckeletin""-go"
         CURRENT_NAME=$(grep 'BINARY_NAME:' Taskfile.yml | head -1 | awk '{print $2}')
         if [ -n "$CURRENT_NAME" ] && [ "$CURRENT_NAME" != "$UPSTREAM_NAME" ]; then
-          echo "   Updating binary name references ($UPSTREAM_NAME → $CURRENT_NAME)..."
-          find .ckeletin -name "*.go" ! -name "*_test.go" | while IFS= read -r f; do
-            # Skip import lines, only replace in non-import content
-            awk -v old="$UPSTREAM_NAME" -v new="$CURRENT_NAME" '
-              /^import \(/ { in_import=1; print; next }
-              in_import && /^\)/ { in_import=0; print; next }
-              in_import { print; next }
-              /^import "/ { print; next }
-              { gsub(old, new); print }
-            ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-          done
-          # Also replace env var prefix form (CKELETIN_GO → MYAPP)
-          UPSTREAM_ENV=$(echo "$UPSTREAM_NAME" | tr '[:lower:]-' '[:upper:]_')
-          CURRENT_ENV=$(echo "$CURRENT_NAME" | tr '[:lower:]-' '[:upper:]_')
-          if [ "$UPSTREAM_ENV" != "$CURRENT_ENV" ]; then
-            find .ckeletin -name "*.go" ! -name "*_test.go" | while IFS= read -r f; do
-              awk -v old="$UPSTREAM_ENV" -v new="$CURRENT_ENV" '
-                /^import \(/ { in_import=1; print; next }
-                in_import && /^\)/ { in_import=0; print; next }
-                in_import { print; next }
-                /^import "/ { print; next }
-                { gsub(old, new); print }
-              ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-            done
-          fi
+          echo "   Updating derived names ($UPSTREAM_NAME → $CURRENT_NAME)..."
+          bash .ckeletin/scripts/rewrite-derived-names.sh \
+            "$UPSTREAM_MODULE" "$CURRENT_MODULE" "$UPSTREAM_NAME" "$CURRENT_NAME" .ckeletin
         fi
 
         echo "   Updating module dependencies..."

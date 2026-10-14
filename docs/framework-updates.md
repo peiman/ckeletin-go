@@ -64,7 +64,7 @@ The update is a 14-step process:
 4. **Captures old version** — Records current `.ckeletin/VERSION` for changelog diff
 5. **Checks out framework** — `git checkout ckeletin-upstream/main -- .ckeletin/` — only the `.ckeletin/` directory, nothing else
 6. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
-7. **Replaces binary name** — Updates string literals in `.ckeletin/` Go files (e.g., `"./logs/ckeletin-go.log"` → `"./logs/myapp.log"`) and env var prefixes
+7. **Replaces derived names** — Rewrites the upstream module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in `.ckeletin/` Go files including tests, the same way `task init` did. Shell scripts are left unchanged.
 8. **Tidies modules** — `go mod tidy` to update `go.mod`/`go.sum` if dependencies changed
 9. **Regenerates constants** — `task ckeletin:generate:config:key-constants` to keep config constants in sync
 10. **Formats code** — `task ckeletin:format`

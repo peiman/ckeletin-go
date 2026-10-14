@@ -7,6 +7,10 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+### Fixed
+
+- **`task ckeletin:update` re-applies the derived project's names.** After checkout it rewrites the module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in Go files including tests, the same way `task init` did. A same-version update no longer leaves a `.ckeletin/` diff that fails the changelog gate. Shell scripts are unchanged.
+
 ## [0.2.0] - 2026-10-14
 
 This version rolls up every framework change since 0.1.0. `task ckeletin:update` checks out `.ckeletin/` only, so this file is the record a derived CLI receives. The root `CHANGELOG.md` stays in the reference repository.

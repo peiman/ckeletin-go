@@ -583,33 +583,15 @@ func TestFrameworkUpdate(t *testing.T) {
 	rewriteOutput, err := rewriteCmd.CombinedOutput()
 	require.NoError(t, err, "AST import rewrite failed\nOutput: %s", string(rewriteOutput))
 
-	// Replace binary name in .ckeletin/ Go string literals (matches real update workflow).
-	// The AST rewriter only handles import paths; string literals like
-	// "./logs/ckeletin-go.log" need separate replacement.
-	t.Log("Replacing binary name in .ckeletin/ Go string literals")
-	replaceNameInCkeletinGoFiles(t, dstCkeletin, oldName, testName)
-
-	// Also replace non-import references (e.g., string constants in non-Go files)
-	// that the AST rewriter doesn't touch
-	err = filepath.Walk(dstCkeletin, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil || info.IsDir() {
-			return walkErr
-		}
-		// Only process non-Go files (AST rewriter handles .go files)
-		if strings.HasSuffix(path, ".go") {
-			return nil
-		}
-		content, readErr := os.ReadFile(path)
-		if readErr != nil {
-			return readErr
-		}
-		updated := strings.ReplaceAll(string(content), upstreamModule, testModule)
-		if updated != string(content) {
-			return os.WriteFile(path, []byte(updated), info.Mode())
-		}
-		return nil
-	})
-	require.NoError(t, err, "failed to replace module paths in non-Go files")
+	// Re-apply derived names the way task ckeletin:update does, which matches
+	// what task init wrote. A same-version checkout must not leave a framework
+	// diff that the changelog gate would reject.
+	t.Log("Re-applying derived names in .ckeletin/")
+	namesCmd := exec.Command("bash", "./.ckeletin/scripts/rewrite-derived-names.sh",
+		upstreamModule, testModule, oldName, testName, ".ckeletin")
+	namesCmd.Dir = tmpDir
+	namesOutput, err := namesCmd.CombinedOutput()
+	require.NoError(t, err, "derived-name rewrite failed\nOutput: %s", string(namesOutput))
 
 	// Run go mod tidy after update
 	tidyCmd := exec.Command("go", "mod", "tidy")
@@ -1020,71 +1002,4 @@ func parseFrameworkTaskNames(t *testing.T, path string) []string {
 		}
 	}
 	return names
-}
-
-// replaceNameInCkeletinGoFiles replaces the old binary name with the new name
-// in Go string literals within .ckeletin/, skipping import lines.
-// Also replaces the env var prefix form (e.g., CKELETIN_GO → UPDATETEST).
-// This mirrors what task ckeletin:update does for binary name references
-// (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log").
-func replaceNameInCkeletinGoFiles(t *testing.T, ckeletinDir, oldName, newName string) {
-	t.Helper()
-
-	// Build replacement pairs: binary name + env var prefix
-	type replacement struct{ old, new string }
-	replacements := []replacement{{oldName, newName}}
-
-	oldEnv := strings.ToUpper(strings.ReplaceAll(oldName, "-", "_"))
-	newEnv := strings.ToUpper(strings.ReplaceAll(newName, "-", "_"))
-	if oldEnv != newEnv {
-		replacements = append(replacements, replacement{oldEnv, newEnv})
-	}
-
-	for _, r := range replacements {
-		err := filepath.Walk(ckeletinDir, func(path string, info os.FileInfo, walkErr error) error {
-			if walkErr != nil || info.IsDir() {
-				return walkErr
-			}
-			if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
-				return nil
-			}
-
-			content, readErr := os.ReadFile(path)
-			if readErr != nil {
-				return readErr
-			}
-
-			original := string(content)
-			lines := strings.Split(original, "\n")
-			inImportBlock := false
-
-			for i, line := range lines {
-				trimmed := strings.TrimSpace(line)
-
-				if strings.HasPrefix(trimmed, "import (") {
-					inImportBlock = true
-					continue
-				}
-				if inImportBlock {
-					if trimmed == ")" {
-						inImportBlock = false
-					}
-					continue
-				}
-				if strings.HasPrefix(trimmed, "import ") {
-					continue
-				}
-
-				lines[i] = strings.ReplaceAll(line, r.old, r.new)
-			}
-
-			updated := strings.Join(lines, "\n")
-			if updated != original {
-				return os.WriteFile(path, []byte(updated), info.Mode())
-			}
-			return nil
-		})
-
-		require.NoError(t, err, "failed to replace %q in .ckeletin Go files", r.old)
-	}
 }

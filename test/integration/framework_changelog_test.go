@@ -194,6 +194,66 @@ func TestGenerateCommandMigration_WarnsWhenTheProjectTaskDoesNotForward(t *testi
 	assert.Equal(t, 1, strings.Count(text, "does not forward to ckeletin:generate:command"))
 }
 
+func TestRewriteDerivedNames_MatchesInit(t *testing.T) {
+	// Build the upstream name from parts. task init rewrites that name, and its
+	// env-var form, in this file when the update fixture copies it into a
+	// derived project. A contiguous literal would make the fixture lie.
+	upstreamName := "ckeletin" + "-go"
+	upstreamModule := "github.com/peiman/" + upstreamName
+	upstreamEnv := "CKELETIN" + "_GO"
+	derivedName := "updatetest"
+	derivedModule := "github.com/test/" + derivedName
+	derivedEnv := "UPDATETEST"
+
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	script := filepath.Join(root, ".ckeletin", "scripts", "rewrite-derived-names.sh")
+	require.FileExists(t, script)
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".ckeletin", "scripts"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "Taskfile.yml"), []byte(""+
+		"vars:\n"+
+		"  _BINARY_NAME_DEFAULT: "+upstreamName+"\n"+
+		"  _MODULE_PATH_DEFAULT: "+upstreamModule+"\n"+
+		"  # see https://github.com/peiman/"+upstreamName+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "scripts", "note.sh"), []byte(
+		"echo \""+upstreamModule+"\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "sample_test.go"), []byte(""+
+		"package sample\n"+
+		"\n"+
+		"import \""+upstreamModule+"/pkg/checkmate\"\n"+
+		"\n"+
+		"// comment before rewrite: "+upstreamName+" and ckeletin-rust.\n"+
+		"const logPath = \"./logs/"+upstreamName+".log\"\n"+
+		"const envPrefix = \""+upstreamEnv+"\"\n"), 0o644))
+
+	cmd := exec.Command("bash", script,
+		upstreamModule, derivedModule, upstreamName, derivedName, ".ckeletin")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	taskfile, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "Taskfile.yml"))
+	require.NoError(t, err)
+	assert.Contains(t, string(taskfile), "_BINARY_NAME_DEFAULT: "+derivedName)
+	assert.Contains(t, string(taskfile), "_MODULE_PATH_DEFAULT: "+derivedModule)
+	assert.Contains(t, string(taskfile), "https://github.com/test/"+derivedName)
+	assert.NotContains(t, string(taskfile), upstreamName)
+
+	// Shell files are not rewritten by task init, so an update must leave them alone.
+	scriptBody, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "scripts", "note.sh"))
+	require.NoError(t, err)
+	assert.Contains(t, string(scriptBody), upstreamModule)
+
+	goBody, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "sample_test.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(goBody), "import \""+upstreamModule+"/pkg/checkmate\"")
+	assert.Contains(t, string(goBody), derivedName+" and ckeletin-rust")
+	assert.Contains(t, string(goBody), "\"./logs/"+derivedName+".log\"")
+	assert.Contains(t, string(goBody), "const envPrefix = \""+derivedEnv+"\"")
+}
+
 func TestGenerateCommandMigration_SilentWhenTheProjectTaskForwards(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)
