@@ -64,7 +64,7 @@ The update is a 14-step process:
 4. **Captures old version** — Records current `.ckeletin/VERSION` for changelog diff
 5. **Checks out framework** — `git checkout ckeletin-upstream/main -- .ckeletin/` — only the `.ckeletin/` directory, nothing else
 6. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
-7. **Replaces binary name** — Updates string literals in `.ckeletin/` Go files (e.g., `"./logs/ckeletin-go.log"` → `"./logs/myapp.log"`) and env var prefixes
+7. **Replaces derived names** — Rewrites the upstream module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in `.ckeletin/` Go files including tests, the same way `task init` did. Shell scripts are left unchanged.
 8. **Tidies modules** — `go mod tidy` to update `go.mod`/`go.sum` if dependencies changed
 9. **Regenerates constants** — `task ckeletin:generate:config:key-constants` to keep config constants in sync
 10. **Formats code** — `task ckeletin:format`
@@ -89,6 +89,10 @@ If the build fails at step 13, the commit still exists so you can inspect it. Se
 | `.ckeletin/CHANGELOG.md` | `AGENTS.md`, `CLAUDE.md` |
 
 The boundary is strict: `git checkout ckeletin-upstream/main -- .ckeletin/` ensures only files under `.ckeletin/` are touched. Your code, your configs, and your documentation are never modified.
+
+`.ckeletin/CHANGELOG.md` is what the update prints when `.ckeletin/VERSION` changes. The root `CHANGELOG.md` is not checked out. `task check` fails when framework files change without an edit to the framework changelog. Docs under `.ckeletin/docs/` are exempt.
+
+`task generate:command` is a framework task. Keep the project entry as a forwarding that passes `name` and `CLI_ARGS`. A bare `task:` call drops both, so `name=<name>` never reaches the generator. The post-update migration prints the forwarding when your Taskfile still runs the generator itself.
 
 ## How Import Rewriting Works
 

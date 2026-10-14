@@ -7,6 +7,21 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Printed when a project Taskfile is missing generate:command, or still runs
+# the generator itself. The vars are required: a bare `task:` forwarding drops
+# name= and CLI_ARGS, which is how `task generate:command name=<name>` broke.
+print_generate_command_forwarding() {
+	cat << 'EOF'
+  generate:command:
+    desc: Generate a new command with full pattern (cmd + internal + tests + config)
+    cmds:
+      - task: ckeletin:generate:command
+        vars:
+          name: '{{.name}}'
+          CLI_ARGS: '{{.CLI_ARGS}}'
+EOF
+}
+
 # Migration 1: Remove stale public component from .go-arch-lint.yml
 # When: pkg/ directory doesn't exist but .go-arch-lint.yml still references it
 if [ ! -d "pkg" ] && [ -f ".go-arch-lint.yml" ] && grep -q "pkg/\*\*" .go-arch-lint.yml; then
@@ -68,8 +83,14 @@ if [ -f "$FORWARDINGS_FILE" ] && [ -f "Taskfile.yml" ]; then
         echo "     Add these to your Taskfile.yml under '# === Convenience Aliases ===':"
         echo ""
         for task_name in "${missing[@]}"; do
-            # Derive description from framework Taskfile
-            desc=$(grep -A1 "^  ${task_name}:" .ckeletin/Taskfile.yml 2>/dev/null | grep "desc:" | sed 's/.*desc: //' | head -1)
+            if [ "$task_name" = "generate:command" ]; then
+                print_generate_command_forwarding
+                echo ""
+                continue
+            fi
+            # Derive description from framework Taskfile. A missing framework
+            # Taskfile must not abort the migration (pipefail + set -e).
+            desc=$(grep -A1 "^  ${task_name}:" .ckeletin/Taskfile.yml 2> /dev/null | grep "desc:" | sed 's/.*desc: //' | head -1) || true
             echo "  ${task_name}:"
             if [ -n "$desc" ]; then
                 echo "    desc: ${desc}"
@@ -127,4 +148,21 @@ if [ -f ".go-arch-lint.yml" ] \
         print "  - /\\.claude/.*"
     }
     ' .go-arch-lint.yml > "$tmpfile" && mv "$tmpfile" .go-arch-lint.yml
+fi
+
+# Migration 6: generate:command must forward into the framework task.
+# The task body is project-owned, so ckeletin:update will not replace an old
+# copy that still runs `go run ./.ckeletin/scripts/generate-command/`. That copy
+# drops name=. A missing task is reported by migration 3; this catches the
+# stale body, which still has the `generate:command:` key.
+if [ -f "Taskfile.yml" ] \
+    && grep -q "^  generate:command:" Taskfile.yml \
+    && ! grep -q "ckeletin:generate:command" Taskfile.yml; then
+    echo ""
+    echo "   ⚠ generate:command does not forward to ckeletin:generate:command"
+    echo "     The local task still runs the generator itself, so name= is dropped."
+    echo "     Replace it with:"
+    echo ""
+    print_generate_command_forwarding
+    echo ""
 fi

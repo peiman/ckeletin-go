@@ -190,37 +190,17 @@ tasks:
         echo "   Updating module paths (AST-based import rewriting)..."
         go run ./.ckeletin/scripts/rewrite-imports/ -old "$UPSTREAM_MODULE" -new "$CURRENT_MODULE" -dir .ckeletin
 
-        # Replace upstream binary name in .ckeletin/ Go string literals
-        # (e.g., "./logs/ckeletin-go.log" → "./logs/myapp.log")
-        # NOTE: String split prevents scaffold-init from replacing this name
+        # Re-apply the names task init wrote. Checkout brings the upstream
+        # module path and binary name back into markdown, YAML, and Go files
+        # (including tests). Leaving those names is a framework diff with no
+        # changelog edit, so task check fails after a same-version update.
+        # NOTE: String split prevents scaffold-init from replacing this name.
         UPSTREAM_NAME="ckeletin""-go"
         CURRENT_NAME=$(grep 'BINARY_NAME:' Taskfile.yml | head -1 | awk '{print $2}')
         if [ -n "$CURRENT_NAME" ] && [ "$CURRENT_NAME" != "$UPSTREAM_NAME" ]; then
-          echo "   Updating binary name references ($UPSTREAM_NAME → $CURRENT_NAME)..."
-          find .ckeletin -name "*.go" ! -name "*_test.go" | while IFS= read -r f; do
-            # Skip import lines, only replace in non-import content
-            awk -v old="$UPSTREAM_NAME" -v new="$CURRENT_NAME" '
-              /^import \(/ { in_import=1; print; next }
-              in_import && /^\)/ { in_import=0; print; next }
-              in_import { print; next }
-              /^import "/ { print; next }
-              { gsub(old, new); print }
-            ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-          done
-          # Also replace env var prefix form (CKELETIN_GO → MYAPP)
-          UPSTREAM_ENV=$(echo "$UPSTREAM_NAME" | tr '[:lower:]-' '[:upper:]_')
-          CURRENT_ENV=$(echo "$CURRENT_NAME" | tr '[:lower:]-' '[:upper:]_')
-          if [ "$UPSTREAM_ENV" != "$CURRENT_ENV" ]; then
-            find .ckeletin -name "*.go" ! -name "*_test.go" | while IFS= read -r f; do
-              awk -v old="$UPSTREAM_ENV" -v new="$CURRENT_ENV" '
-                /^import \(/ { in_import=1; print; next }
-                in_import && /^\)/ { in_import=0; print; next }
-                in_import { print; next }
-                /^import "/ { print; next }
-                { gsub(old, new); print }
-              ' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-            done
-          fi
+          echo "   Updating derived names ($UPSTREAM_NAME → $CURRENT_NAME)..."
+          bash .ckeletin/scripts/rewrite-derived-names.sh \
+            "$UPSTREAM_MODULE" "$CURRENT_MODULE" "$UPSTREAM_NAME" "$CURRENT_NAME" .ckeletin
         fi
 
         echo "   Updating module dependencies..."
@@ -557,6 +537,12 @@ tasks:
       - go mod tidy
 
   # --- Go Version Check ---
+
+  check:framework-changelog:
+    desc: Fail when .ckeletin changes are missing from the framework changelog
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-framework-changelog.sh'
 
   check:go-version:
     desc: Check if system Go version matches .go-version (SSOT)
@@ -1122,6 +1108,7 @@ tasks:
           category_header "Tests"
         silent: true
       - task: test:full
+      - task: check:framework-changelog
       - task: check:summary
 
   check:
@@ -1147,6 +1134,9 @@ tasks:
       # gate. The binary/bash check above measures coverage but does not gate on
       # it; this is the authoritative threshold check (excludes TUI/demo code).
       - task: test:coverage:project
+      # The binary check above does not know about the framework changelog.
+      # This script travels with .ckeletin/, so derived projects run it too.
+      - task: check:framework-changelog
       # Non-fatal footer: nudge when the framework (.ckeletin/) is behind upstream.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'
@@ -1195,6 +1185,7 @@ tasks:
           category_header "Tests (Unit Only)"
         silent: true
       - task: test:unit
+      - task: check:framework-changelog
       - task: check:summary
         vars: { CHECK_MODE: "fast" }
 
@@ -1286,6 +1277,19 @@ tasks:
       - task: clean:release
 
   # --- Code Generation ---
+
+  generate:command:
+    desc: Generate a new command with full pattern (cmd + internal + tests + config)
+    vars:
+      # name= is the documented form. CLI_ARGS covers `task generate:command -- greet`.
+      NAME: '{{.name | default .CLI_ARGS}}'
+    preconditions:
+      - sh: '[ -n "{{.NAME}}" ]'
+        msg: "Command name is required. Usage: task generate:command name=<name>"
+    cmds:
+      - go run {{.SCRIPTS_DIR}}/generate-command/ {{.NAME}}
+      - task: generate:config:key-constants
+      - task: format
 
   generate:config:key-constants:
     desc: Generate type-safe config key constants

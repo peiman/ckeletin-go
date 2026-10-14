@@ -63,6 +63,7 @@ clean:local
 clean:release
 
 # === Generate ===
+generate:command
 generate:config:key-constants
 generate:config:schema
 generate:license
