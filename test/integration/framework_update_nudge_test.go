@@ -26,8 +26,7 @@ func nudgeScriptPath(t *testing.T) string {
 // nudgeRunGit runs a git command in dir and fails the test on error.
 func nudgeRunGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	cmd := gitCmd(dir, args...)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "git %v failed.\nOutput:\n%s", args, string(out))
 }
@@ -82,7 +81,7 @@ func setupDownstream(t *testing.T) (upstream, downstream string) {
 	nudgeRunGit(t, upstream, "add", "-A")
 	nudgeRunGit(t, upstream, "commit", "-m", "c1")
 
-	clone := exec.Command("git", "clone", "--quiet", upstream, downstream)
+	clone := gitCmd(filepath.Dir(downstream), "clone", "--quiet", upstream, downstream)
 	out, err := clone.CombinedOutput()
 	require.NoError(t, err, "git clone failed.\nOutput:\n%s", string(out))
 

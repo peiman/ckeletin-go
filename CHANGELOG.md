@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Dependency updates**: Go modules `go-isatty` 0.0.24, `testify` 1.12.1, `golang.org/x/text` 0.43.0, and `golang.org/x/sys` 0.49.0. GitHub Actions moved to current tags, including `actions/cache` v6 and `actions/setup-go` v7. `arduino/setup-task` stays on v2: v3 is GPL-3.0 and its July dependency-review failure could not be reproduced from expired logs. Dependabot now groups minor and patch updates and allows 10 open PRs, so one major bump cannot block the queue.
+- **Go toolchain bumped to 1.26.9**: `.go-version` and `go.mod` pick up the standard-library fixes through 1.26.9, including the reachable `net/http` advisories present on 1.26.4. CI installs this version from `.go-version`, so `task setup:latest` can build current tools such as grype.
+
+### Changed
+
+- **Agent guides**: `AGENTS.md` is the only project guide. `CLAUDE.md` imports it and keeps only Claude Code behavior. `.cursorrules`, `.github/copilot-instructions.md`, and `.claude/rules/task-commands.md` point at `AGENTS.md` instead of restating the rules.
+
 ### Added
 
+- **`.license-ignore` for the source license check**: A module go-licenses cannot classify (for example MIT-0) never gets a license name, so `LICENSE_ALLOWED` cannot allow it. List its module path, one per line, in a repo-root `.license-ignore`. Each path is an extra `--ignore`. A module that is not listed still fails the check. This repository does not ship that file.
 - **`catalog` command (CKSPEC-AGENT-006)**: Emits the CLI's command surface — commands, flags, and globals — as machine-readable JSON derived from the live Cobra command tree, so agents discover capabilities without parsing `--help` text. Conformance published against spec v0.8.0 (40/40 requirements met).
 - **Complete `--version` output (CKSPEC-OUT-006)**: Now reports four fields — version, commit, build date, and working-tree state (clean/dirty/unknown) — and supports `--version --output json` (previously a latent `unknown command` error). Uninjected builds degrade to `unknown` instead of empty strings.
 - **Validators for numeric and constrained config options**: Positive-integer validation for the `app.log.sampling_*` and `app.log.file_max_*` options, plus validators for `app.log.color_enabled` and `app.docs.output_format`, catch invalid values at startup.
@@ -22,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`check` classifies govulncheck the same way as the shell gate**: `ckeletin-go check` used to report every govulncheck failure as vulnerabilities found. Exit 3 is a finding, including a trace that mentions `dial tcp` or `timeout`. A different exit status is a network failure only when the output names the connectivity problem, and that failure is reported as a network error. Any other failure still counts as a finding.
+- **`task check` accepts a newer Go and rescans a stale SBOM**: `.go-version` is the minimum toolchain. CI installs that version. A newer local Go passes; an older one fails. The SBOM scan regenerates a CycloneDX file that is older than `go.mod`, `go.sum`, or `.go-version`, and rebuilds the binary first when that is older than the module. `reports/sbom/` stays gitignored.
+- **Integration tests no longer inherit `GIT_*`**: Git commands in the integration suite drop `GIT_DIR` and the other `GIT_*` variables. Under a hook in a worktree those variables point at the calling repository, so a temp-dir `git init` could set `core.bare=true` there and `git config` could write the test identity into it.
+- **Vulnerability checks follow govulncheck's exit status**: A findings report exits 3. `check-vuln-fast.sh` and `check-deps.sh` used to grep that report for the word `timeout` and treat a call stack (`http2bufferedWriterTimeoutWriter`) as a network failure, so the pre-commit scan could exit 0 with vulnerabilities present. Exit 3 is now always a finding. A network failure is a different exit status whose text names the connectivity problem.
 - **File-walking checks no longer descend into Claude Code worktrees**: `.claude/worktrees/` holds full nested module checkouts; stale copies there failed `task format`/`task check` (goimports walked in, and `task format` would even rewrite the foreign worktree's files) and broke `validate:layering` ("not attached to any component"). A shared scanner-exclusion list (`lib/check-output.sh`) now prunes excluded directories and any nested `go.mod`, go-arch-lint excludes `.claude/`, and a regression test pins the contract for format, layering, and SAST. Downstream projects inherit the script fix via framework sync plus a post-update migration for their `.go-arch-lint.yml` (reported by the daana-cli team — scanners that error on unbuildable nested code may silently skip it, degrading coverage behind a green summary).
 - **JSON output mode keeps the audit log alive**: `--output json` previously disabled zerolog globally, silencing the audit log file along with stderr — contradicting the documented contract and dropping the shadow logs cited as CKSPEC-OUT-004 evidence. Only the console writer is disabled now; the audit file receives all entries. Env-var- and config-file-driven JSON mode are equally clean: pre-init log output is buffered and discarded in JSON mode (replayed to stderr in text mode), and init errors render the standard error envelope regardless of how JSON mode was activated.
 - **A requested audit log that cannot be created fails the command**: When file logging is explicitly enabled but the log file cannot be opened (bad path, unwritable directory), the command now exits with an error instead of silently continuing without an audit trail — previously the warning was unobservable in JSON mode.

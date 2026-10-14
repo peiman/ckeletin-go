@@ -10,7 +10,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     reviewers:
       - "peiman"
     labels:
@@ -19,6 +19,15 @@ updates:
     commit-message:
       prefix: "chore(deps)"
       include: "scope"
+    # Group minor and patch updates. Majors stay as their own PRs so one
+    # stuck major cannot fill the open-PR limit and block patches.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Go modules - Keep Go dependencies up to date
   - package-ecosystem: "gomod"
@@ -27,7 +36,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     reviewers:
       - "peiman"
     labels:

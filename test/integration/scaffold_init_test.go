@@ -58,33 +58,14 @@ func TestScaffoldInit(t *testing.T) {
 	err := copyProjectFiles(tmpDir)
 	require.NoError(t, err, "failed to copy project files")
 
-	// Initialize git repo (needed for Taskfile VERSION variable)
-	initCmd := exec.Command("git", "init")
-	initCmd.Dir = tmpDir
-	output, err := initCmd.CombinedOutput()
-	require.NoError(t, err, "failed to init git repo\nOutput: %s", string(output))
-
-	// Configure git user (required for commits in CI)
-	configEmailCmd := exec.Command("git", "config", "user.email", "test@ckeletin-go.example")
-	configEmailCmd.Dir = tmpDir
-	output, err = configEmailCmd.CombinedOutput()
-	require.NoError(t, err, "failed to set git user.email\nOutput: %s", string(output))
-
-	configNameCmd := exec.Command("git", "config", "user.name", "Test User")
-	configNameCmd.Dir = tmpDir
-	output, err = configNameCmd.CombinedOutput()
-	require.NoError(t, err, "failed to set git user.name\nOutput: %s", string(output))
-
-	// Add and commit files (needed for git describe)
-	addCmd := exec.Command("git", "add", ".")
-	addCmd.Dir = tmpDir
-	output, err = addCmd.CombinedOutput()
-	require.NoError(t, err, "failed to add files\nOutput: %s", string(output))
-
-	commitCmd := exec.Command("git", "commit", "-m", "Initial commit")
-	commitCmd.Dir = tmpDir
-	output, err = commitCmd.CombinedOutput()
-	require.NoError(t, err, "failed to commit\nOutput: %s", string(output))
+	// Initialize git repo (needed for Taskfile VERSION variable).
+	// Configure a local identity (required for commits in CI) and make the
+	// initial commit (needed for git describe).
+	runGit(t, tmpDir, "init")
+	runGit(t, tmpDir, "config", "user.email", "test@ckeletin-go.example")
+	runGit(t, tmpDir, "config", "user.name", "Test User")
+	runGit(t, tmpDir, "add", ".")
+	runGit(t, tmpDir, "commit", "-m", "Initial commit")
 
 	// Run: task init name=testapp module=github.com/test/testapp
 	testName := "testapp"
@@ -923,8 +904,7 @@ deps:
 // runGit executes a git command in the given directory and requires it to succeed.
 func runGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	cmd := gitCmd(dir, args...)
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err, "git %s failed\nOutput: %s", strings.Join(args, " "), string(output))
 }

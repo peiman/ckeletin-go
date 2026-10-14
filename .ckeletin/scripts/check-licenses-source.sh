@@ -18,6 +18,21 @@ ALLOWED_LICENSES="${LICENSE_ALLOWED:-MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,IS
 # Get module path to ignore self
 MODULE_PATH=$(go list -m 2>/dev/null || echo "github.com/peiman/ckeletin-go")
 
+# .license-ignore (repo root, optional): one module path per line, for a
+# module go-licenses cannot classify (it never gets a license name, so
+# LICENSE_ALLOWED cannot allow it). Blank lines and # comments are skipped.
+# Text after the path is a comment. Each path is another --ignore. A module
+# that is not listed still fails. See docs/licenses.md.
+IGNORE_FLAGS="--ignore='$MODULE_PATH'"
+if [ -f .license-ignore ]; then
+    while read -r mod _; do
+        case "$mod" in
+            ''|'#'*) continue ;;
+        esac
+        IGNORE_FLAGS="$IGNORE_FLAGS --ignore='$mod'"
+    done < .license-ignore
+fi
+
 check_header "Checking dependency licenses (source-based)"
 
 # Check if go-licenses is installed
@@ -28,7 +43,7 @@ if ! command -v go-licenses &> /dev/null; then
 fi
 
 # Run license check
-if run_check "go-licenses check --allowed_licenses='$ALLOWED_LICENSES' --ignore='$MODULE_PATH' ./... 2>&1"; then
+if run_check "go-licenses check --allowed_licenses='$ALLOWED_LICENSES' $IGNORE_FLAGS ./... 2>&1"; then
     check_success "All dependency licenses compliant"
     check_note "Source-based check. Run 'task check:license:binary' for release verification."
     exit 0

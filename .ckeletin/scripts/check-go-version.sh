@@ -3,8 +3,11 @@
 # Also validates .go-version meets go.mod minimum requirement
 #
 # Usage:
-#   ./scripts/check-go-version.sh         # Strict match (for CI)
-#   ./scripts/check-go-version.sh --minor # Minor version match (for dev)
+#   ./scripts/check-go-version.sh         # Installed Go must be >= .go-version
+#   ./scripts/check-go-version.sh --minor # Same major.minor, any patch
+#
+# .go-version is the minimum. CI installs that exact version. A newer local
+# toolchain still contains those fixes, so it passes. An older one fails.
 
 set -eo pipefail
 
@@ -100,19 +103,14 @@ case "$MODE" in
         fi
         ;;
     --strict|*)
-        # Strict match: exact version required
-        if [ "$CURRENT_VERSION" = "$EXPECTED_VERSION" ]; then
-            echo "✅ Go version OK: $CURRENT_VERSION (min: ${MIN_VERSION:-n/a})"
+        # .go-version is the floor. Newer toolchains pass; older ones do not.
+        if version_gte "$CURRENT_MAJOR" "$CURRENT_MINOR" "$CURRENT_PATCH" "$EXPECTED_MAJOR" "$EXPECTED_MINOR" "$EXPECTED_PATCH"; then
+            echo "✅ Go version OK: $CURRENT_VERSION (minimum $EXPECTED_VERSION from .go-version)"
             exit 0
         else
-            echo "❌ Go version mismatch"
-            echo "   Expected: $EXPECTED_VERSION (from .go-version)"
-            echo "   Minimum:  ${MIN_VERSION:-n/a} (from go.mod)"
-            echo "   Found:    $CURRENT_VERSION"
-            echo ""
-            echo "💡 Options:"
-            echo "   1. Update Go to $EXPECTED_VERSION"
-            echo "   2. Update .go-version to $CURRENT_VERSION (if intentional)"
+            echo "❌ Go $CURRENT_VERSION is older than .go-version ($EXPECTED_VERSION)"
+            echo "   Install Go $EXPECTED_VERSION or newer."
+            echo "   CI installs the pinned version from .go-version."
             echo ""
             echo "   After upgrading Go, rebuild tools: task setup"
             exit 1

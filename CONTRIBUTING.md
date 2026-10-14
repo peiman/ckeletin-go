@@ -22,7 +22,7 @@ Be respectful, professional, and constructive in all interactions. This project 
 
 ### Prerequisites
 
-- Go — the exact required version is pinned in `.go-version` (the single source of truth; also reflected in `go.mod`)
+- Go — `.go-version` is the minimum (also reflected in `go.mod`). CI installs that version. A newer toolchain passes `task check`.
 - Git
 - A GitHub account
 
@@ -54,8 +54,8 @@ Be respectful, professional, and constructive in all interactions. This project 
 
 4. **Read the architecture documentation:**
    - `README.md` - Project overview
-   - `AGENTS.md` - Comprehensive project guide (commands, conventions, architecture)
-   - `CLAUDE.md` - Claude Code-specific development guidelines
+   - `AGENTS.md` - Project guide (commands, where code goes, hard rules, troubleshooting)
+   - `CLAUDE.md` - Imports `AGENTS.md`; Claude Code behavior only
    - `.ckeletin/docs/adr/*.md` - Framework ADRs (000-099)
    - `docs/adr/*.md` - Project ADRs (100+)
 
@@ -80,7 +80,7 @@ ckeletin-go separates **framework code** (reusable infrastructure) from **projec
 
 ### AI Agent Compatibility
 
-The framework includes AI agent configuration (`AGENTS.md`, `CLAUDE.md`, `.claude/rules/`, `.claude/hooks.json`) that enables AI coding agents to work within the project's enforced patterns. When contributing, be aware that changes to architectural patterns, task commands, or configuration conventions may need corresponding updates to `AGENTS.md` and `CLAUDE.md` so that AI agents stay aligned.
+The framework includes AI agent configuration (`AGENTS.md`, a thin `CLAUDE.md` that imports it, `.claude/rules/`, `.claude/settings.json`) so agents work within the enforced patterns. When contributing, changes to commands or conventions belong in `AGENTS.md`. `CLAUDE.md` stays a pointer plus Claude Code-only behavior.
 
 ## Development Workflow
 

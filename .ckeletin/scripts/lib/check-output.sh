@@ -136,6 +136,32 @@ run_check() {
     return $exit_code
 }
 
+# classify_govulncheck: map a govulncheck status to clean, findings, or network.
+# Exit 3 means vulnerabilities were found. That output must not be scanned for
+# network words: a call stack can contain "timeout"
+# (http2bufferedWriterTimeoutWriter) and is not a connectivity failure.
+# Any other non-zero status is a network failure only when the text says so.
+# Usage: class=$(classify_govulncheck "$?" "$CHECK_OUTPUT")
+classify_govulncheck() {
+    local code="$1"
+    local output="$2"
+
+    if [[ "$code" -eq 0 ]]; then
+        echo clean
+        return 0
+    fi
+    if [[ "$code" -eq 3 ]]; then
+        echo findings
+        return 0
+    fi
+    if printf '%s\n' "$output" | grep -qiE 'no such host|connection refused|network is unreachable|dial tcp|temporary failure in name resolution|TLS handshake timeout|Client\.Timeout'; then
+        echo network
+        return 0
+    fi
+    echo findings
+    return 0
+}
+
 # ─────────────────────────────────────────────────────────────────────
 # Scanner exclusions (SSOT)
 #

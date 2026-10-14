@@ -513,7 +513,7 @@ func TestCheckGoVersionAgainstGoVersionFile(t *testing.T) {
 		assert.NoError(t, err)
 		defer os.Chdir(currentDir)
 
-		// Pin .go-version to the exact running toolchain (e.g. "1.26.4"):
+		// Pin .go-version to the exact running toolchain (e.g. "1.26.9"):
 		// the doctor must parse the full patch version from `go version`,
 		// not truncate it to major.minor and warn on its own toolchain.
 		pinned := strings.TrimPrefix(runtime.Version(), "go")

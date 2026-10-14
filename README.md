@@ -75,9 +75,9 @@ CLAUDE.md          → Claude Code-specific behavioral rules
 task check         → Single gateway that catches all violations
 ```
 
-**`AGENTS.md`** gives any AI agent complete project context: architecture, commands, conventions, testing thresholds, and decision trees. It's structured as a specification, not prose — designed for machine consumption.
+**`AGENTS.md`** is the project guide every agent reads: commands, where code goes, hard rules, and troubleshooting. Provider files do not restate it.
 
-**`CLAUDE.md`** adds Claude Code-specific rules: mandatory task commands, code placement decision trees, priority cascade (Security → License → Correctness → Coverage → Style).
+**`CLAUDE.md`** imports `AGENTS.md` and adds only Claude Code behavior (how to edit files, hooks, unused variables).
 
 **Hooks and enforcement** close the loop. SessionStart hooks auto-install tools. Pre-commit hooks validate changes. `task check` runs the same quality gates regardless of who wrote the code.
 
@@ -90,9 +90,9 @@ task check         → Single gateway that catches all violations
 
 ### Using With AI Agents
 
-**Claude Code**: Reads `CLAUDE.md` and `.claude/rules/` automatically. Hooks fire on session start. No configuration needed.
+**Claude Code**: Reads `CLAUDE.md`, which imports `AGENTS.md`. Hooks fire on session start. No configuration needed.
 
-**Cursor / Copilot / Codex**: Point your agent at `AGENTS.md` for full project context. The task-based workflow and automated enforcement work with any tool.
+**Cursor / Copilot / Codex**: Read `AGENTS.md` directly. `.cursorrules` and `.github/copilot-instructions.md` point at the same file.
 
 **The pattern is reusable.** The `AGENTS.md` → rules → hooks → enforcement approach works in any codebase. ckeletin-go is a reference implementation.
 
