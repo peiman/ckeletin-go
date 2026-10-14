@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -206,6 +207,8 @@ func TestGeneratedContent_ContainsExpectedPatterns(t *testing.T) {
 		assert.Contains(t, s, "MustAddToRoot(greetCmd)")
 		assert.Contains(t, s, "greet.NewExecutor")
 		assert.Contains(t, s, "greet.Config{")
+		assert.Contains(t, s, `.ckeletin/pkg/config"`)
+		assert.Contains(t, s, `getConfigValueWithFlags[string](cmd, "message", config.KeyAppGreetMessage)`)
 	})
 
 	t.Run("executor has Config and Executor types", func(t *testing.T) {
@@ -217,6 +220,9 @@ func TestGeneratedContent_ContainsExpectedPatterns(t *testing.T) {
 		assert.Contains(t, s, "func NewExecutor(")
 		assert.Contains(t, s, "func (e *Executor) Execute() error")
 		assert.Contains(t, s, `"github.com/rs/zerolog/log"`)
+		assert.Contains(t, s, "ui.RenderSuccess")
+		assert.Contains(t, s, "message is empty")
+		assert.NotContains(t, s, "not yet implemented")
 	})
 
 	t.Run("test file uses testify", func(t *testing.T) {
@@ -228,6 +234,8 @@ func TestGeneratedContent_ContainsExpectedPatterns(t *testing.T) {
 		assert.Contains(t, s, "func TestNewExecutor(")
 		assert.Contains(t, s, "func TestExecutor_Execute(")
 		assert.Contains(t, s, "t.Parallel()")
+		assert.Contains(t, s, `Message: "hello"`)
+		assert.Contains(t, s, "empty message")
 	})
 
 	t.Run("config file has metadata and provider", func(t *testing.T) {
@@ -238,5 +246,38 @@ func TestGeneratedContent_ContainsExpectedPatterns(t *testing.T) {
 		assert.Contains(t, s, "func GreetOptions() []config.ConfigOption")
 		assert.Contains(t, s, "config.RegisterOptionsProvider(GreetOptions)")
 		assert.Contains(t, s, `ConfigPrefix: "app.greet"`)
+		assert.Contains(t, s, `"app.greet.message"`)
+		assert.Contains(t, s, `DefaultValue: "hello"`)
+		assert.Contains(t, s, `"app.greet.message": "message"`)
 	})
+}
+
+func TestAddBusinessPackage_InsertsOneEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".go-arch-lint.yml")
+	original := "" +
+		"business:\n" +
+		"  in:\n" +
+		"      - internal/ping/**\n" +
+		"      # Add your business logic packages below:\n" +
+		"      # - internal/yourpackage/**\n" +
+		"public:\n" +
+		"  in:\n" +
+		"      - pkg/**\n"
+	require.NoError(t, os.WriteFile(path, []byte(original), 0o644))
+
+	require.NoError(t, addBusinessPackage(path, "greet"))
+
+	got, err := os.ReadFile(path)
+	require.NoError(t, err)
+	text := string(got)
+	assert.Contains(t, text, "      - internal/greet/**\n      # Add your business logic packages below:")
+	assert.Contains(t, text, "      - internal/ping/**\n")
+	assert.Contains(t, text, "public:\n")
+	assert.Equal(t, 1, strings.Count(text, "internal/greet/**"))
+
+	require.NoError(t, addBusinessPackage(path, "greet"))
+	got, err = os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(string(got), "internal/greet/**"))
 }

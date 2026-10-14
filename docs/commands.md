@@ -104,6 +104,8 @@ build via `task doctor`.
 task generate:command name=mycommand
 ```
 
-This creates the command file, business-logic skeleton, tests, and config
-options following the ultra-thin pattern. See
-[CONTRIBUTING.md](../CONTRIBUTING.md) for the full walkthrough.
+This creates a working command: one string option, wired through a
+`config.Key*` constant, printed with `ui.RenderSuccess`, and covered by a
+table test. It also registers the new package in `.go-arch-lint.yml` and
+regenerates the key constants. `ping` stays the demo for color and the
+optional UI. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full walkthrough.
