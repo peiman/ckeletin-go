@@ -43,9 +43,11 @@ package check
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -420,13 +422,54 @@ func (e *checkMethods) checkDeps(ctx context.Context) error {
 	return nil
 }
 
-// checkVuln scans for vulnerabilities using govulncheck
+// govulnNetworkPattern matches classify_govulncheck in
+// .ckeletin/scripts/lib/check-output.sh. Exit 3 is never matched against
+// this pattern: a findings trace can contain "timeout".
+var govulnNetworkPattern = regexp.MustCompile(`(?i)no such host|connection refused|network is unreachable|dial tcp|temporary failure in name resolution|TLS handshake timeout|Client\.Timeout`)
+
+// classifyGovulncheck maps a govulncheck status to clean, findings, or network.
+// The cases are the same ones classify_govulncheck uses.
+func classifyGovulncheck(code int, output string) string {
+	switch {
+	case code == 0:
+		return "clean"
+	case code == 3:
+		return "findings"
+	case govulnNetworkPattern.MatchString(output):
+		return "network"
+	default:
+		return "findings"
+	}
+}
+
+// checkVuln scans for vulnerabilities using govulncheck.
+// A network failure fails this check with its own label. ckeletin-go check is
+// a full check, matching check-deps.sh rather than the pre-commit skip.
 func (e *checkMethods) checkVuln(ctx context.Context) error {
 	log.Debug().Msg("Running vulnerability check")
 
 	cmd := exec.CommandContext(ctx, "govulncheck", "./...")
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("vulnerabilities found:\n%s", strings.TrimSpace(string(output)))
+	output, err := cmd.CombinedOutput()
+	code := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			code = exitErr.ExitCode()
+		} else {
+			code = -1
+			if strings.TrimSpace(string(output)) == "" {
+				output = []byte(err.Error())
+			}
+		}
 	}
-	return nil
+
+	text := strings.TrimSpace(string(output))
+	switch classifyGovulncheck(code, text) {
+	case "clean":
+		return nil
+	case "network":
+		return fmt.Errorf("vulnerability check failed (network error):\n%s", text)
+	default:
+		return fmt.Errorf("security vulnerabilities found:\n%s", text)
+	}
 }

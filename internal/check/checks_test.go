@@ -2,9 +2,14 @@ package check
 
 import (
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShellCheck_NonExistentScript(t *testing.T) {
@@ -190,4 +195,110 @@ func TestParseCoverage(t *testing.T) {
 			assert.InDelta(t, tt.expected, parseCoverage(tt.output), 0.01)
 		})
 	}
+}
+
+// govulncheck exits 3 when it finds vulnerabilities. A findings trace can
+// contain "timeout" and even "dial tcp" inside a stack. classify_govulncheck
+// in .ckeletin/scripts/lib/check-output.sh is the rule task check already
+// runs: exit 0 is clean, exit 3 is always a finding, and only a different
+// status whose text names a connectivity problem is a network failure.
+// ckeletin-go check is a full check, so a network failure fails the check
+// with that label (as check-deps.sh does) instead of passing.
+func TestCheckVuln_ClassifiesGovulncheckLikeTheShellGate(t *testing.T) {
+	bin := buildGovulncheckStub(t)
+	t.Setenv("PATH", filepath.Dir(bin)+string(os.PathListSeparator)+os.Getenv("PATH"))
+
+	tests := []struct {
+		name       string
+		exitCode   string
+		output     string
+		wantSubstr string
+		forbid     string
+	}{
+		{
+			name:     "clean",
+			exitCode: "0",
+			output:   "No vulnerabilities found.",
+		},
+		{
+			name:       "exit 3 is a finding even when the trace says dial tcp",
+			exitCode:   "3",
+			output:     "Vulnerability #1: GO-2026-6603\nnet/http.http2bufferedWriterTimeoutWriter.Write\ndial tcp: lookup vuln.go.dev: no such host",
+			wantSubstr: "security vulnerabilities found",
+			forbid:     "network",
+		},
+		{
+			name:       "network failure keeps its label",
+			exitCode:   "1",
+			output:     "govulncheck: dial tcp: lookup vuln.go.dev: no such host",
+			wantSubstr: "network error",
+			forbid:     "vulnerabilities found",
+		},
+		{
+			name:       "any other failure is a finding",
+			exitCode:   "2",
+			output:     "govulncheck: something broke",
+			wantSubstr: "security vulnerabilities found",
+			forbid:     "network",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			marker := filepath.Join(t.TempDir(), "ran")
+			t.Setenv("CKELETIN_GOVULN_MARKER", marker)
+			t.Setenv("CKELETIN_GOVULN_EXIT", tt.exitCode)
+			t.Setenv("CKELETIN_GOVULN_OUTPUT", tt.output)
+
+			err := (&checkMethods{}).checkVuln(context.Background())
+
+			_, statErr := os.Stat(marker)
+			require.NoError(t, statErr, "checkVuln must run govulncheck")
+
+			if tt.wantSubstr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantSubstr)
+			assert.NotContains(t, err.Error(), tt.forbid)
+			assert.Contains(t, err.Error(), tt.output)
+		})
+	}
+}
+
+func buildGovulncheckStub(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module govulnstub\n\ngo 1.26.9\n"), 0o644))
+	src := `package main
+
+import (
+	"os"
+	"strconv"
+)
+
+func main() {
+	if marker := os.Getenv("CKELETIN_GOVULN_MARKER"); marker != "" {
+		if err := os.WriteFile(marker, []byte("ran"), 0o644); err != nil {
+			os.Stderr.WriteString(err.Error())
+			os.Exit(9)
+		}
+	}
+	_, _ = os.Stdout.WriteString(os.Getenv("CKELETIN_GOVULN_OUTPUT"))
+	code, _ := strconv.Atoi(os.Getenv("CKELETIN_GOVULN_EXIT"))
+	os.Exit(code)
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "main.go"), []byte(src), 0o644))
+	name := "govulncheck"
+	if runtime.GOOS == "windows" {
+		name = "govulncheck.exe"
+	}
+	bin := filepath.Join(dir, name)
+	cmd := exec.Command("go", "build", "-o", bin, ".")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "build govulncheck stub: %s", out)
+	return bin
 }
