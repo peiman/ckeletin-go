@@ -24,6 +24,7 @@ CHECKS+=("ADR-009: Layered architecture")
 CHECKS+=("ADR-010: Package organization")
 CHECKS+=("ADR-013: Output patterns")
 CHECKS+=("ADR-012: Dev build tags")
+CHECKS+=("Framework changelog records .ckeletin changes")
 
 if [ "$CHECK_MODE" != "fast" ]; then
   CHECKS+=("No hardcoded secrets (gitleaks)")

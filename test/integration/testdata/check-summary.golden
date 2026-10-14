@@ -1,5 +1,5 @@
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ All checks passed (20/20)
+✅ All checks passed (21/21)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ Code formatting
@@ -15,6 +15,7 @@
 ✅ ADR-010: Package organization
 ✅ ADR-013: Output patterns
 ✅ ADR-012: Dev build tags
+✅ Framework changelog records .ckeletin changes
 ✅ No hardcoded secrets (gitleaks)
 ✅ Static analysis passed (semgrep)
 ✅ Dependency integrity

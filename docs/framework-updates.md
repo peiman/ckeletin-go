@@ -90,6 +90,10 @@ If the build fails at step 13, the commit still exists so you can inspect it. Se
 
 The boundary is strict: `git checkout ckeletin-upstream/main -- .ckeletin/` ensures only files under `.ckeletin/` are touched. Your code, your configs, and your documentation are never modified.
 
+`.ckeletin/CHANGELOG.md` is what the update prints when `.ckeletin/VERSION` changes. The root `CHANGELOG.md` is not checked out. `task check` fails when framework files change without an edit to the framework changelog. Docs under `.ckeletin/docs/` are exempt.
+
+`task generate:command` is a framework task. Keep the project entry as a forwarding that passes `name` and `CLI_ARGS`. A bare `task:` call drops both, so `name=<name>` never reaches the generator. The post-update migration prints the forwarding when your Taskfile still runs the generator itself.
+
 ## How Import Rewriting Works
 
 When you fork ckeletin-go and run `task init`, your module path changes (e.g., from `github.com/peiman/ckeletin-go` to `github.com/you/myapp`). Framework code in `.ckeletin/pkg/` imports need to reflect your module path, not the upstream one.

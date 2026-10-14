@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Framework 0.2.0**: `.ckeletin/VERSION` moves off 0.1.0, and `.ckeletin/CHANGELOG.md` is the record a derived CLI receives on `task ckeletin:update`. `task generate:command` now lives in the framework Taskfile; the project task forwards it and passes `name`. `task check` fails when `.ckeletin/` changes without that changelog. Edits under `.ckeletin/docs/` are exempt.
 - **`task generate:command` emits a working command**: The generated command maps one string option through a `config.Key*` constant, refuses an empty value, and prints it with `ui.RenderSuccess`, so `--output json` carries the message. The generator registers `internal/<name>` in `.go-arch-lint.yml`, and `name=<name>` is passed through to the generator. `ping` stays the demo for color and the optional UI.
 - **Agent guides**: `AGENTS.md` is the only project guide. `CLAUDE.md` imports it and keeps only Claude Code behavior. `.cursorrules`, `.github/copilot-instructions.md`, and `.claude/rules/task-commands.md` point at `AGENTS.md` instead of restating the rules.
 

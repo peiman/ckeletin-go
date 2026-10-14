@@ -414,16 +414,13 @@ tasks:
 
   generate:command:
     desc: Generate a new command with full pattern (cmd + internal + tests + config)
-    vars:
-      # name= is the documented form. CLI_ARGS covers `task generate:command -- greet`.
-      NAME: '{{.name | default .CLI_ARGS}}'
-    preconditions:
-      - sh: '[ -n "{{.NAME}}" ]'
-        msg: "Command name is required. Usage: task generate:command name=<name>"
     cmds:
-      - go run ./.ckeletin/scripts/generate-command/ {{.NAME}}
-      - task: generate:config:key-constants
-      - task: format
+      # The framework task owns the generator invocation. Pass name and CLI_ARGS
+      # through; a bare `task:` call drops both, and `name=` is the documented form.
+      - task: ckeletin:generate:command
+        vars:
+          name: '{{.name}}'
+          CLI_ARGS: '{{.CLI_ARGS}}'
 
   generate:docs:config:
     desc: Generate configuration documentation
