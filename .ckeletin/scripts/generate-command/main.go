@@ -69,13 +69,45 @@ func main() {
 		fmt.Printf("  created %s\n", f.path)
 	}
 
+	if err := addBusinessPackage(".go-arch-lint.yml", name); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("  registered internal/%s in .go-arch-lint.yml\n", name)
+
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Printf("  1. Run: task generate:config:key-constants\n")
+	fmt.Printf("     (task generate:command already does this)\n")
 	fmt.Printf("  2. Run: task format\n")
 	fmt.Printf("  3. Customize business logic in internal/%s/%s.go\n", name, name)
 	fmt.Printf("  4. Update metadata/options in internal/config/commands/%s_config.go\n", name)
 	fmt.Printf("  5. Run: task check\n")
+}
+
+// addBusinessPackage registers internal/<name> under business.in in
+// .go-arch-lint.yml. The marker comment is the insertion point. A second
+// call for the same package leaves the file unchanged.
+func addBusinessPackage(path, name string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("cannot read %s: %w", path, err)
+	}
+	text := string(data)
+	entry := "internal/" + name + "/**"
+	if strings.Contains(text, entry) {
+		return nil
+	}
+	const marker = "      # Add your business logic packages below:"
+	if !strings.Contains(text, marker) {
+		return fmt.Errorf("%s has no %q marker", path, marker)
+	}
+	line := "      - " + entry + "\n"
+	updated := strings.Replace(text, marker, line+marker, 1)
+	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
+		return fmt.Errorf("cannot write %s: %w", path, err)
+	}
+	return nil
 }
 
 // templateData holds the data passed to all templates.
@@ -211,6 +243,7 @@ var cmdTemplate = `// cmd/{{.Name}}.go
 package cmd
 
 import (
+	"{{.ModulePath}}/.ckeletin/pkg/config"
 	"{{.ModulePath}}/internal/config/commands"
 	"{{.ModulePath}}/internal/{{.Name}}"
 	"github.com/spf13/cobra"
@@ -224,9 +257,7 @@ func init() {
 
 func run{{.NameTitle}}(cmd *cobra.Command, args []string) error {
 	cfg := {{.Name}}.Config{
-		// TODO: Map config values to Config struct fields.
-		// Example:
-		//   Message: getConfigValueWithFlags[string](cmd, "message", config.KeyApp{{.NameTitle}}Message),
+		Message: getConfigValueWithFlags[string](cmd, "message", config.KeyApp{{.NameTitle}}Message),
 	}
 	return {{.Name}}.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
 }
@@ -241,14 +272,18 @@ import (
 	"fmt"
 	"io"
 
+	"{{.ModulePath}}/internal/ui"
 	"github.com/rs/zerolog/log"
 )
 
 // Config holds configuration for the {{.Name}} command.
 type Config struct {
-	// TODO: Add configuration fields.
-	// Example:
-	//   Message string
+	Message string
+}
+
+// Result is the JSON data for a successful run.
+type Result struct {
+	Message string ` + "`json:\"message\"`" + `
 }
 
 // Executor handles the execution of the {{.Name}} command.
@@ -269,10 +304,11 @@ func NewExecutor(cfg Config, writer io.Writer) *Executor {
 func (e *Executor) Execute() error {
 	log.Debug().Str("component", "{{.Name}}").Msg("Starting {{.Name}} execution")
 
-	// TODO: Implement command logic.
-	fmt.Fprintln(e.writer, "{{.Name}}: not yet implemented")
+	if e.cfg.Message == "" {
+		return fmt.Errorf("message is empty")
+	}
 
-	return nil
+	return ui.RenderSuccess(e.writer, e.cfg.Message, Result{Message: e.cfg.Message})
 }
 `
 
@@ -299,16 +335,20 @@ func TestNewExecutor(t *testing.T) {
 
 func TestExecutor_Execute(t *testing.T) {
 	tests := []struct {
-		name       string
-		cfg        Config
-		wantOutput string
-		wantErr    bool
+		name    string
+		cfg     Config
+		want    string
+		wantErr bool
 	}{
 		{
-			name:       "Default execution",
-			cfg:        Config{},
-			wantOutput: "{{.Name}}: not yet implemented\n",
-			wantErr:    false,
+			name: "default message",
+			cfg:  Config{Message: "hello"},
+			want: "hello",
+		},
+		{
+			name:    "empty message",
+			cfg:     Config{},
+			wantErr: true,
 		},
 	}
 
@@ -322,10 +362,11 @@ func TestExecutor_Execute(t *testing.T) {
 
 			if tt.wantErr {
 				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
+				assert.Empty(t, buf.String())
+				return
 			}
-			assert.Equal(t, tt.wantOutput, buf.String())
+			require.NoError(t, err)
+			assert.Contains(t, buf.String(), tt.want)
 		})
 	}
 }
@@ -346,33 +387,30 @@ import "{{.ModulePath}}/.ckeletin/pkg/config"
 // {{.NameTitle}}Metadata defines all metadata for the {{.Name}} command.
 var {{.NameTitle}}Metadata = config.CommandMetadata{
 	Use:          "{{.Name}}",
-	Short:        "TODO: Short description for {{.Name}}",
-	Long:         "TODO: Long description for {{.Name}}.",
+	Short:        "Print a message",
+	Long:         "Prints the configured message. An empty message is an error.",
 	ConfigPrefix: "app.{{.Name}}",
 	FlagOverrides: map[string]string{
-		// TODO: Map config keys to flag names.
-		// Example:
-		//   "app.{{.Name}}.message": "message",
+		"app.{{.Name}}.message": "message",
 	},
 	Examples: []string{
 		"{{.Name}}",
+		"{{.Name}} --message hello",
 	},
 }
 
 // {{.NameTitle}}Options returns configuration options for the {{.Name}} command.
 func {{.NameTitle}}Options() []config.ConfigOption {
 	return []config.ConfigOption{
-		// TODO: Add configuration options.
-		// Example:
-		// {
-		//     Key:          "app.{{.Name}}.message",
-		//     DefaultValue: "Hello",
-		//     Description:  "Message to display",
-		//     Type:         "string",
-		//     ShortFlag:    "m",
-		//     Required:     false,
-		//     Example:      "Hello World!",
-		// },
+		{
+			Key:          "app.{{.Name}}.message",
+			DefaultValue: "hello",
+			Description:  "Message to display",
+			Type:         "string",
+			ShortFlag:    "m",
+			Required:     false,
+			Example:      "hello",
+		},
 	}
 }
 

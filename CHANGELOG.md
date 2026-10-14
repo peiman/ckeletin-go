@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`task generate:command` emits a working command**: The generated command maps one string option through a `config.Key*` constant, refuses an empty value, and prints it with `ui.RenderSuccess`, so `--output json` carries the message. The generator registers `internal/<name>` in `.go-arch-lint.yml`, and `name=<name>` is passed through to the generator. `ping` stays the demo for color and the optional UI.
 - **Agent guides**: `AGENTS.md` is the only project guide. `CLAUDE.md` imports it and keeps only Claude Code behavior. `.cursorrules`, `.github/copilot-instructions.md`, and `.claude/rules/task-commands.md` point at `AGENTS.md` instead of restating the rules.
 
 ### Added

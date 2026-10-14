@@ -166,11 +166,14 @@ Follow the **ultra-thin command pattern** ([ADR-001](.ckeletin/docs/adr/001-ultr
 task generate:command name=mycommand
 ```
 
-This creates:
+This creates a command that already works. It maps `app.mycommand.message` through `config.KeyAppMycommandMessage`, prints that message, and returns an error when the message is empty. `--output json` carries the message in the envelope because the executor calls `ui.RenderSuccess`.
+
 - `cmd/mycommand.go` - Ultra-thin CLI wrapper
-- `internal/mycommand/mycommand.go` - Executor skeleton (Config, NewExecutor, Execute)
-- `internal/mycommand/mycommand_test.go` - Table-driven test skeleton (testify)
+- `internal/mycommand/mycommand.go` - Executor (Config, NewExecutor, Execute)
+- `internal/mycommand/mycommand_test.go` - Table-driven tests (testify)
 - `internal/config/commands/mycommand_config.go` - Configuration metadata
+
+The task regenerates `.ckeletin/pkg/config/keys_generated.go` and formats the tree. The generator adds `internal/mycommand` to `.go-arch-lint.yml`. `ping` remains the demo for color and the optional UI.
 
 ### Step 2: Define Configuration Options
 
@@ -218,6 +221,8 @@ func MycommandOptions() []config.ConfigOption {
 ```
 
 ### Step 3: Generate Type-Safe Constants
+
+`task generate:command` already runs this once. Run it again after you add or rename an option:
 
 ```bash
 task generate:config:key-constants

@@ -14,7 +14,7 @@ cmd/
 ├── root.go               # Root command (framework file)
 ├── flags.go              # Flag registration helpers (framework file)
 ├── helpers.go            # Command creation helpers (framework file)
-├── ping.go               # Example ultra-thin command
+├── ping.go               # Demo command (color and optional UI)
 └── docs.go               # Example ultra-thin command with subcommands
 ```
 
@@ -36,9 +36,13 @@ cmd/
 task generate:command name=mycommand
 ```
 
-This creates:
-- `cmd/mycommand.go` - Ultra-thin command file
-- `internal/config/commands/mycommand_config.go` - Metadata + options
+This creates a command that already maps one string option, prints it, and refuses an empty value:
+- `cmd/mycommand.go` - Ultra-thin command file. Reads `config.KeyAppMycommandMessage`.
+- `internal/mycommand/mycommand.go` - Executor. `ui.RenderSuccess` supplies text and JSON output.
+- `internal/mycommand/mycommand_test.go` - Table test for the default message and an empty message.
+- `internal/config/commands/mycommand_config.go` - Metadata and the `app.mycommand.message` option.
+
+The task then regenerates config key constants and formats the tree. The generator registers `internal/mycommand` in `.go-arch-lint.yml`. `ping` remains the demo for color and the optional UI. Copy the generated command, not `ping.go`.
 
 ### Option 2: Manual Creation
 
