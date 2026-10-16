@@ -31,9 +31,11 @@ fi
 if ! command -v go-arch-lint &> /dev/null; then
     echo "📦 go-arch-lint not found, installing..."
     echo ""
-    if ! go install github.com/fe3dback/go-arch-lint@latest; then
+    # v1.18.0 is the last release before v1.19.0, which walks with native
+    # paths and reports false violations on Windows (fe3dback/go-arch-lint#79).
+    if ! go install github.com/fe3dback/go-arch-lint@v1.18.0; then
         echo "❌ Failed to install go-arch-lint"
-        echo "   Please install manually: go install github.com/fe3dback/go-arch-lint@latest"
+        echo "   Please install manually: go install github.com/fe3dback/go-arch-lint@v1.18.0"
         exit 1
     fi
     echo "✅ go-arch-lint installed successfully"

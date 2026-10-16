@@ -95,3 +95,16 @@ func TestScannersExcludeClaudeWorktrees(t *testing.T) {
 		assert.NoError(t, err, "SAST scan must pass with a stale worktree present.\nOutput:\n%s", out)
 	})
 }
+
+// TestValidateLayeringPinsGoArchLint locks the linter version the release
+// matrix installs. go-arch-lint v1.19.0 walks with native paths and reports
+// false dependency violations on Windows (fe3dback/go-arch-lint#79). v1.18.0
+// is the last release before that walk. @latest would pull the broken one.
+func TestValidateLayeringPinsGoArchLint(t *testing.T) {
+	root := scannerProjectRoot(t)
+	body, err := os.ReadFile(filepath.Join(root, ".ckeletin", "scripts", "validate-layering.sh"))
+	require.NoError(t, err)
+	text := string(body)
+	assert.Contains(t, text, "github.com/fe3dback/go-arch-lint@v1.18.0")
+	assert.NotContains(t, text, "go-arch-lint@latest")
+}

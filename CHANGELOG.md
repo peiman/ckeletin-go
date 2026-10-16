@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-16
+
 ### Security
 
 - **Dependency updates**: Go modules `go-isatty` 0.0.24, `testify` 1.12.1, `golang.org/x/text` 0.43.0, and `golang.org/x/sys` 0.49.0. GitHub Actions moved to current tags, including `actions/cache` v6 and `actions/setup-go` v7. `arduino/setup-task` stays on v2: v3 is GPL-3.0 and its July dependency-review failure could not be reproduced from expired logs. Dependabot now groups minor and patch updates and allows 10 open PRs, so one major bump cannot block the queue.
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Layering check installs go-arch-lint v1.18.0.** v1.19.0 reports false dependency violations on Windows. The unwritable-directory audit-log fixture skips there, because mode `0500` does not remove the owner's write access. The fail-closed case where a path component is a file still runs.
 - **`check` classifies govulncheck the same way as the shell gate**: `ckeletin-go check` used to report every govulncheck failure as vulnerabilities found. Exit 3 is a finding, including a trace that mentions `dial tcp` or `timeout`. A different exit status is a network failure only when the output names the connectivity problem, and that failure is reported as a network error. Any other failure still counts as a finding.
 - **`task check` accepts a newer Go and rescans a stale SBOM**: `.go-version` is the minimum toolchain. CI installs that version. A newer local Go passes; an older one fails. The SBOM scan regenerates a CycloneDX file that is older than `go.mod`, `go.sum`, or `.go-version`, and rebuilds the binary first when that is older than the module. `reports/sbom/` stays gitignored.
 - **Integration tests no longer inherit `GIT_*`**: Git commands in the integration suite drop `GIT_DIR` and the other `GIT_*` variables. Under a hook in a worktree those variables point at the calling repository, so a temp-dir `git init` could set `core.bare=true` there and `git config` could write the test identity into it.
@@ -575,7 +578,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/peiman/ckeletin-go/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/peiman/ckeletin-go/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/peiman/ckeletin-go/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/peiman/ckeletin-go/compare/v0.9.0...v0.9.1
