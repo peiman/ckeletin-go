@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -396,6 +397,9 @@ func TestInit_FileLoggingEnabledButUnopenable_FailsClosed(t *testing.T) {
 			},
 			skip: func(t *testing.T) {
 				t.Helper()
+				if runtime.GOOS == "windows" {
+					t.Skip("mode 0500 does not remove the owner's write access on Windows")
+				}
 				if os.Geteuid() == 0 {
 					t.Skip("root bypasses directory write permissions")
 				}
