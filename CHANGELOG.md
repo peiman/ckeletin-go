@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Framework 0.2.3**: `task ckeletin:update` stops when `.ckeletin/` has uncommitted changes or a committed local difference, shows the diff, and does not replace the tree. `discard_local=1` discards a committed difference and says so. Project defaults belong in `internal/projectdefaults/ckeletin-project.toml`, outside `.ckeletin/`, and override only the framework default.
+
 - **Framework 0.2.2**: `task validate:commands:baseline` records a project's existing long `run*` functions in `.ckeletin-command-baseline`, so a project can adopt the 35-line limit and then shrink them one at a time. Recorded functions warn; growth, stale entries and new long functions fail. See ADR-001.
 
 ### Changed

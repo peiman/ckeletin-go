@@ -25,6 +25,7 @@ import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 	"github.com/peiman/ckeletin-go/internal/xdg"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -572,13 +573,17 @@ func initConfig() error {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
-	// Set default values from registry
-	// IMPORTANT: Never set defaults directly with viper.SetDefault() here.
-	// All defaults MUST be defined in internal/config/registry.go
+	// Set default values from the registry, then the project overlay.
+	// The registry is the source of which options exist and of the framework
+	// default. internal/projectdefaults only replaces a default; it does not
+	// add options. Do not call viper.SetDefault() anywhere else.
 	//
 	// Thread-safety: This is called during startup before any concurrent access.
 	// No synchronization needed as all config writes happen here in PersistentPreRunE.
 	config.SetDefaults()
+	if err := config.ApplyProjectDefaultsTOML(projectdefaults.TOML); err != nil {
+		return fmt.Errorf("apply project defaults: %w", err)
+	}
 
 	// Validate default values to ensure they don't exceed limits
 	// This catches programming errors in default value definitions
@@ -646,8 +651,9 @@ func setupCommandConfig(cmd *cobra.Command) {
 		// The common viper environment setup is already done in root's PersistentPreRunE
 		// via the initConfig() function, so we don't need to repeat it here
 
-		// IMPORTANT: Never set defaults directly with viper.SetDefault() here or in command files.
-		// All defaults MUST be defined in internal/config/registry.go
+		// Do not call viper.SetDefault() here or in command files.
+		// The registry defines the options. A project replaces a default only
+		// through ApplyProjectDefaultsTOML, before flags, env, and config files.
 
 		return nil
 	}

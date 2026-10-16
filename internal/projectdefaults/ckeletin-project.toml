@@ -1,0 +1,6 @@
+# Project defaults for framework options.
+# Keys are registry keys, for example "app.log_level".
+# This file is outside .ckeletin/ and survives task ckeletin:update.
+# A config file, an environment variable, or a flag still wins.
+# The reference repository sets none.
+[defaults]

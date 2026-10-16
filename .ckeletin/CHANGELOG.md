@@ -7,6 +7,17 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-17
+
+### Added
+
+- **`task ckeletin:update` stops before it replaces a local framework edit.** Uncommitted changes under `.ckeletin/` always stop the command, including when `discard_local=1` is set. A committed difference from the upstream tree at the project's current `.ckeletin/VERSION` stops the command unless `discard_local=1`. Names the update itself rewrites are not a local difference. The dry run shows the difference and changes nothing. The compatibility check refuses to apply a candidate when a local difference exists, and still restores `.ckeletin/` when the tree is clean. A stop prints `CKELETIN_UPDATE_RESULT` with `status` `stopped`, `reason` (`uncommitted`, `local_difference`, or `unknown_version`), `to` null, and `discarded` false.
+- **Project defaults live outside the framework tree.** `config.ApplyProjectDefaultsTOML` replaces the framework default for a registry key. An unknown key fails when configuration is loaded. A config file, environment variable, or flag still wins.
+
+### Changed
+
+- **`CKELETIN_UPDATE_RESULT` includes `discarded`.** It is true only when the command discarded a committed local difference. `up_to_date`, `build_failed`, and `updated` keep their existing fields.
+
 ## [0.2.2] - 2026-10-16
 
 ### Added
