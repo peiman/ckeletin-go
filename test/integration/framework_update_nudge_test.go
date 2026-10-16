@@ -302,7 +302,10 @@ func TestUpdateNudge_UpstreamExempt(t *testing.T) {
 	}
 	upstream, downstream := setupDownstream(t)
 	advanceUpstreamVersion(t, upstream, "9.9.9")
-	require.NoError(t, os.WriteFile(filepath.Join(downstream, "go.mod"), []byte("module github.com/peiman/ckeletin-go\n"), 0o644))
+	// Split the binary name. task init rewrites "ckeletin-go" in Go files, and
+	// this test has to keep naming the real upstream module after that.
+	upstreamModule := "github.com/peiman/" + "ckeletin" + "-go"
+	require.NoError(t, os.WriteFile(filepath.Join(downstream, "go.mod"), []byte("module "+upstreamModule+"\n"), 0o644))
 
 	out, code := runNudge(t, downstream, nil)
 	assert.Equal(t, 0, code)
