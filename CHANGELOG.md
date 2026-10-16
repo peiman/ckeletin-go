@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Framework 0.2.1**: `task check` tells you when upstream `.ckeletin/VERSION` is a newer semver. The notice does not fail the build. `task ckeletin:check-update format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.
+
 ## [0.12.0] - 2026-10-16
 
 ### Security

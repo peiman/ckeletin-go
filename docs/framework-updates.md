@@ -12,11 +12,16 @@ This means you get framework improvements (better validation, new scripts, updat
 
 | Command | Purpose | Modifies files? |
 |---------|---------|-----------------|
+| `task check` | Ordinary gate. Also prints a notice when upstream `.ckeletin/VERSION` is a newer semver | No |
+| `task ckeletin:check-update` | The same comparison, on demand | No |
+| `task ckeletin:check-update format=json` | `current`, `latest`, `update_available` | No |
 | `task ckeletin:update:dry-run` | Preview what would change | No (read-only) |
 | `task ckeletin:update:check-compatibility` | Test if the update builds with your code | No (restores original) |
-| `task ckeletin:update` | Apply the update (latest) | Yes (creates a commit) |
-| `task ckeletin:update version=v0.2.0` | Apply a specific version | Yes (creates a commit) |
-| `task ckeletin:version` | Show current framework version | No |
+| `task ckeletin:update` | Apply the update (upstream default branch) | Yes (creates a commit) |
+| `task ckeletin:update version=v0.12.0` | Apply the framework pinned by that git tag | Yes (creates a commit) |
+| `task ckeletin:version` | Show current framework version (`.ckeletin/VERSION`) | No |
+
+`task check` compares framework versions, not how many commits touch `.ckeletin/`. The notice does not fail the build, does not run in CI, and stays quiet when you set `CKELETIN_SKIP_UPDATE_CHECK=1`, when you are offline, or when no `ckeletin-upstream` remote exists. A local version ahead of upstream is not an update. The version you see is `.ckeletin/VERSION`. `version=` is a git tag that pins a commit; it is not a second version number. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with `from`, `to`, and `committed`.
 
 ## The Safe Update Workflow
 

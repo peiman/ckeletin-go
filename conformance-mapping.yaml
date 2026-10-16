@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.11.0"
+spec_version: "0.12.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -190,7 +190,7 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 42 requirement IDs are present in
+      task conform validates all 45 requirement IDs are present in
       conformance-mapping.yaml before running checks. Missing IDs
       cause the generator to fail with a non-zero exit code. The count is
       machine-verified by the ENF-008 drift guard, not hand-maintained.
@@ -816,3 +816,72 @@ requirements:
     violation_tests: []
     violation_evidence: >
       Removing the reference-style compare links fails the grep check.
+
+  # ═══════════════════════════════════════════════════════════════
+  # Framework updates (CKSPEC-UPD-001 through CKSPEC-UPD-003)
+  # ═══════════════════════════════════════════════════════════════
+
+  CKSPEC-UPD-001:
+    title: "Notice when a newer framework version exists"
+    status: met
+    enforcement_level: test
+    evidence: >
+      task check runs .ckeletin/scripts/check-framework-updates.sh as a
+      non-fatal footer. The script compares .ckeletin/VERSION with
+      ckeletin-upstream/main and prints when upstream is a newer semver.
+      It names task ckeletin:update. It exits 0, skips when CI is set,
+      skips when CKELETIN_SKIP_UPDATE_CHECK=1, stays silent when the fetch
+      fails or the remote is missing, and does not run in the upstream
+      module. A commit that does not change VERSION does not notify. A
+      local version ahead of upstream does not notify.
+    checks:
+      - "test -f .ckeletin/scripts/check-framework-updates.sh"
+      - "go test -count=1 -timeout 180s -run 'TestUpdateNudge' ./test/integration/"
+    violation_tests: []
+    violation_evidence: >
+      test/integration/framework_update_nudge_test.go asserts the notice,
+      the non-version commit, the local-ahead case, CI, the opt-out, and
+      a failed fetch. TestUpdateNudge_IgnoresNonVersionCommit is the
+      violation case: a .ckeletin/ commit that leaves VERSION unchanged
+      must not print "Framework update available".
+
+  CKSPEC-UPD-002:
+    title: "One command updates only the framework"
+    status: met
+    enforcement_level: script
+    evidence: >
+      task ckeletin:update checks out only .ckeletin/ from an explicit ref
+      (version=) or from ckeletin-upstream/main, the upstream default branch.
+      task ckeletin:update:dry-run prints the diff and changes nothing.
+      task ckeletin:update:check-compatibility applies the candidate and
+      restores it. The command prints the framework version before and after
+      (v$OLD_VERSION → v$NEW_VERSION). .ckeletin/VERSION is that version.
+      version= is a git tag, a pin, not a second version.
+    checks:
+      - "grep -q 'git checkout \"$CHECKOUT_REF\" -- .ckeletin/' .ckeletin/Taskfile.yml"
+      - "grep -q 'update:dry-run' .ckeletin/Taskfile.yml"
+      - "grep -q 'update:check-compatibility' .ckeletin/Taskfile.yml"
+      - "grep -q 'Updated: v$OLD_VERSION' .ckeletin/Taskfile.yml"
+    violation_tests: []
+    violation_evidence: >
+      .ckeletin/Taskfile.yml is the update command. The checkout path is
+      .ckeletin/ only. The dry-run and check-compatibility tasks are the
+      read-only and discard paths. docs/framework-updates.md describes the
+      same three commands.
+
+  CKSPEC-UPD-003:
+    title: "Machine-readable update status"
+    status: met
+    enforcement_level: test
+    evidence: >
+      task ckeletin:check-update format=json prints current, latest, and
+      update_available from the same script as the notice. task ckeletin:update
+      prints CKELETIN_UPDATE_RESULT with from, to, and committed.
+    checks:
+      - "grep -q 'CKELETIN_UPDATE_RESULT' .ckeletin/Taskfile.yml"
+      - "grep -q -- '--json' .ckeletin/Taskfile.yml"
+    violation_tests: []
+    violation_evidence: >
+      test/integration/framework_update_nudge_test.go TestUpdateNudge_JSON
+      parses the object and requires current, latest, and update_available.
+      The update result line is CKELETIN_UPDATE_RESULT in .ckeletin/Taskfile.yml.

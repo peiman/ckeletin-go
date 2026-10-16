@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-16
+
+### Added
+
+- **`task check` notices a newer framework version.** The notice compares `.ckeletin/VERSION` with upstream and prints when upstream is a newer semver. It names `task ckeletin:update`. It does not fail the build, does not run in CI, can be turned off with `CKELETIN_SKIP_UPDATE_CHECK=1`, and stays quiet offline or without the `ckeletin-upstream` remote. A commit that does not change the version is not an update. A local version ahead of upstream is not one either. `task ckeletin:check-update` prints the same comparison on demand. `format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.
+
 ### Fixed
 
 - **Layering check installs go-arch-lint v1.18.0** instead of `@latest`. That pin does not fix Windows: through v1.19.0 the linter reports false violations there, so the worktree layering fixture skips on Windows. The unwritable-directory audit-log fixture also skips on Windows, where mode `0500` does not remove the owner's write access. The fail-closed case where a path component is a file still runs there.
