@@ -41,6 +41,19 @@ func getExitCode(err error) int {
 
 // TestMain builds the binary before running tests
 func TestMain(m *testing.M) {
+	// A git hook run from a worktree (pre-push runs these tests) exports
+	// GIT_DIR, GIT_INDEX_FILE and the rest of GIT_*, pointing at the calling
+	// repository. Every git, task and scaffold subprocess below inherits them
+	// and then acts on that repository instead of its temp directory: it
+	// rewrote the index, staged files and set core.bare=true on a real
+	// checkout. Clear them once for the whole package; gitCmd stays as a
+	// second guard for git calls.
+	for _, kv := range os.Environ() {
+		if name, _, ok := strings.Cut(kv, "="); ok && strings.HasPrefix(name, "GIT_") {
+			_ = os.Unsetenv(name)
+		}
+	}
+
 	// Build the binary with platform-specific name
 	binaryName := "ckeletin-go-test"
 	if runtime.GOOS == "windows" {

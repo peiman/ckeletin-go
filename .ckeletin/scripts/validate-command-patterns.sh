@@ -11,6 +11,13 @@
 #   - Whitelist mechanism: // ckeletin:allow-custom-command skips the pattern
 #     checks, but the marker MUST carry a short justification on the marker
 #     line or on a comment line directly above/below it. A bare marker errors.
+#   - Adoption ratchet: .ckeletin-command-baseline (project root, one
+#     "<command> <run func> <lines>" per line, # for comments) records long
+#     run* functions that existed when a project adopted the limit. A recorded
+#     function at its recorded length warns. It errors when it grows, when the
+#     entry is above its length, or when it is back within the limit (remove
+#     the entry), so the list only shrinks. `--write-baseline` records the
+#     current long functions; use it once, when adopting.
 
 set -eo pipefail
 
@@ -18,6 +25,24 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/check-output.sh
 source "${SCRIPT_DIR}/lib/check-output.sh"
+
+WRITE_BASELINE=false
+if [ "${1:-}" = "--write-baseline" ]; then
+    WRITE_BASELINE=true
+fi
+BASELINE_FILE=".ckeletin-command-baseline"
+RECORDED=""     # "<command> <func>" keys of recorded functions still over the limit
+RECORDED_NOTES="" # recorded functions at their recorded length, shown even on a pass
+NEW_BASELINE="" # entries collected by --write-baseline
+
+# baseline_entry prints the recorded length for a command's run* function, or
+# nothing when it is not recorded.
+baseline_entry() {
+    [ -f "$BASELINE_FILE" ] || return 0
+    # tr: a CRLF-saved file would leave "41\r", which no numeric test accepts.
+    tr -d '\r' <"$BASELINE_FILE" | awk -v c="$1" -v f="$2" '!/^[[:space:]]*#/ && NF >= 3 && $1 == c && $2 == f { print $3; exit }'
+
+}
 
 RUN_FUNC_TARGET=30 # run* functions should stay at or below this
 RUN_FUNC_LIMIT=35  # 31-35 lines tolerated with a warning; beyond is an error
@@ -94,8 +119,27 @@ for cmd_file in $COMMAND_FILES; do
             continue
         fi
         if [ "$func_lines" -gt "$RUN_FUNC_LIMIT" ]; then
-            ERROR_DETAILS+="$cmd_name: ${func_name}() is ${func_lines} lines (target ${RUN_FUNC_TARGET}, hard limit ${RUN_FUNC_LIMIT}) - move logic to internal/"$'\n'
-            ((++ERRORS))
+            if $WRITE_BASELINE; then
+                NEW_BASELINE+="$cmd_name $func_name $func_lines"$'\n'
+                continue
+            fi
+            recorded=$(baseline_entry "$cmd_name" "$func_name")
+            if [ -z "$recorded" ]; then
+                ERROR_DETAILS+="$cmd_name: ${func_name}() is ${func_lines} lines (target ${RUN_FUNC_TARGET}, hard limit ${RUN_FUNC_LIMIT}) - move logic to internal/"$'\n'
+                ((++ERRORS))
+                continue
+            fi
+            RECORDED+="$cmd_name $func_name"$'\n'
+            if [ "$func_lines" -gt "$recorded" ]; then
+                ERROR_DETAILS+="$cmd_name: ${func_name}() is ${func_lines} lines, over its recorded ${recorded} in ${BASELINE_FILE} - move logic to internal/"$'\n'
+                ((++ERRORS))
+            elif [ "$func_lines" -lt "$recorded" ]; then
+                ERROR_DETAILS+="$cmd_name: ${func_name}() is ${func_lines} lines but recorded at ${recorded} - lower its entry in ${BASELINE_FILE} to ${func_lines}"$'\n'
+                ((++ERRORS))
+            else
+                RECORDED_NOTES+="$cmd_name: ${func_name}() is ${func_lines} lines, recorded in ${BASELINE_FILE} (hard limit ${RUN_FUNC_LIMIT}) - shrink it and lower the entry"$'\n'
+                ((++WARNINGS))
+            fi
         elif [ "$func_lines" -gt "$RUN_FUNC_TARGET" ]; then
             ERROR_DETAILS+="$cmd_name: ${func_name}() is ${func_lines} lines (target ${RUN_FUNC_TARGET}, tolerated up to ${RUN_FUNC_LIMIT})"$'\n'
             ((++WARNINGS))
@@ -160,18 +204,53 @@ for cmd_file in $COMMAND_FILES; do
     fi
 done
 
+# The adoption ratchet: write the baseline, or fail on stale entries so the
+# list only shrinks.
+if $WRITE_BASELINE; then
+    if [ -n "$NEW_BASELINE" ]; then
+        {
+            echo "# Long run* functions recorded when this project adopted the ${RUN_FUNC_LIMIT}-line limit (ADR-001)."
+            echo "# One \"<command> <run func> <lines>\" per line. Shrink a function, then lower or remove its entry."
+            printf '%s' "$NEW_BASELINE" | sort
+        } >"$BASELINE_FILE"
+        check_note "Recorded $(printf '%s' "$NEW_BASELINE" | grep -c .) long run* function(s) in ${BASELINE_FILE}"
+    else
+        rm -f "$BASELINE_FILE"
+        check_note "No run* function is over the limit; ${BASELINE_FILE} is not needed"
+    fi
+elif [ -f "$BASELINE_FILE" ]; then
+    SEEN=""
+    while read -r b_cmd b_func _; do
+        case "$b_cmd" in "" | \#*) continue ;; esac
+        if printf '%s' "$SEEN" | grep -qxF "$b_cmd $b_func"; then
+            ERROR_DETAILS+="$b_cmd: ${b_func}() is listed more than once in ${BASELINE_FILE} - keep one entry"$'\n'
+            ((++ERRORS))
+            continue
+        fi
+        SEEN+="$b_cmd $b_func"$'\n'
+        if ! printf '%s' "$RECORDED" | grep -qxF "$b_cmd $b_func"; then
+            ERROR_DETAILS+="$b_cmd: ${b_func}() is within the limit now - remove its entry from ${BASELINE_FILE}"$'\n'
+            ((++ERRORS))
+        fi
+    done < <(tr -d '\r' <"$BASELINE_FILE")
+fi
+
 # Summary
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
     check_success "All commands follow the pattern"
     exit 0
 elif [ $ERRORS -eq 0 ]; then
     check_success "All commands pass (${WARNINGS} warning(s))"
+    if [ -n "$RECORDED_NOTES" ]; then
+        # Recorded debt stays visible: each line is a function still over the limit.
+        printf '%s' "$RECORDED_NOTES"
+    fi
     check_note "Warnings are suggestions and won't fail the build."
     exit 0
 else
     check_failure \
         "${ERRORS} error(s) found, ${WARNINGS} warning(s)" \
-        "$ERROR_DETAILS" \
+        "${ERROR_DETAILS}${RECORDED_NOTES}" \
         "Keep run* functions <=${RUN_FUNC_TARGET} lines; move logic to internal/.
 To whitelist a command, add: // ckeletin:allow-custom-command - <short reason>"
     exit 1

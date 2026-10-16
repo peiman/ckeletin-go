@@ -735,6 +735,12 @@ tasks:
     cmds:
       - '{{.SCRIPTS_DIR}}/validate-command-patterns.sh'
 
+  validate:commands:baseline:
+    desc: Record the current long run* functions in .ckeletin-command-baseline (once, when adopting ADR-001's limit)
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/validate-command-patterns.sh --write-baseline'
+
   validate:constants:
     desc: Validate config constants are in sync with registry (enforces ADR-005)
     silent: true
