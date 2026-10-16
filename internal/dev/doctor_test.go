@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDoctor(t *testing.T) {
@@ -692,6 +693,13 @@ func TestCheckProjectStructurePartialDirs(t *testing.T) {
 }
 
 func TestCheckGitStatusInNonGitDir(t *testing.T) {
+	// A git hook (pre-commit from a worktree) exports GIT_DIR and friends, and
+	// git then finds the real repository from inside the temp dir. Clear them
+	// so this test sees what a user outside any repository sees.
+	for _, k := range []string{"GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_PREFIX"} {
+		t.Setenv(k, "")
+		require.NoError(t, os.Unsetenv(k))
+	}
 	doctor := NewDoctor()
 
 	currentDir, err := os.Getwd()
