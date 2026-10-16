@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-16
+
 ### Security
 
 - **Dependency updates**: Go modules `go-isatty` 0.0.24, `testify` 1.12.1, `golang.org/x/text` 0.43.0, and `golang.org/x/sys` 0.49.0. GitHub Actions moved to current tags, including `actions/cache` v6 and `actions/setup-go` v7. `arduino/setup-task` stays on v2: v3 is GPL-3.0 and its July dependency-review failure could not be reproduced from expired logs. Dependabot now groups minor and patch updates and allows 10 open PRs, so one major bump cannot block the queue.
@@ -576,7 +578,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test coverage setup
 - Error logging improvements
 
-[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/peiman/ckeletin-go/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/peiman/ckeletin-go/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/peiman/ckeletin-go/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/peiman/ckeletin-go/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/peiman/ckeletin-go/compare/v0.9.0...v0.9.1
