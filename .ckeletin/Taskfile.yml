@@ -222,6 +222,7 @@ tasks:
           echo ""
           echo "✅ Framework is already up-to-date!"
           echo "   No changes needed."
+          printf 'CKELETIN_UPDATE_RESULT={"status":"up_to_date","from":"%s","to":"%s","committed":false}\n' "$OLD_VERSION" "$NEW_VERSION"
         else
           # --no-verify: framework update commits bypass pre-commit hooks because
           # the commit is machine-generated and verified by build+test below.
@@ -234,6 +235,7 @@ tasks:
             echo "The update may have introduced breaking changes."
             echo "Check .ckeletin/CHANGELOG.md and fix compilation errors."
             echo "To rollback: git revert HEAD"
+            printf 'CKELETIN_UPDATE_RESULT={"status":"build_failed","from":"%s","to":"%s","committed":true}\n' "$OLD_VERSION" "$NEW_VERSION"
             exit 1
           fi
           echo "✅ Build verified successfully"
@@ -275,6 +277,7 @@ tasks:
 
           echo ""
           echo "✅ Framework updated successfully!"
+          printf 'CKELETIN_UPDATE_RESULT={"status":"updated","from":"%s","to":"%s","committed":true}\n' "$OLD_VERSION" "$NEW_VERSION"
           echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
           echo "   Review changes with: git diff HEAD~1"
         fi
@@ -467,6 +470,17 @@ tasks:
     cmds:
       - echo "ckeletin framework v$(cat .ckeletin/VERSION)"
 
+  check-update:
+    desc: Report whether a newer framework version is available (format=json for machines)
+    cmds:
+      - |
+        format="{{.format}}"
+        if [ "$format" = "json" ]; then
+          '{{.SCRIPTS_DIR}}/check-framework-updates.sh' --json
+        else
+          '{{.SCRIPTS_DIR}}/check-framework-updates.sh' --check
+        fi
+
   health:
     desc: Check framework health and update status
     cmds:
@@ -487,25 +501,9 @@ tasks:
           git diff --stat -- .ckeletin/
         fi
 
-        # Update check
-        CURRENT_MODULE=$(head -1 go.mod | awk '{print $2}')
-        UPSTREAM_MODULE="github.com/peiman/ckeleti""n-go"
-        if [ "$CURRENT_MODULE" = "$UPSTREAM_MODULE" ]; then
-          echo "ℹ️  This is the upstream repository"
-        else
-          if git remote get-url ckeletin-upstream >/dev/null 2>&1; then
-            git fetch ckeletin-upstream --quiet 2>/dev/null || true
-            BEHIND=$(git rev-list HEAD..ckeletin-upstream/main -- .ckeletin/ 2>/dev/null | wc -l | tr -d ' ')
-            if [ "$BEHIND" = "0" ]; then
-              echo "✅ Framework is up-to-date"
-            else
-              echo "⚠️  Framework is $BEHIND commit(s) behind upstream"
-              echo "   Run: task ckeletin:update:dry-run"
-            fi
-          else
-            echo "ℹ️  No upstream remote configured (run task ckeletin:update to set up)"
-          fi
-        fi
+        # Same comparison as `task check` and `task ckeletin:check-update`:
+        # upstream .ckeletin/VERSION is a newer semver. Not a commit count.
+        '{{.SCRIPTS_DIR}}/check-framework-updates.sh' --check
 
         # Import consistency
         echo ""
@@ -1137,7 +1135,7 @@ tasks:
       # The binary check above does not know about the framework changelog.
       # This script travels with .ckeletin/, so derived projects run it too.
       - task: check:framework-changelog
-      # Non-fatal footer: nudge when the framework (.ckeletin/) is behind upstream.
+      # Non-fatal footer: nudge when upstream .ckeletin/VERSION is a newer semver.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'
         silent: true
