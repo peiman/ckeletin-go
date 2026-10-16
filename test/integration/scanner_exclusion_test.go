@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,6 +84,9 @@ func TestScannersExcludeClaudeWorktrees(t *testing.T) {
 	})
 
 	t.Run("layering validation ignores stale worktree", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("go-arch-lint through v1.19.0 reports false violations on Windows (fe3dback/go-arch-lint#79)")
+		}
 		out, err := runFrameworkScript(t, root, "validate-layering.sh")
 		assert.NoError(t, err, "go-arch-lint must pass with a stale worktree present.\nOutput:\n%s", out)
 	})
@@ -96,10 +100,9 @@ func TestScannersExcludeClaudeWorktrees(t *testing.T) {
 	})
 }
 
-// TestValidateLayeringPinsGoArchLint locks the linter version the release
-// matrix installs. go-arch-lint v1.19.0 walks with native paths and reports
-// false dependency violations on Windows (fe3dback/go-arch-lint#79). v1.18.0
-// is the last release before that walk. @latest would pull the broken one.
+// TestValidateLayeringPinsGoArchLint locks the linter the release matrix
+// installs. @latest is not a pin. v1.18.0 does not fix Windows either
+// (fe3dback/go-arch-lint#79); the worktree subtest skips there.
 func TestValidateLayeringPinsGoArchLint(t *testing.T) {
 	root := scannerProjectRoot(t)
 	body, err := os.ReadFile(filepath.Join(root, ".ckeletin", "scripts", "validate-layering.sh"))
