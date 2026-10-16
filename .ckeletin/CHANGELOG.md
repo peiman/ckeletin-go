@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-16
+
+### Added
+
+- **An adoption ratchet for the 35-line `run*` limit.** A project that updates from 0.1.0 with long commands already in place runs `task validate:commands:baseline` once. It writes `.ckeletin-command-baseline` in the project root, outside `.ckeletin/`, one `<command> <run func> <lines>` per line. A recorded function at its recorded length is a warning, and the line is shown even on a pass. Growing past the record fails. An entry above the current length fails until it is lowered. An entry for a function back within the limit, or gone, fails until it is removed. So the list only shrinks. Unrecorded long functions fail as before.
+
 ## [0.2.1] - 2026-10-16
 
 ### Added

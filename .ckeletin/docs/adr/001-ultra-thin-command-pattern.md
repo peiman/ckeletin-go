@@ -117,6 +117,10 @@ what is enforced — the script and this table must stay in sync.
 | Uses `MustAddToRoot()` helper | manual root wiring | Warning |
 | Business-logic heuristic (control flow outside `run*` functions) | match | Warning |
 | `// ckeletin:allow-custom-command` marker | no justification on or adjacent to the marker line | **Error** |
+| `run*` function recorded in `.ckeletin-command-baseline` | at its recorded length | Warning (shown even on a pass) |
+| | longer than recorded | **Error** |
+| | shorter than recorded, still >35 | **Error** (lower the entry) |
+| | ≤35 lines, or the function is gone | **Error** (remove the entry) |
 
 Errors fail the build; warnings do not.
 
@@ -126,6 +130,16 @@ cobra-specific introspection, shell completion) may carry
 pattern checks, but the justification is mandatory — it must appear on the
 marker line or in a comment directly above/below it (a file-path header
 comment like `// cmd/foo.go` does not count). A bare marker fails validation.
+
+**Adoption ratchet**: a project that adopts the 35-line limit with long
+commands already in place records them once with
+`task validate:commands:baseline` (`validate-command-patterns.sh
+--write-baseline`). It writes `.ckeletin-command-baseline` in the project
+root, outside `.ckeletin/`, so `task ckeletin:update` never touches it. Each
+line is `<command> <run func> <lines>`. A recorded function may stay at its
+length but not grow, and its entry must be lowered as it shrinks and removed
+once it is within the limit, so the list only shrinks. New long functions
+fail as before.
 
 **Honor-system gaps**:
 - The business-logic heuristic is grep-based and cannot prove logic is absent;

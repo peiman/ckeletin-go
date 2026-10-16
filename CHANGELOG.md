@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Framework 0.2.2**: `task validate:commands:baseline` records a project's existing long `run*` functions in `.ckeletin-command-baseline`, so a project can adopt the 35-line limit and then shrink them one at a time. Recorded functions warn; growth, stale entries and new long functions fail. See ADR-001.
+
 ### Changed
 
 - **Framework 0.2.1**: `task check` tells you when upstream `.ckeletin/VERSION` is a newer semver. The notice does not fail the build. `task ckeletin:check-update format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.

@@ -166,6 +166,10 @@ tasks:
     desc: Validate command files follow ultra-thin patterns
     cmds: [task: ckeletin:validate:commands]
 
+  validate:commands:baseline:
+    desc: Record the current long run* functions in .ckeletin-command-baseline (once, when adopting)
+    cmds: [task: ckeletin:validate:commands:baseline]
+
   validate:defaults:
     desc: Validate no unauthorized viper.SetDefault() calls
     cmds: [task: ckeletin:validate:defaults]
