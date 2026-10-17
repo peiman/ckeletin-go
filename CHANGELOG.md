@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Framework 0.2.4**: a config file mode of 0644 no longer prints a permissions note at Info on every command. The note is Debug. Group-writable still warns. World-writable is still an error.
+- **Framework 0.2.4**: golangci-lint is pinned to v2.15.0. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`.
 
 ## [0.12.0] - 2026-10-16
 

@@ -47,22 +47,26 @@ vars:
   # Scripts directory (relative to this Taskfile)
   SCRIPTS_DIR: '{{.TASKFILE_DIR}}/scripts'
 
-  # Pinned tool versions for reproducibility
-  TOOL_GOIMPORTS_VERSION: v0.45.0
-  TOOL_GOVULNCHECK_VERSION: latest
-  TOOL_GOTESTSUM_VERSION: latest
-  TOOL_GOLANGCI_LINT_VERSION: v2.12.2
-  TOOL_LEFTHOOK_VERSION: v2.1.9
-  TOOL_GO_MOD_OUTDATED_VERSION: latest
-  TOOL_GO_LICENSES_VERSION: v2.0.1
-  TOOL_LICHEN_VERSION: v0.1.7
-  TOOL_SYFT_VERSION: v1.45.1
-  TOOL_GITLEAKS_VERSION: latest
-  TOOL_GRYPE_VERSION: latest
-  TOOL_GOCOVMERGE_VERSION: latest
+  # Pinned tool versions for reproducibility.
+  # A project overrides one pin by setting CKELETIN_TOOL_<NAME> in its own
+  # Taskfile vars, or by passing that name on the task command line. The
+  # framework default below wins when the override is unset. Do not edit
+  # this file to change a pin in a derived project: an update replaces it.
+  TOOL_GOIMPORTS_VERSION: '{{.CKELETIN_TOOL_GOIMPORTS_VERSION | default "v0.45.0"}}'
+  TOOL_GOVULNCHECK_VERSION: '{{.CKELETIN_TOOL_GOVULNCHECK_VERSION | default "latest"}}'
+  TOOL_GOTESTSUM_VERSION: '{{.CKELETIN_TOOL_GOTESTSUM_VERSION | default "latest"}}'
+  TOOL_GOLANGCI_LINT_VERSION: '{{.CKELETIN_TOOL_GOLANGCI_LINT_VERSION | default "v2.15.0"}}'
+  TOOL_LEFTHOOK_VERSION: '{{.CKELETIN_TOOL_LEFTHOOK_VERSION | default "v2.1.9"}}'
+  TOOL_GO_MOD_OUTDATED_VERSION: '{{.CKELETIN_TOOL_GO_MOD_OUTDATED_VERSION | default "latest"}}'
+  TOOL_GO_LICENSES_VERSION: '{{.CKELETIN_TOOL_GO_LICENSES_VERSION | default "v2.0.1"}}'
+  TOOL_LICHEN_VERSION: '{{.CKELETIN_TOOL_LICHEN_VERSION | default "v0.1.7"}}'
+  TOOL_SYFT_VERSION: '{{.CKELETIN_TOOL_SYFT_VERSION | default "v1.45.1"}}'
+  TOOL_GITLEAKS_VERSION: '{{.CKELETIN_TOOL_GITLEAKS_VERSION | default "latest"}}'
+  TOOL_GRYPE_VERSION: '{{.CKELETIN_TOOL_GRYPE_VERSION | default "latest"}}'
+  TOOL_GOCOVMERGE_VERSION: '{{.CKELETIN_TOOL_GOCOVMERGE_VERSION | default "latest"}}'
   # Keep in sync with YQ_VERSION in .github/workflows/reusable-conformance.yml
   # (CI downloads the release binary; install_tools.sh go-installs this tag)
-  TOOL_YQ_VERSION: v4.53.3
+  TOOL_YQ_VERSION: '{{.CKELETIN_TOOL_YQ_VERSION | default "v4.53.3"}}'
 
 tasks:
   default:
