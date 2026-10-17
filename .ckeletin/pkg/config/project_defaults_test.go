@@ -94,3 +94,48 @@ func TestApplyProjectDefaultsTOML_InvalidTOML(t *testing.T) {
 	err := config.ApplyProjectDefaultsTOML([]byte("[defaults\n"))
 	require.Error(t, err)
 }
+
+func TestEffectiveRegistry_ReplacesDefaultOnACopy(t *testing.T) {
+	resetViper(t)
+	config.SetDefaults()
+
+	opts, err := config.EffectiveRegistry([]byte(projectDefaultWarn))
+	require.NoError(t, err)
+
+	var effective interface{}
+	for _, opt := range opts {
+		if opt.Key == config.KeyAppLogLevel {
+			effective = opt.DefaultValue
+		}
+	}
+	assert.Equal(t, "warn", effective, "the overlay replaces the framework default on the returned copy")
+	assert.Equal(t, "info", viper.GetString(config.KeyAppLogLevel),
+		"reading the effective registry must not change the process defaults")
+
+	var framework interface{}
+	for _, opt := range config.Registry() {
+		if opt.Key == config.KeyAppLogLevel {
+			framework = opt.DefaultValue
+		}
+	}
+	assert.Equal(t, "info", framework, "the registry itself keeps the framework default")
+}
+
+func TestEffectiveRegistry_UnknownKey(t *testing.T) {
+	opts, err := config.EffectiveRegistry([]byte("[defaults]\n\"app.not_a_real_option\" = \"x\"\n"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "app.not_a_real_option")
+	assert.Nil(t, opts)
+}
+
+func TestEffectiveRegistry_EmptyIsFrameworkDefault(t *testing.T) {
+	opts, err := config.EffectiveRegistry([]byte("[defaults]\n"))
+	require.NoError(t, err)
+	var got interface{}
+	for _, opt := range opts {
+		if opt.Key == config.KeyAppLogLevel {
+			got = opt.DefaultValue
+		}
+	}
+	assert.Equal(t, "info", got)
+}

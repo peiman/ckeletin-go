@@ -23,6 +23,9 @@ func RegisterFlagsForPrefixWithOverrides(cmd *cobra.Command, prefix string, over
 		if !strings.HasPrefix(opt.Key, prefix) {
 			continue
 		}
+		if opt.NoFlag {
+			continue
+		}
 
 		// Derive default flag name from key suffix
 		suffix := strings.TrimPrefix(opt.Key, prefix)

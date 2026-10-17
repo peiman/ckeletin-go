@@ -136,3 +136,48 @@ func TestTestEnvPrelude_AllTestTasksWired(t *testing.T) {
 		"these test:* tasks run go test but are missing {{._TEST_ENV_PRELUDE}} "+
 			"(consumers would lose test-env isolation on them — issue #95): %v", offenders)
 }
+
+// TestOrdinaryTestGateIncludesFrameworkScripts locks the dot-directory blind
+// spot (issue #154). ./... never enters .ckeletin, and ./.ckeletin/... matches
+// nothing because the walk starts on the dot directory and skips it. Framework
+// script packages have to be listed explicitly, in the same test invocation.
+func TestOrdinaryTestGateIncludesFrameworkScripts(t *testing.T) {
+	content := teFrameworkTaskfile(t)
+	lines := strings.Split(content, "\n")
+	taskHeader := regexp.MustCompile(`^  ([a-zA-Z][a-zA-Z0-9:_-]*):\s*$`)
+	bodies := map[string]string{}
+
+	var cur string
+	var body []string
+	flush := func() {
+		if cur == "" {
+			return
+		}
+		bodies[cur] = strings.Join(body, "\n")
+	}
+	for _, line := range lines {
+		if m := taskHeader.FindStringSubmatch(line); m != nil {
+			flush()
+			cur = m[1]
+			body = nil
+			continue
+		}
+		body = append(body, line)
+	}
+	flush()
+
+	ordinary := []string{"test", "test:dev", "test:prod", "test:unit", "test:full", "test:coverage:text"}
+	for _, name := range ordinary {
+		taskBody, ok := bodies[name]
+		require.True(t, ok, "missing task %s", name)
+		assert.Contains(t, taskBody, "./.ckeletin/scripts/...", name)
+		assert.NotContains(t, taskBody, "scaffold", "%s must not enable the scaffold tag", name)
+		assert.Equal(t, 1, strings.Count(taskBody, "gotestsum"), "%s must not run the suite twice", name)
+	}
+
+	scaffoldBody, ok := bodies["test:scaffold"]
+	require.True(t, ok, "missing task test:scaffold")
+	assert.Contains(t, scaffoldBody, "scaffold")
+	assert.Contains(t, scaffoldBody, "./test/integration/...")
+	assert.NotContains(t, scaffoldBody, "./.ckeletin/scripts/...")
+}

@@ -68,7 +68,7 @@ The application searches for configuration files in this order:
 2. `./.ckeletin-go.yaml` (current directory)
 3. `~/.ckeletin-go.yaml` (user home directory)
 
-If no configuration file is found, the application uses default values from the registry.
+If no configuration file is found, the application uses the project default when one is set, and otherwise the framework default.
 
 ## Configuration Precedence
 
@@ -77,7 +77,8 @@ Values are resolved in this order (highest to lowest priority):
 1. **Command-line flags** - `--log-level debug`
 2. **Environment variables** - `CKELETIN_GO_APP_LOG_LEVEL=debug`
 3. **Configuration file** - `app.log_level: debug`
-4. **Default values** - From internal registry
+4. **Project defaults** - `internal/projectdefaults/ckeletin-project.toml`
+5. **Framework defaults** - from the registry
 
 ## Environment Variables
 

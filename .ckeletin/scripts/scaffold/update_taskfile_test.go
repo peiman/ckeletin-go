@@ -1,3 +1,4 @@
+// ckeletin:keep-upstream-names — fixture literals must survive the derived-name rewrite.
 package main
 
 import (

@@ -47,22 +47,26 @@ vars:
   # Scripts directory (relative to this Taskfile)
   SCRIPTS_DIR: '{{.TASKFILE_DIR}}/scripts'
 
-  # Pinned tool versions for reproducibility
-  TOOL_GOIMPORTS_VERSION: v0.45.0
-  TOOL_GOVULNCHECK_VERSION: latest
-  TOOL_GOTESTSUM_VERSION: latest
-  TOOL_GOLANGCI_LINT_VERSION: v2.12.2
-  TOOL_LEFTHOOK_VERSION: v2.1.9
-  TOOL_GO_MOD_OUTDATED_VERSION: latest
-  TOOL_GO_LICENSES_VERSION: v2.0.1
-  TOOL_LICHEN_VERSION: v0.1.7
-  TOOL_SYFT_VERSION: v1.45.1
-  TOOL_GITLEAKS_VERSION: latest
-  TOOL_GRYPE_VERSION: latest
-  TOOL_GOCOVMERGE_VERSION: latest
+  # Pinned tool versions for reproducibility.
+  # A project overrides one pin by setting CKELETIN_TOOL_<NAME> in its own
+  # Taskfile vars, or by passing that name on the task command line. The
+  # framework default below wins when the override is unset. Do not edit
+  # this file to change a pin in a derived project: an update replaces it.
+  TOOL_GOIMPORTS_VERSION: '{{.CKELETIN_TOOL_GOIMPORTS_VERSION | default "v0.45.0"}}'
+  TOOL_GOVULNCHECK_VERSION: '{{.CKELETIN_TOOL_GOVULNCHECK_VERSION | default "latest"}}'
+  TOOL_GOTESTSUM_VERSION: '{{.CKELETIN_TOOL_GOTESTSUM_VERSION | default "latest"}}'
+  TOOL_GOLANGCI_LINT_VERSION: '{{.CKELETIN_TOOL_GOLANGCI_LINT_VERSION | default "v2.15.0"}}'
+  TOOL_LEFTHOOK_VERSION: '{{.CKELETIN_TOOL_LEFTHOOK_VERSION | default "v2.1.9"}}'
+  TOOL_GO_MOD_OUTDATED_VERSION: '{{.CKELETIN_TOOL_GO_MOD_OUTDATED_VERSION | default "latest"}}'
+  TOOL_GO_LICENSES_VERSION: '{{.CKELETIN_TOOL_GO_LICENSES_VERSION | default "v2.0.1"}}'
+  TOOL_LICHEN_VERSION: '{{.CKELETIN_TOOL_LICHEN_VERSION | default "v0.1.7"}}'
+  TOOL_SYFT_VERSION: '{{.CKELETIN_TOOL_SYFT_VERSION | default "v1.45.1"}}'
+  TOOL_GITLEAKS_VERSION: '{{.CKELETIN_TOOL_GITLEAKS_VERSION | default "latest"}}'
+  TOOL_GRYPE_VERSION: '{{.CKELETIN_TOOL_GRYPE_VERSION | default "latest"}}'
+  TOOL_GOCOVMERGE_VERSION: '{{.CKELETIN_TOOL_GOCOVMERGE_VERSION | default "latest"}}'
   # Keep in sync with YQ_VERSION in .github/workflows/reusable-conformance.yml
   # (CI downloads the release binary; install_tools.sh go-installs this tag)
-  TOOL_YQ_VERSION: v4.53.3
+  TOOL_YQ_VERSION: '{{.CKELETIN_TOOL_YQ_VERSION | default "v4.53.3"}}'
 
 tasks:
   default:
@@ -262,7 +266,9 @@ tasks:
 
           echo "🧪 Verifying framework tests pass..."
           set +e
-          TEST_OUTPUT=$(go test ./.ckeletin/... 2>&1)
+          # ./.ckeletin/... matches no packages: the walk starts on the dot
+          # directory and skips it. List the two framework trees explicitly.
+          TEST_OUTPUT=$(go test ./.ckeletin/pkg/... ./.ckeletin/scripts/... 2>&1)
           TEST_RESULT=$?
           set -e
           if [ $TEST_RESULT -ne 0 ]; then
@@ -830,13 +836,18 @@ tasks:
       - '{{.SCRIPTS_DIR}}/validate-hook-forwardings.sh'
 
   # --- Testing ---
+  # ./... skips directories whose names start with ".". ./.ckeletin/... also
+  # matches nothing: the walk starts on .ckeletin and skips that directory.
+  # List the framework trees explicitly. pkg was already listed; scripts is
+  # where the rename fixtures live. Same gotestsum invocation, so pkg is not
+  # run twice. Do not add -tags scaffold here; that tag stays on test:scaffold.
 
   test:
     desc: Run tests with coverage
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -845,7 +856,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -854,7 +865,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -863,7 +874,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... ./.ckeletin/scripts/... | grep -v /test/integration)
 
   test:scaffold:
     desc: Run scaffold integration tests (slow — copies project, runs task check)
@@ -883,7 +894,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -919,7 +930,7 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data
     cmds:
-      - '{{._TEST_ENV_PRELUDE}} gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...'
+      - '{{._TEST_ENV_PRELUDE}} gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...'
       - gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       - rm -f coverage.raw.txt
       - echo "Detailed coverage report:"

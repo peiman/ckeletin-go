@@ -210,6 +210,8 @@ func replaceInTextFiles(root string, replacements []StringReplacement) (int, err
 // (which deliberately preserves pkg/ imports), so this function must not
 // modify import lines. It handles string literals, comments, and other
 // non-import references.
+// Files marked keep-upstream-names are not modified. Fixture tests of the
+// rename tools must keep the upstream module and binary name as literals.
 // Returns the number of files that were modified.
 func replaceNameInGoFiles(root, oldName, newName string) (int, error) {
 	count := 0
@@ -238,6 +240,11 @@ func replaceNameInGoFiles(root, oldName, newName string) (int, error) {
 		}
 
 		original := string(content)
+		// Split the marker so this file does not carry it. A contiguous
+		// literal would make the rewrite skip helpers.go itself.
+		if strings.Contains(original, "ckeletin:keep-upstream-"+"names") {
+			return nil
+		}
 
 		// Replace line by line, skipping import lines to avoid clobbering
 		// preserved pkg/ imports from the AST rewriter

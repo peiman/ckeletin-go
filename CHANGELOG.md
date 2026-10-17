@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Framework 0.2.1**: `task check` tells you when upstream `.ckeletin/VERSION` is a newer semver. The notice does not fail the build. `task ckeletin:check-update format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.
 
+### Fixed
+
+- **Framework 0.2.4**: a config file mode of 0644 no longer prints a permissions note at Info on every command. The note is Debug. Group-writable still warns. World-writable is still an error.
+- **Framework 0.2.4**: golangci-lint is pinned to v2.15.0. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`.
+- **Framework 0.2.4**: a framework update leaves a Go file marked `ckeletin:keep-upstream-names` unchanged, so the rename tools' fixtures keep the upstream module path. The test tasks run `.ckeletin/scripts` by path.
+- **Framework 0.2.4**: `docs config` and `config.schema.json` publish a project default from `internal/projectdefaults/ckeletin-project.toml`. The registry keeps the framework default.
+- **Framework 0.2.4**: a config option with `NoFlag` is config file or environment only. It stays in the registry and the generated docs, and flag registration does not create a flag for it.
+
 ## [0.12.0] - 2026-10-16
 
 ### Security

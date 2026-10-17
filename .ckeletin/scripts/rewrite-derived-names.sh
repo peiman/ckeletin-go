@@ -9,6 +9,10 @@
 #
 # Shell scripts are left alone. `task init` does not rewrite them.
 #
+# A Go file that contains `ckeletin:keep-upstream-names` is left alone too.
+# The rename tools' own fixtures must keep the upstream module and binary
+# name as literals. Rewriting them makes the tests compare a name to itself.
+#
 # Usage: rewrite-derived-names.sh OLD_MODULE NEW_MODULE OLD_NAME NEW_NAME DIR
 
 set -euo pipefail
@@ -86,6 +90,12 @@ function lreplace(s, old, new,    i, out) {
 	return out s
 }
 '
+
+# True when the file carries ckeletin:keep-upstream-names. grep's miss is
+# not an error; set -e would otherwise exit the script.
+keeps_upstream_names() {
+	grep -q -F 'ckeletin:keep-upstream-names' "$1"
+}
 
 file_mode() {
 	# macOS stat uses -f and prints octal like 644. GNU stat -f is a different
@@ -171,6 +181,9 @@ rewrite_go() {
 }
 
 while IFS= read -r -d '' file; do
+	if keeps_upstream_names "$file"; then
+		continue
+	fi
 	rewrite_go "$file"
 done < <(find "$dir" \( -name .git -o -name vendor -o -name dist -o -name .task \) -prune -o -type f -name '*.go' -print0)
 

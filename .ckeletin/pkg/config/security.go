@@ -53,9 +53,10 @@ This will set owner-only read/write permissions.`, path, perm, path)
 			Msg("Config file is group-writable, consider restricting to 0600 or 0400")
 	}
 
-	// Recommend stricter permissions if too permissive
+	// Debug, not Info: 0644 matches perm&0077 and is a normal config mode.
+	// Group-writable already warned above. World-writable already returned.
 	if perm&0077 != 0 {
-		log.Info().
+		log.Debug().
 			Str("path", path).
 			Str("current", fmt.Sprintf("%04o", perm)).
 			Str("recommended", "0600").

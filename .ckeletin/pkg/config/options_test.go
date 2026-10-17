@@ -57,6 +57,36 @@ func TestOptionEnvVarName(t *testing.T) {
 	}
 }
 
+func TestDocsDescription(t *testing.T) {
+	tests := []struct {
+		name string
+		opt  ConfigOption
+		want string
+	}{
+		{
+			name: "flag option keeps its description",
+			opt:  ConfigOption{Description: "Log level"},
+			want: "Log level",
+		},
+		{
+			name: "flagless option names the two sources",
+			opt:  ConfigOption{Description: "Example setting", NoFlag: true},
+			want: "Example setting (config file or environment only)",
+		},
+		{
+			name: "flagless option with no description",
+			opt:  ConfigOption{NoFlag: true},
+			want: "config file or environment only",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.opt.DocsDescription())
+		})
+	}
+}
+
 func TestOptionDefaultValueString(t *testing.T) {
 	tests := []struct {
 		name string

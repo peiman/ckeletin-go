@@ -9,7 +9,8 @@ Configuration can be provided in multiple ways, in order of precedence:
 1. Command-line flags
 2. Environment variables (with prefix `CKELETIN_GO_`)
 3. Configuration file (~/.config/ckeletin-go/config.yaml)
-4. Default values
+4. Project defaults
+5. Framework defaults
 
 ## Configuration Options
 
