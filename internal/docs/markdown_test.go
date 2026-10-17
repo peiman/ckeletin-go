@@ -139,6 +139,27 @@ func TestGenerateMarkdownDocs_ProjectDefaultMatchesOverride(t *testing.T) {
 	assert.Contains(t, output, "5. Framework defaults")
 }
 
+func TestGenerateMarkdownDocs_NoFlagSaysConfigOrEnvironmentOnly(t *testing.T) {
+	opt := config.ConfigOption{
+		Key:          "app.example_only",
+		DefaultValue: "x",
+		Description:  "Example setting",
+		Type:         "string",
+		NoFlag:       true,
+	}
+	var buf bytes.Buffer
+	generator := NewGenerator(Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		Registry:     func() []config.ConfigOption { return []config.ConfigOption{opt} },
+	})
+
+	require.NoError(t, generator.GenerateMarkdownDocs(&buf, AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"}))
+	output := buf.String()
+	assert.Contains(t, output, "`app.example_only`")
+	assert.Contains(t, output, "config file or environment only")
+}
+
 // TestGenerateMarkdownDocs_YAMLError tests how markdown generation handles YAML errors
 func TestGenerateMarkdownDocs_YAMLError(t *testing.T) {
 	// SETUP PHASE

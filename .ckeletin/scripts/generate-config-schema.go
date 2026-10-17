@@ -122,8 +122,8 @@ func (s *schemaBuilder) addOption(opt config.ConfigOption) {
 		"type": goTypeToJSONSchemaType(opt.Type),
 	}
 
-	if opt.Description != "" {
-		prop["description"] = opt.Description
+	if desc := opt.DocsDescription(); desc != "" {
+		prop["description"] = desc
 	}
 
 	if opt.DefaultValue != nil {

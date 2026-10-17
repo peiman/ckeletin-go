@@ -73,7 +73,7 @@ func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 			opt.Type,
 			defaultVal,
 			opt.EnvVarName(appInfo.EnvPrefix),
-			opt.Description,
+			opt.DocsDescription(),
 			required,
 		)
 	}
@@ -96,7 +96,7 @@ func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 	ew.printf("### Environment Variables\n\n")
 	ew.printf("```bash\n")
 	for _, opt := range registry {
-		ew.printf("# %s\n", opt.Description)
+		ew.printf("# %s\n", opt.DocsDescription())
 		ew.printf("export %s=%s\n\n", opt.EnvVarName(appInfo.EnvPrefix), opt.ExampleValueString())
 	}
 	ew.printf("```\n")

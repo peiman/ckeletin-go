@@ -28,6 +28,7 @@ func testShortFlagOptions() []config.ConfigOption {
 		{Key: "test.shortflag.float_no_short", DefaultValue: 2.71, Description: "Test float without short flag", Type: "float64", ShortFlag: ""},
 		{Key: "test.shortflag.slice_no_short", DefaultValue: []string{"x", "y"}, Description: "Test slice without short flag", Type: "[]string", ShortFlag: ""},
 		{Key: "test.shortflag.unknown_no_short", DefaultValue: "val", Description: "Test unknown without short flag", Type: "weirdtype", ShortFlag: ""},
+		{Key: "test.shortflag.no_flag", DefaultValue: "secret", Description: "Config or environment only", Type: "string", NoFlag: true},
 	}
 }
 
@@ -725,4 +726,6 @@ func TestRegisterFlagsForPrefixWithOverrides_AllTypesWithShortFlags(t *testing.T
 	unknownNoShort := cmd.Flags().Lookup("unknown-no-short")
 	require.NotNil(t, unknownNoShort, "unknown type flag without short should exist")
 	assert.Empty(t, unknownNoShort.Shorthand, "unknown type flag should not have shorthand")
+
+	assert.Nil(t, cmd.Flags().Lookup("no-flag"), "NoFlag option must not register a flag")
 }

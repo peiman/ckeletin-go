@@ -15,6 +15,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 - **golangci-lint is pinned to v2.15.0.** v2.12.2 cannot read Go 1.27 export data. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`, so the override has to live outside it.
 - **A framework update no longer rewrites the rename tools' fixtures.** A Go file marked `ckeletin:keep-upstream-names` keeps the upstream module path. The ordinary test tasks list `.ckeletin/scripts` explicitly, because `./...` skips a directory whose name starts with `.`.
 - **Generated config docs use the project default.** `config.EffectiveRegistry` applies `internal/projectdefaults` to a copy of the registry. `docs config` and the config schema publish that value. The registry itself keeps the framework default. The generated precedence is flag, environment, config file, project default, then framework default.
+- **An option can omit its command-line flag.** `ConfigOption.NoFlag` keeps the option in the registry, the config file, the environment, and the generated docs. Flag registration skips it. Generated docs say it is config file or environment only. Flags written out by hand, including the reference root flags, are separate from this loop. An update brings the field. A project that already registers flags has to honor `NoFlag` in its own `cmd/flags.go`, because an update does not replace that file.
 
 ## [0.2.3] - 2026-10-17
 

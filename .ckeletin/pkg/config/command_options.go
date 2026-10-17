@@ -33,6 +33,10 @@ type ConfigOption struct {
 	// Leave empty if no short flag is desired
 	ShortFlag string
 
+	// NoFlag keeps the option in the registry, config file, and environment,
+	// and out of per-invocation flags. Zero value registers a flag.
+	NoFlag bool
+
 	// Required indicates whether this option is required
 	Required bool
 
@@ -53,6 +57,19 @@ type ConfigOption struct {
 func (o ConfigOption) EnvVarName(prefix string) string {
 	key := strings.ReplaceAll(o.Key, ".", "_")
 	return fmt.Sprintf("%s_%s", prefix, strings.ToUpper(key))
+}
+
+// DocsDescription is the description generated docs show. A flagless option
+// says that it is set from the config file or the environment.
+func (o ConfigOption) DocsDescription() string {
+	if !o.NoFlag {
+		return o.Description
+	}
+	const note = "config file or environment only"
+	if o.Description == "" {
+		return note
+	}
+	return o.Description + " (" + note + ")"
 }
 
 // DefaultValueString returns a string representation of the default value

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Framework 0.2.4**: golangci-lint is pinned to v2.15.0. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`.
 - **Framework 0.2.4**: a framework update leaves a Go file marked `ckeletin:keep-upstream-names` unchanged, so the rename tools' fixtures keep the upstream module path. The test tasks run `.ckeletin/scripts` by path.
 - **Framework 0.2.4**: `docs config` and `config.schema.json` publish a project default from `internal/projectdefaults/ckeletin-project.toml`. The registry keeps the framework default.
+- **Framework 0.2.4**: a config option with `NoFlag` is config file or environment only. It stays in the registry and the generated docs, and flag registration does not create a flag for it.
 
 ## [0.12.0] - 2026-10-16
 
