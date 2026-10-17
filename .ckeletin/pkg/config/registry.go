@@ -6,7 +6,9 @@
 // - All default values and configuration options are defined close to their commands
 //   (e.g., internal/config/<command>_options.go).
 // - Those files self-register providers here via RegisterOptionsProvider in init().
-// - Never use viper.SetDefault() directly in command files or elsewhere.
+// - Never use viper.SetDefault() directly in command files.
+// - SetDefaults applies the registry. ApplyProjectDefaultsTOML may replace a
+//   default for a key this registry already defines. It does not add options.
 //
 // Thread-Safety Notes:
 //

@@ -136,7 +136,7 @@ tasks:
     silent: false
 
   update:
-    desc: Update ckeletin framework to latest version (set version=vX.Y.Z to pin)
+    desc: Update ckeletin framework to latest version (set version=vX.Y.Z to pin, discard_local=1 to discard a committed local framework difference)
     cmds:
       - |
         set -eo pipefail
@@ -161,6 +161,24 @@ tasks:
           git remote add ckeletin-upstream https://github.com/peiman/ckeleti""n-go.git
         fi
 
+        # Compare with upstream at the recorded framework version before any
+        # checkout of .ckeletin/. discard_local=1 continues only for a
+        # committed difference. Uncommitted changes always stop.
+        DISCARD_LOCAL="{{.discard_local}}"
+        if [ -z "$DISCARD_LOCAL" ]; then
+          DISCARD_LOCAL=0
+        fi
+        DISCARD_RESULT=$(mktemp)
+        bash .ckeletin/scripts/framework-local-diff.sh \
+          --mode update \
+          --discard "$DISCARD_LOCAL" \
+          --result "$DISCARD_RESULT"
+        DISCARDED=false
+        if [ -f "$DISCARD_RESULT" ] && grep -q '^discarded=true$' "$DISCARD_RESULT"; then
+          DISCARDED=true
+        fi
+        rm -f "$DISCARD_RESULT"
+
         # Determine update target: pinned version or latest main
         UPDATE_REF="{{.CLI_ARGS}}"
         if [ -z "$UPDATE_REF" ]; then
@@ -182,6 +200,8 @@ tasks:
         OLD_VERSION=$(cat .ckeletin/VERSION 2>/dev/null || echo "unknown")
 
         echo "   Applying framework update ($UPDATE_TARGET)..."
+        # checkout alone leaves files that exist only in the local tree.
+        git rm -r --quiet -- .ckeletin
         git checkout "$CHECKOUT_REF" -- .ckeletin/
 
         # Capture new version for changelog diff
@@ -222,7 +242,7 @@ tasks:
           echo ""
           echo "✅ Framework is already up-to-date!"
           echo "   No changes needed."
-          printf 'CKELETIN_UPDATE_RESULT={"status":"up_to_date","from":"%s","to":"%s","committed":false}\n' "$OLD_VERSION" "$NEW_VERSION"
+          printf 'CKELETIN_UPDATE_RESULT={"status":"up_to_date","from":"%s","to":"%s","committed":false,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
         else
           # --no-verify: framework update commits bypass pre-commit hooks because
           # the commit is machine-generated and verified by build+test below.
@@ -235,7 +255,7 @@ tasks:
             echo "The update may have introduced breaking changes."
             echo "Check .ckeletin/CHANGELOG.md and fix compilation errors."
             echo "To rollback: git revert HEAD"
-            printf 'CKELETIN_UPDATE_RESULT={"status":"build_failed","from":"%s","to":"%s","committed":true}\n' "$OLD_VERSION" "$NEW_VERSION"
+            printf 'CKELETIN_UPDATE_RESULT={"status":"build_failed","from":"%s","to":"%s","committed":true,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
             exit 1
           fi
           echo "✅ Build verified successfully"
@@ -277,7 +297,7 @@ tasks:
 
           echo ""
           echo "✅ Framework updated successfully!"
-          printf 'CKELETIN_UPDATE_RESULT={"status":"updated","from":"%s","to":"%s","committed":true}\n' "$OLD_VERSION" "$NEW_VERSION"
+          printf 'CKELETIN_UPDATE_RESULT={"status":"updated","from":"%s","to":"%s","committed":true,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
           echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
           echo "   Review changes with: git diff HEAD~1"
         fi
@@ -298,6 +318,10 @@ tasks:
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
           git remote add ckeletin-upstream "https://github.com/peiman/ckeleti""n-go.git"
         fi
+
+        # Read-only. A local difference is printed and the update would stop.
+        # The incoming upstream diff below is still shown.
+        bash .ckeletin/scripts/framework-local-diff.sh --mode dry-run
 
         # Determine update target
         UPDATE_REF="{{.CLI_ARGS}}"
@@ -344,6 +368,10 @@ tasks:
         if ! git remote get-url ckeletin-upstream >/dev/null 2>&1; then
           git remote add ckeletin-upstream "https://github.com/peiman/ckeleti""n-go.git"
         fi
+
+        # Refuse before any backup or checkout when the tree has a local edit.
+        # A clean tree keeps the apply-then-restore path below.
+        bash .ckeletin/scripts/framework-local-diff.sh --mode compatibility
 
         # Determine update target
         UPDATE_REF="{{.CLI_ARGS}}"

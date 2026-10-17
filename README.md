@@ -273,7 +273,10 @@ Your project code and the framework layer are independent:
 task ckeletin:update:dry-run             # Preview changes (safe)
 task ckeletin:update:check-compatibility # Test build compatibility (safe)
 task ckeletin:update                     # Apply update (creates a commit)
+task ckeletin:update discard_local=1     # Discard a committed local framework edit
 ```
+
+A local edit under `.ckeletin/` stops the update until you keep it or pass `discard_local=1` for a committed difference. Uncommitted changes always stop. Project defaults live in `internal/projectdefaults/ckeletin-project.toml`, outside the framework tree.
 
 | Framework (`.ckeletin/`) | Project (yours) |
 |--------------------------|-----------------|

@@ -21,7 +21,31 @@ This means you get framework improvements (better validation, new scripts, updat
 | `task ckeletin:update version=v0.12.0` | Apply the framework pinned by that git tag | Yes (creates a commit) |
 | `task ckeletin:version` | Show current framework version (`.ckeletin/VERSION`) | No |
 
-`task check` compares framework versions, not how many commits touch `.ckeletin/`. The notice does not fail the build, does not run in CI, and stays quiet when you set `CKELETIN_SKIP_UPDATE_CHECK=1`, when you are offline, or when no `ckeletin-upstream` remote exists. A local version ahead of upstream is not an update. The version you see is `.ckeletin/VERSION`. `version=` is a git tag that pins a commit; it is not a second version number. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with `from`, `to`, and `committed`.
+`task check` compares framework versions, not how many commits touch `.ckeletin/`. The notice does not fail the build, does not run in CI, and stays quiet when you set `CKELETIN_SKIP_UPDATE_CHECK=1`, when you are offline, or when no `ckeletin-upstream` remote exists. A local version ahead of upstream is not an update. The version you see is `.ckeletin/VERSION`. `version=` is a git tag that pins a commit; it is not a second version number. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with `from`, `to`, `committed`, and `discarded`.
+
+## Local changes to `.ckeletin/`
+
+Before it replaces anything, the update compares your `.ckeletin/` with upstream at the framework version you have now. Names the update rewrites (module path and binary name) are not a local change. Anything else is.
+
+Uncommitted changes always stop the update. A committed local difference stops the update and the compatibility check. The command prints the difference and does not replace `.ckeletin/`. The dry run prints the difference, says the update would stop, and still changes nothing. It also shows the incoming upstream diff.
+
+```bash
+task ckeletin:update discard_local=1
+```
+
+`discard_local=1` continues, discards that committed difference, and says so. It does not discard uncommitted changes.
+
+A stop looks like:
+
+```text
+CKELETIN_UPDATE_RESULT={"status":"stopped","reason":"local_difference","from":"0.2.3","to":null,"committed":false,"discarded":false}
+```
+
+`reason` is `uncommitted`, `local_difference`, or `unknown_version`. `discarded` is true only when a committed difference was discarded.
+
+## Project defaults
+
+A default you choose for a framework option belongs in `internal/projectdefaults/ckeletin-project.toml`, not in `.ckeletin/`. The key is a registry key such as `"app.log_level"`. An unknown key fails at startup. The update does not replace that file. A config file, environment variable, or flag still wins over the project default, and the project default wins over the framework default.
 
 ## The Safe Update Workflow
 
@@ -67,7 +91,7 @@ The update is a 14-step process:
 2. **Sets up remote** — Adds or reuses the `ckeletin-upstream` git remote pointing to `https://github.com/peiman/ckeletin-go.git`
 3. **Fetches upstream** — `git fetch ckeletin-upstream main` (or a specific tag if `version=vX.Y.Z` is set)
 4. **Captures old version** — Records current `.ckeletin/VERSION` for changelog diff
-5. **Checks out framework** — `git checkout ckeletin-upstream/main -- .ckeletin/` — only the `.ckeletin/` directory, nothing else
+5. **Replaces the framework tree** — removes `.ckeletin/` and checks out `ckeletin-upstream/main -- .ckeletin/`, so a file that exists only locally is not kept. Nothing outside `.ckeletin/` is checked out
 6. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
 7. **Replaces derived names** — Rewrites the upstream module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in `.ckeletin/` Go files including tests, the same way `task init` did. Shell scripts are left unchanged.
 8. **Tidies modules** — `go mod tidy` to update `go.mod`/`go.sum` if dependencies changed

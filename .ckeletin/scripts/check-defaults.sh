@@ -2,7 +2,7 @@
 # scripts/check-defaults.sh
 #
 # This script checks for unauthorized direct calls to viper.SetDefault()
-# outside of the internal/config/registry.go file.
+# outside the registry and the project-default overlay.
 # Test files (*_test.go) are exempted from this rule.
 
 # Set strict mode
@@ -16,16 +16,17 @@ source "${SCRIPT_DIR}/lib/check-output.sh"
 check_header "Validating ADR-002: Config defaults in registry"
 
 # Find all Go files that call viper.SetDefault(), excluding:
-# 1. registry.go (authorized location - both old and new paths)
-# 2. *_test.go files (allowed in tests)
-# 3. comment lines (not actual calls)
-UNAUTHORIZED_DEFAULTS=$(grep -rn --include="*.go" --exclude="*_test.go" "viper\.SetDefault" . | grep -v "internal/config/registry.go" | grep -v "\.ckeletin/pkg/config/registry.go" | grep -v "//.*viper\.SetDefault" || true)
+# 1. registry.go (framework defaults)
+# 2. project_defaults.go (replaces a registry default; unknown keys fail)
+# 3. *_test.go files (allowed in tests)
+# 4. comment lines (not actual calls)
+UNAUTHORIZED_DEFAULTS=$(grep -rn --include="*.go" --exclude="*_test.go" "viper\.SetDefault" . | grep -v "internal/config/registry.go" | grep -v "\.ckeletin/pkg/config/registry.go" | grep -v "\.ckeletin/pkg/config/project_defaults.go" | grep -v "//.*viper\.SetDefault" || true)
 
 if [ -n "$UNAUTHORIZED_DEFAULTS" ]; then
     check_failure \
         "Found unauthorized viper.SetDefault() calls" \
         "$UNAUTHORIZED_DEFAULTS" \
-        "All defaults must be defined in internal/config/registry.go"$'\n'"Move these defaults to the registry"
+        "All defaults must be defined in internal/config/registry.go"$'\n'"A project may replace one via ApplyProjectDefaultsTOML. Move other calls to the registry"
     exit 1
 else
     check_success "No unauthorized viper.SetDefault() calls"
