@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.12.0"
+spec_version: "0.13.0"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
@@ -818,7 +818,7 @@ requirements:
       Removing the reference-style compare links fails the grep check.
 
   # ═══════════════════════════════════════════════════════════════
-  # Framework updates (CKSPEC-UPD-001 through CKSPEC-UPD-003)
+  # Framework updates (CKSPEC-UPD-001 through CKSPEC-UPD-004)
   # ═══════════════════════════════════════════════════════════════
 
   CKSPEC-UPD-001:
@@ -848,13 +848,20 @@ requirements:
   CKSPEC-UPD-002:
     title: "One command updates only the framework"
     status: met
-    enforcement_level: script
+    enforcement_level: test
     evidence: >
-      task ckeletin:update checks out only .ckeletin/ from an explicit ref
-      (version=) or from ckeletin-upstream/main, the upstream default branch.
-      task ckeletin:update:dry-run prints the diff and changes nothing.
-      task ckeletin:update:check-compatibility applies the candidate and
-      restores it. The command prints the framework version before and after
+      task ckeletin:update replaces only .ckeletin/ from an explicit ref
+      (version=) or from ckeletin-upstream/main. Before that replacement,
+      .ckeletin/scripts/framework-local-diff.sh compares the project tree
+      with upstream at the commit whose .ckeletin/VERSION equals the version
+      the project records. Names the update itself rewrites are not a local
+      difference. Any other difference is. Uncommitted changes always stop,
+      even when discard_local=1. A committed local difference stops unless
+      discard_local=1, which says it discarded and then replaces only
+      .ckeletin/. Dry-run prints the difference and changes nothing. The
+      compatibility check stops without modifying the tree when a local
+      difference exists, and otherwise applies the candidate and restores
+      it. The command prints the framework version before and after
       (v$OLD_VERSION → v$NEW_VERSION). .ckeletin/VERSION is that version.
       version= is a git tag, a pin, not a second version.
     checks:
@@ -862,12 +869,20 @@ requirements:
       - "grep -q 'update:dry-run' .ckeletin/Taskfile.yml"
       - "grep -q 'update:check-compatibility' .ckeletin/Taskfile.yml"
       - "grep -q 'Updated: v$OLD_VERSION' .ckeletin/Taskfile.yml"
+      - "grep -q 'framework-local-diff.sh' .ckeletin/Taskfile.yml"
+      - "grep -q 'discard_local' .ckeletin/Taskfile.yml"
+      - "go test -count=1 -timeout 180s -run 'TestFrameworkLocalDiff' ./test/integration/"
     violation_tests: []
     violation_evidence: >
-      .ckeletin/Taskfile.yml is the update command. The checkout path is
-      .ckeletin/ only. The dry-run and check-compatibility tasks are the
-      read-only and discard paths. docs/framework-updates.md describes the
-      same three commands.
+      test/integration/framework_local_diff_test.go
+      TestFrameworkLocalDiff_UncommittedStopsEvenWhenDiscard,
+      TestFrameworkLocalDiff_CommittedExtraFileStops,
+      TestFrameworkLocalDiff_DryRunShowsExtraFile, and
+      TestFrameworkLocalDiff_CompatibilityDoesNotModify are the stop cases.
+      TestFrameworkLocalDiff_NameRewritesDoNotStop is the rewrite exclusion.
+      TestFrameworkLocalDiff_DiscardExtraFile is the explicit discard.
+      .ckeletin/Taskfile.yml calls the guard before git rm and git checkout.
+      docs/framework-updates.md describes the same stop.
 
   CKSPEC-UPD-003:
     title: "Machine-readable update status"
@@ -876,12 +891,55 @@ requirements:
     evidence: >
       task ckeletin:check-update format=json prints current, latest, and
       update_available from the same script as the notice. task ckeletin:update
-      prints CKELETIN_UPDATE_RESULT with from, to, and committed.
+      prints CKELETIN_UPDATE_RESULT with from, to, committed, and discarded.
+      A stop uses status stopped, reason uncommitted, local_difference, or
+      unknown_version, to null, committed false, and discarded false. A
+      kept replacement sets discarded true only when a committed difference
+      was discarded.
     checks:
       - "grep -q 'CKELETIN_UPDATE_RESULT' .ckeletin/Taskfile.yml"
       - "grep -q -- '--json' .ckeletin/Taskfile.yml"
+      - "grep -q '\"status\":\"stopped\"' .ckeletin/scripts/framework-local-diff.sh"
+      - "go test -count=1 -timeout 180s -run 'TestFrameworkLocalDiff_CommittedExtraFileStops|TestFrameworkLocalDiff_UnknownVersionStops|TestUpdateNudge_JSON$' ./test/integration/"
     violation_tests: []
     violation_evidence: >
       test/integration/framework_update_nudge_test.go TestUpdateNudge_JSON
       parses the object and requires current, latest, and update_available.
+      test/integration/framework_local_diff_test.go
+      TestFrameworkLocalDiff_CommittedExtraFileStops and
+      TestFrameworkLocalDiff_UnknownVersionStops require the stopped object.
       The update result line is CKELETIN_UPDATE_RESULT in .ckeletin/Taskfile.yml.
+
+  CKSPEC-UPD-004:
+    title: "Project defaults survive a framework update"
+    status: met
+    enforcement_level: test
+    evidence: >
+      The registry is the source of which options exist and of the framework
+      default. A derived project replaces a default from
+      internal/projectdefaults/ckeletin-project.toml, which is embedded and
+      applied by config.ApplyProjectDefaultsTOML after config.SetDefaults and
+      before the config file is read. The file is outside .ckeletin/, so
+      task ckeletin:update leaves it in place. Precedence is the invocation
+      flag, then the environment, then the project config file, then this
+      project default, then the framework default. ApplyProjectDefaultsTOML
+      only calls viper.SetDefault, so a flag, an environment variable, and a
+      config file still win. An unknown option name or an unknown table
+      fails when the document is loaded and does not change a default
+      already applied. An empty [defaults] table changes nothing.
+    checks:
+      - "test -f internal/projectdefaults/ckeletin-project.toml"
+      - "grep -q 'ApplyProjectDefaultsTOML' cmd/root.go"
+      - "go test -count=1 -timeout 120s -run 'TestApplyProjectDefaultsTOML|TestProjectDefaultsFileOutsideFramework|TestRootAppliesEmbeddedDefaultsBeforeConfigFile' ./.ckeletin/pkg/config/ ./internal/projectdefaults/"
+    violation_tests: []
+    violation_evidence: >
+      .ckeletin/pkg/config/project_defaults_test.go
+      TestApplyProjectDefaultsTOML_ReplacesFrameworkDefault,
+      TestApplyProjectDefaultsTOML_ConfigFileWins,
+      TestApplyProjectDefaultsTOML_EnvWins, and
+      TestApplyProjectDefaultsTOML_UnknownKey are the precedence and unknown
+      key cases. internal/projectdefaults/defaults_test.go
+      TestProjectDefaultsFileOutsideFramework requires the file to live
+      outside .ckeletin/. TestRootAppliesEmbeddedDefaultsBeforeConfigFile
+      requires the apply call to sit after SetDefaults and before
+      viper.ReadInConfig.
