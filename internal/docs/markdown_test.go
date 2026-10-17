@@ -116,6 +116,29 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 	assert.True(t, strings.Contains(output, "```bash"), "Missing bash code block for environment variables")
 }
 
+// TestGenerateMarkdownDocs_ProjectDefaultMatchesOverride is the generator half
+// of the project-defaults overlay. docs config must publish the same default
+// the process uses, which is the project file when one is set.
+func TestGenerateMarkdownDocs_ProjectDefaultMatchesOverride(t *testing.T) {
+	opts, err := config.EffectiveRegistry([]byte("[defaults]\n\"app.log_level\" = \"warn\"\n"))
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	appInfo := AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"}
+	generator := NewGenerator(Config{
+		Writer:       &buf,
+		OutputFormat: FormatMarkdown,
+		Registry:     func() []config.ConfigOption { return opts },
+	})
+
+	require.NoError(t, generator.GenerateMarkdownDocs(&buf, appInfo))
+	output := buf.String()
+	assert.Contains(t, output, "| `app.log_level` | string | `warn` |")
+	assert.NotContains(t, output, "| `app.log_level` | string | `info` |")
+	assert.Contains(t, output, "4. Project defaults")
+	assert.Contains(t, output, "5. Framework defaults")
+}
+
 // TestGenerateMarkdownDocs_YAMLError tests how markdown generation handles YAML errors
 func TestGenerateMarkdownDocs_YAMLError(t *testing.T) {
 	// SETUP PHASE

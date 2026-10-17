@@ -19,6 +19,7 @@ import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	_ "github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands" // Import to trigger init() functions (framework)
 	_ "github.com/peiman/ckeletin-go/internal/config/commands"      // Import to trigger init() functions (project)
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 )
 
 // JSONSchema represents a JSON Schema document.
@@ -40,7 +41,11 @@ type JSONSchema struct {
 }
 
 func main() {
-	options := config.Registry()
+	options, err := config.EffectiveRegistry(projectdefaults.TOML)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to apply project defaults: %v\n", err)
+		os.Exit(1)
+	}
 
 	schema := &schemaBuilder{
 		root: map[string]interface{}{

@@ -49,7 +49,8 @@ func (g *Generator) GenerateMarkdownDocs(w io.Writer, appInfo AppInfo) error {
 	ew.printf("1. Command-line flags\n")
 	ew.printf("2. Environment variables (with prefix `%s_`)\n", appInfo.EnvPrefix)
 	ew.printf("3. Configuration file (%s)\n", sanitizeConfigPath(appInfo.ConfigPaths.DefaultPath))
-	ew.printf("4. Default values\n\n")
+	ew.printf("4. Project defaults\n")
+	ew.printf("5. Framework defaults\n\n")
 
 	// Configuration options
 	ew.printf("## Configuration Options\n\n")

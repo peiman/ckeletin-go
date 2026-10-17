@@ -7,6 +7,7 @@ import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config/commands"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/docs"
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +28,6 @@ func init() {
 }
 
 func runDocsConfig(cmd *cobra.Command, args []string) error {
-	// Get configuration values from Viper by key (flags already bound)
 	outputFormat := getKeyValue[string](config.KeyAppDocsOutputFormat)
 	outputFile := getKeyValue[string](config.KeyAppDocsOutputFile)
 
@@ -36,11 +36,16 @@ func runDocsConfig(cmd *cobra.Command, args []string) error {
 		Str("output_file", outputFile).
 		Msg("Documentation configuration loaded")
 
+	registry, err := config.EffectiveRegistry(projectdefaults.TOML)
+	if err != nil {
+		return err
+	}
+
 	cfg := docs.Config{
 		Writer:       cmd.OutOrStdout(),
 		OutputFormat: outputFormat,
 		OutputFile:   outputFile,
-		Registry:     config.Registry,
+		Registry:     func() []config.ConfigOption { return registry },
 	}
 
 	generator := docs.NewGenerator(cfg)
