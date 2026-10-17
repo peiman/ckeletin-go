@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Framework 0.2.1**: `task check` tells you when upstream `.ckeletin/VERSION` is a newer semver. The notice does not fail the build. `task ckeletin:check-update format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.
 
+### Fixed
+
+- **Framework 0.2.4**: a config file mode of 0644 no longer prints a permissions note at Info on every command. The note is Debug. Group-writable still warns. World-writable is still an error.
+
 ## [0.12.0] - 2026-10-16
 
 ### Security

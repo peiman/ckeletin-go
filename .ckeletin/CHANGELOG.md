@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-17
+
+### Fixed
+
+- **A normal config file no longer logs at Info.** Mode 0644 matches the permissive-permission check, and that note is now Debug. Group-writable still warns. World-writable is still an error.
+
 ## [0.2.3] - 2026-10-17
 
 ### Added

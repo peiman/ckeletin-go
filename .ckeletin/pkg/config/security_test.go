@@ -3,12 +3,15 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/testutil"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,6 +85,81 @@ func TestValidateConfigFilePermissions(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateConfigFilePermissions_LogLevel(t *testing.T) {
+	// Not parallel: this replaces the process-wide zerolog logger.
+	// Capture at Info, the production console level, so a Debug note stays hidden.
+	testutil.SkipOnWindowsWithReason(t, "permission tests require Unix file permissions")
+
+	savedLogger := log.Logger
+	savedLevel := zerolog.GlobalLevel()
+	t.Cleanup(func() {
+		log.Logger = savedLogger
+		zerolog.SetGlobalLevel(savedLevel)
+	})
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+
+	const permissiveNote = "permissive permissions"
+	const groupWritableWarning = "group-writable"
+
+	tests := []struct {
+		name              string
+		permissions       os.FileMode
+		wantErr           bool
+		errContains       string
+		wantGroupWritable bool
+	}{
+		{
+			name:        "mode 0644 does not emit the permissive note at info",
+			permissions: 0644,
+		},
+		{
+			name:              "mode 0620 still emits the group-writable warning",
+			permissions:       0620,
+			wantGroupWritable: true,
+		},
+		{
+			name:        "mode 0600 emits neither",
+			permissions: 0600,
+		},
+		{
+			name:        "mode 0666 still returns the world-writable error",
+			permissions: 0666,
+			wantErr:     true,
+			errContains: "world-writable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := &bytes.Buffer{}
+			log.Logger = zerolog.New(buf).Level(zerolog.InfoLevel)
+
+			tmpDir := t.TempDir()
+			tmpFile := filepath.Join(tmpDir, "config.yaml")
+			require.NoError(t, os.WriteFile(tmpFile, []byte("test: value\n"), 0600))
+			require.NoError(t, os.Chmod(tmpFile, tt.permissions))
+
+			err := ValidateConfigFilePermissions(tmpFile)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+
+			logged := buf.String()
+			assert.NotContains(t, logged, permissiveNote)
+			if tt.wantGroupWritable {
+				assert.Contains(t, logged, groupWritableWarning)
+				assert.Contains(t, logged, `"level":"warn"`)
+			} else {
+				assert.NotContains(t, logged, groupWritableWarning)
 			}
 		})
 	}
