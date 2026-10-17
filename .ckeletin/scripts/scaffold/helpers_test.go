@@ -1,3 +1,4 @@
+// ckeletin:keep-upstream-names — fixture literals must survive the derived-name rewrite.
 package main
 
 import (
@@ -704,5 +705,33 @@ var name = "ckeletin-go"
 		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
 		require.NoError(t, err)
 		assert.Equal(t, 0, count)
+	})
+
+	t.Run("skips files marked keep-upstream-names", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		marked := filepath.Join(tmpDir, "kept_test.go")
+		require.NoError(t, os.WriteFile(marked, []byte(
+			"// ckeletin:keep-upstream-names — fixture literals must survive the derived-name rewrite.\n"+
+				"package kept\n\nconst oldModule = \"github.com/peiman/ckeletin-go\"\n",
+		), 0600))
+		unmarked := filepath.Join(tmpDir, "plain.go")
+		require.NoError(t, os.WriteFile(unmarked, []byte(
+			"package plain\n\nconst oldModule = \"github.com/peiman/ckeletin-go\"\n",
+		), 0600))
+
+		count, err := replaceNameInGoFiles(tmpDir, "ckeletin-go", "myapp")
+		require.NoError(t, err)
+		assert.Equal(t, 1, count)
+
+		kept, err := os.ReadFile(marked)
+		require.NoError(t, err)
+		assert.Contains(t, string(kept), "github.com/peiman/ckeletin-go")
+		assert.NotContains(t, string(kept), "myapp")
+
+		plain, err := os.ReadFile(unmarked)
+		require.NoError(t, err)
+		assert.Contains(t, string(plain), "github.com/peiman/myapp")
+		assert.NotContains(t, string(plain), "ckeletin-go")
 	})
 }

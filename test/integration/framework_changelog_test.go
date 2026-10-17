@@ -227,6 +227,22 @@ func TestRewriteDerivedNames_MatchesInit(t *testing.T) {
 		"// comment before rewrite: "+upstreamName+" and ckeletin-rust.\n"+
 		"const logPath = \"./logs/"+upstreamName+".log\"\n"+
 		"const envPrefix = \""+upstreamEnv+"\"\n"), 0o644))
+	// The marker keeps upstream module literals. An unmarked Go file is renamed.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "kept_test.go"), []byte(""+
+		"// ckeletin:keep-upstream-names — fixture literals must survive the derived-name rewrite.\n"+
+		"package kept\n"+
+		"\n"+
+		"const oldModule = \""+upstreamModule+"\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "plain_test.go"), []byte(""+
+		"package plain\n"+
+		"\n"+
+		"const oldModule = \""+upstreamModule+"\"\n"), 0o644))
+	fixtureSrc := filepath.Join(root, ".ckeletin", "scripts", "rewrite-imports", "main_test.go")
+	fixtureBody, readErr := os.ReadFile(fixtureSrc)
+	require.NoError(t, readErr)
+	fixtureDst := filepath.Join(dir, ".ckeletin", "scripts", "rewrite-imports", "main_test.go")
+	require.NoError(t, os.MkdirAll(filepath.Dir(fixtureDst), 0o755))
+	require.NoError(t, os.WriteFile(fixtureDst, fixtureBody, 0o644))
 
 	cmd := exec.Command("bash", script,
 		upstreamModule, derivedModule, upstreamName, derivedName, ".ckeletin")
@@ -252,6 +268,36 @@ func TestRewriteDerivedNames_MatchesInit(t *testing.T) {
 	assert.Contains(t, string(goBody), derivedName+" and ckeletin-rust")
 	assert.Contains(t, string(goBody), "\"./logs/"+derivedName+".log\"")
 	assert.Contains(t, string(goBody), "const envPrefix = \""+derivedEnv+"\"")
+
+	kept, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "kept_test.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(kept), upstreamModule)
+	assert.NotContains(t, string(kept), derivedName)
+
+	plain, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "plain_test.go"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(plain), upstreamModule)
+	assert.Contains(t, string(plain), derivedName)
+
+	rewrittenFixture, err := os.ReadFile(fixtureDst)
+	require.NoError(t, err)
+	assert.Contains(t, string(rewrittenFixture), upstreamModule, "marked fixture must keep the upstream module literal")
+	assert.NotContains(t, string(rewrittenFixture), derivedName)
+}
+
+func TestUpstreamFixtureFilesKeepTheMarker(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	files := []string{
+		".ckeletin/scripts/rewrite-imports/main_test.go",
+		".ckeletin/scripts/scaffold/helpers_test.go",
+		".ckeletin/scripts/scaffold/update_taskfile_test.go",
+	}
+	for _, rel := range files {
+		body, readErr := os.ReadFile(filepath.Join(root, rel))
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), "ckeletin:keep-upstream-names", rel)
+	}
 }
 
 func TestGenerateCommandMigration_SilentWhenTheProjectTaskForwards(t *testing.T) {

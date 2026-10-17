@@ -13,6 +13,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 - **A normal config file no longer logs at Info.** Mode 0644 matches the permissive-permission check, and that note is now Debug. Group-writable still warns. World-writable is still an error.
 - **golangci-lint is pinned to v2.15.0.** v2.12.2 cannot read Go 1.27 export data. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`, so the override has to live outside it.
+- **A framework update no longer rewrites the rename tools' fixtures.** A Go file marked `ckeletin:keep-upstream-names` keeps the upstream module path. The ordinary test tasks list `.ckeletin/scripts` explicitly, because `./...` skips a directory whose name starts with `.`.
 
 ## [0.2.3] - 2026-10-17
 

@@ -93,13 +93,13 @@ The update is a 14-step process:
 4. **Captures old version** — Records current `.ckeletin/VERSION` for changelog diff
 5. **Replaces the framework tree** — removes `.ckeletin/` and checks out `ckeletin-upstream/main -- .ckeletin/`, so a file that exists only locally is not kept. Nothing outside `.ckeletin/` is checked out
 6. **Rewrites imports** — Runs the AST-based import rewriter to replace the upstream module path with your project's module path (from `go.mod`)
-7. **Replaces derived names** — Rewrites the upstream module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in `.ckeletin/` Go files including tests, the same way `task init` did. Shell scripts are left unchanged.
+7. **Replaces derived names** — Rewrites the upstream module path and binary name in framework markdown and YAML, and the binary name plus env-var prefix in `.ckeletin/` Go files including tests, the same way `task init` did. Shell scripts are left unchanged. Go files marked `ckeletin:keep-upstream-names` are left unchanged so the rename tools' fixtures keep the upstream module path.
 8. **Tidies modules** — `go mod tidy` to update `go.mod`/`go.sum` if dependencies changed
 9. **Regenerates constants** — `task ckeletin:generate:config:key-constants` to keep config constants in sync
 10. **Formats code** — `task ckeletin:format`
 11. **Runs migrations** — `migrate-post-update.sh` for structural changes (e.g., removing stale config entries)
 12. **Commits** — `git add .ckeletin go.mod go.sum && git commit` with message including the new version
-13. **Verifies build and tests** — `go build ./...` to catch compilation errors, then `go test ./.ckeletin/...` to catch test utility breakage
+13. **Verifies build and tests** — `go build ./...` to catch compilation errors, then `go test ./.ckeletin/pkg/... ./.ckeletin/scripts/...` to catch framework test breakage. `./.ckeletin/...` matches no packages, because Go skips a directory whose name starts with `.` even when that directory is the root of the pattern.
 14. **Reports result** — Shows changelog diff (old → new version), success message, or "already up-to-date"
 
 If the build fails at step 13, the commit still exists so you can inspect it. See [Handling Breaking Changes](#handling-breaking-changes) for recovery.

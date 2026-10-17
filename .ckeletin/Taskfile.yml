@@ -266,7 +266,9 @@ tasks:
 
           echo "🧪 Verifying framework tests pass..."
           set +e
-          TEST_OUTPUT=$(go test ./.ckeletin/... 2>&1)
+          # ./.ckeletin/... matches no packages: the walk starts on the dot
+          # directory and skips it. List the two framework trees explicitly.
+          TEST_OUTPUT=$(go test ./.ckeletin/pkg/... ./.ckeletin/scripts/... 2>&1)
           TEST_RESULT=$?
           set -e
           if [ $TEST_RESULT -ne 0 ]; then
@@ -834,13 +836,18 @@ tasks:
       - '{{.SCRIPTS_DIR}}/validate-hook-forwardings.sh'
 
   # --- Testing ---
+  # ./... skips directories whose names start with ".". ./.ckeletin/... also
+  # matches nothing: the walk starts on .ckeletin and skips that directory.
+  # List the framework trees explicitly. pkg was already listed; scripts is
+  # where the rename fixtures live. Same gotestsum invocation, so pkg is not
+  # run twice. Do not add -tags scaffold here; that tag stays on test:scaffold.
 
   test:
     desc: Run tests with coverage
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -849,7 +856,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -858,7 +865,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -867,7 +874,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... | grep -v /test/integration)
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -short $(go list ./... ./.ckeletin/scripts/... | grep -v /test/integration)
 
   test:scaffold:
     desc: Run scaffold integration tests (slow — copies project, runs task check)
@@ -887,7 +894,7 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...
+      gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -v -race -tags dev -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...
       gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       rm -f coverage.raw.txt
 
@@ -923,7 +930,7 @@ tasks:
   test:coverage:text:
     desc: Run tests with detailed coverage data
     cmds:
-      - '{{._TEST_ENV_PRELUDE}} gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/...'
+      - '{{._TEST_ENV_PRELUDE}} gotestsum --format short --jsonfile {{.TEST_OUTPUT_JSON}} --hide-summary=skipped -- -cover -coverprofile=coverage.raw.txt -covermode=atomic -coverpkg=./...,{{._MODULE_PATH}}/.ckeletin/pkg/... ./... ./.ckeletin/pkg/... ./.ckeletin/scripts/...'
       - gocovmerge coverage.raw.txt > {{.COVERAGE_TXT}}
       - rm -f coverage.raw.txt
       - echo "Detailed coverage report:"
