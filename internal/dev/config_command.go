@@ -18,7 +18,10 @@ type ConfigCommandFlags struct {
 // Returns nil if a flag was handled, or an error.
 // Returns (false, nil) if no flags were specified (caller should show help).
 func RunConfigCommand(w io.Writer, flags ConfigCommandFlags) (handled bool, err error) {
-	ci := NewConfigInspector()
+	ci, err := NewConfigInspector()
+	if err != nil {
+		return false, err
+	}
 
 	if flags.List {
 		_, _ = fmt.Fprintln(w, ci.FormatAsTable())

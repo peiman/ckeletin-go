@@ -156,7 +156,7 @@ func TestRunConfigCommand_ValidateWithErrors(t *testing.T) {
 	// A more direct approach: we test the output format by looking at the
 	// validation path in the source code and verifying with a registry that
 	// does have required fields. Since RunConfigCommand always calls
-	// NewConfigInspector() which uses config.Registry(), we can verify the
+	// NewConfigInspector() which uses the effective registry, we can verify the
 	// error formatting by checking that the function handles error cases.
 	t.Run("validate with required field missing", func(t *testing.T) {
 		// We can't easily inject a custom registry into RunConfigCommand,

@@ -6,18 +6,31 @@ import (
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+// projectDefaultsTOML is the overlay flag defaults are built from.
+// Production is the embedded project file. Tests replace the slice.
+var projectDefaultsTOML = projectdefaults.TOML
+
 // RegisterFlagsForPrefixWithOverrides registers Cobra flags for all configuration options
 // whose keys start with the provided prefix. It binds each flag to Viper using the
 // option's key. Flag names are derived from the key suffix by converting underscores
 // to hyphens, unless an explicit override is provided in the overrides map.
-// Returns an error if flag binding fails.
+// The flag default is the project default when one is set, otherwise the framework
+// default. Returns an error if the project defaults are invalid or flag binding fails.
 func RegisterFlagsForPrefixWithOverrides(cmd *cobra.Command, prefix string, overrides map[string]string) error {
-	options := config.Registry()
+	return registerFlagsForPrefix(cmd, prefix, overrides, projectDefaultsTOML)
+}
+
+func registerFlagsForPrefix(cmd *cobra.Command, prefix string, overrides map[string]string, projectTOML []byte) error {
+	options, err := config.EffectiveRegistry(projectTOML)
+	if err != nil {
+		return err
+	}
 
 	for _, opt := range options {
 		if !strings.HasPrefix(opt.Key, prefix) {
