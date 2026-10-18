@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Global `--help` and `catalog` show a project default from `internal/projectdefaults/ckeletin-project.toml` on the root flags (`--log-level`, `--output`, and the other registry-backed global flags). Bare `--version` stays text unless `--output json` is passed. `--config` and `--config-path-mode` are unchanged. A flag, an environment variable, or a config file still wins.
 - Command `--help` shows a project default from `internal/projectdefaults/ckeletin-project.toml` as the flag default. `dev config` reports that value as the default. Generated config docs do the same. A flag, an environment variable, or a config file still wins.
 - **Framework 0.2.4**: a config file mode of 0644 no longer prints a permissions note at Info on every command. The note is Debug. Group-writable still warns. World-writable is still an error.
 - **Framework 0.2.4**: golangci-lint is pinned to v2.15.0. A project overrides any tool pin with `CKELETIN_TOOL_<NAME>` in its own Taskfile, or on the task command line. Unset, the framework default is used. An update still replaces `.ckeletin/Taskfile.yml`.

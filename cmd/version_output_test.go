@@ -218,6 +218,7 @@ func TestRenderVersion_JSONNeverEmitsEmptyFields(t *testing.T) {
 		outputFlag.Changed = origChanged
 	})
 	require.NoError(t, outputFlag.Value.Set("json"))
+	outputFlag.Changed = true // explicit --output, not an unchanged default
 
 	// EXECUTION PHASE
 	got := renderVersion(RootCmd)
@@ -235,6 +236,29 @@ func TestRenderVersion_JSONNeverEmitsEmptyFields(t *testing.T) {
 	}
 	assert.Equal(t, treeStateUnknown, data["tree"],
 		"tree state must be unknown when no build identity was injected")
+}
+
+// TestRenderVersion_UnchangedOutputStaysText pins that a default of "json"
+// is not an explicit --output json. Cobra runs this template before
+// PersistentPreRunE, so the flag value still holds the default.
+func TestRenderVersion_UnchangedOutputStaysText(t *testing.T) {
+	outputFlag := RootCmd.PersistentFlags().Lookup("output")
+	require.NotNil(t, outputFlag)
+	origValue, origDef, origChanged := outputFlag.Value.String(), outputFlag.DefValue, outputFlag.Changed
+	t.Cleanup(func() {
+		outputFlag.Value.Set(origValue) //nolint:errcheck // restoring saved state
+		outputFlag.DefValue = origDef
+		outputFlag.Changed = origChanged
+	})
+
+	require.NoError(t, outputFlag.Value.Set("json"))
+	outputFlag.DefValue = "json"
+	outputFlag.Changed = false
+
+	got := renderVersion(RootCmd)
+
+	assert.NotContains(t, got, `"status"`)
+	assert.Contains(t, got, "version")
 }
 
 func TestVersionFlag_TextOutput(t *testing.T) {

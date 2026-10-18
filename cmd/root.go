@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
@@ -238,6 +239,10 @@ var RootCmd = &cobra.Command{
 	Long:          "",
 	SilenceErrors: true, // Errors are handled by main.go, don't print twice
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if rootFlagDefaultsErr != nil {
+			return fmt.Errorf("apply root flag defaults: %w", rootFlagDefaultsErr)
+		}
+
 		// Bind flags to viper first (must happen before initConfig)
 		if err := bindFlags(cmd); err != nil {
 			return fmt.Errorf("failed to bind flags: %w", err)
@@ -417,8 +422,12 @@ type versionData struct {
 // renderVersion renders the --version output. Cobra handles the version flag
 // BEFORE PersistentPreRunE runs, so JSON mode is detected from the parsed
 // --output flag directly rather than via output.IsJSONMode() (not yet set).
+// The flag value still holds its default when the user did not pass --output.
+// An unchanged flag must not select JSON: a project default of "json" would
+// otherwise change bare --version and ignore an environment value of "text".
 func renderVersion(cmd *cobra.Command) string {
-	if outputFlag := cmd.Root().PersistentFlags().Lookup("output"); outputFlag != nil && outputFlag.Value.String() == "json" {
+	outputFlag := cmd.Root().PersistentFlags().Lookup("output")
+	if outputFlag != nil && outputFlag.Changed && outputFlag.Value.String() == "json" {
 		envelope := output.JSONEnvelope{
 			Status:  "success",
 			Command: cmd.Name(),
@@ -508,6 +517,108 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 
 	// Output format flag
 	RootCmd.PersistentFlags().String("output", "text", "Output format: text (human-readable) or json (machine-readable)")
+
+	// Replace the literals above with the project overlay. The calls stay so
+	// the flags remain persistent and keep their CLI names and help text.
+	rootFlagDefaultsErr = applyRootFlagDefaults(projectDefaultsTOML)
+}
+
+// rootRegistryFlagBindings lists the persistent flags whose defaults come from
+// the registry. Two names are not a mechanical rewrite of the key:
+// app.log.color_enabled is --log-color, and app.output_format is --output.
+// --config and --config-path-mode are not registry options.
+var rootRegistryFlagBindings = []struct {
+	key  string
+	name string
+}{
+	{config.KeyAppLogLevel, "log-level"},
+	{config.KeyAppLogConsoleLevel, "log-console-level"},
+	{config.KeyAppLogFileEnabled, "log-file-enabled"},
+	{config.KeyAppLogFilePath, "log-file-path"},
+	{config.KeyAppLogFileLevel, "log-file-level"},
+	{config.KeyAppLogColorEnabled, "log-color"},
+	{config.KeyAppLogFileMaxSize, "log-file-max-size"},
+	{config.KeyAppLogFileMaxBackups, "log-file-max-backups"},
+	{config.KeyAppLogFileMaxAge, "log-file-max-age"},
+	{config.KeyAppLogFileCompress, "log-file-compress"},
+	{config.KeyAppLogSamplingEnabled, "log-sampling-enabled"},
+	{config.KeyAppLogSamplingInitial, "log-sampling-initial"},
+	{config.KeyAppLogSamplingThereafter, "log-sampling-thereafter"},
+	{config.KeyAppOutputFormat, "output"},
+}
+
+// rootFlagDefaultsErr is set from init. PersistentPreRunE returns it so a
+// broken project defaults file fails the command. --help does not run PreRun.
+var rootFlagDefaultsErr error
+
+// applyRootFlagDefaults sets each registry-backed root flag's default from
+// the project overlay. Flag registration stays in init. Changed is cleared
+// because installing a default is not an explicit flag. A registry error
+// leaves every flag untouched.
+func applyRootFlagDefaults(projectTOML []byte) error {
+	options, err := config.EffectiveRegistry(projectTOML)
+	if err != nil {
+		return err
+	}
+	byKey := make(map[string]config.ConfigOption, len(options))
+	for _, opt := range options {
+		byKey[opt.Key] = opt
+	}
+
+	type pendingDefault struct {
+		flag *pflag.Flag
+		text string
+	}
+	pending := make([]pendingDefault, 0, len(rootRegistryFlagBindings))
+	for _, binding := range rootRegistryFlagBindings {
+		opt, ok := byKey[binding.key]
+		if !ok {
+			return fmt.Errorf("root flag %q: option %s is not in the registry", binding.name, binding.key)
+		}
+		flag := RootCmd.PersistentFlags().Lookup(binding.name)
+		if flag == nil {
+			return fmt.Errorf("root flag %q is not registered", binding.name)
+		}
+		text, err := flagDefaultText(flag, opt.DefaultValue)
+		if err != nil {
+			return fmt.Errorf("root flag %q: %w", binding.name, err)
+		}
+		pending = append(pending, pendingDefault{flag: flag, text: text})
+	}
+
+	for _, item := range pending {
+		if err := item.flag.Value.Set(item.text); err != nil {
+			return fmt.Errorf("root flag %q: %w", item.flag.Name, err)
+		}
+		item.flag.DefValue = item.flag.Value.String()
+		item.flag.Changed = false
+	}
+	return nil
+}
+
+func flagDefaultText(flag *pflag.Flag, value any) (string, error) {
+	switch flag.Value.Type() {
+	case "string":
+		text, ok := value.(string)
+		if !ok {
+			return "", fmt.Errorf("default must be a string, got %T", value)
+		}
+		return text, nil
+	case "bool":
+		parsed, err := cast.ToBoolE(value)
+		if err != nil {
+			return "", fmt.Errorf("default must be a bool, got %T", value)
+		}
+		return strconv.FormatBool(parsed), nil
+	case "int":
+		parsed, err := cast.ToIntE(value)
+		if err != nil {
+			return "", fmt.Errorf("default must be an int, got %T", value)
+		}
+		return strconv.Itoa(parsed), nil
+	default:
+		return "", fmt.Errorf("unsupported flag type %q", flag.Value.Type())
+	}
 }
 
 // bindFlags binds all persistent flags to viper configuration keys.
@@ -525,22 +636,11 @@ func bindFlags(cmd *cobra.Command) error {
 		}
 	}
 
-	// Bind all flags to their viper keys
+	// Bind all flags to their viper keys. "config" is not a registry option.
 	bindFlag("config", "config")
-	bindFlag(config.KeyAppLogLevel, "log-level")
-	bindFlag(config.KeyAppLogConsoleLevel, "log-console-level")
-	bindFlag(config.KeyAppLogFileEnabled, "log-file-enabled")
-	bindFlag(config.KeyAppLogFilePath, "log-file-path")
-	bindFlag(config.KeyAppLogFileLevel, "log-file-level")
-	bindFlag(config.KeyAppLogColorEnabled, "log-color")
-	bindFlag(config.KeyAppLogFileMaxSize, "log-file-max-size")
-	bindFlag(config.KeyAppLogFileMaxBackups, "log-file-max-backups")
-	bindFlag(config.KeyAppLogFileMaxAge, "log-file-max-age")
-	bindFlag(config.KeyAppLogFileCompress, "log-file-compress")
-	bindFlag(config.KeyAppLogSamplingEnabled, "log-sampling-enabled")
-	bindFlag(config.KeyAppLogSamplingInitial, "log-sampling-initial")
-	bindFlag(config.KeyAppLogSamplingThereafter, "log-sampling-thereafter")
-	bindFlag(config.KeyAppOutputFormat, "output")
+	for _, binding := range rootRegistryFlagBindings {
+		bindFlag(binding.key, binding.name)
+	}
 
 	// Return combined error if any bindings failed
 	if len(errs) > 0 {
