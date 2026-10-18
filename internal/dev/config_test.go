@@ -8,11 +8,19 @@ import (
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func mustInspector(t *testing.T) *ConfigInspector {
+	t.Helper()
+	ci, err := NewConfigInspector()
+	require.NoError(t, err)
+	return ci
+}
 
 func TestNewConfigInspector(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 
 	// ASSERTION PHASE
 	assert.NotNil(t, ci, "ConfigInspector should not be nil")
@@ -22,7 +30,7 @@ func TestNewConfigInspector(t *testing.T) {
 
 func TestListAllOptions(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 
 	// EXECUTION PHASE
 	options := ci.ListAllOptions()
@@ -47,7 +55,7 @@ func TestListAllOptions(t *testing.T) {
 
 func TestGetEffectiveConfig(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 	viper.Reset() // Start fresh
 
 	// Set a test value
@@ -70,7 +78,7 @@ func TestGetEffectiveConfig(t *testing.T) {
 
 func TestFormatAsTable(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 
 	// EXECUTION PHASE
 	table := ci.FormatAsTable()
@@ -90,7 +98,7 @@ func TestFormatAsTable(t *testing.T) {
 
 func TestFormatEffectiveAsTable(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 	viper.Reset()
 	viper.Set("app.log.level", "info")
 
@@ -132,7 +140,7 @@ func TestExportToJSON(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
-			ci := NewConfigInspector()
+			ci := mustInspector(t)
 			tt.setupViper()
 
 			// EXECUTION PHASE
@@ -181,7 +189,7 @@ func TestValidateConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
-			ci := NewConfigInspector()
+			ci := mustInspector(t)
 			tt.setupViper()
 
 			// EXECUTION PHASE
@@ -208,7 +216,7 @@ func TestValidateConfigWithRequiredFields(t *testing.T) {
 	// Test validation with required field scenarios
 	t.Run("required field not set", func(t *testing.T) {
 		// SETUP PHASE
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		viper.Reset()
 
 		// In the current registry, there may not be required fields
@@ -236,7 +244,7 @@ func TestValidateConfigWithRequiredFields(t *testing.T) {
 
 	t.Run("required field with nil value", func(t *testing.T) {
 		// SETUP PHASE
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		viper.Reset()
 
 		// Test the specific validation path for required fields
@@ -253,7 +261,7 @@ func TestValidateConfigWithRequiredFields(t *testing.T) {
 
 	t.Run("required field with empty string", func(t *testing.T) {
 		// SETUP PHASE
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		viper.Reset()
 
 		// Set a value to empty string (this tests the fmt.Sprintf(%v) == "" check)
@@ -419,7 +427,7 @@ func TestGetConfigByPrefix(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
-			ci := NewConfigInspector()
+			ci := mustInspector(t)
 
 			// EXECUTION PHASE
 			matches := ci.GetConfigByPrefix(tt.prefix)
@@ -440,7 +448,7 @@ func TestGetConfigByPrefix(t *testing.T) {
 
 func TestGetConfigSourceInfo(t *testing.T) {
 	// SETUP PHASE
-	ci := NewConfigInspector()
+	ci := mustInspector(t)
 	viper.Reset()
 
 	// Set some test values
@@ -462,7 +470,7 @@ func TestGetConfigSourceInfoWithEnvVars(t *testing.T) {
 	// Test GetConfigSourceInfo with environment variable simulation
 	t.Run("file vs environment source detection", func(t *testing.T) {
 		// SETUP PHASE
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		viper.Reset()
 
 		// Set a value different from default (simulating file config)
@@ -493,7 +501,7 @@ func TestGetConfigSourceInfoWithEnvVars(t *testing.T) {
 func TestConfigOptionMethods(t *testing.T) {
 	// Test that we can work with ConfigOption instances
 	t.Run("option has expected fields", func(t *testing.T) {
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		options := ci.ListAllOptions()
 
 		assert.Greater(t, len(options), 0, "Should have options")
@@ -518,7 +526,7 @@ func TestConfigInspectorIntegration(t *testing.T) {
 	// Integration test that exercises multiple methods together
 	t.Run("full workflow", func(t *testing.T) {
 		// SETUP PHASE
-		ci := NewConfigInspector()
+		ci := mustInspector(t)
 		viper.Reset()
 		viper.Set("app.log.level", "debug")
 
@@ -549,4 +557,76 @@ func TestConfigInspectorIntegration(t *testing.T) {
 		appOptions := ci.GetConfigByPrefix("app.")
 		assert.Greater(t, len(appOptions), 0, "Should have app options")
 	})
+}
+
+func TestNewConfigInspector_ProjectDefaultIsTheDefault(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.SetDefault("app.log_level", "warn")
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+
+	ci, err := NewConfigInspector()
+	require.NoError(t, err)
+
+	var got interface{}
+	for _, opt := range ci.ListAllOptions() {
+		if opt.Key == "app.log_level" {
+			got = opt.DefaultValue
+		}
+	}
+	assert.Equal(t, "warn", got)
+
+	sources := ci.GetConfigSourceInfo("CKELETIN")
+	assert.Equal(t, "warn", sources.Defaults["app.log_level"])
+	_, inFile := sources.File["app.log_level"]
+	assert.False(t, inFile)
+	_, inEnv := sources.Environment["app.log_level"]
+	assert.False(t, inEnv)
+
+	var row string
+	for _, line := range strings.Split(ci.FormatEffectiveAsTable(), "\n") {
+		if strings.Contains(line, "app.log_level") {
+			row = line
+		}
+	}
+	require.NotEmpty(t, row)
+	assert.Contains(t, row, "warn")
+	assert.Contains(t, row, "default")
+	assert.NotContains(t, row, "file/env")
+}
+
+func TestNewConfigInspector_FileValueStaysFile(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	viper.Set("app.log_level", "from-file")
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+
+	ci, err := NewConfigInspector()
+	require.NoError(t, err)
+
+	sources := ci.GetConfigSourceInfo("CKELETIN")
+	assert.Equal(t, "from-file", sources.File["app.log_level"])
+
+	var row string
+	for _, line := range strings.Split(ci.FormatEffectiveAsTable(), "\n") {
+		if strings.Contains(line, "app.log_level") {
+			row = line
+		}
+	}
+	require.NotEmpty(t, row)
+	assert.Contains(t, row, "file/env")
+}
+
+func TestNewConfigInspector_UnknownProjectDefault(t *testing.T) {
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"nope\" = \"x\"\n")
+
+	_, err := NewConfigInspector()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown option")
 }

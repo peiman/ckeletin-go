@@ -295,3 +295,54 @@ func TestGenerateYAMLConvenience(t *testing.T) {
 	assert.True(t, strings.Contains(output, "TEST_YAML_CONTENT_FOR_CONVENIENCE_TEST"),
 		"Expected YAML content function to be called")
 }
+
+func TestGenerateMarkdown_PublishesProjectDefault(t *testing.T) {
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+
+	var buf bytes.Buffer
+	err := GenerateMarkdown(&buf, AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"})
+	require.NoError(t, err)
+
+	output := buf.String()
+	assert.Contains(t, output, "| `app.log_level` | string | `warn` |")
+	assert.NotContains(t, output, "| `app.log_level` | string | `info` |")
+}
+
+func TestGenerateYAML_PublishesProjectDefault(t *testing.T) {
+	origTOML := projectDefaultsTOML
+	origYAML := generateYAMLContentFunc
+	t.Cleanup(func() {
+		projectDefaultsTOML = origTOML
+		generateYAMLContentFunc = origYAML
+	})
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+
+	var seen []config.ConfigOption
+	generateYAMLContentFunc = func(w io.Writer, registry []config.ConfigOption) error {
+		seen = registry
+		_, err := fmt.Fprintln(w, "yaml")
+		return err
+	}
+
+	require.NoError(t, GenerateYAML(&bytes.Buffer{}))
+
+	var got interface{}
+	for _, opt := range seen {
+		if opt.Key == "app.log_level" {
+			got = opt.DefaultValue
+		}
+	}
+	assert.Equal(t, "warn", got)
+}
+
+func TestGenerateMarkdown_RejectsUnknownProjectDefault(t *testing.T) {
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"nope\" = \"x\"\n")
+
+	err := GenerateMarkdown(&bytes.Buffer{}, AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown option")
+}

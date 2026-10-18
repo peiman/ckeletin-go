@@ -9,8 +9,13 @@ import (
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 	"github.com/rs/zerolog/log"
 )
+
+// projectDefaultsTOML is the overlay the convenience generators publish.
+// Production is the embedded project file. Tests replace the slice.
+var projectDefaultsTOML = projectdefaults.TOML
 
 // Generator handles document generation based on configuration
 type Generator struct {
@@ -105,11 +110,15 @@ func (g *Generator) Generate() error {
 
 // GenerateMarkdown is a convenience function to generate markdown documentation directly
 func GenerateMarkdown(writer io.Writer, appInfo AppInfo) error {
+	registry, err := registryWithProjectDefaults()
+	if err != nil {
+		return err
+	}
 	g := NewGenerator(Config{
 		Writer:       writer,
 		OutputFormat: FormatMarkdown,
 		OutputFile:   "",
-		Registry:     config.Registry,
+		Registry:     registry,
 	})
 	g.SetAppInfo(appInfo)
 	return g.GenerateMarkdownDocs(writer, appInfo)
@@ -117,11 +126,23 @@ func GenerateMarkdown(writer io.Writer, appInfo AppInfo) error {
 
 // GenerateYAML is a convenience function to generate YAML configuration template directly
 func GenerateYAML(writer io.Writer) error {
+	registry, err := registryWithProjectDefaults()
+	if err != nil {
+		return err
+	}
 	g := NewGenerator(Config{
 		Writer:       writer,
 		OutputFormat: FormatYAML,
 		OutputFile:   "",
-		Registry:     config.Registry,
+		Registry:     registry,
 	})
 	return g.GenerateYAMLDocs(writer)
+}
+
+func registryWithProjectDefaults() (RegistryFunc, error) {
+	opts, err := config.EffectiveRegistry(projectDefaultsTOML)
+	if err != nil {
+		return nil, err
+	}
+	return func() []config.ConfigOption { return opts }, nil
 }

@@ -12,19 +12,27 @@ import (
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/internal/projectdefaults"
 	"github.com/spf13/viper"
 )
+
+// projectDefaultsTOML is the overlay the inspector treats as the default.
+// Production is the embedded project file. Tests replace the slice.
+var projectDefaultsTOML = projectdefaults.TOML
 
 // ConfigInspector provides utilities for inspecting configuration
 type ConfigInspector struct {
 	registry []config.ConfigOption
 }
 
-// NewConfigInspector creates a new ConfigInspector
-func NewConfigInspector() *ConfigInspector {
-	return &ConfigInspector{
-		registry: config.Registry(),
+// NewConfigInspector snapshots the registry with project defaults applied.
+// An invalid project defaults file returns an error and no inspector.
+func NewConfigInspector() (*ConfigInspector, error) {
+	opts, err := config.EffectiveRegistry(projectDefaultsTOML)
+	if err != nil {
+		return nil, err
 	}
+	return &ConfigInspector{registry: opts}, nil
 }
 
 // ListAllOptions returns all registered configuration options

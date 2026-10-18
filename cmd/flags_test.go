@@ -729,3 +729,47 @@ func TestRegisterFlagsForPrefixWithOverrides_AllTypesWithShortFlags(t *testing.T
 
 	assert.Nil(t, cmd.Flags().Lookup("no-flag"), "NoFlag option must not register a flag")
 }
+
+// A project default on a command option is that flag's default, including the
+// text --help prints. A value already in viper still wins when the flag was
+// not passed.
+func TestRegisterFlags_ProjectDefaultIsFlagDefault(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"app.ping.output_message\" = \"from-project\"\n")
+
+	cmd := &cobra.Command{Use: "ping"}
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", nil)
+	require.NoError(t, err)
+
+	flag := cmd.Flags().Lookup("output-message")
+	require.NotNil(t, flag)
+	assert.Equal(t, "from-project", flag.DefValue)
+	assert.Contains(t, cmd.Flags().FlagUsages(), `default "from-project"`)
+
+	renamed := &cobra.Command{Use: "ping"}
+	err = RegisterFlagsForPrefixWithOverrides(renamed, "app.ping.", map[string]string{
+		"app.ping.output_message": "message",
+	})
+	require.NoError(t, err)
+	message := renamed.Flags().Lookup("message")
+	require.NotNil(t, message)
+	assert.Equal(t, "from-project", message.DefValue)
+
+	viper.Set("app.ping.output_message", "from-file")
+	assert.Equal(t, "from-file", viper.GetString("app.ping.output_message"))
+}
+
+func TestRegisterFlags_UnknownProjectDefault(t *testing.T) {
+	viper.Reset()
+	orig := projectDefaultsTOML
+	t.Cleanup(func() { projectDefaultsTOML = orig })
+	projectDefaultsTOML = []byte("[defaults]\n\"nope\" = \"x\"\n")
+
+	cmd := &cobra.Command{Use: "ping"}
+	err := RegisterFlagsForPrefixWithOverrides(cmd, "app.ping.", nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown option")
+}
