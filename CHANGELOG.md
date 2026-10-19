@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Conformance evidence no longer states how many requirement IDs are mapped. `task conform` rejects a handwritten count, including one that still matches, so the sentence cannot go stale when a requirement is added.
 - Global `--help` and `catalog` show a project default from `internal/projectdefaults/ckeletin-project.toml` on the root flags (`--log-level`, `--output`, and the other registry-backed global flags). Bare `--version` stays text unless `--output json` is passed. `--config` and `--config-path-mode` are unchanged. A flag, an environment variable, or a config file still wins.
 - Command `--help` shows a project default from `internal/projectdefaults/ckeletin-project.toml` as the flag default. `dev config` reports that value as the default. Generated config docs do the same. A flag, an environment variable, or a config file still wins.
 - **Framework 0.2.4**: a config file mode of 0644 no longer prints a permissions note at Info on every command. The note is Debug. Group-writable still warns. World-writable is still an error.

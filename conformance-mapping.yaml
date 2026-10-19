@@ -190,10 +190,12 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      task conform validates all 45 requirement IDs are present in
+      task conform validates every requirement ID is present in
       conformance-mapping.yaml before running checks. Missing IDs
-      cause the generator to fail with a non-zero exit code. The count is
-      machine-verified by the ENF-008 drift guard, not hand-maintained.
+      cause the generator to fail with a non-zero exit code. The mapped
+      count is computed from the mapping and is not restated here, so this
+      sentence cannot go stale. The ENF-008 drift guard rejects a
+      handwritten count even when the number matches.
     checks:
       - "test -f conformance-mapping.yaml"
       - "test -f .ckeletin/scripts/conform.sh"
@@ -258,12 +260,15 @@ requirements:
       to .ckeletin/scripts/lib/anchor.sh (anchor_resolve) and unit-tested across
       all branches by the violation_test below. Met requirements are tallied as
       machine-anchored vs analysis-with-evidence and the split is printed. The
-      same gate also catches prose count drift ("all N requirement").
+      same gate rejects a handwritten requirement count in evidence, including
+      one that matches the mapped total.
     checks:
       - "grep -q 'machine-anchored' .ckeletin/scripts/conform.sh"
       - "grep -q 'met but unanchored' .ckeletin/scripts/conform.sh"
       - "grep -q 'dangling anchor' .ckeletin/scripts/lib/anchor.sh"
       - "grep -q 'anchor_resolve' .ckeletin/scripts/conform.sh"
+      - "grep -q 'evidence_count_drift' .ckeletin/scripts/conform.sh"
+      - "grep -q 'evidence_count_drift' .ckeletin/scripts/lib/evidence-drift.sh"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_ENF008_AnchorResolution"
     violation_evidence: >

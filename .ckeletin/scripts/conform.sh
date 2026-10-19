@@ -55,6 +55,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/anchor.sh
 source "${SCRIPT_DIR}/lib/anchor.sh"
+# shellcheck source=lib/evidence-drift.sh
+source "${SCRIPT_DIR}/lib/evidence-drift.sh"
 
 MAPPING_FILE="conformance-mapping.yaml"
 FAIL_FILE=$(mktemp)
@@ -255,11 +257,12 @@ rm -f "$GEN_TMP"
 echo "Report sync: $REPORT_FILE matches the mapping (PASS)"
 echo ""
 
-# ── ENF-008 drift guard: machine-derivable facts in evidence must match reality.
-# (A hand-typed count in prose silently rots — e.g. "35" after a 36th requirement.)
-DRIFT=$(yq '.requirements[].evidence // ""' "$MAPPING_FILE" | grep -oE 'all [0-9]+ requirement' | grep -oE '[0-9]+' | head -1 || true)
-if [[ -n "$DRIFT" && "$DRIFT" != "$TOTAL" ]]; then
-    echo "evidence drift: prose claims '$DRIFT requirement IDs' but $TOTAL are mapped (ENF-008)" >> "$FAIL_FILE"
+# ── ENF-008 drift guard: evidence must not restate the requirement count.
+# The completeness line above is that count. A handwritten number that
+# matches today still fails, because it rots when the next requirement lands.
+DRIFT_LINE=$(evidence_count_drift "$MAPPING_FILE" "$TOTAL" || true)
+if [[ -n "$DRIFT_LINE" ]]; then
+    echo "$DRIFT_LINE" >> "$FAIL_FILE"
 fi
 
 # ENF-008 anchoring tallies: machine-enforced vs declared-analysis.
