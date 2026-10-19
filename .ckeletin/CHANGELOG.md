@@ -7,6 +7,10 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Conformance evidence cannot hardcode the requirement count.** `task conform` rejects `all <digits> requirement` in mapping evidence even when the number matches the mapped total. The completeness line is the count. A matching sentence is what went stale when the spec gained a requirement.
+
 ## [0.2.4] - 2026-10-17
 
 ### Fixed
