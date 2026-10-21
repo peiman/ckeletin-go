@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Dependency updates**: indirect Go modules `charmbracelet/x/ansi` 0.11.9, `go-cmp` 0.7.0, `go-colorful` 1.4.1, `go-colorable` 0.1.16, `go-runewidth` 0.0.31, `go-toml` 2.4.3, `go-internal` 1.16.0, `go-diff` 1.4.0, and `xo/terminfo` 1.2.0. `golang.org/x/exp` is no longer required. `github/codeql-action/upload-sarif` is 4.39.0. Direct modules were already current.
+
 - **Framework 0.2.1**: `task check` tells you when upstream `.ckeletin/VERSION` is a newer semver. The notice does not fail the build. `task ckeletin:check-update format=json` prints `current`, `latest`, and `update_available`. `task ckeletin:update` prints `CKELETIN_UPDATE_RESULT` with the version before and after.
 
 ### Fixed
