@@ -7,8 +7,11 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-23
+
 ### Fixed
 
+- **A derived project can add a config key without a framework changelog edit.** `.ckeletin/pkg/config/keys_generated.go` is regenerated from that project's registry. The changelog gate ignores that file. Any other change under `.ckeletin/` still needs a changelog edit. Docs under `.ckeletin/docs/` stay exempt.
 - **Conformance evidence cannot hardcode the requirement count.** `task conform` rejects `all <digits> requirement` in mapping evidence even when the number matches the mapped total. The completeness line is the count. A matching sentence is what went stale when the spec gained a requirement.
 
 ## [0.2.4] - 2026-10-17

@@ -3,6 +3,7 @@ package integration
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,6 +21,14 @@ type Section struct {
 // Unlike golden file tests, this runs the full integration to verify structure.
 func runTaskCheckForStructure(t *testing.T) string {
 	t.Helper()
+
+	// CI saves the full task check output and points here, so the structure
+	// test does not run task check a second time. Local runs leave it unset.
+	if path := os.Getenv("TASK_CHECK_OUTPUT_FILE"); path != "" {
+		saved, err := os.ReadFile(path)
+		require.NoError(t, err, "TASK_CHECK_OUTPUT_FILE should be readable")
+		return string(saved)
+	}
 
 	// Get the project root directory
 	projectRoot, err := os.Getwd()
@@ -41,6 +50,16 @@ func runTaskCheckForStructure(t *testing.T) string {
 	require.NoError(t, err, "task check should succeed for structure validation.\nOutput:\n%s", string(output))
 
 	return string(output)
+}
+
+func TestRunTaskCheckForStructureReadsSavedOutput(t *testing.T) {
+	saved := filepath.Join(t.TempDir(), "task-check-output.txt")
+	const body = "Development Environment\nCode Quality\nArchitecture Validation\nDependencies\nTests\n[OK] All 23 Checks Passed\n"
+	require.NoError(t, os.WriteFile(saved, []byte(body), 0o644))
+	t.Setenv("TASK_CHECK_OUTPUT_FILE", saved)
+	t.Setenv("PATH", "")
+
+	assert.Equal(t, body, runTaskCheckForStructure(t))
 }
 
 // TestTaskCheckOutputStructure verifies the overall structure of task check output.

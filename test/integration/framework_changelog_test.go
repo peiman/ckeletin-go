@@ -124,6 +124,44 @@ func TestFrameworkChangelog_AllowsDocsOnlyEdits(t *testing.T) {
 	assert.Equal(t, 0, code, out)
 }
 
+func TestFrameworkChangelog_AllowsRegeneratedKeyConstants(t *testing.T) {
+	dir := t.TempDir()
+	writeFrameworkTree(t, dir, "0.2.0", frameworkChangelog020, map[string]string{
+		".ckeletin/pkg/config/keys_generated.go": "package config\n\nconst KeyAppName = \"app.name\"\n",
+	})
+	gitCommitAll(t, dir, "framework 0.2.0")
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".ckeletin", "pkg", "config", "keys_generated.go"),
+		[]byte("package config\n\nconst KeyAppName = \"app.name\"\nconst KeyAppNotePinned = \"app.note.pinned\"\n"),
+		0o644,
+	))
+
+	out, code := runFrameworkChangelog(t, dir)
+	assert.Equal(t, 0, code, out)
+}
+
+func TestFrameworkChangelog_RequiresChangelogWhenKeyConstantsAndCodeChange(t *testing.T) {
+	dir := t.TempDir()
+	writeFrameworkTree(t, dir, "0.2.0", frameworkChangelog020, map[string]string{
+		".ckeletin/pkg/config/keys_generated.go": "package config\n\nconst KeyAppName = \"app.name\"\n",
+		".ckeletin/scripts/example.sh":           "echo ok\n",
+	})
+	gitCommitAll(t, dir, "framework 0.2.0")
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".ckeletin", "pkg", "config", "keys_generated.go"),
+		[]byte("package config\n\nconst KeyAppName = \"app.name\"\nconst KeyAppNotePinned = \"app.note.pinned\"\n"),
+		0o644,
+	))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "scripts", "example.sh"), []byte("echo changed\n"), 0o644))
+
+	out, code := runFrameworkChangelog(t, dir)
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, ".ckeletin/scripts/example.sh")
+	assert.NotContains(t, out, "  .ckeletin/pkg/config/keys_generated.go")
+}
+
 func TestFrameworkChangelog_UncommittedVersionBumpDoesNotReplayHistory(t *testing.T) {
 	dir := t.TempDir()
 	writeFrameworkTree(t, dir, "0.1.0", "# Framework Changelog\n\n## [0.1.0] - 2026-04-01\n", map[string]string{

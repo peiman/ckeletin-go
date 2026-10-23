@@ -279,12 +279,14 @@ jobs:
 
       - name: Run Quality Checks (Full - main/releases)
         if: github.event_name != 'pull_request'
-        run: task check
+        shell: bash
+        run: set -o pipefail; task check 2>&1 | tee "$RUNNER_TEMP/task-check-output.txt"
 
       - name: Validate Task Check Output Structure (Full - main/releases)
         if: github.event_name != 'pull_request'
         env:
           RUN_TASK_CHECK_TESTS: "1"
+          TASK_CHECK_OUTPUT_FILE: ${{ runner.temp }}/task-check-output.txt
         run: go test ./test/integration -v -count=1 -run '^TestTaskCheckOutputStructure$'
 
       - name: Upload Coverage to Codecov
