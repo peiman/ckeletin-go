@@ -9,7 +9,10 @@
 #   1. .ckeletin/VERSION must appear as a ## [X.Y.Z] heading in the changelog.
 #   2. Since the last commit that touched .ckeletin/VERSION or
 #      .ckeletin/CHANGELOG.md, any other change under .ckeletin/ (except
-#      .ckeletin/docs/) must arrive with a changelog edit.
+#      .ckeletin/docs/ and .ckeletin/pkg/config/keys_generated.go) must
+#      arrive with a changelog edit. A derived project regenerates the
+#      key constants from its own registry, so that file is not a
+#      framework change.
 # A version bump that is not committed yet does not replay earlier history:
 # only the files that differ from that last changelog/version commit count.
 
@@ -84,6 +87,7 @@ $path
 "
 	case "$path" in
 	.ckeletin/docs | .ckeletin/docs/*) continue ;;
+	.ckeletin/pkg/config/keys_generated.go) ;;
 	.ckeletin/CHANGELOG.md) changelog_changed=1 ;;
 	.ckeletin/VERSION) ;;
 	.ckeletin/*)
@@ -103,7 +107,7 @@ if [ -n "$code_changes" ] && [ "$changelog_changed" -eq 0 ]; then
 	check_failure \
 		"Framework files changed without a .ckeletin/CHANGELOG.md edit" \
 		"$code_changes" \
-		"Record the change under [Unreleased] in .ckeletin/CHANGELOG.md, or bump .ckeletin/VERSION and add that version's section. Docs under .ckeletin/docs/ are exempt."
+		"Record the change under [Unreleased] in .ckeletin/CHANGELOG.md, or bump .ckeletin/VERSION and add that version's section. Docs under .ckeletin/docs/ are exempt. .ckeletin/pkg/config/keys_generated.go is exempt: a derived project regenerates it from its own registry."
 	exit 1
 fi
 
