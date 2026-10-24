@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.6**: a CRLF checkout is not a local framework edit, so `task ckeletin:update` no longer stops on line endings alone. The update notice no longer wraps `git fetch` in Windows `timeout.exe`, which skipped the fetch and left the notice silent.
+- The nightly and release test matrix installs yq 4.53.3, including on Windows, because the evidence-count check calls it.
 - **Framework 0.2.5**: adding a project config key no longer fails the framework changelog gate. Regenerating `.ckeletin/pkg/config/keys_generated.go` is not a framework change. Any other change under `.ckeletin/` still needs a changelog edit.
 - On `main`, CI keeps the `task check` output and the structure test reads that file. The full check runs once.
 - Conformance evidence no longer states how many requirement IDs are mapped. `task conform` rejects a handwritten count, including one that still matches, so the sentence cannot go stale when a requirement is added.

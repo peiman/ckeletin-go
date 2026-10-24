@@ -117,6 +117,25 @@ show_tree_diff() {
 	return 0
 }
 
+# strip_cr rewrites text files so a CRLF checkout compares equal to LF.
+# Git for Windows stores or extracts those bytes without the user editing
+# the file. A file that contains a NUL byte is left alone.
+strip_cr() {
+	root=$1
+	find "$root" -type f | while IFS= read -r file; do
+		[ -n "$file" ] || continue
+		if ! cmp -s "$file" <(tr -d '\000' < "$file"); then
+			continue
+		fi
+		if cmp -s "$file" <(tr -d '\r' < "$file"); then
+			continue
+		fi
+		tmp=$(mktemp)
+		tr -d '\r' < "$file" > "$tmp"
+		mv "$tmp" "$file"
+	done
+}
+
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 	echo "framework-local-diff: not a git repository" >&2
 	exit 1
@@ -193,6 +212,9 @@ if [ -n "$current_name" ] && [ "$current_name" != "$upstream_name" ]; then
 		"$upstream_module" "$current_module" "$upstream_name" "$current_name" \
 		"$upstream_tree/.ckeletin"
 fi
+
+strip_cr "$upstream_tree/.ckeletin"
+strip_cr "$local_tree/.ckeletin"
 
 set +e
 diff -rq "$upstream_tree/.ckeletin" "$local_tree/.ckeletin" >/dev/null
