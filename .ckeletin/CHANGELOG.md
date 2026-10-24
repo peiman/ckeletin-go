@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-25
+
+### Fixed
+
+- **The update notice can read the upstream version on Windows.** Git Bash rewrites a `git show` argument shaped like `remote/branch:path`, so the notice never saw `.ckeletin/VERSION` and stayed silent. The check resolves the commit, then reads the version from that commit id.
+
 ## [0.2.6] - 2026-10-24
 
 ### Fixed

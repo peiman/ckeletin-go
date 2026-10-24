@@ -172,7 +172,15 @@ if [ "$fetched" -ne 1 ]; then
     exit 0
 fi
 
-REMOTE=$(git show "ckeletin-upstream/main:.ckeletin/VERSION" 2> /dev/null | tr -d '[:space:]' || true)
+# Git Bash rewrites an argument shaped like remote/branch:path. The colon
+# plus the slash becomes a Windows path list, git show never reads the
+# version file, and the notice stays silent. A commit id has no slash
+# before the colon. framework-local-diff.sh already uses that form.
+rev=$(git rev-parse --verify --quiet refs/remotes/ckeletin-upstream/main 2> /dev/null || true)
+REMOTE=""
+if [ -n "$rev" ]; then
+    REMOTE=$(git show "${rev}:.ckeletin/VERSION" 2> /dev/null | tr -d '[:space:]' || true)
+fi
 available=false
 if semver_is_newer "$REMOTE" "$LOCAL"; then
     available=true
