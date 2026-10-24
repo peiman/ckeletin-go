@@ -360,6 +360,25 @@ func TestFrameworkLocalDiff_CompatibilityDoesNotModify(t *testing.T) {
 	assert.FileExists(t, extra)
 }
 
+func TestFrameworkLocalDiff_LineEndingsAreNotADifference(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping framework local-diff integration test in short mode")
+	}
+	_, downstream := setupDerived(t)
+	nudgeRunGit(t, downstream, "config", "core.autocrlf", "false")
+	note := filepath.Join(downstream, ".ckeletin", "note.md")
+	body, err := os.ReadFile(note)
+	require.NoError(t, err)
+	unix := strings.ReplaceAll(string(body), "\r\n", "\n")
+	require.NoError(t, os.WriteFile(note, []byte(strings.ReplaceAll(unix, "\n", "\r\n")), 0o644))
+	nudgeRunGit(t, downstream, "add", "-A")
+	nudgeRunGit(t, downstream, "commit", "-m", "crlf checkout")
+
+	out, code := runLocalDiff(t, downstream, "--mode", "update")
+	assert.Equal(t, 0, code, "CRLF versus LF is not a local framework edit.\n%s", out)
+	assert.NotContains(t, out, "Local framework difference")
+}
+
 func TestFrameworkLocalDiff_TaskfileCallsGuardBeforeCheckout(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join(localDiffRoot(t), ".ckeletin", "Taskfile.yml"))
 	require.NoError(t, err)

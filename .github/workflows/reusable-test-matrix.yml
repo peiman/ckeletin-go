@@ -71,6 +71,46 @@ jobs:
       - name: Verify Task Installation
         run: task --version
 
+      # evidence-drift.sh calls yq. Ubuntu and macOS images already have it.
+      # windows-latest does not, and the nightly matrix runs that script.
+      # Keep the version beside reusable-conformance.yml and Taskfile
+      # CKELETIN_TOOL_YQ_VERSION (that pin has a leading v).
+      - name: Install yq
+        shell: bash
+        run: |
+          YQ_VERSION=4.53.3
+          case "$(uname -s)" in
+            Linux)
+              asset=yq_linux_amd64
+              ;;
+            Darwin)
+              if [ "$(uname -m)" = "arm64" ]; then
+                asset=yq_darwin_arm64
+              else
+                asset=yq_darwin_amd64
+              fi
+              ;;
+            MINGW*|MSYS*|CYGWIN*)
+              asset=yq_windows_amd64.exe
+              ;;
+            *)
+              echo "::error::no yq build for $(uname -s)"
+              exit 1
+              ;;
+          esac
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          if [ "$asset" = "yq_windows_amd64.exe" ]; then
+            curl -sSfL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/${asset}" -o "$INSTALL_DIR/yq.exe"
+            chmod +x "$INSTALL_DIR/yq.exe"
+            "$INSTALL_DIR/yq.exe" --version
+          else
+            curl -sSfL "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/${asset}" -o "$INSTALL_DIR/yq"
+            chmod +x "$INSTALL_DIR/yq"
+            "$INSTALL_DIR/yq" --version
+          fi
+          echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+
       - name: Cache Dev Tools (pinned versions)
         id: cache-devtools
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0

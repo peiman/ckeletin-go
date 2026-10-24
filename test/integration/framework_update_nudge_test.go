@@ -43,6 +43,9 @@ func runNudge(t *testing.T, dir string, overrides map[string]string, args ...str
 	cmd.Dir = dir
 
 	drop := map[string]bool{"CI": true, "CKELETIN_SKIP_UPDATE_CHECK": true, "CKELETIN_UPDATE_CHECK_TTL": true}
+	for k := range overrides {
+		drop[k] = true
+	}
 	var env []string
 	for _, kv := range os.Environ() {
 		if k, _, ok := strings.Cut(kv, "="); ok && drop[k] {
@@ -316,6 +319,23 @@ func TestUpdateNudge_UpstreamExempt(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(jsonOut)), &body), "json:\n%s", jsonOut)
 	assert.Equal(t, false, body["applicable"])
+}
+
+func TestUpdateNudge_IgnoresWindowsTimeout(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping update-nudge integration test in short mode")
+	}
+	upstream, downstream := setupDownstream(t)
+	advanceUpstreamVersion(t, upstream, "0.2.0")
+
+	// Windows timeout.exe is not GNU timeout. It accepts "timeout 5" and does
+	// not run the following command, so a fetch wrapped in it never happens.
+	bin := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "timeout"), []byte("#!/bin/sh\nexit 1\n"), 0o755))
+
+	out, code := runNudge(t, downstream, map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH")})
+	assert.Equal(t, 0, code, "nudge must never fail the build.\nOutput:\n%s", out)
+	assert.Contains(t, out, nudgeMarker, "a non-GNU timeout on PATH must not replace git fetch.\nOutput:\n%s", out)
 }
 
 func TestUpdateNudge_WiredIntoCheck(t *testing.T) {

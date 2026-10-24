@@ -7,6 +7,13 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-24
+
+### Fixed
+
+- **A CRLF checkout is not a local framework edit.** The update guard compares text after stripping carriage returns. A Windows checkout that only differs by line endings no longer stops `task ckeletin:update`. A real content change still stops it.
+- **The update notice fetches on Windows.** `timeout.exe` is not GNU `timeout`. Wrapping `git fetch` in it skipped the fetch, so the notice stayed silent and the JSON check reported no latest version. The fetch uses GNU `timeout` or `gtimeout` only.
+
 ## [0.2.5] - 2026-10-23
 
 ### Fixed

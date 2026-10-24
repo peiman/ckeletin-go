@@ -142,10 +142,13 @@ fi
 fetched=0
 if [ "$should_fetch" -eq 1 ]; then
     TIMEOUT=""
-    if command -v timeout > /dev/null 2>&1; then
-        TIMEOUT="timeout 5"
-    elif command -v gtimeout > /dev/null 2>&1; then
+    # GNU timeout prints a version. Windows timeout.exe accepts the same
+    # "timeout 5 git ..." shape and does not run git, so a fetch wrapped in
+    # it never happens. gtimeout is the Homebrew name for GNU timeout.
+    if command -v gtimeout > /dev/null 2>&1; then
         TIMEOUT="gtimeout 5"
+    elif command -v timeout > /dev/null 2>&1 && timeout --version > /dev/null 2>&1; then
+        TIMEOUT="timeout 5"
     fi
     # shellcheck disable=SC2086
     if $TIMEOUT git fetch ckeletin-upstream main --quiet > /dev/null 2>&1; then
