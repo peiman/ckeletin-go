@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-28
+
+### Added
+
+- **A check for mkdir used as a lock.** `task check` fails when a tracked shell script, Taskfile, or GitHub workflow takes a lock with `mkdir`. On ubuntu-26.04 two of those calls can both succeed. The exclusive form is noclobber: `( set -C; printf '%s\n' "$$" > "$LOCK" ) 2>/dev/null`. `mkdir -p` of a directory still passes.
+
 ## [0.2.7] - 2026-10-25
 
 ### Fixed
