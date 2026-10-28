@@ -887,7 +887,8 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short -- -v -tags "dev scaffold" -count=1 ./test/integration/...
+      # Two nested task checks do not finish inside Go's 10m default.
+      gotestsum --format short -- -v -tags "dev scaffold" -count=1 -timeout 40m ./test/integration/...
 
   test:race:
     desc: Run tests with race detection
