@@ -817,6 +817,12 @@ tasks:
     cmds:
       - '{{.SCRIPTS_DIR}}/validate-security-patterns.sh'
 
+  validate:mkdir-lock:
+    desc: Flag mkdir used as a lock in shell scripts
+    silent: true
+    cmds:
+      - '{{.SCRIPTS_DIR}}/check-mkdir-lock.sh'
+
   validate:task-naming:
     desc: Validate task names follow action:target pattern (enforces ADR-000)
     silent: true
@@ -881,7 +887,8 @@ tasks:
     silent: true
     cmd: |
       {{._TEST_ENV_PRELUDE}}
-      gotestsum --format short -- -v -tags "dev scaffold" -count=1 ./test/integration/...
+      # Two nested task checks do not finish inside Go's 10m default.
+      gotestsum --format short -- -v -tags "dev scaffold" -count=1 -timeout 40m ./test/integration/...
 
   test:race:
     desc: Run tests with race detection
@@ -1131,6 +1138,7 @@ tasks:
       - task: validate:config-consumption
       - task: validate:output
       - task: validate:security
+      - task: validate:mkdir-lock
       - task: validate:dev-build-tags
       - task: validate:hook-forwardings
       - cmd: |
@@ -1177,8 +1185,10 @@ tasks:
       # gate. The binary/bash check above measures coverage but does not gate on
       # it; this is the authoritative threshold check (excludes TUI/demo code).
       - task: test:coverage:project
-      # The binary check above does not know about the framework changelog.
-      # This script travels with .ckeletin/, so derived projects run it too.
+      # The binary check above does not know about the framework changelog
+      # or the mkdir-lock scan. These scripts travel with .ckeletin/, so
+      # derived projects run them too.
+      - task: validate:mkdir-lock
       - task: check:framework-changelog
       # Non-fatal footer: nudge when upstream .ckeletin/VERSION is a newer semver.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
@@ -1221,6 +1231,7 @@ tasks:
       # runs the same validate:* set as check:common, only skipping the
       # heavyweight stages (race detection, integration tests, dep scans).
       - task: validate:security
+      - task: validate:mkdir-lock
       - task: validate:dev-build-tags
       - task: validate:hook-forwardings
       - cmd: |

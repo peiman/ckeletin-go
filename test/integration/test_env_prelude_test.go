@@ -180,4 +180,7 @@ func TestOrdinaryTestGateIncludesFrameworkScripts(t *testing.T) {
 	assert.Contains(t, scaffoldBody, "scaffold")
 	assert.Contains(t, scaffoldBody, "./test/integration/...")
 	assert.NotContains(t, scaffoldBody, "./.ckeletin/scripts/...")
+	// Two nested task checks do not finish inside Go's 10m package default.
+	// The pre-push hook runs this task, so the ceiling has to live here.
+	assert.Contains(t, scaffoldBody, "-timeout 40m")
 }
