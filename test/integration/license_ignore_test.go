@@ -89,6 +89,75 @@ func TestLicenseIgnore_UnlistedModuleStillFails(t *testing.T) {
 	assert.Contains(t, out, "License compliance check failed")
 }
 
+const licenseRecordGOROOTStub = `#!/bin/sh
+printf '%s\n' "$GOROOT" > "$LICENSE_GOROOT_FILE"
+printf '%s\n' "Package,License"
+exit 0
+`
+
+const goToolchainStub = `#!/bin/sh
+if [ "$1" = "env" ] && [ "$2" = "GOROOT" ]; then
+  printf '%s\n' "/toolchain/go"
+  exit 0
+fi
+printf '%s\n' "github.com/test/fixture"
+`
+
+func licenseEnv(t *testing.T, bin, gorootFile string) []string {
+	t.Helper()
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "LICENSE_GOROOT_FILE=") || strings.HasPrefix(kv, "LICENSE_REPORT_DIR=") || strings.HasPrefix(kv, "GOROOT=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return append(env,
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"LICENSE_GOROOT_FILE="+gorootFile,
+	)
+}
+
+func TestLicenseCheck_ExportsTheToolchainGOROOT(t *testing.T) {
+	dir := t.TempDir()
+	bin := t.TempDir()
+	gorootFile := filepath.Join(bin, "goroot.txt")
+	writeExec(t, bin, "go", goToolchainStub)
+	writeExec(t, bin, "go-licenses", licenseRecordGOROOTStub)
+
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	cmd := exec.Command("bash", filepath.Join(root, ".ckeletin", "scripts", "check-licenses-source.sh"))
+	cmd.Dir = dir
+	cmd.Env = licenseEnv(t, bin, gorootFile)
+
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "the license check must pass when go-licenses accepts the tree\n%s", out)
+	got, readErr := os.ReadFile(gorootFile)
+	require.NoError(t, readErr, "go-licenses was not invoked\n%s", out)
+	assert.Equal(t, "/toolchain/go\n", string(got))
+}
+
+func TestLicenseReport_ExportsTheToolchainGOROOT(t *testing.T) {
+	dir := t.TempDir()
+	bin := t.TempDir()
+	gorootFile := filepath.Join(bin, "goroot.txt")
+	writeExec(t, bin, "go", goToolchainStub)
+	writeExec(t, bin, "go-licenses", licenseRecordGOROOTStub)
+
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	cmd := exec.Command("bash", filepath.Join(root, ".ckeletin", "scripts", "generate-license-report.sh"))
+	cmd.Dir = dir
+	cmd.Env = append(licenseEnv(t, bin, gorootFile), "LICENSE_REPORT_DIR="+filepath.Join(dir, "reports"))
+
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "the license report must succeed\n%s", out)
+	got, readErr := os.ReadFile(gorootFile)
+	require.NoError(t, readErr, "go-licenses was not invoked\n%s", out)
+	assert.Equal(t, "/toolchain/go\n", string(got))
+}
+
 func TestLicenseIgnore_AbsentFileStillChecksTheModuleItself(t *testing.T) {
 	dir := t.TempDir()
 

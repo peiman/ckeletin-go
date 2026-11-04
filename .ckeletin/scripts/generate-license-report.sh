@@ -32,6 +32,11 @@ fi
 # Create output directory
 mkdir -p "$OUTPUT_DIR"
 
+# go-licenses classifies the standard library by the GOROOT of the Go that
+# built it. This module may select a newer toolchain. Hand that GOROOT over.
+GOROOT="$(go env GOROOT)"
+export GOROOT
+
 # Generate report
 echo "Scanning dependencies..."
 if go-licenses report \

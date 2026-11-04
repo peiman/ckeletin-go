@@ -42,6 +42,11 @@ if ! command -v go-licenses &> /dev/null; then
     exit 1
 fi
 
+# go-licenses classifies the standard library by the GOROOT of the Go that
+# built it. This module may select a newer toolchain. Hand that GOROOT over.
+GOROOT="$(go env GOROOT)"
+export GOROOT
+
 # Run license check
 if run_check "go-licenses check --allowed_licenses='$ALLOWED_LICENSES' $IGNORE_FLAGS ./... 2>&1"; then
     check_success "All dependency licenses compliant"

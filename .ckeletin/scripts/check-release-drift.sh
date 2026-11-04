@@ -46,16 +46,25 @@ if [ -n "$GORELEASER_FILE" ]; then
         # (e.g. a freshly-initialised project). Deprecations still surface in CI.
         echo "  ⏭️  no git remote — skipped goreleaser config check (needs a remote)"
     else
-        if ! GR_OUT=$(goreleaser check 2>&1); then
-            # Non-zero exit: removed/unknown properties or invalid config.
+        GR_OUT=$(goreleaser check 2>&1) && gr_ok=1 || gr_ok=0
+        if echo "$GR_OUT" | grep -q "configuration is valid, but uses deprecated properties"; then
+            # goreleaser v2.15 exits 1 for this case. The config still
+            # releases. Report the deprecation, not an invalid config.
+            check_failure \
+                "GoReleaser config uses deprecated properties" \
+                "$GR_OUT" \
+                "Update the deprecated properties before they are removed"$'\n'"See https://goreleaser.com/deprecations"
+            note_issue
+        elif [ "$gr_ok" -eq 0 ]; then
+            # Non-zero exit without that phrase: removed/unknown properties
+            # or an invalid config.
             check_failure \
                 "GoReleaser config is invalid (removed or unknown properties)" \
                 "$GR_OUT" \
                 "Run 'goreleaser check' and fix the reported properties"$'\n'"See https://goreleaser.com/deprecations"
             note_issue
         elif echo "$GR_OUT" | grep -qiE "deprecat|phased out|will be removed"; then
-            # `goreleaser check` exits 0 on still-valid-but-deprecated properties;
-            # surface them so they are fixed before they are removed in a future release.
+            # Older goreleaser exits 0 on still-valid-but-deprecated properties.
             check_failure \
                 "GoReleaser config uses deprecated properties" \
                 "$GR_OUT" \

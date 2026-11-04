@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.9**: the license check and the license report export `GOROOT` from `go env GOROOT` before they run `go-licenses`. A module whose toolchain is newer than the Go that built the tool no longer fails with "Package fmt does not have module info".
+- **Framework 0.2.9**: `task ckeletin:check:release:drift` reports a GoReleaser config that is valid but deprecated as deprecated. GoReleaser v2.15 exits 1 for that case. A config goreleaser rejects is still invalid.
+- **Framework 0.2.9**: the framework changelog gate ignores `.ckeletin/cache/`. `task check` rewrites `.ckeletin/cache/.last-update-check`, and that stamp is not a framework change. The directory stays gitignored.
 - **Framework 0.2.8**: `task check` flags a shell script that uses `mkdir` as a lock. Two concurrent `mkdir` calls can both succeed on ubuntu-26.04. The check names the noclobber replacement. Creating a directory with `mkdir -p` still passes.
 - **Framework 0.2.8**: `task test:scaffold` allows 40 minutes. The scaffold tests run two nested `task check`s, which do not finish inside Go's 10 minute default.
 - **Framework 0.2.7**: the update notice reads the upstream version on Windows. Git Bash was rewriting the `git show` argument, so the notice stayed silent even after a successful fetch.
