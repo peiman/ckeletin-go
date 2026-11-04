@@ -105,3 +105,65 @@ func TestReleaseDrift_DetectsStaleConfig(t *testing.T) {
 	assert.Contains(t, out, "Outdated cosign", "should flag the outdated cosign flags")
 	assert.Contains(t, out, "orphan tags", "should flag the orphan tag")
 }
+
+const goreleaserStub = `#!/bin/sh
+printf '%s\n' "$GR_FAKE_OUT"
+exit "${GR_FAKE_CODE:-0}"
+`
+
+func runDriftWithGoreleaser(t *testing.T, code, output string) (string, int) {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".goreleaser.yml"), []byte("version: 2\n"), 0o644))
+	driftRunGit(t, dir, "init")
+	driftRunGit(t, dir, "config", "user.email", "test@ckeletin-go.example")
+	driftRunGit(t, dir, "config", "user.name", "Test User")
+	driftRunGit(t, dir, "remote", "add", "origin", "https://example.invalid/ckeletin.git")
+
+	bin := t.TempDir()
+	writeExec(t, bin, "goreleaser", goreleaserStub)
+
+	cmd := exec.Command("bash", driftScriptPath(t))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"GR_FAKE_CODE="+code,
+		"GR_FAKE_OUT="+output,
+	)
+	out, err := cmd.CombinedOutput()
+	if ee, ok := err.(*exec.ExitError); ok {
+		return string(out), ee.ExitCode()
+	}
+	require.NoError(t, err, "failed to run drift script.\nOutput:\n%s", string(out))
+	return string(out), 0
+}
+
+func TestReleaseDrift_DeprecatedButValidIsNotCalledInvalid(t *testing.T) {
+	out, code := runDriftWithGoreleaser(t, "1",
+		"  • .goreleaser.yml   error=configuration is valid, but uses deprecated properties")
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, "GoReleaser config uses deprecated properties")
+	assert.NotContains(t, out, "GoReleaser config is invalid")
+}
+
+func TestReleaseDrift_RealConfigErrorStaysInvalid(t *testing.T) {
+	out, code := runDriftWithGoreleaser(t, "1",
+		"yaml: unmarshal errors:\n  line 1: field notfound not found in type config.Project")
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, "GoReleaser config is invalid")
+	assert.NotContains(t, out, "uses deprecated properties")
+}
+
+func TestReleaseDrift_ExitZeroDeprecationIsStillReported(t *testing.T) {
+	out, code := runDriftWithGoreleaser(t, "0",
+		"DEPRECATED: archives.format should not be used anymore")
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, "GoReleaser config uses deprecated properties")
+	assert.NotContains(t, out, "GoReleaser config is invalid")
+}
+
+func TestReleaseDrift_CleanGoreleaserPasses(t *testing.T) {
+	out, code := runDriftWithGoreleaser(t, "0", "configuration is valid")
+	assert.Equal(t, 0, code, out)
+	assert.Contains(t, out, "GoReleaser config valid")
+}

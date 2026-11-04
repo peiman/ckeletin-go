@@ -7,6 +7,14 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-11-04
+
+### Fixed
+
+- **The license check uses this module's Go toolchain.** `go-licenses` classifies the standard library by the `GOROOT` of the Go that built the tool. When `go.mod` selects a newer toolchain, every standard-library package was reported as having no module info. The source check and the license report now export `GOROOT` from `go env GOROOT` before they run the tool.
+- **A deprecated GoReleaser config is not called invalid.** GoReleaser v2.15 exits 1 when the config is valid and uses deprecated properties. The drift check reports that as deprecated. A real validation failure is still invalid.
+- **The update-check stamp is not a framework change.** `.ckeletin/cache/` is gitignored. The changelog gate ignores it too, so a tracked `.ckeletin/cache/.last-update-check` rewritten by `task check` does not demand a changelog edit. Any other change under `.ckeletin/` still does.
+
 ## [0.2.8] - 2026-10-28
 
 ### Added

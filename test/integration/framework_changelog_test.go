@@ -124,6 +124,45 @@ func TestFrameworkChangelog_AllowsDocsOnlyEdits(t *testing.T) {
 	assert.Equal(t, 0, code, out)
 }
 
+func TestFrameworkChangelog_AllowsCacheStampRewrites(t *testing.T) {
+	dir := t.TempDir()
+	writeFrameworkTree(t, dir, "0.2.0", frameworkChangelog020, map[string]string{
+		".ckeletin/cache/.last-update-check": "1\n",
+	})
+	gitCommitAll(t, dir, "framework 0.2.0")
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".ckeletin", "cache", ".last-update-check"),
+		[]byte("2\n"),
+		0o644,
+	))
+
+	out, code := runFrameworkChangelog(t, dir)
+	assert.Equal(t, 0, code, out)
+	assert.NotContains(t, out, ".last-update-check")
+}
+
+func TestFrameworkChangelog_CacheStampDoesNotHideACodeChange(t *testing.T) {
+	dir := t.TempDir()
+	writeFrameworkTree(t, dir, "0.2.0", frameworkChangelog020, map[string]string{
+		".ckeletin/cache/.last-update-check": "1\n",
+		".ckeletin/scripts/example.sh":       "echo ok\n",
+	})
+	gitCommitAll(t, dir, "framework 0.2.0")
+
+	require.NoError(t, os.WriteFile(
+		filepath.Join(dir, ".ckeletin", "cache", ".last-update-check"),
+		[]byte("2\n"),
+		0o644,
+	))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin", "scripts", "example.sh"), []byte("echo changed\n"), 0o644))
+
+	out, code := runFrameworkChangelog(t, dir)
+	assert.Equal(t, 1, code, out)
+	assert.Contains(t, out, ".ckeletin/scripts/example.sh")
+	assert.NotContains(t, out, ".last-update-check")
+}
+
 func TestFrameworkChangelog_AllowsRegeneratedKeyConstants(t *testing.T) {
 	dir := t.TempDir()
 	writeFrameworkTree(t, dir, "0.2.0", frameworkChangelog020, map[string]string{
