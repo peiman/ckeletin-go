@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.11**: `task check` runs the framework changelog gate before the binary prints `All N Checks Passed`. A missing `.ckeletin/CHANGELOG.md` entry fails the command without a green summary.
 - **Framework 0.2.10**: `mkdir -p … || return` is not a lock. `mkdir -p` succeeds when the directory already exists. `--parents` and a short cluster such as `-pm` are the same. `mkdir "$LOCK" || exit` and `if mkdir "$LOCK"` are still locks. `mkdir -p` of a path named like a lock is still flagged.
 - **Framework 0.2.9**: the license check and the license report export `GOROOT` from `go env GOROOT` before they run `go-licenses`. A module whose toolchain is newer than the Go that built the tool no longer fails with "Package fmt does not have module info".
 - **Framework 0.2.9**: `task ckeletin:check:release:drift` reports a GoReleaser config that is valid but deprecated as deprecated. GoReleaser v2.15 exits 1 for that case. A config goreleaser rejects is still invalid.

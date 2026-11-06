@@ -1167,6 +1167,11 @@ tasks:
     cmds:
       - task: build:dev
         vars: { CLI_ARGS: "" }
+      # The binary prints "All N Checks Passed" and then exits. Run the
+      # changelog gate first so a missing entry cannot follow that box.
+      # The script travels with .ckeletin/, including into a derived project
+      # whose check binary does not list this gate.
+      - task: check:framework-changelog
       - cmd: |
           # Check if binary has the 'check' subcommand (requires dev build tag).
           # Use 'check --help' (NOT 'help check') as the probe: Cobra's `help`
@@ -1185,11 +1190,9 @@ tasks:
       # gate. The binary/bash check above measures coverage but does not gate on
       # it; this is the authoritative threshold check (excludes TUI/demo code).
       - task: test:coverage:project
-      # The binary check above does not know about the framework changelog
-      # or the mkdir-lock scan. These scripts travel with .ckeletin/, so
-      # derived projects run them too.
+      # The binary check above does not know about the mkdir-lock scan.
+      # The script travels with .ckeletin/, so derived projects run it too.
       - task: validate:mkdir-lock
-      - task: check:framework-changelog
       # Non-fatal footer: nudge when upstream .ckeletin/VERSION is a newer semver.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'
