@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-11-06
+
+### Fixed
+
+- **`mkdir -p` followed by `|| return` or `|| exit` is not a lock.** `mkdir -p` succeeds when the directory already exists, so that failure is not another holder. `--parents` and a short cluster such as `-pm` are the same, including inside `if` or `until`. `mkdir "$LOCK" || exit` and `if mkdir "$LOCK"` are still locks. `mkdir -p` of a path named like a lock is still flagged.
+
 ## [0.2.9] - 2026-11-04
 
 ### Fixed

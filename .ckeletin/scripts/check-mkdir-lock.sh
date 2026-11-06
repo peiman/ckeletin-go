@@ -6,7 +6,11 @@
 # not depend on coreutils:
 #   ( set -C; printf '%s\n' "$$" > "$LOCK" ) 2>/dev/null
 #
-# `mkdir -p` of an ordinary directory is not a lock.
+# `mkdir -p` of an ordinary directory is not a lock. Neither is
+# `mkdir -p ... || return`: -p succeeds when the directory already
+# exists, so that failure is not another holder. --parents and a short
+# cluster such as -pm are the same. A path named like a lock is still
+# flagged.
 # Usage: check-mkdir-lock.sh [file...]
 # With no files, scan tracked shell scripts and shell blocks in Taskfiles
 # and GitHub workflows.
@@ -48,12 +52,44 @@ names_a_lock() {
     [[ $1 =~ [Ll][Oo][Cc][Kk] ]]
 }
 
+# True when the mkdir on this line creates parents (-p, --parents, or a
+# short cluster such as -pm). That call succeeds if the directory exists,
+# so it cannot be the mutual-exclusion lock.
+mkdir_creates_parents() {
+    local rest=$1 word
+    [[ $rest =~ (^|[^[:alnum:]_-])mkdir[[:space:]]+(.*)$ ]] || return 1
+    rest=${BASH_REMATCH[2]}
+    while [ -n "$rest" ]; do
+        rest="${rest#"${rest%%[![:space:]]*}"}"
+        [ -n "$rest" ] || break
+        word=${rest%%[[:space:]]*}
+        [ -n "$word" ] || break
+        case $word in
+            --) return 1 ;;
+            --parents | --parents=*) return 0 ;;
+            --*) ;;
+            -*)
+                case $word in
+                    *p*) return 0 ;;
+                esac
+                ;;
+            *) return 1 ;;
+        esac
+        if [ "$rest" = "$word" ]; then
+            break
+        fi
+        rest=${rest#"$word"}
+        rest="${rest#"${rest%%[![:space:]]*}"}"
+    done
+    return 1
+}
+
 is_lock_condition() {
-    [[ $1 =~ (^|[^[:alnum:]_])(until|if)[[:space:]]+mkdir([^[:alnum:]_]|$) ]]
+    [[ $1 =~ (^|[^[:alnum:]_])(until|if)[[:space:]]+mkdir([^[:alnum:]_]|$) ]] && ! mkdir_creates_parents "$1"
 }
 
 is_mkdir_or_exit() {
-    is_mkdir_command "$1" && [[ $1 =~ \|\|[[:space:]]*(return|exit)([^[:alnum:]_]|$) ]]
+    is_mkdir_command "$1" && [[ $1 =~ \|\|[[:space:]]*(return|exit)([^[:alnum:]_]|$) ]] && ! mkdir_creates_parents "$1"
 }
 
 report() {
@@ -95,6 +131,8 @@ check_command() {
         until | if)
             if is_lock_condition "$command"; then
                 report "$file" "$number" "$raw" "mkdir is used as a lock condition"
+            elif mkdir_creates_parents "$command" && names_a_lock "$command"; then
+                report "$file" "$number" "$raw" "mkdir creates a path named like a lock"
             fi
             ;;
         mkdir)
@@ -109,7 +147,7 @@ check_command() {
 
 check_file() {
     local file=$1
-    local number=0 line code shell part rest
+    local number=0 line code part rest
     while IFS= read -r line || [ -n "$line" ]; do
         number=$((number + 1))
         code=$(code_without_comment "$line")

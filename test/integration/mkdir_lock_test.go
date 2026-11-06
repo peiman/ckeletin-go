@@ -57,6 +57,46 @@ func TestMkdirLockCheckFlagsMkdirUsedAsLock(t *testing.T) {
 	require.Contains(t, out, "path named like a lock")
 }
 
+func TestMkdirLockCheckAllowsParentsFollowedByReturn(t *testing.T) {
+	dir := t.TempDir()
+	ok := filepath.Join(dir, "ok.sh")
+	body := "#!/bin/bash\n" +
+		"mkdir -p \"$d\" || return 1\n" +
+		"mkdir -pm 700 \"$d\" || exit 1\n" +
+		"mkdir --parents \"$d\" || return 1\n" +
+		"if mkdir -p \"$d\"; then echo made; fi\n"
+	require.NoError(t, os.WriteFile(ok, []byte(body), 0o644))
+
+	out, code := runMkdirLock(t, dir, ok)
+	require.Equal(t, 0, code, out)
+	require.NotContains(t, out, "mkdir failure is used as a lock")
+	require.NotContains(t, out, "lock condition")
+}
+
+func TestMkdirLockCheckFlagsParentsOfALockPath(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.sh")
+	body := "#!/bin/bash\nmkdir -p \"$TMP/run.lock\"\n"
+	require.NoError(t, os.WriteFile(bad, []byte(body), 0o644))
+
+	out, code := runMkdirLock(t, dir, bad)
+	require.NotEqual(t, 0, code, out)
+	require.Contains(t, out, "path named like a lock")
+	require.NotContains(t, out, "mkdir failure is used as a lock")
+}
+
+func TestMkdirLockCheckFlagsParentsLockInsideACondition(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.sh")
+	body := "#!/bin/bash\nif mkdir -p \"$LOCK\"; then echo held; fi\n"
+	require.NoError(t, os.WriteFile(bad, []byte(body), 0o644))
+
+	out, code := runMkdirLock(t, dir, bad)
+	require.NotEqual(t, 0, code, out)
+	require.Contains(t, out, "path named like a lock")
+	require.NotContains(t, out, "lock condition")
+}
+
 func TestMkdirLockCheckPassesOnThisRepo(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	require.NoError(t, err)
