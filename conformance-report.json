@@ -531,7 +531,7 @@
       "violation_tests": []
     }
   },
-  "spec_version": "0.13.0",
+  "spec_version": "0.13.1",
   "summary": {
     "deferred": 0,
     "met": 46,

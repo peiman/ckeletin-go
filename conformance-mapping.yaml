@@ -13,7 +13,7 @@
 # Simple commands with no special characters may stay as plain double-quoted
 # one-liners (e.g. "task validate:layering").
 
-spec_version: "0.13.0"
+spec_version: "0.13.1"
 
 requirements:
   # ═══════════════════════════════════════════════════════════════
