@@ -22,6 +22,7 @@ Configuration can be provided in multiple ways, in order of precedence:
 | `app.log.file_path` | string | `./logs/ckeletin-go.log` | `CKELETIN_GO_APP_LOG_FILE_PATH` | Path to the log file (created with secure 0600 permissions) |
 | `app.log.file_level` | string | `debug` | `CKELETIN_GO_APP_LOG_FILE_LEVEL` | File log level (trace, debug, info, warn, error, fatal, panic) |
 | `app.log.color_enabled` | string | `auto` | `CKELETIN_GO_APP_LOG_COLOR_ENABLED` | Enable colored console output (auto, true, false). Auto detects TTY. |
+| `app.log.console_time_format` | string | `2006-01-02T15:04:05Z07:00` | `CKELETIN_GO_APP_LOG_CONSOLE_TIME_FORMAT` | Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp. (config file or environment only) |
 | `app.log.file_max_size` | int | `100` | `CKELETIN_GO_APP_LOG_FILE_MAX_SIZE` | Maximum size in megabytes before log file is rotated |
 | `app.log.file_max_backups` | int | `3` | `CKELETIN_GO_APP_LOG_FILE_MAX_BACKUPS` | Maximum number of old log files to retain |
 | `app.log.file_max_age` | int | `28` | `CKELETIN_GO_APP_LOG_FILE_MAX_AGE` | Maximum number of days to retain old log files |
@@ -92,6 +93,9 @@ app:
     # Enable colored console output (auto, true, false). Auto detects TTY.
     color_enabled: true
 
+    # Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp. (config file or environment only)
+    console_time_format: 15:04:05
+
     # Maximum size in megabytes before log file is rotated
     file_max_size: 100
 
@@ -145,6 +149,9 @@ export CKELETIN_GO_APP_LOG_FILE_LEVEL=debug
 
 # Enable colored console output (auto, true, false). Auto detects TTY.
 export CKELETIN_GO_APP_LOG_COLOR_ENABLED=true
+
+# Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp. (config file or environment only)
+export CKELETIN_GO_APP_LOG_CONSOLE_TIME_FORMAT=15:04:05
 
 # Maximum size in megabytes before log file is rotated
 export CKELETIN_GO_APP_LOG_FILE_MAX_SIZE=100

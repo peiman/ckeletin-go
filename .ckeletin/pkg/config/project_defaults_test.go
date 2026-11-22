@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/viper"
@@ -126,6 +127,17 @@ func TestEffectiveRegistry_UnknownKey(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "app.not_a_real_option")
 	assert.Nil(t, opts)
+}
+
+func TestApplyProjectDefaultsTOML_EmptyConsoleTimeFormat(t *testing.T) {
+	resetViper(t)
+	config.SetDefaults()
+	assert.Equal(t, time.RFC3339, viper.GetString(config.KeyAppLogConsoleTimeFormat))
+
+	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte("[defaults]\n\"app.log.console_time_format\" = \"\"\n")))
+
+	assert.Empty(t, viper.GetString(config.KeyAppLogConsoleTimeFormat),
+		"an empty project default drops the console timestamp; the framework default is RFC3339")
 }
 
 func TestEffectiveRegistry_EmptyIsFrameworkDefault(t *testing.T) {

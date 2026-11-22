@@ -7,7 +7,11 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
-## [0.2.11] - 2026-11-06
+## [0.2.12] - 2026-11-22
+
+### Added
+
+- **Console timestamps can be turned off.** `app.log.console_time_format` (`config.KeyAppLogConsoleTimeFormat`) is a Go time layout. The default is RFC3339, so an application that does not set it keeps the same console line. An empty value, including an empty project default, omits the console timestamp. The level token is then the first field. The audit file still has a timestamp. `SetConsoleLevel` keeps the layout captured at `Init`. Colour is unchanged. There is no flag. Set it from the config file, the environment, or `config.ApplyProjectDefaultsTOML`.
 
 ### Fixed
 

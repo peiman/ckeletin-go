@@ -11,6 +11,7 @@ const (
 	KeyAppLogFilePath           = "app.log.file_path"           // Path to the log file (created with secure 0600 permissions)
 	KeyAppLogFileLevel          = "app.log.file_level"          // File log level (trace, debug, info, warn, error, fatal, panic)
 	KeyAppLogColorEnabled       = "app.log.color_enabled"       // Enable colored console output (auto, true, false). Auto detects TTY.
+	KeyAppLogConsoleTimeFormat  = "app.log.console_time_format" // Go time layout for console log lines. Default is RFC3339. Empty omits the con...
 	KeyAppLogFileMaxSize        = "app.log.file_max_size"       // Maximum size in megabytes before log file is rotated
 	KeyAppLogFileMaxBackups     = "app.log.file_max_backups"    // Maximum number of old log files to retain
 	KeyAppLogFileMaxAge         = "app.log.file_max_age"        // Maximum number of days to retain old log files

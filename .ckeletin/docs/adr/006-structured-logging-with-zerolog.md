@@ -1,7 +1,7 @@
 # ADR-006: Structured Logging with Zerolog
 
 ## Status
-Accepted (Updated: 2026-01-09 - Added logging best practices and level selection guidance)
+Accepted (Updated: 2026-11-22 - Console timestamp layout is configurable. Updated: 2026-01-09 - Added logging best practices and level selection guidance)
 
 ## Context
 
@@ -99,7 +99,14 @@ app:
     file_path: ./logs/app.log  # Log file path
     file_level: debug          # File log level
     color_enabled: auto        # Console colors (auto/true/false)
+    console_time_format: ""    # Go layout; default RFC3339; empty omits the console timestamp
 ```
+
+`app.log.console_time_format` is `config.KeyAppLogConsoleTimeFormat`. The framework default is `time.RFC3339`, so an application that does not set the key keeps today's console line. An empty value, including an empty project default from `config.ApplyProjectDefaultsTOML`, removes the timestamp part. The level token is then the first field (`WRN …`). A custom Go layout such as `15:04:05` is passed through. Colour (`app.log.color_enabled`) is unchanged.
+
+The audit file is zerolog JSON. It always keeps its own timestamp. `SetConsoleLevel` rebuilds the console writer with the layout captured at `Init`.
+
+There is no flag. Set it from the config file, the environment (`<PREFIX>_APP_LOG_CONSOLE_TIME_FORMAT`), or a project default.
 
 ## Best Practices
 

@@ -6,12 +6,12 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/mattn/go-isatty"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
-	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -34,6 +34,10 @@ var (
 	currentFileWriter io.WriteCloser
 	// currentColorEnabled stores whether colors are enabled
 	currentColorEnabled bool
+	// currentConsoleTimeFormat is the console timestamp layout captured by Init.
+	// rebuildLogger reuses it so a runtime level change does not pick up a later edit.
+	// Empty means the console line has no timestamp. The file writer is separate.
+	currentConsoleTimeFormat string
 )
 
 // Init initializes the logger with options from Viper.
@@ -46,8 +50,9 @@ var (
 //   - app.log.file_path: Log file path (default: ./logs/ckeletin-go.log)
 //   - app.log.file_level: File log level (default: debug)
 //   - app.log.color_enabled: Color output (auto/true/false, default: auto)
+//   - app.log.console_time_format: Console timestamp layout (default: RFC3339; empty omits it)
 //
-// When JSON output mode is active (output.IsJSONMode), the console writer is
+// When the resolved output mode is json, the console writer is
 // disabled entirely; only the file (audit) writer receives entries.
 //
 // Init fails closed when file logging is explicitly enabled but the log file
@@ -73,7 +78,7 @@ func Init(out io.Writer) error {
 
 	// Get console log level (with backward compatibility)
 	consoleLevel := getConsoleLogLevel()
-	if output.IsJSONMode() {
+	if jsonMode() {
 		// JSON mode contract (CKSPEC-OUT-004): stdout carries exactly one
 		// JSON envelope and stderr stays silent, so the console writer is
 		// fully disabled. The file (audit) writer below is unaffected and
@@ -87,13 +92,10 @@ func Init(out io.Writer) error {
 	// Determine if color should be enabled
 	colorEnabled := isColorEnabled(out)
 	currentColorEnabled = colorEnabled
+	currentConsoleTimeFormat = loadConsoleTimeFormat()
 
 	// Console writer with filtering
-	consoleWriter := zerolog.ConsoleWriter{
-		Out:        out,
-		TimeFormat: time.RFC3339,
-		NoColor:    !colorEnabled,
-	}
+	consoleWriter := newConsoleWriter(out)
 
 	filteredConsole := FilteredWriter{
 		Writer:   consoleWriter,
@@ -188,7 +190,7 @@ func Cleanup() {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
 	if logFile != nil {
-		if err := logFile.Close(); err != nil && !output.IsJSONMode() {
+		if err := logFile.Close(); err != nil && !jsonMode() {
 			// Can't use logger here as it might be cleaning up. In JSON mode
 			// stderr must stay silent (CKSPEC-OUT-004), so the warning is
 			// suppressed — the close failure cannot reach the audit file
@@ -197,6 +199,14 @@ func Cleanup() {
 		}
 		logFile = nil
 	}
+}
+
+// jsonMode reports the resolved output mode without importing the output
+// package. The output package imports the command framework, and the logger
+// must stay free of that import so business logic can depend on logging
+// without depending on rendering.
+func jsonMode() bool {
+	return strings.EqualFold(strings.TrimSpace(viper.GetString(config.KeyAppOutputFormat)), "json")
 }
 
 // getConsoleLogLevel determines the console log level from configuration.
@@ -272,6 +282,32 @@ func clampSamplingValue(n int) uint32 {
 	return uint32(v)
 }
 
+// loadConsoleTimeFormat reads app.log.console_time_format.
+// Unset (no default installed) stays RFC3339, which is what Init hardcoded before
+// the key existed. A configured empty string, including a project default, drops
+// the console timestamp. The file writer does not use this value.
+func loadConsoleTimeFormat() string {
+	if !viper.IsSet(config.KeyAppLogConsoleTimeFormat) {
+		return time.RFC3339
+	}
+	return viper.GetString(config.KeyAppLogConsoleTimeFormat)
+}
+
+// newConsoleWriter builds the console writer from the format and color captured
+// by Init. An empty layout removes the timestamp part. Zerolog would otherwise
+// treat an empty TimeFormat as time.Kitchen.
+func newConsoleWriter(out io.Writer) zerolog.ConsoleWriter {
+	w := zerolog.ConsoleWriter{
+		Out:        out,
+		TimeFormat: currentConsoleTimeFormat,
+		NoColor:    !currentColorEnabled,
+	}
+	if currentConsoleTimeFormat == "" {
+		w.PartsExclude = []string{zerolog.TimestampFieldName}
+	}
+	return w
+}
+
 // isColorEnabled determines if colored output should be enabled.
 func isColorEnabled(out io.Writer) bool {
 	colorConfig := viper.GetString(config.KeyAppLogColorEnabled)
@@ -321,12 +357,8 @@ func openLogFileWithRotation(path string) (io.WriteCloser, error) {
 func rebuildLogger() {
 	var writers []io.Writer
 
-	// Recreate console writer with current level
-	consoleWriter := zerolog.ConsoleWriter{
-		Out:        currentConsoleWriter,
-		TimeFormat: time.RFC3339,
-		NoColor:    !currentColorEnabled,
-	}
+	// Recreate console writer with the format captured at Init.
+	consoleWriter := newConsoleWriter(currentConsoleWriter)
 
 	filteredConsole := FilteredWriter{
 		Writer:   consoleWriter,

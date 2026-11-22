@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
-	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -339,8 +339,8 @@ func TestInit_JSONModeSilencesConsoleNotFile(t *testing.T) {
 		viper.Set(config.KeyAppLogConsoleLevel, "info")
 	}()
 
-	output.SetOutputMode("json")
-	defer output.SetOutputMode("")
+	viper.Set(config.KeyAppOutputFormat, "json")
+	defer viper.Set(config.KeyAppOutputFormat, "text")
 
 	consoleBuf := &bytes.Buffer{}
 
@@ -470,8 +470,8 @@ func TestCleanup_CloseFailureRespectsJSONMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
-			output.SetOutputMode(tt.outputMode)
-			defer output.SetOutputMode("")
+			viper.Set(config.KeyAppOutputFormat, tt.outputMode)
+			defer viper.Set(config.KeyAppOutputFormat, "text")
 
 			origLogFile := logFile
 			defer func() { logFile = origLogFile }()
@@ -990,4 +990,150 @@ func TestOpenLogFileWithRotation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// fixedLogTime is the timestamp console and file assertions share.
+var fixedLogTime = time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+
+func withFixedLogTime(t *testing.T) {
+	t.Helper()
+	previous := zerolog.TimestampFunc
+	zerolog.TimestampFunc = func() time.Time { return fixedLogTime }
+	t.Cleanup(func() { zerolog.TimestampFunc = previous })
+}
+
+func silenceConsoleTimeNoise(t *testing.T) {
+	t.Helper()
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	viper.Set(config.KeyAppLogLevel, "debug")
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	t.Setenv("NO_COLOR", "")
+	t.Cleanup(func() {
+		viper.Set(config.KeyAppLogConsoleTimeFormat, time.RFC3339)
+		viper.Set(config.KeyAppLogColorEnabled, "auto")
+		viper.Set(config.KeyAppLogFileEnabled, false)
+	})
+}
+
+func consoleLine(t *testing.T, format *string) string {
+	t.Helper()
+	if format == nil {
+		// Leave the key unset so Init takes the historical RFC3339 path.
+	} else {
+		viper.Set(config.KeyAppLogConsoleTimeFormat, *format)
+	}
+	buf := &bytes.Buffer{}
+	require.NoError(t, Init(buf))
+	t.Cleanup(func() { Cleanup() })
+	log.Warn().Msg("hello")
+	return buf.String()
+}
+
+func TestConsoleTimeFormat_UnsetMatchesRFC3339(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	unset := consoleLine(t, nil)
+	explicit := time.RFC3339
+	again := consoleLine(t, &explicit)
+
+	want := fixedLogTime.In(time.Local).Format(time.RFC3339) + " WRN hello\n"
+	assert.Equal(t, want, unset, "unset key must stay byte-identical to the historical RFC3339 console line")
+	assert.Equal(t, unset, again, "an explicit RFC3339 layout must match the unset default")
+}
+
+func TestConsoleTimeFormat_EmptyDropsTimestamp(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	empty := ""
+	got := consoleLine(t, &empty)
+	assert.Equal(t, "WRN hello\n", got)
+	assert.True(t, strings.HasPrefix(got, "WRN "), "console line starts with the level token")
+}
+
+func TestConsoleTimeFormat_CustomLayout(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	layout := "15:04:05"
+	got := consoleLine(t, &layout)
+	want := fixedLogTime.In(time.Local).Format(layout) + " WRN hello\n"
+	assert.Equal(t, want, got)
+}
+
+func TestConsoleTimeFormat_FileKeepsTimestamp(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	logFile := filepath.Join(t.TempDir(), "audit.log")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, logFile)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	empty := ""
+	_ = consoleLine(t, &empty)
+
+	content, err := os.ReadFile(logFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "hello")
+	assert.Contains(t, string(content), fixedLogTime.Format(time.RFC3339),
+		"audit file keeps a full timestamp when the console timestamp is omitted")
+}
+
+func TestConsoleTimeFormat_RebuildKeepsFormat(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	layout := "15:04:05"
+	viper.Set(config.KeyAppLogConsoleTimeFormat, layout)
+	buf := &bytes.Buffer{}
+	require.NoError(t, Init(buf))
+	t.Cleanup(func() { Cleanup() })
+	log.Warn().Msg("before")
+
+	viper.Set(config.KeyAppLogConsoleTimeFormat, time.RFC3339)
+	SetConsoleLevel(zerolog.DebugLevel)
+	log.Warn().Msg("after")
+
+	short := fixedLogTime.In(time.Local).Format(layout)
+	assert.Contains(t, buf.String(), short+" WRN before")
+	assert.Contains(t, buf.String(), short+" WRN after")
+	assert.NotContains(t, buf.String(), "2026")
+}
+
+func TestConsoleTimeFormat_ColorUnchanged(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+	layout := "15:04:05"
+
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogConsoleTimeFormat, layout)
+	plain := &bytes.Buffer{}
+	require.NoError(t, Init(plain))
+	log.Warn().Msg("plain")
+	Cleanup()
+
+	viper.Set(config.KeyAppLogColorEnabled, "true")
+	colored := &bytes.Buffer{}
+	require.NoError(t, Init(colored))
+	t.Cleanup(func() { Cleanup() })
+	log.Warn().Msg("colored")
+
+	assert.NotContains(t, plain.String(), "\x1b[")
+	assert.Contains(t, colored.String(), "\x1b[")
+	assert.Contains(t, colored.String(), "WRN")
 }

@@ -88,6 +88,14 @@
               ],
               "type": "string"
             },
+            "console_time_format": {
+              "default": "2006-01-02T15:04:05Z07:00",
+              "description": "Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp. (config file or environment only)",
+              "examples": [
+                "15:04:05"
+              ],
+              "type": "string"
+            },
             "file_compress": {
               "default": false,
               "description": "Compress rotated log files with gzip",
