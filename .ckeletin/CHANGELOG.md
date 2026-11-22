@@ -23,6 +23,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ### Fixed
 
+- **A derived presentation layer can import the upstream `pkg` module.** `task init` deletes the local `pkg/` tree and allows `business` and `infrastructure` to import it as `ckeletin-pkg`. `presentation` needs the same allow: `internal/ui` and `internal/check` import `pkg/checkmate`.
+
+## [0.2.11] - 2026-11-06
+
+### Fixed
+
 - **`task check` no longer says every check passed and then fails the changelog gate.** The binary prints `All N Checks Passed` and exits. The framework changelog gate now runs before that binary, so a missing `.ckeletin/CHANGELOG.md` entry fails the command without a green summary. The bash and fast paths already ran the gate before their summary.
 
 ## [0.2.10] - 2026-11-06
