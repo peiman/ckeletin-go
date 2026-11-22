@@ -20,8 +20,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/catalog"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/spf13/cobra"
@@ -58,7 +56,7 @@ func runCatalog(cmd *cobra.Command, _ []string) error {
 		})
 	}
 
-	_, err := fmt.Fprint(cmd.OutOrStdout(), cat.String())
+	_, err := output.Result(cmd).Write([]byte(cat.String()))
 	return err
 }
 

@@ -109,11 +109,12 @@
         "task validate:layering"
       ],
       "enforcement_level": "linter",
-      "evidence": "depOnAnyVendor:false enables vendor import checking. canUse rules restrict Cobra and pflag to commands layer only. Business and infrastructure cannot import them.\n",
+      "evidence": "depOnAnyVendor:false enables vendor import checking. canUse rules allow Cobra and pflag on the commands layer and the output component. Infrastructure, presentation, and business logic cannot import them. The output component is not common, so business logic cannot import pkg/output. The violation tests still reject both imports.\n",
       "status": "met",
       "violation_evidence": null,
       "violation_tests": [
-        "test/conformance/violation_test.go::TestViolation_ARCH003_BusinessImportsCobra"
+        "test/conformance/violation_test.go::TestViolation_ARCH003_BusinessImportsCobra",
+        "test/conformance/violation_test.go::TestViolation_BusinessImportsOutputWriters"
       ]
     },
     "CKSPEC-ARCH-004": {

@@ -1,7 +1,7 @@
 # ADR-012: Structured Output and Shadow Logging
 
 ## Status
-Accepted
+Accepted (Updated: 2026-11-22 - Command path, output flag, execute entry point, exit codes, text writers)
 
 ## Context
 
@@ -29,8 +29,8 @@ We adopt a **3-Stream Output Model** using a **UI Adapter Pattern** with **Shado
 
 ### 2. The UI Adapter (Shadow Logging)
 
-Business logic (`internal/*`) MUST NOT print directly to `os.Stdout` or `fmt.Println`.
-Instead, it must pass data to a `ui.Renderer`.
+Business logic (`internal/*`) MUST NOT print directly to `os.Stdout` or `fmt.Println`, and it MUST NOT import `.ckeletin/pkg/output`.
+It reports progress through `progress.Reporter` (`Step`, `Status`, `Warn`, `Done`). The command layer implements that port with `output.NewReporter` and renders the returned data.
 
 The `ui.Renderer` is responsible for **Shadow Logging**:
 1.  **Render**: Formats the data for the User (Stream 1).
@@ -39,9 +39,13 @@ The `ui.Renderer` is responsible for **Shadow Logging**:
 **Example:**
 
 ```go
-// Internal Logic
+// Business logic reports. It does not choose a stream.
 user := User{ID: 1, Name: "Alice"}
-ui.RenderSuccess(cmd.OutOrStdout(), "User created", user)
+rep.Step("creating user")
+return user, nil
+
+// The command layer renders.
+return ui.RenderSuccess(cmd.OutOrStdout(), "User created", user)
 ```
 
 **Result:**
@@ -58,7 +62,7 @@ ui.RenderSuccess(cmd.OutOrStdout(), "User created", user)
 - **Consistency**: All commands output in a standard way.
 
 ### Negative
-- **Boilerplate**: Requires passing a `Renderer` or using `internal/ui` helper functions instead of simple `fmt.Println`.
+- **Boilerplate**: The command passes a `progress.Reporter` and renders the returned value. Business logic does not call `fmt.Println`.
 
 ## Enforcement
 
@@ -76,8 +80,9 @@ task check           # Includes output validation
 ```
 
 **3. What Gets Validated**
-- Business logic packages use `internal/ui` for Data Stream
-- Business logic packages use `internal/logger` for Status Stream
+- Business logic reports through `progress.Reporter` and does not import `.ckeletin/pkg/output`
+- The command layer and presentation packages render the Data Stream
+- Business logic packages use the logger for the Status Stream's audit copy
 - Fails on direct `fmt.Print*` in `internal/*` (except ui/)
 - Fails on direct `os.Stdout` writes in `internal/*` (except ui/)
 
@@ -90,4 +95,42 @@ task check           # Includes output validation
 
 - `internal/logger` defaults console output to `os.Stderr`.
 - `internal/ui` provides `RenderSuccess`, `RenderTable`, `RenderError`.
-- Commands delegate final output to `internal/ui`.
+- Commands delegate final output to `internal/ui` or to `.ckeletin/pkg/output`.
+
+## Framework output API (0.2.12)
+
+The reference `main` and `cmd/root.go` call this package. A derived application does the same instead of copying the wiring.
+
+### Command identifier
+
+The envelope field `command` is the full path without the program name, words separated by one space: `check model`. A top-level command is its name. `--version` uses `version`. `SetCommandName` still overrides the path. A failure before any command resolves marshals `command` as JSON null. A failure after a parent resolved uses that parent's path (`check` when `check nope` does not resolve).
+
+### One mode resolver
+
+`RegisterOutputFlag(root, WithEnvPrefix(prefix), WithAliasFlag("format"))` registers persistent `--output text|json` and resolves the mode in `PersistentPreRunE` before the application's own pre-run, then again after the config file is read and before `logger.Init`.
+
+Precedence is the changed `--output` flag, then a changed alias flag, then the environment variable, then the config file, then the default `text`. `WithAliasFlag` does not register the alias. It recognises a flag the command already has. An invalid value (`yaml`) returns one error. The exit code is `output.ExitInvalidOutput` (2) for every command.
+
+### One envelope per run
+
+`Execute(root) int` runs the command and returns the process exit code. Call `SetAfterRun(logger.Cleanup)` so the audit file stays open until the error document is written.
+
+- Success exits 0.
+- JSON mode, on an error the command did not already render, writes one error envelope to stdout and nothing to stderr.
+- Text mode writes `Error: …` to stderr and leaves stdout empty.
+- `ErrRendered` and `Rendered(code)` mean the command already wrote the document. Execute does not write a second one.
+- `Rendered(code)` wraps `ErrRendered`. `errors.Is(Rendered(code), ErrRendered)` is true.
+- `ExitCoder` (`ExitCode() int`) is honoured for any error. A plain error exits 1.
+- Exit code 0 is not returned together with `status: "error"`. A non-zero code is not returned for a success. `Rendered(0)` and an `ExitCoder` of 0 both exit 1.
+
+The failure is logged at debug, so the audit file receives it, before cleanup.
+
+### Text writers
+
+`Result(cmd)` writes stdout. `Status(cmd)` writes stderr. Both honour `SetOut` and `SetErr`. `Resultf`, `Statusf`, and `Success` are the helpers. `Progressf` writes a status line and strips ANSI control codes when stderr is not a terminal.
+
+Every successful write is shadow-logged to the audit stream afterwards, with `command` and `stream` (`stdout` or `stderr`). A failed write is not logged.
+
+JSON mode: `Result` and `Success` succeed without writing, so stdout stays the envelope. `Status` is silenced, matching the console logger.
+
+Business logic still must not call `fmt.Print*` (see Enforcement). Commands in `cmd/` use these writers.

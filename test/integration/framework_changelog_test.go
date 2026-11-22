@@ -401,3 +401,86 @@ func TestGenerateCommandMigration_SilentWhenTheProjectTaskForwards(t *testing.T)
 	require.NoError(t, err, string(out))
 	assert.NotContains(t, string(out), "does not forward to ckeletin:generate:command")
 }
+
+func TestOutputComponentMigration_MovesWritersAndLeavesBusinessImports(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+	script := filepath.Join(root, ".ckeletin", "scripts", "migrate-post-update.sh")
+
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".ckeletin", "pkg", "output"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "ui"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "ping"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "ui", "renderer.go"), []byte(
+		"package ui\n\nimport _ \"github.com/peiman/ckeletin-go/.ckeletin/pkg/output\"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "ping", "ping.go"), []byte(
+		"package ping\n\nimport _ \"github.com/peiman/ckeletin-go/.ckeletin/pkg/output\"\n"), 0o644))
+
+	old := "" +
+		"components:\n" +
+		"  infrastructure:\n" +
+		"    in:\n" +
+		"      - .ckeletin/pkg/config/**\n" +
+		"      - .ckeletin/pkg/logger/**\n" +
+		"      - .ckeletin/pkg/output/**\n" +
+		"      - .ckeletin/pkg/progress/**\n" +
+		"      - .ckeletin/pkg/testutil/**\n" +
+		"      - internal/ui/**\n" +
+		"  business:\n" +
+		"    in:\n" +
+		"      - internal/ping/**\n" +
+		"      - internal/docs/**\n" +
+		"      - internal/check/**\n" +
+		"vendors:\n" +
+		"  cobra:\n" +
+		"    in: github.com/spf13/cobra\n" +
+		"deps:\n" +
+		"  commands:\n" +
+		"    mayDependOn:\n" +
+		"      - business\n" +
+		"      - infrastructure\n" +
+		"  business:\n" +
+		"    mayDependOn:\n" +
+		"      - infrastructure\n" +
+		"  infrastructure:\n" +
+		"    mayDependOn: []\n"
+	archPath := filepath.Join(dir, ".go-arch-lint.yml")
+	require.NoError(t, os.WriteFile(archPath, []byte(old), 0o644))
+
+	run := func() string {
+		cmd := exec.Command("bash", script)
+		cmd.Dir = dir
+		out, runErr := cmd.CombinedOutput()
+		require.NoError(t, runErr, string(out))
+		return string(out)
+	}
+
+	first := run()
+	assert.Contains(t, first, "Moved pkg/output into its own component")
+	assert.Contains(t, first, "internal/ping/ping.go")
+	assert.NotContains(t, first, "internal/ui/renderer.go")
+
+	body, err := os.ReadFile(archPath)
+	require.NoError(t, err)
+	text := string(body)
+	assert.Contains(t, text, "  output:\n    in:\n      - .ckeletin/pkg/output/**\n")
+	assert.Contains(t, text, "  presentation:\n    in:\n      - internal/ui/**\n      - internal/check/**\n      - internal/docs/**\n")
+	assert.NotContains(t, text, "infrastructure:\n    in:\n      - .ckeletin/pkg/config/**\n      - .ckeletin/pkg/logger/**\n      - .ckeletin/pkg/output/**\n")
+	assert.Contains(t, text, "      - internal/ping/**\n")
+	assert.NotRegexp(t, `(?m)^  business:\n    in:\n(?:      .*\n)*      - internal/(?:ui|check|docs)/\*\*`, text)
+	commands := text[strings.Index(text, "\ndeps:\n"):]
+	assert.Contains(t, commands, "      - output\n")
+	assert.Contains(t, commands, "      - presentation\n")
+	businessBlock := commands[strings.Index(commands, "  business:\n"):]
+	nextHeading := strings.Index(businessBlock[len("  business:\n"):], "\n  ")
+	require.Greater(t, nextHeading, 0)
+	businessOnly := businessBlock[:len("  business:\n")+nextHeading]
+	assert.NotContains(t, businessOnly, "output")
+	assert.NotContains(t, businessOnly, "presentation")
+
+	second := run()
+	assert.NotContains(t, second, "Moved pkg/output into its own component")
+	again, err := os.ReadFile(archPath)
+	require.NoError(t, err)
+	assert.Equal(t, text, string(again))
+}

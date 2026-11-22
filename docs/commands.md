@@ -1,7 +1,11 @@
 # Commands
 
 Production commands support the framework-level `--output json` flag for
-machine-readable output (one JSON envelope on stdout). Exception:
+machine-readable output (one JSON envelope on stdout). The envelope's
+`command` is the full path without the program name (`config validate`,
+`docs config`). `--version` uses `version`. A failure before a command
+resolves uses JSON null. Success exits 0. An error exits with the command's
+code (1 by default, 2 for an invalid `--output` value). Exception:
 `completion`, which emits shell scripts for the shell to source.
 
 ## `ping` Command

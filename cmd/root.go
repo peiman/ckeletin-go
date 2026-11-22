@@ -248,11 +248,9 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
-		// Activate JSON output mode as early as it is knowable (flag, then
-		// env var) so errors raised DURING config/logger init are routed
-		// through the JSON error handler in main.go instead of plain text.
-		output.SetOutputMode(earlyOutputMode(cmd))
-		output.SetCommandName(cmd.Name())
+		// output.RegisterOutputFlag already resolved the flag and the env var,
+		// and stored the command path, before this function runs. Errors
+		// raised during config load use that mode.
 
 		// Config-file-driven JSON mode is unknowable until the config is
 		// read, so buffer all pre-init log output and resolve it after the
@@ -266,45 +264,26 @@ var RootCmd = &cobra.Command{
 			return err
 		}
 
-		// Apply the final output mode (flag > env > config file) BEFORE the
-		// logger is initialized: in JSON mode logger.Init silences ONLY the
-		// console writer, so stdout carries exactly one JSON envelope and
-		// stderr stays silent, while the audit log file (if enabled) keeps
-		// receiving entries (CKSPEC-OUT-004). This second site covers
-		// config-file-driven JSON mode, which earlyOutputMode cannot see.
-		output.SetOutputMode(viper.GetString(config.KeyAppOutputFormat))
+		// initConfig resolves the mode again once the config file is visible,
+		// still before the logger starts.
 
 		// Initialize logger with configuration values
 		if err := logger.Init(nil); err != nil {
 			preInit.flush(false)
 			return fmt.Errorf("failed to initialize logger: %w", err)
 		}
+		output.SetFailureLog(func(err error, command string, code int) {
+			log.Debug().
+				Err(err).
+				Str("command", command).
+				Int("exit_code", code).
+				Msg("command failed")
+		})
 		preInit.flush(true)
 
 		logConfigStatus()
 		return nil
 	},
-}
-
-// earlyOutputMode resolves the output mode from the sources knowable BEFORE
-// initConfig runs: the --output flag (highest precedence), then the env var
-// mirror of config.KeyAppOutputFormat. A config file can still switch the
-// mode afterwards — the post-initConfig SetOutputMode site covers that.
-// Resolving early matters for errors raised during init itself: main.go must
-// already know it is in JSON mode to emit the error envelope, because the
-// post-initConfig site is never reached on those error paths.
-func earlyOutputMode(cmd *cobra.Command) string {
-	if f := cmd.Root().PersistentFlags().Lookup("output"); f != nil && f.Changed {
-		return f.Value.String()
-	}
-	return strings.TrimSpace(os.Getenv(outputFormatEnvVar()))
-}
-
-// outputFormatEnvVar mirrors config.KeyAppOutputFormat through viper's env
-// mapping (SetEnvPrefix plus the "." -> "_" key replacer in initConfig): the
-// same variable viper itself reads, knowable before initConfig runs.
-func outputFormatEnvVar() string {
-	return EnvPrefix() + "_" + strings.ToUpper(strings.ReplaceAll(config.KeyAppOutputFormat, ".", "_"))
 }
 
 // preInitLogBuffer captures log output emitted before logger.Init installs
@@ -359,16 +338,20 @@ func logConfigStatus() {
 }
 
 func Execute() error {
-	// Ensure logger cleanup on exit
+	// Ensure logger cleanup on exit. main uses output.Execute, which closes
+	// the audit file after error rendering instead of here.
 	defer logger.Cleanup()
-
-	RootCmd.Version = versionString()
-	// Register the --version flag NOW (cobra normally defers this until after
-	// command lookup): without it, `--version --output json` makes stripFlags
-	// treat the unknown --version as value-taking, swallow --output, and fail
-	// with `unknown command "json"`.
-	RootCmd.InitDefaultVersionFlag()
+	prepareRoot()
 	return RootCmd.Execute()
+}
+
+// prepareRoot publishes the version string and registers --version before
+// command lookup. Cobra would otherwise treat --version as an unknown flag
+// and swallow a following --output value. init registers it for output.Execute;
+// Execute refreshes the string so tests can change the build identity first.
+func prepareRoot() {
+	RootCmd.Version = versionString()
+	RootCmd.InitDefaultVersionFlag()
 }
 
 // orUnknown backstops build-identity fields at runtime: a pipeline that
@@ -430,7 +413,7 @@ func renderVersion(cmd *cobra.Command) string {
 	if outputFlag != nil && outputFlag.Changed && outputFlag.Value.String() == "json" {
 		envelope := output.JSONEnvelope{
 			Status:  "success",
-			Command: cmd.Name(),
+			Command: "version",
 			Data: versionData{
 				Version: orUnknown(Version),
 				Commit:  orUnknown(Commit),
@@ -515,12 +498,15 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 
 	RootCmd.PersistentFlags().Int("log-sampling-thereafter", 100, "Number of messages to log thereafter per second")
 
-	// Output format flag
-	RootCmd.PersistentFlags().String("output", "text", "Output format: text (human-readable) or json (machine-readable)")
+	// Output format flag. The helper also resolves the mode before this
+	// command's PersistentPreRunE, and again from inside initConfig.
+	output.RegisterOutputFlag(RootCmd, output.WithEnvPrefix(EnvPrefix()))
+	output.SetAfterRun(logger.Cleanup)
 
 	// Replace the literals above with the project overlay. The calls stay so
 	// the flags remain persistent and keep their CLI names and help text.
 	rootFlagDefaultsErr = applyRootFlagDefaults(projectDefaultsTOML)
+	prepareRoot()
 }
 
 // rootRegistryFlagBindings lists the persistent flags whose defaults come from
@@ -713,6 +699,14 @@ func initConfig() error {
 			log.Debug().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
 			return fmt.Errorf("config file security validation failed: %w", err)
 		}
+	}
+
+	// One resolver for flag > env > config file > default, before the
+	// registry walks every key. An invalid output value fails here, with
+	// the same error and exit code for every command, and the mode is
+	// stored before logger.Init runs.
+	if err := output.UseOutputMode(output.PhaseResolved); err != nil {
+		return err
 	}
 
 	// Validate registered config options (colors, log levels, etc.)

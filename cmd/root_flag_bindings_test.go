@@ -85,8 +85,8 @@ func TestFlagBindings_RegistryDriven(t *testing.T) {
 	// EXECUTION & ASSERTION PHASE
 	// Test each option from the registry
 	for _, opt := range options {
-		// Skip non-flag options (like nested config groups)
-		if opt.Key == "" {
+		// Skip non-flag options. NoFlag is config file or environment only.
+		if opt.Key == "" || opt.NoFlag {
 			continue
 		}
 

@@ -297,7 +297,7 @@ func TestDocumentationOutputErrors(t *testing.T) {
 			name: "Output to non-existent directory",
 			setupFunc: func(t *testing.T) (string, []string) {
 				nonExistentPath := filepath.Join(tmpDir, "nonexistent", "dir", "output.md")
-				return nonExistentPath, []string{"docs", "config", "--output", nonExistentPath}
+				return nonExistentPath, []string{"docs", "config", "--output-file", nonExistentPath}
 			},
 			wantExitCode:       1,
 			wantStderrContains: "failed",

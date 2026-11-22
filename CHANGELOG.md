@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Framework 0.2.12**: console log lines follow `app.log.console_time_format` (default RFC3339; empty omits only the console timestamp).
+- **Framework 0.2.12**: a nested command's JSON envelope uses the full path without the program name (`docs config`, not `config`). `--version --output json` reports `"command": "version"`. Console log lines follow `app.log.console_time_format` (default RFC3339; empty omits only the console timestamp). Invalid `--output` exits 2. Business logic reports through `progress.Reporter`. Only `cmd/` and the presentation packages import `pkg/output`.
 
 - **Dependency updates**: indirect Go modules `charmbracelet/x/ansi` 0.11.9, `go-cmp` 0.7.0, `go-colorful` 1.4.1, `go-colorable` 0.1.16, `go-runewidth` 0.0.31, `go-toml` 2.4.3, `go-internal` 1.16.0, `go-diff` 1.4.0, and `xo/terminfo` 1.2.0. `golang.org/x/exp` is no longer required. `github/codeql-action/upload-sarif` is 4.39.0. Direct modules were already current.
 

@@ -117,7 +117,7 @@ We adopt a **4-layer architecture** optimized for CLI applications:
 - Delegation to business logic
 - **Imports**: internal/*, Cobra
 - **Imported by**: Entry layer only
-- **Key Rule**: Only this layer can import Cobra
+- **Key Rule**: Business logic cannot import Cobra. The commands layer can. `.ckeletin/pkg/output` can too: it registers `--output` and runs the command (`Execute`). See ADR-013.
 
 **3. Business Logic Layer (internal/ping, internal/docs, etc.)**
 - Feature-specific implementations
@@ -145,7 +145,7 @@ We adopt a **4-layer architecture** optimized for CLI applications:
 
 **Critical Rules (Enforced):**
 1. **Acyclic Dependencies**: Outer layers depend on inner, never reverse
-2. **CLI Isolation**: Only `cmd/` can import Cobra (framework independence)
+2. **CLI Isolation**: Business logic cannot import Cobra. `cmd/` and `.ckeletin/pkg/output` can (ADR-013).
 3. **Internal Protection**: `internal/*` packages cannot import `cmd/`
 4. **Business Isolation**: Business logic packages don't import each other
 5. **Infrastructure Separation**: Infrastructure cannot import business logic
@@ -162,13 +162,15 @@ We adopt a **4-layer architecture** optimized for CLI applications:
 - Business Logic → Entry (architectural violation)
 - Infrastructure → Business Logic (wrong direction)
 - Infrastructure → Command (wrong direction)
-- `internal/*` → Cobra (only cmd/ uses Cobra)
+- Business logic → Cobra (`cmd/` and `.ckeletin/pkg/output` may import it)
 
 ### Enforcement
 
 **1. Go Compiler Baseline**
 - Prevents import cycles automatically
 - Enforces `internal/` package visibility rules
+
+**Output edge.** Business logic does not import `.ckeletin/pkg/output`. It reports through `.ckeletin/pkg/progress.Reporter`, which the command layer implements with `output.NewReporter`. The writers are the `output` component. That component is not in `commonComponents`, so business logic cannot depend on it. `commands` and `presentation` (`internal/ui`, `internal/check`, `internal/docs`) may. Packages inside one component cannot import each other, which is why the writers are not inside `presentation`. Principle 8: the framework defines this edge once. A derived project maps a package that renders into `presentation`, and a package that decides into `business`.
 
 **2. Automated Validation** (go-arch-lint)
 - Layer dependency rules verified in CI
