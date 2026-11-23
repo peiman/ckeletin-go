@@ -24,7 +24,7 @@ jobs:
   test:
     name: ${{ inputs.os }}
     runs-on: ${{ inputs.os }}
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
     steps:

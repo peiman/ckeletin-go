@@ -7,6 +7,21 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.18] - 2026-11-23
+
+### Fixed
+
+- **An alias below the root does not replace the real usage error.** The unresolved `--output` probe defines only that flag and the alias. `--format` on a subcommand no longer becomes `unknown flag: --format`.
+- **Environment JSON mode covers parse errors.** With no flag, a pre-resolution failure still reads the output env var and can print one envelope.
+- **A success envelope does not hide a later error.** The error is audited. A command-rendered error is audited too, and it is not printed a second time.
+- **A panic keeps the command that had resolved.** The previous run's command is cleared at the start of `Execute`.
+- **The output allowlist rejects a stale or unpinned entry.** A missing file, a count that no longer matches, and a line without `count=` or `lines=` fail the check.
+- **`task ckeletin:update` does not pass `--no-verify`.** `commit=false` leaves the update staged.
+
+### Changed
+
+- **The Windows test job waits 40 minutes.** The tests were finishing and the job was then cancelled at 20 minutes, which skipped the release.
+
 ## [0.2.17] - 2026-11-23
 
 ### Changed

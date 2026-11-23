@@ -45,6 +45,12 @@ var resolvedPhase = phaseUnset
 // preset mode when a command fails before PersistentPreRunE.
 var modePinned bool
 
+// modeWroteKey is true after UseOutputMode stores the resolved mode in
+// viper. The next resolution ignores that write unless the config file
+// or a later caller set the key to a different value.
+var modeWroteKey bool
+var modeWroteValue string
+
 type modeSource int
 
 const (
@@ -130,6 +136,8 @@ func UseOutputMode(phase Phase) error {
 	}
 	if source != sourceDefault || phase == PhaseResolved {
 		viper.Set(config.KeyAppOutputFormat, mode)
+		modeWroteKey = true
+		modeWroteValue = mode
 	}
 	return nil
 }
@@ -149,11 +157,29 @@ func resolveMode(phase Phase) (string, modeSource, error) {
 		mode, err := validMode(value)
 		return mode, sourceEnv, err
 	}
-	if phase == PhaseResolved && viper.IsSet(config.KeyAppOutputFormat) {
+	// A value this process wrote for the logger is not the config file.
+	// InConfig is the file. IsSet covers a caller that set the key itself,
+	// which is how tests load configuration without a file.
+	if phase == PhaseResolved && configMode() {
 		mode, err := validMode(viper.GetString(config.KeyAppOutputFormat))
 		return mode, sourceConfig, err
 	}
 	return "text", sourceDefault, nil
+}
+
+func configMode() bool {
+	key := config.KeyAppOutputFormat
+	if !viper.IsSet(key) {
+		modeWroteKey = false
+		return false
+	}
+	if viper.InConfig(key) {
+		return true
+	}
+	if !modeWroteKey {
+		return true
+	}
+	return viper.GetString(key) != modeWroteValue
 }
 
 func explicitFlag(cmd *cobra.Command, name string) (string, bool) {
