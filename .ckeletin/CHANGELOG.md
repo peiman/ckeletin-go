@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-11-23
+
+### Fixed
+
+- **The audit-file test closes the log before deleting its directory.** `TestInitClosesPreviousAuditFile` registered the directory cleanup before the close, so Windows could not remove `app.log`.
+
 ## [0.2.15] - 2026-11-23
 
 ### Fixed
