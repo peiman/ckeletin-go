@@ -53,12 +53,15 @@ requirements:
     enforcement_level: linter
     evidence: >
       depOnAnyVendor:false enables vendor import checking. canUse rules
-      restrict Cobra and pflag to commands layer only. Business and
-      infrastructure cannot import them.
+      allow Cobra and pflag on the commands layer and the output component.
+      Infrastructure, presentation, and business logic cannot import them.
+      The output component is not common, so business logic cannot import
+      pkg/output. The violation tests still reject both imports.
     checks:
       - "task validate:layering"
     violation_tests:
       - "test/conformance/violation_test.go::TestViolation_ARCH003_BusinessImportsCobra"
+      - "test/conformance/violation_test.go::TestViolation_BusinessImportsOutputWriters"
 
   CKSPEC-ARCH-004:
     title: "Business logic isolation"
@@ -503,7 +506,13 @@ requirements:
     status: met
     enforcement_level: script
     evidence: >
-      RenderSuccess and RenderError in internal/ui/renderer.go log.Debug()
+      The audit stream is on by default. app.log.file_enabled defaults to
+      true, and an explicit false opts out. A fresh command creates
+      ./logs/<app>.log (directory 0700, file 0600). An unwritable log
+      directory fails the command with one JSON error envelope, a non-zero
+      exit, and no panic (TestRun_DefaultAuditFile,
+      TestRun_DefaultAuditUnwritable). RenderSuccess and RenderError in
+      internal/ui/renderer.go log.Debug()
       raw data to the audit log file while rendering formatted text to
       stdout; debug level reaches the file logger without polluting the
       console. Commands that stream generated artifacts shadow-log the
@@ -520,6 +529,8 @@ requirements:
         grep -qE 'log\.Debug' internal/ui/renderer.go
       - |-
         grep -qE 'log\.Debug' internal/docs/json.go
+      - |-
+        grep -A3 '"app.log.file_enabled"' .ckeletin/pkg/config/core_options.go | grep -q 'DefaultValue: true'
     violation_tests: []
     violation_evidence: >
       Removing the shadow log.Debug from the renderer or from the docs

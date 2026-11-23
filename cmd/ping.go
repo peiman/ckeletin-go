@@ -3,7 +3,10 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/config/commands"
 	"github.com/peiman/ckeletin-go/internal/ping"
 	"github.com/peiman/ckeletin-go/internal/ui"
@@ -27,5 +30,9 @@ func runPingWithUIRunner(cmd *cobra.Command, args []string, uiRunner ui.UIRunner
 		Color:   getConfigValueWithFlags[string](cmd, "color", config.KeyAppPingOutputColor),
 		UI:      getConfigValueWithFlags[bool](cmd, "ui", config.KeyAppPingUi),
 	}
-	return ping.NewExecutor(cfg, uiRunner, cmd.OutOrStdout()).Execute()
+	response, err := ping.NewExecutor(cfg, uiRunner).Execute(output.NewReporter(cmd))
+	if err != nil || cfg.UI {
+		return err
+	}
+	return ui.RenderSuccess(cmd.OutOrStdout(), fmt.Sprintf("Pong! %s", response.Message), response)
 }

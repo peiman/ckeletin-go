@@ -405,11 +405,18 @@ func registerUpstreamVendor(projectRoot, oldModule string) error {
 		}
 	}
 
-	// Add ckeletin-pkg to canUse for business and infrastructure
+	// Add ckeletin-pkg to canUse for the components that import pkg/checkmate
+	// after init deletes the local pkg/ tree. Presentation does: internal/ui
+	// and internal/check render with it. Output does not.
 	lines := strings.Split(updated, "\n")
 	var finalLines []string
 	inDepsSection := false
 	currentComponent := ""
+	allowUpstreamPkg := map[string]bool{
+		"business":       true,
+		"infrastructure": true,
+		"presentation":   true,
+	}
 
 	for i, line := range lines {
 		finalLines = append(finalLines, line)
@@ -425,7 +432,7 @@ func registerUpstreamVendor(projectRoot, oldModule string) error {
 				currentComponent = strings.TrimSuffix(strings.TrimSpace(line), ":")
 			}
 
-			if trimmed == "canUse:" && (currentComponent == "business" || currentComponent == "infrastructure") {
+			if trimmed == "canUse:" && allowUpstreamPkg[currentComponent] {
 				if i+1 < len(lines) && !strings.Contains(lines[i+1], "ckeletin-pkg") {
 					finalLines = append(finalLines, "      - ckeletin-pkg")
 				}

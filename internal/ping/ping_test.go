@@ -8,19 +8,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/progress"
 	"github.com/peiman/ckeletin-go/internal/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// errorWriter always returns an error on Write
-type errorWriter struct{}
-
-func (e *errorWriter) Write(p []byte) (int, error) {
-	return 0, fmt.Errorf("write error")
-}
 
 // setupTestLogger creates a test logger and returns a cleanup function
 // that restores the original logger state. This prevents race conditions
@@ -49,10 +43,9 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 	defer cleanup()
 
 	tests := []struct {
-		name       string
-		cfg        Config
-		wantOutput string
-		wantErr    bool
+		name    string
+		cfg     Config
+		wantErr bool
 	}{
 		{
 			name: "Successful output - white",
@@ -61,8 +54,6 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 				Color:   "white",
 				UI:      false,
 			},
-			wantOutput: "✔ Pong! Test Message\n",
-			wantErr:    false,
 		},
 		{
 			name: "Successful output - red",
@@ -71,8 +62,6 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 				Color:   "red",
 				UI:      false,
 			},
-			wantOutput: "✔ Pong! Red Message\n",
-			wantErr:    false,
 		},
 	}
 
@@ -80,12 +69,12 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			// SETUP PHASE: Create output buffer and executor
-			outBuf := &bytes.Buffer{}
 			mockRunner := &ui.MockUIRunner{}
-			executor := NewExecutor(tt.cfg, mockRunner, outBuf)
+			var rec progress.Recorder
+			executor := NewExecutor(tt.cfg, mockRunner)
 
 			// EXECUTION PHASE: Execute the command
-			err := executor.Execute()
+			response, err := executor.Execute(&rec)
 
 			// ASSERTION PHASE: Check results
 			if tt.wantErr {
@@ -93,9 +82,9 @@ func TestExecutor_Execute_NonUIMode(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-
-			got := outBuf.String()
-			assert.Equal(t, tt.wantOutput, got)
+			require.NotNil(t, response)
+			assert.Equal(t, tt.cfg.Message, response.Message)
+			assert.Equal(t, "step", rec.Events[len(rec.Events)-1].Kind)
 
 			// Verify UI runner was not called
 			assert.Empty(t, mockRunner.CalledWithMessage, "UI runner should not be called in non-UI mode")
@@ -148,64 +137,54 @@ func TestExecutor_Execute_UIMode(t *testing.T) {
 			t.Parallel()
 			// SETUP PHASE: Create mock UI runner and executor
 			mockRunner := &ui.MockUIRunner{ReturnError: tt.uiRunnerError}
-			outBuf := &bytes.Buffer{}
-			executor := NewExecutor(tt.cfg, mockRunner, outBuf)
+			var rec progress.Recorder
+			executor := NewExecutor(tt.cfg, mockRunner)
 
 			// EXECUTION PHASE: Execute the command
-			err := executor.Execute()
+			response, err := executor.Execute(&rec)
 
 			// ASSERTION PHASE: Check results
 			if tt.wantErr {
 				require.Error(t, err)
+				assert.Nil(t, response)
 			} else {
 				require.NoError(t, err)
+				require.NotNil(t, response)
+				assert.Equal(t, tt.cfg.Message, response.Message)
 			}
 
 			// Verify UI runner was called with correct parameters
 			assert.Equal(t, tt.wantUIMessage, mockRunner.CalledWithMessage)
 			assert.Equal(t, tt.wantUIColor, mockRunner.CalledWithColor)
 
-			// Verify nothing was written to output in UI mode (UNLESS there was an error)
-			if !tt.wantErr {
-				assert.Empty(t, outBuf.String(), "Output buffer should be empty in UI mode")
+			if tt.wantErr {
+				assert.Equal(t, "warn", rec.Events[len(rec.Events)-1].Kind)
 			}
 		})
 	}
 }
 
-func TestExecutor_Execute_WriteError(t *testing.T) {
-	// SETUP PHASE: Setup error writer
-	writer := &errorWriter{}
-	cfg := Config{
-		Message: "Test Message",
-		Color:   "white",
-		UI:      false,
-	}
-	mockRunner := &ui.MockUIRunner{}
-	executor := NewExecutor(cfg, mockRunner, writer)
-
-	// EXECUTION PHASE: Execute the command
-	err := executor.Execute()
-
-	// ASSERTION PHASE: Check for expected error
-	require.Error(t, err, "Execute() expected error, got nil")
-	assert.True(t, strings.Contains(err.Error(), "failed to write output"),
-		"Execute() error = %v, expected to contain 'failed to write output'", err)
+func TestExecutor_Execute_NilReporter(t *testing.T) {
+	executor := NewExecutor(Config{Message: "Test Message", Color: "white"}, &ui.MockUIRunner{})
+	response, err := executor.Execute(nil)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+	assert.Equal(t, "Test Message", response.Message)
 }
 
 func TestExecutor_Execute_InvalidColor(t *testing.T) {
 	// SETUP PHASE: Create executor with invalid color
-	outBuf := &bytes.Buffer{}
 	cfg := Config{
 		Message: "Test Message",
 		Color:   "invalid_color",
 		UI:      false,
 	}
 	mockRunner := &ui.MockUIRunner{}
-	executor := NewExecutor(cfg, mockRunner, outBuf)
+	var rec progress.Recorder
+	executor := NewExecutor(cfg, mockRunner)
 
 	// EXECUTION PHASE: Execute the command
-	err := executor.Execute()
+	_, err := executor.Execute(&rec)
 
 	// ASSERTION PHASE: Check for expected error
 	require.Error(t, err, "Execute() expected error for invalid color, got nil")

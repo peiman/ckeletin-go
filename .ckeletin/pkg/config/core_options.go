@@ -8,7 +8,10 @@
 
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // CoreOptions returns core application configuration options
 // These settings affect the overall behavior of the application
@@ -18,8 +21,8 @@ func CoreOptions() []ConfigOption {
 		// If app.log.console_level is not set, this value is used for console output
 		{
 			Key:          "app.log_level",
-			DefaultValue: "info",
-			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.",
+			DefaultValue: "warn",
+			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level. Flag: --log-level.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
@@ -30,7 +33,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log.console_level",
 			DefaultValue: "",
-			Description:  "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.",
+			Description:  "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level. Flag: --log-level-console.",
 			Type:         "string",
 			Required:     false,
 			Example:      "info",
@@ -38,8 +41,8 @@ func CoreOptions() []ConfigOption {
 		},
 		{
 			Key:          "app.log.file_enabled",
-			DefaultValue: false,
-			Description:  "Enable file logging to capture detailed logs",
+			DefaultValue: true,
+			Description:  "Enable file logging to capture detailed logs. Set false to turn the audit log off.",
 			Type:         "bool",
 			Required:     false,
 			Example:      "true",
@@ -56,7 +59,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log.file_level",
 			DefaultValue: "debug",
-			Description:  "File log level (trace, debug, info, warn, error, fatal, panic)",
+			Description:  "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug. Flag: --log-level-file.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
@@ -71,6 +74,16 @@ func CoreOptions() []ConfigOption {
 			Example:      "true",
 			// Empty is allowed: the logger treats "" as auto-detection
 			Validation: ValidateOneOf([]string{"auto", "true", "false"}, true),
+		},
+		{
+			Key:          "app.log.console_time_format",
+			DefaultValue: time.RFC3339,
+			Description:  "Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp.",
+			Type:         "string",
+			Required:     false,
+			Example:      "15:04:05",
+			NoFlag:       true,
+			Validation:   validateConsoleTimeFormat,
 		},
 		// Log rotation options (lumberjack)
 		{
@@ -160,4 +173,16 @@ func CoreOptions() []ConfigOption {
 		},
 		// Add other application-wide settings here
 	}
+}
+
+// validateConsoleTimeFormat accepts any Go time layout, including empty.
+// Empty means the console line has no timestamp. The audit file is unaffected.
+func validateConsoleTimeFormat(value interface{}) error {
+	if value == nil {
+		return nil
+	}
+	if _, ok := value.(string); !ok {
+		return fmt.Errorf("console_time_format must be a string")
+	}
+	return nil
 }

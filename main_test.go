@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -24,9 +25,12 @@ import (
 // These live in package main (not cmd) because they assert on the error
 // envelope that run() itself renders — the part no cmd-package test can see.
 const (
-	jsonInitErrorRunEnv  = "CKELETIN_TEST_JSON_INIT_ERROR_RUN"
-	auditOpenFailRunEnv  = "CKELETIN_TEST_AUDIT_OPEN_FAIL_RUN"
-	auditOpenFailPathEnv = "CKELETIN_TEST_AUDIT_OPEN_FAIL_PATH"
+	jsonInitErrorRunEnv   = "CKELETIN_TEST_JSON_INIT_ERROR_RUN"
+	auditOpenFailRunEnv   = "CKELETIN_TEST_AUDIT_OPEN_FAIL_RUN"
+	auditOpenFailPathEnv  = "CKELETIN_TEST_AUDIT_OPEN_FAIL_PATH"
+	defaultAuditRunEnv    = "CKELETIN_TEST_DEFAULT_AUDIT_RUN"
+	defaultAuditOffEnv    = "CKELETIN_TEST_DEFAULT_AUDIT_OFF"
+	defaultAuditBadDirEnv = "CKELETIN_TEST_DEFAULT_AUDIT_BAD_DIR"
 )
 
 // isolateSubprocessEnv builds the environment for a re-exec subprocess with
@@ -198,6 +202,125 @@ func TestRun_AuditOpenFailure_FailsClosed(t *testing.T) {
 					"text mode must report the failure on stderr")
 				assert.Contains(t, stderr.String(), "log file",
 					"text mode error must identify the log file as the failure")
+			}
+		})
+	}
+}
+
+// dropEnv removes keys so a developer shell cannot override the case under test.
+func dropEnv(env []string, keys ...string) []string {
+	out := make([]string, 0, len(env))
+next:
+	for _, item := range env {
+		for _, key := range keys {
+			if strings.HasPrefix(item, key+"=") {
+				continue next
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func TestRun_DefaultAuditFile(t *testing.T) {
+	if os.Getenv(defaultAuditRunEnv) == "1" {
+		args := []string{"ping", "--log-level", "error"}
+		if os.Getenv(defaultAuditOffEnv) == "1" {
+			args = append(args, "--log-file-enabled=false")
+		}
+		cmd.RootCmd.SetArgs(args)
+		os.Exit(run())
+	}
+
+	logName := filepath.Join("logs", "ckeletin-go.log")
+	envKeys := []string{
+		cmd.EnvPrefix() + "_APP_LOG_FILE_ENABLED",
+		cmd.EnvPrefix() + "_APP_LOG_FILE_PATH",
+	}
+
+	t.Run("fresh command", func(t *testing.T) {
+		home := t.TempDir()
+		proc := exec.Command(os.Args[0], "-test.run=^TestRun_DefaultAuditFile$")
+		proc.Dir = home
+		proc.Env = dropEnv(isolateSubprocessEnv(home, defaultAuditRunEnv+"=1"), envKeys...)
+		var stdout, stderr bytes.Buffer
+		proc.Stdout = &stdout
+		proc.Stderr = &stderr
+
+		require.NoError(t, proc.Run(), "stdout: %s\nstderr: %s", stdout.String(), stderr.String())
+
+		file := filepath.Join(home, logName)
+		info, err := os.Stat(file)
+		require.NoError(t, err, "a fresh command must create the audit log")
+		if runtime.GOOS != "windows" {
+			dirInfo, dirErr := os.Stat(filepath.Dir(file))
+			require.NoError(t, dirErr)
+			assert.Equal(t, os.FileMode(0o700), dirInfo.Mode().Perm(), "log directory")
+			assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "log file")
+		}
+	})
+
+	t.Run("explicit false", func(t *testing.T) {
+		home := t.TempDir()
+		proc := exec.Command(os.Args[0], "-test.run=^TestRun_DefaultAuditFile$")
+		proc.Dir = home
+		proc.Env = dropEnv(isolateSubprocessEnv(home,
+			defaultAuditRunEnv+"=1",
+			defaultAuditOffEnv+"=1",
+		), envKeys...)
+		var stdout, stderr bytes.Buffer
+		proc.Stdout = &stdout
+		proc.Stderr = &stderr
+
+		require.NoError(t, proc.Run(), "stdout: %s\nstderr: %s", stdout.String(), stderr.String())
+		assert.NoFileExists(t, filepath.Join(home, logName))
+	})
+}
+
+func TestRun_DefaultAuditUnwritable(t *testing.T) {
+	if mode := os.Getenv(defaultAuditBadDirEnv); mode != "" {
+		args := []string{"ping"}
+		if mode == "json" {
+			args = append(args, "--output", "json")
+		}
+		cmd.RootCmd.SetArgs(args)
+		os.Exit(run())
+	}
+
+	for _, mode := range []string{"json", "text"} {
+		t.Run(mode, func(t *testing.T) {
+			home := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(home, "logs"), []byte("x"), 0o600))
+
+			proc := exec.Command(os.Args[0], "-test.run=^TestRun_DefaultAuditUnwritable$")
+			proc.Dir = home
+			proc.Env = dropEnv(isolateSubprocessEnv(home, defaultAuditBadDirEnv+"="+mode),
+				cmd.EnvPrefix()+"_APP_LOG_FILE_ENABLED",
+				cmd.EnvPrefix()+"_APP_LOG_FILE_PATH",
+			)
+			var stdout, stderr bytes.Buffer
+			proc.Stdout = &stdout
+			proc.Stderr = &stderr
+
+			err := proc.Run()
+
+			var exitErr *exec.ExitError
+			require.ErrorAs(t, err, &exitErr,
+				"unwritable audit directory must exit non-zero\nstdout: %s\nstderr: %s",
+				stdout.String(), stderr.String())
+			assert.Equal(t, 1, exitErr.ExitCode())
+			assert.NotContains(t, stdout.String(), "panic")
+			assert.NotContains(t, stderr.String(), "panic")
+			if mode == "json" {
+				var envelope output.JSONEnvelope
+				require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope), stdout.String())
+				assert.Equal(t, "error", envelope.Status)
+				require.NotNil(t, envelope.Error)
+				assert.Contains(t, envelope.Error.Message, "log file")
+				assert.Empty(t, stderr.String())
+				assert.Equal(t, 1, strings.Count(stdout.String(), `"status"`))
+			} else {
+				assert.Contains(t, stderr.String(), "log file")
 			}
 		})
 	}

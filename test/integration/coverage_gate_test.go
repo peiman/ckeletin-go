@@ -30,6 +30,22 @@ func TestCheckTaskEnforcesCoverageGate(t *testing.T) {
 		"the 'check' task must invoke test:coverage:project so the 85% coverage gate is enforced in `task check`")
 }
 
+// TestCheckFastRunsBinaryLicense guards issue #187. Pull-request CI runs
+// check:fast. The source license scan misses some disallowed licenses that
+// only the binary scan reports, so fast mode has to run that scan too.
+func TestCheckFastRunsBinaryLicense(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(filepath.Join(root, ".ckeletin", "Taskfile.yml"))
+	require.NoError(t, err)
+
+	block := topLevelTaskBlock(string(data), "check:fast")
+	require.NotEmpty(t, block, "could not locate the check:fast task")
+	assert.Contains(t, block, "task: check:license:binary",
+		"check:fast must run the binary license scan so a pull request cannot merge a disallowed dependency")
+}
+
 // TestFrameworkChangelogPrecedesTheSummary guards issue #182. The binary
 // prints "All N Checks Passed" and then exits. A later failing task still
 // leaves that green box on screen. The changelog gate has to run first.

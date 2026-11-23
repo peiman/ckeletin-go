@@ -57,7 +57,7 @@ func TestConfigValidateJSON_WarningsEmitSingleEnvelope(t *testing.T) {
 	var envelope output.JSONEnvelope
 	require.NoError(t, json.Unmarshal([]byte(out), &envelope),
 		"stdout must be exactly one JSON envelope, got: %q", out)
-	assert.Equal(t, "validate", envelope.Command)
+	assert.Equal(t, "config validate", envelope.Command)
 	assert.Equal(t, "error", envelope.Status, "warnings map to a non-zero result")
 	require.NotNil(t, envelope.Error)
 
@@ -77,6 +77,6 @@ func TestConfigValidateJSON_ValidEmitsSingleEnvelope(t *testing.T) {
 	var envelope output.JSONEnvelope
 	require.NoError(t, json.Unmarshal([]byte(out), &envelope),
 		"stdout must be exactly one JSON envelope, got: %q", out)
-	assert.Equal(t, "validate", envelope.Command)
+	assert.Equal(t, "config validate", envelope.Command)
 	assert.NotNil(t, envelope.Data)
 }

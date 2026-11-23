@@ -3,8 +3,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"os"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
@@ -12,25 +10,7 @@ import (
 )
 
 func run() int {
-	if err := cmd.Execute(); err != nil {
-		// The command already emitted its single JSON envelope; exit non-zero
-		// without rendering a second envelope.
-		if errors.Is(err, output.ErrRendered) {
-			return 1
-		}
-		if output.IsJSONMode() {
-			_ = output.RenderJSON(os.Stdout, output.JSONEnvelope{
-				Status:  "error",
-				Command: output.CommandName(),
-				Data:    nil,
-				Error:   &output.JSONError{Message: err.Error()},
-			})
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		}
-		return 1
-	}
-	return 0
+	return output.Execute(cmd.RootCmd)
 }
 
 // main is intentionally not covered by tests because it's the program's entry point.

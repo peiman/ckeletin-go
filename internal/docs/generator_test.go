@@ -299,15 +299,15 @@ func TestGenerateYAMLConvenience(t *testing.T) {
 func TestGenerateMarkdown_PublishesProjectDefault(t *testing.T) {
 	orig := projectDefaultsTOML
 	t.Cleanup(func() { projectDefaultsTOML = orig })
-	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"error\"\n")
 
 	var buf bytes.Buffer
 	err := GenerateMarkdown(&buf, AppInfo{BinaryName: "testapp", EnvPrefix: "TESTAPP"})
 	require.NoError(t, err)
 
 	output := buf.String()
-	assert.Contains(t, output, "| `app.log_level` | string | `warn` |")
-	assert.NotContains(t, output, "| `app.log_level` | string | `info` |")
+	assert.Contains(t, output, "| `app.log_level` | string | `error` |")
+	assert.NotContains(t, output, "| `app.log_level` | string | `warn` |")
 }
 
 func TestGenerateYAML_PublishesProjectDefault(t *testing.T) {
@@ -317,7 +317,7 @@ func TestGenerateYAML_PublishesProjectDefault(t *testing.T) {
 		projectDefaultsTOML = origTOML
 		generateYAMLContentFunc = origYAML
 	})
-	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"warn\"\n")
+	projectDefaultsTOML = []byte("[defaults]\n\"app.log_level\" = \"error\"\n")
 
 	var seen []config.ConfigOption
 	generateYAMLContentFunc = func(w io.Writer, registry []config.ConfigOption) error {
@@ -334,7 +334,7 @@ func TestGenerateYAML_PublishesProjectDefault(t *testing.T) {
 			got = opt.DefaultValue
 		}
 	}
-	assert.Equal(t, "warn", got)
+	assert.Equal(t, "error", got)
 }
 
 func TestGenerateMarkdown_RejectsUnknownProjectDefault(t *testing.T) {

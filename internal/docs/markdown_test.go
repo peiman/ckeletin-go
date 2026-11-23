@@ -120,7 +120,7 @@ func TestGenerateMarkdownDocs(t *testing.T) {
 // of the project-defaults overlay. docs config must publish the same default
 // the process uses, which is the project file when one is set.
 func TestGenerateMarkdownDocs_ProjectDefaultMatchesOverride(t *testing.T) {
-	opts, err := config.EffectiveRegistry([]byte("[defaults]\n\"app.log_level\" = \"warn\"\n"))
+	opts, err := config.EffectiveRegistry([]byte("[defaults]\n\"app.log_level\" = \"error\"\n"))
 	require.NoError(t, err)
 
 	var buf bytes.Buffer
@@ -133,8 +133,8 @@ func TestGenerateMarkdownDocs_ProjectDefaultMatchesOverride(t *testing.T) {
 
 	require.NoError(t, generator.GenerateMarkdownDocs(&buf, appInfo))
 	output := buf.String()
-	assert.Contains(t, output, "| `app.log_level` | string | `warn` |")
-	assert.NotContains(t, output, "| `app.log_level` | string | `info` |")
+	assert.Contains(t, output, "| `app.log_level` | string | `error` |")
+	assert.NotContains(t, output, "| `app.log_level` | string | `warn` |")
 	assert.Contains(t, output, "4. Project defaults")
 	assert.Contains(t, output, "5. Framework defaults")
 }

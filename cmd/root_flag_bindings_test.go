@@ -20,8 +20,13 @@ import (
 //   - app.log_level → log-level
 //   - app.log.color_enabled → log-color (special case)
 func viperKeyToFlagName(viperKey string) string {
-	// Special case: color_enabled flag is named "log-color" not "log-color-enabled"
-	if viperKey == "app.log.color_enabled" {
+	// The three level flags are not a mechanical rewrite of the key.
+	switch viperKey {
+	case "app.log.console_level":
+		return "log-level-console"
+	case "app.log.file_level":
+		return "log-level-file"
+	case "app.log.color_enabled":
 		return "log-color"
 	}
 
@@ -46,7 +51,8 @@ func TestViperKeyToFlagName(t *testing.T) {
 	}{
 		{"app.log.file_enabled", "log-file-enabled"},
 		{"app.log_level", "log-level"},
-		{"app.log.console_level", "log-console-level"},
+		{"app.log.console_level", "log-level-console"},
+		{"app.log.file_level", "log-level-file"},
 		{"app.log.color_enabled", "log-color"}, // Special case
 		{"app.ping.output_message", "ping-output-message"},
 	}
@@ -85,8 +91,8 @@ func TestFlagBindings_RegistryDriven(t *testing.T) {
 	// EXECUTION & ASSERTION PHASE
 	// Test each option from the registry
 	for _, opt := range options {
-		// Skip non-flag options (like nested config groups)
-		if opt.Key == "" {
+		// Skip non-flag options. NoFlag is config file or environment only.
+		if opt.Key == "" || opt.NoFlag {
 			continue
 		}
 

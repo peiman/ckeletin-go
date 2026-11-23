@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/viper"
@@ -12,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const projectDefaultWarn = "[defaults]\n\"app.log_level\" = \"warn\"\n"
+const projectDefaultError = "[defaults]\n\"app.log_level\" = \"error\"\n"
 
 func resetViper(t *testing.T) {
 	t.Helper()
@@ -23,11 +24,11 @@ func resetViper(t *testing.T) {
 func TestApplyProjectDefaultsTOML_ReplacesFrameworkDefault(t *testing.T) {
 	resetViper(t)
 	config.SetDefaults()
-	assert.Equal(t, "info", viper.GetString(config.KeyAppLogLevel))
+	assert.Equal(t, "warn", viper.GetString(config.KeyAppLogLevel))
 
-	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte(projectDefaultWarn)))
+	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte(projectDefaultError)))
 
-	assert.Equal(t, "warn", viper.GetString(config.KeyAppLogLevel),
+	assert.Equal(t, "error", viper.GetString(config.KeyAppLogLevel),
 		"a project default is what viper returns when nothing else sets the option")
 }
 
@@ -38,7 +39,7 @@ func TestApplyProjectDefaultsTOML_ConfigFileWins(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("app:\n  log_level: info\n"), 0o644))
 
 	config.SetDefaults()
-	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte(projectDefaultWarn)))
+	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte(projectDefaultError)))
 	viper.SetConfigFile(path)
 	require.NoError(t, viper.ReadInConfig())
 
@@ -54,7 +55,7 @@ func TestApplyProjectDefaultsTOML_EnvWins(t *testing.T) {
 	t.Setenv("CKELETIN_GO_APP_LOG_LEVEL", "error")
 
 	config.SetDefaults()
-	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte(projectDefaultWarn)))
+	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte("[defaults]\n\"app.log_level\" = \"info\"\n")))
 
 	assert.Equal(t, "error", viper.GetString(config.KeyAppLogLevel),
 		"an environment variable still wins over a project default")
@@ -68,7 +69,7 @@ func TestApplyProjectDefaultsTOML_UnknownKey(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "app.not_a_real_option")
-	assert.Equal(t, "info", viper.GetString(config.KeyAppLogLevel),
+	assert.Equal(t, "warn", viper.GetString(config.KeyAppLogLevel),
 		"a rejected file must not change defaults already applied")
 }
 
@@ -80,7 +81,7 @@ func TestApplyProjectDefaultsTOML_EmptyTableKeepsFrameworkDefault(t *testing.T) 
 	require.NoError(t, config.ApplyProjectDefaultsTOML(nil))
 	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte("# no defaults\n")))
 
-	assert.Equal(t, "info", viper.GetString(config.KeyAppLogLevel))
+	assert.Equal(t, "warn", viper.GetString(config.KeyAppLogLevel))
 }
 
 func TestApplyProjectDefaultsTOML_UnknownTable(t *testing.T) {
@@ -99,7 +100,7 @@ func TestEffectiveRegistry_ReplacesDefaultOnACopy(t *testing.T) {
 	resetViper(t)
 	config.SetDefaults()
 
-	opts, err := config.EffectiveRegistry([]byte(projectDefaultWarn))
+	opts, err := config.EffectiveRegistry([]byte(projectDefaultError))
 	require.NoError(t, err)
 
 	var effective interface{}
@@ -108,8 +109,8 @@ func TestEffectiveRegistry_ReplacesDefaultOnACopy(t *testing.T) {
 			effective = opt.DefaultValue
 		}
 	}
-	assert.Equal(t, "warn", effective, "the overlay replaces the framework default on the returned copy")
-	assert.Equal(t, "info", viper.GetString(config.KeyAppLogLevel),
+	assert.Equal(t, "error", effective, "the overlay replaces the framework default on the returned copy")
+	assert.Equal(t, "warn", viper.GetString(config.KeyAppLogLevel),
 		"reading the effective registry must not change the process defaults")
 
 	var framework interface{}
@@ -118,7 +119,7 @@ func TestEffectiveRegistry_ReplacesDefaultOnACopy(t *testing.T) {
 			framework = opt.DefaultValue
 		}
 	}
-	assert.Equal(t, "info", framework, "the registry itself keeps the framework default")
+	assert.Equal(t, "warn", framework, "the registry itself keeps the framework default")
 }
 
 func TestEffectiveRegistry_UnknownKey(t *testing.T) {
@@ -126,6 +127,17 @@ func TestEffectiveRegistry_UnknownKey(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "app.not_a_real_option")
 	assert.Nil(t, opts)
+}
+
+func TestApplyProjectDefaultsTOML_EmptyConsoleTimeFormat(t *testing.T) {
+	resetViper(t)
+	config.SetDefaults()
+	assert.Equal(t, time.RFC3339, viper.GetString(config.KeyAppLogConsoleTimeFormat))
+
+	require.NoError(t, config.ApplyProjectDefaultsTOML([]byte("[defaults]\n\"app.log.console_time_format\" = \"\"\n")))
+
+	assert.Empty(t, viper.GetString(config.KeyAppLogConsoleTimeFormat),
+		"an empty project default drops the console timestamp; the framework default is RFC3339")
 }
 
 func TestEffectiveRegistry_EmptyIsFrameworkDefault(t *testing.T) {
@@ -137,5 +149,5 @@ func TestEffectiveRegistry_EmptyIsFrameworkDefault(t *testing.T) {
 			got = opt.DefaultValue
 		}
 	}
-	assert.Equal(t, "info", got)
+	assert.Equal(t, "warn", got)
 }

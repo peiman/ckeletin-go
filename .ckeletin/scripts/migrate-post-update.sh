@@ -108,7 +108,7 @@ if [ -f ".go-arch-lint.yml" ]; then
     FRAMEWORK_INFRA_PKGS=(
         ".ckeletin/pkg/config/**"
         ".ckeletin/pkg/logger/**"
-        ".ckeletin/pkg/output/**"
+        ".ckeletin/pkg/progress/**"
         ".ckeletin/pkg/testutil/**"
     )
     missing_pkgs=()
@@ -165,4 +165,136 @@ if [ -f "Taskfile.yml" ] \
     echo ""
     print_generate_command_forwarding
     echo ""
+fi
+
+# Migration 7: pkg/output is its own component, not infrastructure.
+# When: the output package exists and .go-arch-lint.yml has no output component.
+# task ckeletin:update does not replace this file. The reference file already
+# has the component, so this is a no-op there. A second run is a no-op too.
+if [ -f ".go-arch-lint.yml" ] \
+    && [ -d ".ckeletin/pkg/output" ] \
+    && ! grep -qE '^  output:' .go-arch-lint.yml; then
+    python3 - << 'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(".go-arch-lint.yml")
+text = path.read_text()
+if re.search(r"(?m)^  output:\s*$", text):
+    sys.exit(0)
+
+known = ("internal/ui/**", "internal/check/**", "internal/docs/**")
+moved = [item for item in known if re.search(rf"(?m)^[ \t]+- {re.escape(item)}\s*$", text)]
+for item in moved:
+    text = re.sub(rf"(?m)^[ \t]+- {re.escape(item)}\s*\n", "", text)
+text = re.sub(r"(?m)^[ \t]+- \.ckeletin/pkg/output/\*\*\s*\n", "", text)
+
+output_component = (
+    "  # Output writers. Not a common component, so business logic cannot import them.\n"
+    "  output:\n"
+    "    in:\n"
+    "      - .ckeletin/pkg/output/**\n"
+    "\n"
+)
+presentation_component = ""
+if moved:
+    presentation_component = (
+        "  presentation:\n"
+        "    in:\n"
+        + "".join(f"      - {item}\n" for item in moved)
+        + "\n"
+    )
+
+business = re.search(r"(?m)^  business:\s*$", text)
+vendors = re.search(r"(?m)^vendors:\s*$", text)
+if business and (vendors is None or business.start() < vendors.start()):
+    text = text[: business.start()] + output_component + presentation_component + text[business.start() :]
+else:
+    sys.stderr.write("   ⚠ .go-arch-lint.yml has no business component; add an output component by hand\n")
+    sys.exit(0)
+
+def add_may_depend(text, component, dep):
+    deps_at = text.find("\ndeps:\n")
+    if deps_at < 0:
+        return text
+    match = re.search(
+        rf"(?m)^  {component}:\n(?:    .*\n)*?    mayDependOn:\n",
+        text[deps_at:],
+    )
+    if not match:
+        return text
+    start = deps_at + match.end()
+    lines = text[start:].splitlines(keepends=True)
+    existing = []
+    for line in lines:
+        if re.match(r"      - ", line):
+            existing.append(line)
+            continue
+        break
+    if any(re.search(rf"\b{dep}\b", line) for line in existing):
+        return text
+    return text[:start] + f"      - {dep}\n" + text[start:]
+
+text = add_may_depend(text, "commands", "output")
+if moved:
+    text = add_may_depend(text, "commands", "presentation")
+
+deps_at = text.find("\ndeps:\n")
+infra = text.find("\n  infrastructure:\n", deps_at if deps_at >= 0 else 0)
+blocks = (
+    "  output:\n"
+    "    mayDependOn:\n"
+    "      - infrastructure\n"
+    "    canUse:\n"
+    "      - cobra\n"
+    "      - pflag\n"
+    "      - zerolog\n"
+    "      - viper\n"
+    "      - isatty\n"
+    "\n"
+)
+if moved:
+    blocks += (
+        "  presentation:\n"
+        "    mayDependOn:\n"
+        "      - infrastructure\n"
+        "      - output\n"
+        "    canUse:\n"
+        "      - zerolog\n"
+        "      - viper\n"
+        "      - isatty\n"
+        "      - lipgloss\n"
+        "      - bubbletea\n"
+        "\n"
+    )
+if infra >= 0 and not re.search(r"(?m)^  output:\n    mayDependOn:", text):
+    text = text[: infra + 1] + blocks + text[infra + 1 :]
+
+path.write_text(text)
+print("   ✓ Moved pkg/output into its own component")
+
+# A business package that still imports the writers is left where it is.
+# Moving it would hide the violation the layering check is there to catch.
+importers = []
+for go_file in Path(".").rglob("*.go"):
+    rel = go_file.as_posix().lstrip("./")
+    if rel.endswith("_test.go") or rel.startswith(("cmd/", ".ckeletin/pkg/output/", "test/")):
+        continue
+    if rel == "main.go":
+        continue
+    body = go_file.read_text(errors="replace")
+    if '.ckeletin/pkg/output"' not in body:
+        continue
+    parent = str(go_file.parent).replace("\\", "/").lstrip("./")
+    glob = parent + "/**"
+    if glob in known or glob == ".ckeletin/pkg/output/**":
+        continue
+    importers.append(rel)
+if importers:
+    print("   ⚠ These files import pkg/output and were left in their component.")
+    print("     Move a presentation package by hand, or report through progress.Reporter:")
+    for rel in sorted(importers):
+        print(f"     - {rel}")
+PY
 fi

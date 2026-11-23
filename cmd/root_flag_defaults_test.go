@@ -36,7 +36,7 @@ func TestRootFlags_ProjectDefaultIsFlagDefault(t *testing.T) {
 
 	err := applyRootFlagDefaults([]byte(`
 [defaults]
-"app.log_level" = "warn"
+"app.log_level" = "error"
 "app.log.file_enabled" = true
 "app.log.file_max_size" = 7
 "app.output_format" = "json"
@@ -45,10 +45,10 @@ func TestRootFlags_ProjectDefaultIsFlagDefault(t *testing.T) {
 
 	logLevel := RootCmd.PersistentFlags().Lookup("log-level")
 	require.NotNil(t, logLevel)
-	assert.Equal(t, "warn", logLevel.DefValue)
-	assert.Equal(t, "warn", logLevel.Value.String())
+	assert.Equal(t, "error", logLevel.DefValue)
+	assert.Equal(t, "error", logLevel.Value.String())
 	assert.False(t, logLevel.Changed)
-	assert.Equal(t, "Set the log level (trace, debug, info, warn, error, fatal, panic)", logLevel.Usage)
+	assert.Equal(t, "Console log level when --log-level-console is empty (trace, debug, info, warn, error, fatal, panic). Does not change the file level.", logLevel.Usage)
 
 	enabled := RootCmd.PersistentFlags().Lookup("log-file-enabled")
 	require.NotNil(t, enabled)
@@ -74,7 +74,7 @@ func TestRootFlags_ProjectDefaultIsFlagDefault(t *testing.T) {
 			published = flag.Default
 		}
 	}
-	assert.Equal(t, "warn", published, "catalog publishes the same default --help does")
+	assert.Equal(t, "error", published, "catalog publishes the same default --help does")
 }
 
 func TestRootFlags_ProjectDefaultDoesNotOverrideExplicitViperValue(t *testing.T) {

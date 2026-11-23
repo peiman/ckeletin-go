@@ -1193,6 +1193,9 @@ tasks:
       # The binary check above does not know about the mkdir-lock scan.
       # The script travels with .ckeletin/, so derived projects run it too.
       - task: validate:mkdir-lock
+      # The reference check binary also runs this script. A derived project's
+      # check command may not. The script travels with .ckeletin/.
+      - task: validate:output
       # Non-fatal footer: nudge when upstream .ckeletin/VERSION is a newer semver.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'
@@ -1230,9 +1233,10 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
-      # validate:security is a sub-second grep script (ADR-004) — fast mode
-      # runs the same validate:* set as check:common, only skipping the
-      # heavyweight stages (race detection, integration tests, dep scans).
+      # validate:security is a sub-second grep script (ADR-004). Fast mode
+      # skips race detection, integration tests, and the heavier dependency
+      # scans. It still runs the binary license scan: a pull request uses
+      # this task, and the source scan can miss a disallowed license.
       - task: validate:security
       - task: validate:mkdir-lock
       - task: validate:dev-build-tags
@@ -1243,6 +1247,7 @@ tasks:
         silent: true
       - task: test:unit
       - task: check:framework-changelog
+      - task: check:license:binary
       - task: check:summary
         vars: { CHECK_MODE: "fast" }
 

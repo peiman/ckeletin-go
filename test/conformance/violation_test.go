@@ -104,6 +104,26 @@ import _ "github.com/peiman/ckeletin-go/cmd"
 		"go-arch-lint should fail when business logic imports cmd/\nOutput: %s", output)
 }
 
+// A business package must not import the output writers. The false pass is a
+// file that does, which go-arch-lint must reject.
+func TestViolation_BusinessImportsOutputWriters(t *testing.T) {
+	if testing.Short() {
+		t.Skip("violation tests modify the source tree")
+	}
+
+	cleanup := writeViolationFile(t,
+		"internal/ping/output_import_violation.go",
+		`package ping
+
+import _ "github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
+`)
+	defer cleanup()
+
+	output, exitCode := runCheck(t, "go-arch-lint", "check")
+	assert.NotEqual(t, 0, exitCode,
+		"go-arch-lint should fail when business logic imports pkg/output\nOutput: %s", output)
+}
+
 // ---------------------------------------------------------------------------
 // CKSPEC-ARCH-003: CLI framework isolation
 // Enforcement: go-arch-lint (linter level)

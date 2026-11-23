@@ -72,18 +72,33 @@ components:
   # Framework packages: .ckeletin/pkg/*
   # Project config: internal/config/commands/** (rarely changes)
   # Project defaults: internal/projectdefaults/** (outside the framework tree)
-  # Project UI: internal/ui/** (rarely changes)
+  # Project UI is presentation, not infrastructure. See the output component.
   infrastructure:
     in:
       - .ckeletin/pkg/catalog/**
       - .ckeletin/pkg/config/**
       - .ckeletin/pkg/logger/**
-      - .ckeletin/pkg/output/**
+      - .ckeletin/pkg/progress/**
       - .ckeletin/pkg/testutil/**
       - internal/config/commands/**
       - internal/projectdefaults/**
-      - internal/ui/**
       - internal/xdg/**
+
+  # Output writers are their own component, not a common one. Packages inside
+  # one component cannot import each other, so the writers cannot share a
+  # component with the packages that call them. Business logic reports
+  # through .ckeletin/pkg/progress and does not depend on this component.
+  output:
+    in:
+      - .ckeletin/pkg/output/**
+
+  # Project packages that render. They may depend on the output component.
+  # They do not import each other.
+  presentation:
+    in:
+      - internal/ui/**
+      - internal/check/**
+      - internal/docs/**
 
   # -------------------------------------------------------------------------
   # PROJECT-MANAGED: Business Logic Layer
@@ -99,10 +114,8 @@ components:
   business:
     in:
       - internal/ping/**
-      - internal/docs/**
       - internal/dev/**
       - internal/progress/**
-      - internal/check/**
       # Add your business logic packages below:
       # - internal/yourpackage/**
 
@@ -123,7 +136,8 @@ components:
 # Each vendor must be registered here for canUse rules to work.
 # depOnAnyVendor: false means unregistered vendors are rejected.
 vendors:
-  # CLI framework — restricted to commands layer
+  # CLI framework — commands, presentation, and the output component.
+  # Business and infrastructure cannot import it.
   cobra:
     in: github.com/spf13/cobra
   pflag:
@@ -177,6 +191,8 @@ deps:
     mayDependOn:
       - business
       - infrastructure
+      - presentation
+      - output
     canUse:
       - cobra
       - pflag
@@ -197,8 +213,34 @@ deps:
       - isatty
       - viper
 
+  # Presentation renders through the output component. Business logic
+  # cannot depend on either, so it cannot import pkg/output.
+  presentation:
+    mayDependOn:
+      - infrastructure
+      - output
+    canUse:
+      - zerolog
+      - viper
+      - cast
+      - isatty
+      - lipgloss
+      - bubbletea
+
+  # The output component imports the CLI framework. It is not common, so
+  # business logic cannot import it (CKSPEC-ARCH-003 stays on commands).
+  output:
+    mayDependOn:
+      - infrastructure
+    canUse:
+      - cobra
+      - pflag
+      - zerolog
+      - viper
+      - isatty
+
   # Infrastructure is the foundation
-  # Cannot depend on upper layers (commands, business)
+  # Cannot depend on upper layers (commands, business, presentation).
   infrastructure:
     mayDependOn: []  # Empty - depends on nothing
     canUse:

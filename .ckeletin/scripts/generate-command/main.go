@@ -244,8 +244,10 @@ package cmd
 
 import (
 	"{{.ModulePath}}/.ckeletin/pkg/config"
+	"{{.ModulePath}}/.ckeletin/pkg/output"
 	"{{.ModulePath}}/internal/config/commands"
 	"{{.ModulePath}}/internal/{{.Name}}"
+	"{{.ModulePath}}/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -259,7 +261,11 @@ func run{{.NameTitle}}(cmd *cobra.Command, args []string) error {
 	cfg := {{.Name}}.Config{
 		Message: getConfigValueWithFlags[string](cmd, "message", config.KeyApp{{.NameTitle}}Message),
 	}
-	return {{.Name}}.NewExecutor(cfg, cmd.OutOrStdout()).Execute()
+	result, err := {{.Name}}.NewExecutor(cfg).Execute(output.NewReporter(cmd))
+	if err != nil || result == nil {
+		return err
+	}
+	return ui.RenderSuccess(cmd.OutOrStdout(), result.Message, result)
 }
 `
 
@@ -270,9 +276,8 @@ package {{.Name}}
 
 import (
 	"fmt"
-	"io"
 
-	"{{.ModulePath}}/internal/ui"
+	"{{.ModulePath}}/.ckeletin/pkg/progress"
 	"github.com/rs/zerolog/log"
 )
 
@@ -288,27 +293,28 @@ type Result struct {
 
 // Executor handles the execution of the {{.Name}} command.
 type Executor struct {
-	cfg    Config
-	writer io.Writer
+	cfg Config
 }
 
 // NewExecutor creates a new {{.Name}} command executor.
-func NewExecutor(cfg Config, writer io.Writer) *Executor {
-	return &Executor{
-		cfg:    cfg,
-		writer: writer,
-	}
+func NewExecutor(cfg Config) *Executor {
+	return &Executor{cfg: cfg}
 }
 
 // Execute runs the {{.Name}} command logic.
-func (e *Executor) Execute() error {
+// The reporter carries progress. The command layer renders the result.
+func (e *Executor) Execute(rep progress.Reporter) (*Result, error) {
+	if rep == nil {
+		rep = progress.Nop{}
+	}
 	log.Debug().Str("component", "{{.Name}}").Msg("Starting {{.Name}} execution")
 
 	if e.cfg.Message == "" {
-		return fmt.Errorf("message is empty")
+		return nil, fmt.Errorf("message is empty")
 	}
 
-	return ui.RenderSuccess(e.writer, e.cfg.Message, Result{Message: e.cfg.Message})
+	rep.Step(e.cfg.Message)
+	return &Result{Message: e.cfg.Message}, nil
 }
 `
 
@@ -318,18 +324,16 @@ var executorTestTemplate = `// internal/{{.Name}}/{{.Name}}_test.go
 package {{.Name}}
 
 import (
-	"bytes"
 	"testing"
 
+	"{{.ModulePath}}/.ckeletin/pkg/progress"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNewExecutor(t *testing.T) {
 	t.Parallel()
-	cfg := Config{}
-	buf := &bytes.Buffer{}
-	executor := NewExecutor(cfg, buf)
+	executor := NewExecutor(Config{})
 	assert.NotNil(t, executor)
 }
 
@@ -355,18 +359,19 @@ func TestExecutor_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			buf := &bytes.Buffer{}
-			executor := NewExecutor(tt.cfg, buf)
-
-			err := executor.Execute()
+			rec := &progress.Recorder{}
+			result, err := NewExecutor(tt.cfg).Execute(rec)
 
 			if tt.wantErr {
 				require.Error(t, err)
-				assert.Empty(t, buf.String())
+				assert.Nil(t, result)
 				return
 			}
 			require.NoError(t, err)
-			assert.Contains(t, buf.String(), tt.want)
+			require.NotNil(t, result)
+			assert.Equal(t, tt.want, result.Message)
+			require.NotEmpty(t, rec.Events)
+			assert.Equal(t, "step", rec.Events[len(rec.Events)-1].Kind)
 		})
 	}
 }

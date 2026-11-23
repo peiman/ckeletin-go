@@ -7,6 +7,43 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-11-23
+
+### Changed
+
+- **The audit log is on by default.** `app.log.file_enabled` was false. A fresh command creates `./logs/<app>.log` (directory 0700, file 0600). Set the key, or pass `--log-file-enabled=false`, to turn it off. An unwritable log directory fails the command: JSON mode writes one error envelope, the exit code is non-zero, and the process does not panic.
+- **The console log level defaults to warn.** `app.log_level` was `info`. ADR-006 already said warn, and the registry now agrees. `app.log.console_level` wins when it is set. When both keys are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. An empty or invalid file level stays debug. This changes what a fresh command prints on stderr.
+
+### Fixed
+
+- **"File logging enabled" is a debug line.** With the file on, Init no longer prints that status at info. It is on stderr only at debug, and it is still in the audit file when the file level is debug.
+
+### Added
+
+- **`task check:fast` runs the binary license scan.** The source scan can miss a disallowed license. A pull request that only runs the fast check can no longer merge one.
+- **Output-pattern check is part of `task check`.** `validate-output-patterns.sh` runs in the framework check a derived app executes, not only in the reference check binary. `.ckeletin-output-allowlist` lists extra paths that write directly, each with a reason. A missing or malformed file fails on its own. A new `fmt.Println` under `internal/` that is not listed fails.
+- **JSON mode fills in an empty success.** A command that succeeds and writes no envelope gets one success envelope with `data` null. A command annotated `ckeletin:out-002-exempt` prints its native output instead. `EnvelopeExemptions` lists those commands and the reason. Shell completion is exempt.
+- **Standard log-level flags.** `output.RegisterLogLevelFlags` registers persistent `--log-level`, `--log-level-console`, and `--log-level-file`, bound to `app.log_level`, `app.log.console_level`, and `app.log.file_level`. A changed flag wins over `<PREFIX>_APP_LOG_LEVEL`, `<PREFIX>_APP_LOG_CONSOLE_LEVEL`, and `<PREFIX>_APP_LOG_FILE_LEVEL`, which win over the config file, which wins over the default. The reference prefix is `CKELETIN_GO`. The bind runs before `logger.Init`.
+- **Component loggers share the console and the audit file.** `logger.Component(name)` writes `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change. `logger.SetDefaultFields` copies fields onto later lines. A field on the event with the same key wins. There is no per-component level key.
+
+## [0.2.12] - 2026-11-22
+
+### Added
+
+- **Console timestamps can be turned off.** `app.log.console_time_format` (`config.KeyAppLogConsoleTimeFormat`) is a Go time layout. The default is RFC3339, so an application that does not set it keeps the same console line. An empty value, including an empty project default, omits the console timestamp. The level token is then the first field. The audit file still has a timestamp. `SetConsoleLevel` keeps the layout captured at `Init`. Colour is unchanged. There is no flag. Set it from the config file, the environment, or `config.ApplyProjectDefaultsTOML`.
+- **The global output switch lives in the framework.** `output.RegisterOutputFlag` registers persistent `--output text|json` and resolves the mode once, flag then alias flag then environment then config file then default, before `logger.Init`. `WithAliasFlag` treats a command's existing flag as the same switch. An invalid value is one error and exit code 2 (`output.ExitInvalidOutput`) for every command. `.ckeletin/pkg/output` imports Cobra for this. That package is the `output` component in `.go-arch-lint.yml`, and only that component, besides `commands`, may import Cobra. Business packages and infrastructure still cannot.
+- **One entry point for the process exit.** `output.Execute` runs the command. JSON mode writes one error envelope when the command did not already render one. Text mode writes `Error: …` on stderr. `SetAfterRun(logger.Cleanup)` keeps the audit file open until that write finishes. `output.Rendered(code)` wraps `ErrRendered` with an exit code. `ExitCoder` is honoured. The default remains 1. Exit 0 is not paired with `status: "error"`.
+- **Business logic reports through `progress.Reporter`.** `Step`, `Status`, `Warn`, and `Done` carry no stream or format. `output.NewReporter` implements them on the status and result writers. `progress.Recorder` is the test double. The `output` component is not common, so business logic cannot import `pkg/output`. `commands` and `presentation` can. `task ckeletin:update` moves an old `.go-arch-lint.yml` onto that split. `internal/ui`, `internal/check`, and `internal/docs` move to `presentation`. Any other file that still imports the writers is reported and left in place. Generated commands follow the same split: the executor takes a `progress.Reporter` and returns the result, and the command renders it.
+- **Text writers.** `output.Result`, `output.Status`, `Resultf`, `Statusf`, `Success`, and `Progressf`. Result text goes to stdout, status text to stderr, and both follow `SetOut` and `SetErr`. A successful write is shadow-logged afterwards with `command` and `stream`. A failed write is not. JSON mode drops result and status text so stdout stays the envelope. `Progressf` strips ANSI control codes when stderr is not a terminal.
+
+### Changed
+
+- **A nested command's JSON envelope names the whole path.** `command` is the path without the program name (`docs config`, `config validate`), not the leaf (`config`, `validate`). A top-level command stays its own name. `--version` reports `"command": "version"`. A failure before a command resolves uses JSON null. A failure after a parent resolved uses that parent's path. This changes machine-readable output for nested commands.
+
+### Fixed
+
+- **A derived presentation layer can import the upstream `pkg` module.** `task init` deletes the local `pkg/` tree and allows `business` and `infrastructure` to import it as `ckeletin-pkg`. `presentation` needs the same allow: `internal/ui` and `internal/check` import `pkg/checkmate`.
+
 ## [0.2.11] - 2026-11-06
 
 ### Fixed

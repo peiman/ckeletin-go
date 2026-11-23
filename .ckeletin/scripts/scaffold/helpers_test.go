@@ -4,6 +4,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -599,6 +600,70 @@ deps:
 		require.NoError(t, err)
 		assert.Contains(t, string(result), "business:")
 	})
+}
+
+func TestRegisterUpstreamVendor_AllowsPresentation(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, ".go-arch-lint.yml")
+	content := `allow:
+  depOnAnyVendor: false
+vendors:
+  cobra:
+    in: github.com/spf13/cobra
+commonComponents:
+  - infrastructure
+deps:
+  commands:
+    canUse:
+      - cobra
+  business:
+    canUse:
+      - zerolog
+  presentation:
+    canUse:
+      - zerolog
+  output:
+    canUse:
+      - cobra
+  infrastructure:
+    canUse:
+      - viper
+`
+	require.NoError(t, os.WriteFile(configPath, []byte(content), 0o600))
+
+	require.NoError(t, registerUpstreamVendor(tmpDir, "github.com/peiman/ckeletin-go"))
+
+	got, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	text := string(got)
+	assert.Contains(t, text, "ckeletin-pkg:\n    in: github.com/peiman/ckeletin-go/pkg/**")
+
+	blocks := map[string]string{}
+	var name string
+	var buf strings.Builder
+	for _, line := range strings.Split(text, "\n") {
+		if strings.HasPrefix(line, "  ") && strings.HasSuffix(line, ":") && !strings.HasPrefix(line, "    ") {
+			if name != "" {
+				blocks[name] = buf.String()
+			}
+			name = strings.TrimSuffix(strings.TrimSpace(line), ":")
+			buf.Reset()
+			continue
+		}
+		if name != "" {
+			buf.WriteString(line)
+			buf.WriteByte('\n')
+		}
+	}
+	if name != "" {
+		blocks[name] = buf.String()
+	}
+
+	for _, component := range []string{"business", "presentation", "infrastructure"} {
+		assert.Contains(t, blocks[component], "ckeletin-pkg", component)
+	}
+	assert.NotContains(t, blocks["commands"], "ckeletin-pkg")
+	assert.NotContains(t, blocks["output"], "ckeletin-pkg")
 }
 
 func TestReplaceNameInGoFiles(t *testing.T) {

@@ -14,6 +14,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/peiman/ckeletin-go/internal/dev"
 	"github.com/spf13/cobra"
 )
@@ -39,8 +40,10 @@ Example:
 		doctor.RunAllChecks()
 
 		// Format and display results
-		output := doctor.FormatResults()
-		fmt.Fprint(cmd.OutOrStdout(), output)
+		report := doctor.FormatResults()
+		if _, err := output.Result(cmd).Write([]byte(report)); err != nil {
+			return err
+		}
 
 		// Return error if there are failures
 		if doctor.HasFailures() {

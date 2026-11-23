@@ -39,7 +39,7 @@ func TestOutputJSON_DocsConfigCommand(t *testing.T) {
 	require.NoError(t, err, "stdout should contain valid JSON, got: %s", stdout.String())
 
 	assert.Equal(t, "success", envelope.Status)
-	assert.Equal(t, "config", envelope.Command)
+	assert.Equal(t, "docs config", envelope.Command)
 	assert.Nil(t, envelope.Error)
 
 	data, ok := envelope.Data.(map[string]interface{})

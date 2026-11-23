@@ -82,9 +82,17 @@
             },
             "console_level": {
               "default": "",
-              "description": "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.",
+              "description": "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level. Flag: --log-level-console.",
               "examples": [
                 "info"
+              ],
+              "type": "string"
+            },
+            "console_time_format": {
+              "default": "2006-01-02T15:04:05Z07:00",
+              "description": "Go time layout for console log lines. Default is RFC3339. Empty omits the console timestamp. (config file or environment only)",
+              "examples": [
+                "15:04:05"
               ],
               "type": "string"
             },
@@ -97,8 +105,8 @@
               "type": "boolean"
             },
             "file_enabled": {
-              "default": false,
-              "description": "Enable file logging to capture detailed logs",
+              "default": true,
+              "description": "Enable file logging to capture detailed logs. Set false to turn the audit log off.",
               "examples": [
                 "true"
               ],
@@ -106,7 +114,7 @@
             },
             "file_level": {
               "default": "debug",
-              "description": "File log level (trace, debug, info, warn, error, fatal, panic)",
+              "description": "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug. Flag: --log-level-file.",
               "examples": [
                 "debug"
               ],
@@ -172,8 +180,8 @@
           "type": "object"
         },
         "log_level": {
-          "default": "info",
-          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.",
+          "default": "warn",
+          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level. Flag: --log-level.",
           "examples": [
             "debug"
           ],

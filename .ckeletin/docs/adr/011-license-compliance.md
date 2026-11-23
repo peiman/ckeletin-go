@@ -278,7 +278,7 @@ generate:attribution:
 **Why this structure:**
 - `check:license` = simple interface, runs everything
 - `check:license:source` = fast feedback during development
-- `check:license:binary` = accurate verification before release
+- `check:license:binary` = accurate verification before release, and in `task check:fast` so a pull request cannot merge a license the source scan misses
 - `generate:license` = all artifacts with one command
 - Consistent with `check:deps`, `generate:docs` patterns
 

@@ -1,7 +1,7 @@
 # ADR-006: Structured Logging with Zerolog
 
 ## Status
-Accepted (Updated: 2026-01-09 - Added logging best practices and level selection guidance)
+Accepted (Updated: 2026-11-22 - Console timestamp layout is configurable. Updated: 2026-01-09 - Added logging best practices and level selection guidance)
 
 ## Context
 
@@ -47,10 +47,10 @@ log.Debug().Str("detail", value).Msg("Detailed debug info")
 
 ```go
 // Configuration via flags or config file
---log-console-level info      // INFO+ to console
+--log-level-console info     // INFO+ to console
 --log-file-enabled            // Enable file logging
 --log-file-path ./logs/app.log
---log-file-level debug        // DEBUG+ to file
+--log-level-file debug        // DEBUG+ to file
 ```
 
 **Result:**
@@ -99,7 +99,14 @@ app:
     file_path: ./logs/app.log  # Log file path
     file_level: debug          # File log level
     color_enabled: auto        # Console colors (auto/true/false)
+    console_time_format: ""    # Go layout; default RFC3339; empty omits the console timestamp
 ```
+
+`app.log.console_time_format` is `config.KeyAppLogConsoleTimeFormat`. The framework default is `time.RFC3339`, so an application that does not set the key keeps today's console line. An empty value, including an empty project default from `config.ApplyProjectDefaultsTOML`, removes the timestamp part. The level token is then the first field (`WRN …`). A custom Go layout such as `15:04:05` is passed through. Colour (`app.log.color_enabled`) is unchanged.
+
+The audit file is zerolog JSON. It always keeps its own timestamp. `SetConsoleLevel` rebuilds the console writer with the layout captured at `Init`.
+
+There is no flag. Set it from the config file, the environment (`<PREFIX>_APP_LOG_CONSOLE_TIME_FORMAT`), or a project default.
 
 ## Best Practices
 
@@ -195,6 +202,12 @@ The default console log level is WARN. This means:
 - Users don't see: DEBUG, INFO, or ERROR logs (unless --log-level set)
 - For debugging: `--log-level debug` shows everything
 
+`app.log.console_level` wins over `app.log_level`. When both are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. Empty or invalid uses debug.
+
+The flags are `--log-level`, `--log-level-console`, and `--log-level-file`, registered by `output.RegisterLogLevelFlags`. A changed flag wins over the environment variable, which wins over the config file, which wins over the default. The environment variables are `<PREFIX>_APP_LOG_LEVEL`, `<PREFIX>_APP_LOG_CONSOLE_LEVEL`, and `<PREFIX>_APP_LOG_FILE_LEVEL`. The reference prefix is `CKELETIN_GO`. The flag is bound before `logger.Init`, so it applies to the first log line.
+
+`logger.Component(name)` returns a logger that writes to the same console and file as the global logger, with `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change, because every logger holds the same sink. `logger.SetDefaultFields` copies fields onto later lines from the global logger and from component loggers created after the call. A field on the event with the same key wins. There is no per-component level key.
+
 This is intentional because:
 1. User input validation errors are expected behavior, not system errors
 2. The formatted output already communicates errors clearly
@@ -222,7 +235,7 @@ This is intentional because:
 - Sanitization helpers prevent data leaks
 - Centralized logger initialization
 - Clear examples in codebase
-- File logging is opt-in (disabled by default)
+- File logging is on by default. Set `app.log.file_enabled` to false to turn it off
 - Cleanup function ensures files are closed properly
 
 ## Performance

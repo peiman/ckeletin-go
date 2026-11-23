@@ -4,48 +4,54 @@ package ping
 
 import (
 	"fmt"
-	"io"
 
-	"github.com/peiman/ckeletin-go/internal/ui"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/progress"
 	"github.com/rs/zerolog/log"
 )
 
-// Config holds configuration for the ping command
+// UIRunner is the interactive presentation port. The command layer injects it.
+// Business logic does not import the UI package.
+type UIRunner interface {
+	RunUI(message, color string) error
+}
+
+// Config holds configuration for the ping command.
 type Config struct {
 	Message string
 	Color   string
 	UI      bool
 }
 
-// Executor handles the execution of the ping command
+// Executor handles the execution of the ping command.
 type Executor struct {
 	cfg      Config
-	uiRunner ui.UIRunner
-	writer   io.Writer
+	uiRunner UIRunner
 }
 
-// NewExecutor creates a new ping command executor
-func NewExecutor(cfg Config, uiRunner ui.UIRunner, writer io.Writer) *Executor {
-	return &Executor{
-		cfg:      cfg,
-		uiRunner: uiRunner,
-		writer:   writer,
-	}
+// NewExecutor creates a new ping command executor.
+func NewExecutor(cfg Config, uiRunner UIRunner) *Executor {
+	return &Executor{cfg: cfg, uiRunner: uiRunner}
 }
 
-// PingResponse represents the structured data returned by the command
-// This demonstrates the "Shadow Log" pattern: this struct is logged to the file
-// while the user sees a formatted message.
+// PingResponse is the data the command layer renders.
 type PingResponse struct {
 	Message   string `json:"message"`
 	Color     string `json:"color"`
 	Timestamp string `json:"timestamp"`
 }
 
-// Execute runs the ping command logic
-func (e *Executor) Execute() error {
-	log.Debug().Str("component", "ping").Msg("Starting ping execution")
+var knownColors = map[string]struct{}{
+	"black": {}, "red": {}, "green": {}, "yellow": {},
+	"blue": {}, "magenta": {}, "cyan": {}, "white": {},
+}
 
+// Execute runs the ping command logic. It reports through rep and does not
+// write stdout or stderr. A nil reporter discards the reports.
+func (e *Executor) Execute(rep progress.Reporter) (*PingResponse, error) {
+	if rep == nil {
+		rep = progress.Nop{}
+	}
+	log.Debug().Str("component", "ping").Msg("Starting ping execution")
 	log.Debug().
 		Str("component", "ping").
 		Str("message", e.cfg.Message).
@@ -54,43 +60,31 @@ func (e *Executor) Execute() error {
 		Msg("Configuration loaded")
 
 	if e.cfg.UI {
-		// For UI mode, we log that we are handing over control
 		log.Debug().Msg("Starting interactive UI mode")
-
+		rep.Step("starting interactive UI")
 		if err := e.uiRunner.RunUI(e.cfg.Message, e.cfg.Color); err != nil {
-			// Use RenderError for consistent error reporting
-			if renderErr := ui.RenderError(e.writer, "Failed to run UI", err); renderErr != nil {
-				log.Warn().Err(renderErr).Msg("Failed to render error message")
-			}
-			return fmt.Errorf("failed to run UI: %w", err)
+			rep.Warn("failed to run UI")
+			return nil, fmt.Errorf("failed to run UI: %w", err)
 		}
-		return nil
+		rep.Done("interactive UI finished")
+		return &PingResponse{
+			Message:   e.cfg.Message,
+			Color:     e.cfg.Color,
+			Timestamp: "now",
+		}, nil
 	}
 
-	// Non-UI mode: Structured Output + Shadow Logging
-
-	// 1. Audit Stream (Log File) - Record what we are doing
-	log.Debug().Msg("Preparing output...")
-
-	// 2. Prepare the Data
-
-	// Validate color before proceeding (Business Rule)
-	if _, err := ui.GetLipglossColor(e.cfg.Color); err != nil {
-		log.Debug().Err(err).Str("color", e.cfg.Color).Msg("Invalid color configuration")
-		return fmt.Errorf("invalid color: %w", err)
+	rep.Step("preparing output")
+	if _, ok := knownColors[e.cfg.Color]; !ok {
+		log.Debug().Str("color", e.cfg.Color).Msg("Invalid color configuration")
+		rep.Warn("invalid color")
+		return nil, fmt.Errorf("invalid color: %s", e.cfg.Color)
 	}
 
-	response := PingResponse{
+	response := &PingResponse{
 		Message:   e.cfg.Message,
 		Color:     e.cfg.Color,
-		Timestamp: "now", // In a real app, use time.Now().Format(time.RFC3339)
+		Timestamp: "now",
 	}
-
-	// 3. Data Stream (Stdout) & Audit Stream (Log File)
-	// Use the UI adapter to render for the user AND log the struct for the auditor
-	if err := ui.RenderSuccess(e.writer, fmt.Sprintf("Pong! %s", response.Message), response); err != nil {
-		return fmt.Errorf("failed to write output: %w", err)
-	}
-
-	return nil
+	return response, nil
 }

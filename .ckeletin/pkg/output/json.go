@@ -9,22 +9,94 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // ErrRendered is a sentinel returned by a command that has already written its
 // single JSON envelope to stdout but still needs to signal a non-zero exit.
-// main.go recognizes it and exits non-zero WITHOUT rendering a second envelope.
+// Execute recognizes it and exits non-zero WITHOUT rendering a second envelope.
 // This keeps the "exactly one envelope per command" contract while preserving a
 // meaningful process exit code for JSON consumers that gate on $?.
+//
+// Rendered(code) wraps this sentinel with the exit code the command chose.
+// errors.Is(Rendered(code), ErrRendered) stays true. A plain ErrRendered exits 1.
 var ErrRendered = errors.New("output: result already rendered")
+
+// ExitInvalidOutput is the exit code for an output mode that is not text or json.
+// Every command uses this code. The default for any other error is 1.
+const ExitInvalidOutput = 2
+
+// ExitCoder is implemented by errors that choose their own process exit code.
+// Execute honours it for rendered and unrendered errors. Code 0 is rejected:
+// a failure cannot exit 0, and a success cannot exit non-zero.
+type ExitCoder interface {
+	ExitCode() int
+}
+
+// renderedError carries the exit code for an envelope the command already wrote.
+type renderedError struct {
+	code int
+}
+
+func (e *renderedError) Error() string { return ErrRendered.Error() }
+
+func (e *renderedError) Unwrap() error { return ErrRendered }
+
+func (e *renderedError) ExitCode() int { return e.code }
+
+// Rendered reports that the command already wrote its one envelope and that
+// the process should exit with code. Code 0 is stored as 1 so an error status
+// is never paired with a successful exit.
+func Rendered(code int) error {
+	return &renderedError{code: normalizeExitCode(code)}
+}
+
+// ExitCodeOf returns 0 for a nil error and the error's ExitCode otherwise.
+// A zero code on a non-nil error becomes 1.
+func ExitCodeOf(err error) int {
+	if err == nil {
+		return 0
+	}
+	var coder ExitCoder
+	if errors.As(err, &coder) {
+		return normalizeExitCode(coder.ExitCode())
+	}
+	return 1
+}
+
+func normalizeExitCode(code int) int {
+	if code == 0 {
+		return 1
+	}
+	return code
+}
+
+// StatusAgrees reports whether a machine-readable status matches the exit code.
+// status "error" requires a non-zero code. status "success" requires 0.
+func StatusAgrees(status string, code int) bool {
+	switch status {
+	case "error":
+		return code != 0
+	case "success":
+		return code == 0
+	default:
+		return false
+	}
+}
 
 // JSONEnvelope is the standard response wrapper for --output json mode.
 // Every command emits exactly one envelope to stdout.
 type JSONEnvelope struct {
-	Status  string      `json:"status"`  // "success" or "error"
-	Command string      `json:"command"` // cobra command name (e.g., "ping")
-	Data    interface{} `json:"data"`    // command-specific payload; nil on error
-	Error   *JSONError  `json:"error"`   // nil on success
+	Status  string `json:"status"`  // "success" or "error"
+	Command string `json:"command"` // full command path without the program name ("check model", "version")
+	// unresolvedCommand marshals Command as JSON null. Used when the command
+	// was never resolved (the parser boundary). An empty Command otherwise
+	// stays an empty string.
+	unresolvedCommand bool        `json:"-"`
+	Data              interface{} `json:"data"`  // command-specific payload; nil on error
+	Error             *JSONError  `json:"error"` // nil on success
 }
 
 // JSONError represents a structured error in the JSON envelope.
@@ -44,11 +116,28 @@ type JSONResponder interface {
 	JSONResponse() interface{}
 }
 
+// AnnotationOut002Exempt marks a command whose successful JSON run prints
+// native output instead of an envelope. The value is the reason. An empty
+// value does not exempt the command. EnvelopeExemptions lists every command
+// that carries a reason.
+const AnnotationOut002Exempt = "ckeletin:out-002-exempt"
+
+// Exemption is one declared OUT-002 exception.
+type Exemption struct {
+	Command string
+	Reason  string
+}
+
 // Package-level state for the current output mode and command name.
 // Safe because CLI commands execute sequentially (Cobra's execution model).
 var (
 	currentOutputMode  string
 	currentCommandName string
+	// commandNameSet is true when SetCommandName was called with a non-empty
+	// override. SetCommandFrom leaves that override in place.
+	commandNameSet bool
+	// rendered is true once this run has written its JSON envelope.
+	rendered bool
 )
 
 // SetOutputMode sets the current output mode ("text" or "json").
@@ -70,10 +159,12 @@ func IsJSONMode() bool {
 	return OutputMode() == "json"
 }
 
-// SetCommandName stores the active command name for the JSON envelope.
-// Called from PersistentPreRunE.
+// SetCommandName overrides the command id in the JSON envelope.
+// An empty name clears the override so the next SetCommandFrom uses the path.
+// The framework sets the path itself; call this only to replace it.
 func SetCommandName(name string) {
 	currentCommandName = name
+	commandNameSet = name != ""
 }
 
 // CommandName returns the stored command name.
@@ -90,6 +181,36 @@ func ResolveJSONData(data interface{}) interface{} {
 	return data
 }
 
+// WithUnresolvedCommand marks the envelope so Command marshals as JSON null.
+// Pre-resolution failures use this when not even a parent command resolved.
+func (e JSONEnvelope) WithUnresolvedCommand() JSONEnvelope {
+	e.unresolvedCommand = true
+	e.Command = ""
+	return e
+}
+
+// MarshalJSON writes command as null only when the failure is unresolved.
+func (e JSONEnvelope) MarshalJSON() ([]byte, error) {
+	var command any
+	if e.unresolvedCommand {
+		command = nil
+	} else {
+		command = e.Command
+	}
+	payload := struct {
+		Status  string      `json:"status"`
+		Command any         `json:"command"`
+		Data    interface{} `json:"data"`
+		Error   *JSONError  `json:"error"`
+	}{
+		Status:  e.Status,
+		Command: command,
+		Data:    e.Data,
+		Error:   e.Error,
+	}
+	return json.Marshal(payload)
+}
+
 // RenderJSON marshals a JSONEnvelope to the writer as indented JSON.
 func RenderJSON(out io.Writer, envelope JSONEnvelope) error {
 	encoded, err := json.MarshalIndent(envelope, "", "  ")
@@ -98,5 +219,56 @@ func RenderJSON(out io.Writer, envelope JSONEnvelope) error {
 	}
 	encoded = append(encoded, '\n')
 	_, err = out.Write(encoded)
+	if err == nil {
+		rendered = true
+	}
 	return err
+}
+
+// ExemptFromEnvelope annotates cmd so a successful JSON run prints the
+// command's own output and does not add an envelope. reason is listed by
+// EnvelopeExemptions. An empty reason does not exempt the command.
+func ExemptFromEnvelope(cmd *cobra.Command, reason string) {
+	if cmd == nil {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return
+	}
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[AnnotationOut002Exempt] = reason
+}
+
+// EnvelopeExemptions lists every command under root that declares an OUT-002
+// exemption, in walk order. The command id is the path without the program name.
+func EnvelopeExemptions(root *cobra.Command) []Exemption {
+	if root == nil {
+		return nil
+	}
+	var out []Exemption
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		if reason, ok := exemptionReason(cmd); ok {
+			out = append(out, Exemption{Command: CommandID(cmd), Reason: reason})
+		}
+		for _, child := range cmd.Commands() {
+			walk(child)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func exemptionReason(cmd *cobra.Command) (string, bool) {
+	if cmd == nil || cmd.Annotations == nil {
+		return "", false
+	}
+	reason := strings.TrimSpace(cmd.Annotations[AnnotationOut002Exempt])
+	if reason == "" {
+		return "", false
+	}
+	return reason, true
 }

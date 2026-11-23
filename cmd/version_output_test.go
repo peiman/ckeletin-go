@@ -320,7 +320,7 @@ func TestVersionFlag_JSONOutput(t *testing.T) {
 		"stdout should contain a single JSON envelope, got: %s", stdout.String())
 
 	assert.Equal(t, "success", envelope.Status)
-	assert.Equal(t, RootCmd.Name(), envelope.Command)
+	assert.Equal(t, "version", envelope.Command)
 	assert.Nil(t, envelope.Error)
 
 	data, ok := envelope.Data.(map[string]interface{})
