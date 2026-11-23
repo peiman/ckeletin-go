@@ -104,6 +104,15 @@ func Init(out io.Writer) error {
 
 	writers = append(writers, filteredConsole)
 
+	// A second Init must not leave the previous audit file open. Windows
+	// cannot delete that path while any handle remains, and only the latest
+	// handle is stored in logFile.
+	if logFile != nil {
+		_ = logFile.Close()
+		logFile = nil
+		currentFileWriter = nil
+	}
+
 	// File writer (if enabled)
 	if viper.GetBool(config.KeyAppLogFileEnabled) {
 		fileLevel := getFileLogLevel()
