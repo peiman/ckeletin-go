@@ -203,6 +203,8 @@ func TestSaveAndRestoreLoggerState(t *testing.T) {
 	assert.Equal(t, testLevel, zerolog.GlobalLevel(),
 		"RestoreLoggerState() level = %v, want %v", zerolog.GlobalLevel(), testLevel)
 
+	assert.Nil(t, logFile, "RestoreLoggerState should close the audit file")
+
 	// Test that the logger is writing to the original buffer
 	log.Info().Msg("test message")
 	assert.True(t, bytes.Contains(testBuf.Bytes(), []byte("test message")),

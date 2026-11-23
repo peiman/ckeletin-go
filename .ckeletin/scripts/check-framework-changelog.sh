@@ -99,9 +99,9 @@ $path
 	esac
 done << EOF
 $(
-	git diff --name-only "$base" -- .ckeletin
-	git diff --name-only --cached "$base" -- .ckeletin
-	git ls-files --others --exclude-standard -- .ckeletin
+	git -c core.autocrlf=false diff --name-only "$base" -- .ckeletin
+	git -c core.autocrlf=false diff --name-only --cached "$base" -- .ckeletin
+	git -c core.autocrlf=false ls-files --others --exclude-standard -- .ckeletin
 )
 EOF
 

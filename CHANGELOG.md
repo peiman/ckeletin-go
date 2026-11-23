@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Framework 0.2.2**: `task validate:commands:baseline` records a project's existing long `run*` functions in `.ckeletin-command-baseline`, so a project can adopt the 35-line limit and then shrink them one at a time. Recorded functions warn; growth, stale entries and new long functions fail. See ADR-001.
 
+### Fixed
+
+- **Framework 0.2.14**: restoring the logger closes the audit file, so Windows can delete a test directory. The framework changelog check ignores Git's CRLF warning. The post-update migration prints UTF-8 on Windows.
+
 ### Changed
 
 - **Conformance report is spec 0.14.0.** The envelope status and the process exit agree, and `command` is the full path without the program name. The published report was spec 0.13.1.
