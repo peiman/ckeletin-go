@@ -409,10 +409,11 @@
     "CKSPEC-OUT-004": {
       "checks": [
         "grep -qE 'log\\.Debug' internal/ui/renderer.go",
-        "grep -qE 'log\\.Debug' internal/docs/json.go"
+        "grep -qE 'log\\.Debug' internal/docs/json.go",
+        "grep -A3 '\"app.log.file_enabled\"' .ckeletin/pkg/config/core_options.go | grep -q 'DefaultValue: true'"
       ],
       "enforcement_level": "script",
-      "evidence": "RenderSuccess and RenderError in internal/ui/renderer.go log.Debug() raw data to the audit log file while rendering formatted text to stdout; debug level reaches the file logger without polluting the console. Commands that stream generated artifacts shadow-log the operation's metadata rather than the full artifact: docs config records format, output file and content size (internal/docs/json.go, cmd/docs.go), and completion's shell scripts are cobra-generated artifacts. This metadata-not-artifact narrowing for generated artifacts is a documented project interpretation of OUT-004 (verbatim multi-KB artifacts would bloat the audit stream without adding evidence) \u2014 flagged upstream as spec feedback. Verified by unit tests.\n",
+      "evidence": "The audit stream is on by default. app.log.file_enabled defaults to true, and an explicit false opts out. A fresh command creates ./logs/<app>.log (directory 0700, file 0600). An unwritable log directory fails the command with one JSON error envelope, a non-zero exit, and no panic (TestRun_DefaultAuditFile, TestRun_DefaultAuditUnwritable). RenderSuccess and RenderError in internal/ui/renderer.go log.Debug() raw data to the audit log file while rendering formatted text to stdout; debug level reaches the file logger without polluting the console. Commands that stream generated artifacts shadow-log the operation's metadata rather than the full artifact: docs config records format, output file and content size (internal/docs/json.go, cmd/docs.go), and completion's shell scripts are cobra-generated artifacts. This metadata-not-artifact narrowing for generated artifacts is a documented project interpretation of OUT-004 (verbatim multi-KB artifacts would bloat the audit stream without adding evidence) \u2014 flagged upstream as spec feedback. Verified by unit tests.\n",
       "status": "met",
       "violation_evidence": "Removing the shadow log.Debug from the renderer or from the docs JSON path fails the grep checks.\n",
       "violation_tests": []

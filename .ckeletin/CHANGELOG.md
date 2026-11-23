@@ -11,6 +11,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ### Changed
 
+- **The audit log is on by default.** `app.log.file_enabled` was false. A fresh command creates `./logs/<app>.log` (directory 0700, file 0600). Set the key, or pass `--log-file-enabled=false`, to turn it off. An unwritable log directory fails the command: JSON mode writes one error envelope, the exit code is non-zero, and the process does not panic.
 - **The console log level defaults to warn.** `app.log_level` was `info`. ADR-006 already said warn, and the registry now agrees. `app.log.console_level` wins when it is set. When both keys are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. An empty or invalid file level stays debug. This changes what a fresh command prints on stderr.
 
 ### Fixed

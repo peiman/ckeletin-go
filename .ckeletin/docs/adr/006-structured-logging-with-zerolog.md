@@ -233,7 +233,7 @@ This is intentional because:
 - Sanitization helpers prevent data leaks
 - Centralized logger initialization
 - Clear examples in codebase
-- File logging is opt-in (disabled by default)
+- File logging is on by default. Set `app.log.file_enabled` to false to turn it off
 - Cleanup function ensures files are closed properly
 
 ## Performance

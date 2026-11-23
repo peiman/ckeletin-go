@@ -105,8 +105,8 @@
               "type": "boolean"
             },
             "file_enabled": {
-              "default": false,
-              "description": "Enable file logging to capture detailed logs",
+              "default": true,
+              "description": "Enable file logging to capture detailed logs. Set false to turn the audit log off.",
               "examples": [
                 "true"
               ],

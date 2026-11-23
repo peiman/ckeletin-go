@@ -481,7 +481,7 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 
 	// Dual logging configuration flags
 	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")
-	RootCmd.PersistentFlags().Bool("log-file-enabled", false, "Enable file logging to capture detailed logs")
+	RootCmd.PersistentFlags().Bool("log-file-enabled", true, "Enable file logging to capture detailed logs. Set false to turn the audit log off.")
 	RootCmd.PersistentFlags().String("log-file-path", "./logs/ckeletin-go.log", "Path to the log file")
 	RootCmd.PersistentFlags().String("log-file-level", "debug", "File log level (trace, debug, info, warn, error, fatal, panic)")
 	RootCmd.PersistentFlags().String("log-color", "auto", "Enable colored console output (auto, true, false)")

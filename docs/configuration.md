@@ -18,7 +18,7 @@ Configuration can be provided in multiple ways, in order of precedence:
 |-----|------|---------|---------------------|-------------|
 | `app.log_level` | string | `warn` | `CKELETIN_GO_APP_LOG_LEVEL` | Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level. |
 | `app.log.console_level` | string | `` | `CKELETIN_GO_APP_LOG_CONSOLE_LEVEL` | Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level. |
-| `app.log.file_enabled` | bool | `false` | `CKELETIN_GO_APP_LOG_FILE_ENABLED` | Enable file logging to capture detailed logs |
+| `app.log.file_enabled` | bool | `true` | `CKELETIN_GO_APP_LOG_FILE_ENABLED` | Enable file logging to capture detailed logs. Set false to turn the audit log off. |
 | `app.log.file_path` | string | `./logs/ckeletin-go.log` | `CKELETIN_GO_APP_LOG_FILE_PATH` | Path to the log file (created with secure 0600 permissions) |
 | `app.log.file_level` | string | `debug` | `CKELETIN_GO_APP_LOG_FILE_LEVEL` | File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug. |
 | `app.log.color_enabled` | string | `auto` | `CKELETIN_GO_APP_LOG_COLOR_ENABLED` | Enable colored console output (auto, true, false). Auto detects TTY. |
@@ -81,7 +81,7 @@ app:
     # Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.
     console_level: info
 
-    # Enable file logging to capture detailed logs
+    # Enable file logging to capture detailed logs. Set false to turn the audit log off.
     file_enabled: true
 
     # Path to the log file (created with secure 0600 permissions)
@@ -138,7 +138,7 @@ export CKELETIN_GO_APP_LOG_LEVEL=debug
 # Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.
 export CKELETIN_GO_APP_LOG_CONSOLE_LEVEL=info
 
-# Enable file logging to capture detailed logs
+# Enable file logging to capture detailed logs. Set false to turn the audit log off.
 export CKELETIN_GO_APP_LOG_FILE_ENABLED=true
 
 # Path to the log file (created with secure 0600 permissions)

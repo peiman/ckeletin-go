@@ -46,7 +46,7 @@ var (
 //
 // Configuration:
 //   - app.log_level or app.log.console_level: Console log level (default: warn)
-//   - app.log.file_enabled: Enable file logging (default: false)
+//   - app.log.file_enabled: Enable file logging (default: true; false opts out)
 //   - app.log.file_path: Log file path (default: ./logs/ckeletin-go.log)
 //   - app.log.file_level: File log level (default: debug)
 //   - app.log.color_enabled: Color output (auto/true/false, default: auto)

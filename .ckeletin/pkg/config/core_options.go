@@ -41,8 +41,8 @@ func CoreOptions() []ConfigOption {
 		},
 		{
 			Key:          "app.log.file_enabled",
-			DefaultValue: false,
-			Description:  "Enable file logging to capture detailed logs",
+			DefaultValue: true,
+			Description:  "Enable file logging to capture detailed logs. Set false to turn the audit log off.",
 			Type:         "bool",
 			Required:     false,
 			Example:      "true",
