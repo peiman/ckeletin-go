@@ -116,6 +116,7 @@ Precedence is the changed `--output` flag, then a changed alias flag, then the e
 `Execute(root) int` runs the command and returns the process exit code. Call `SetAfterRun(logger.Cleanup)` so the audit file stays open until the error document is written.
 
 - Success exits 0.
+- JSON mode, when the command succeeded and wrote no envelope, writes one success envelope with `data` null and `error` null. A command annotated `ckeletin:out-002-exempt` (the value is the reason) prints its native output instead. `EnvelopeExemptions` lists those commands. An empty reason does not exempt anything.
 - JSON mode, on an error the command did not already render, writes one error envelope to stdout and nothing to stderr.
 - Text mode writes `Error: …` to stderr and leaves stdout empty.
 - `ErrRendered` and `Rendered(code)` mean the command already wrote the document. Execute does not write a second one.

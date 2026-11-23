@@ -9,6 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // ErrRendered is a sentinel returned by a command that has already written its
@@ -113,6 +116,18 @@ type JSONResponder interface {
 	JSONResponse() interface{}
 }
 
+// AnnotationOut002Exempt marks a command whose successful JSON run prints
+// native output instead of an envelope. The value is the reason. An empty
+// value does not exempt the command. EnvelopeExemptions lists every command
+// that carries a reason.
+const AnnotationOut002Exempt = "ckeletin:out-002-exempt"
+
+// Exemption is one declared OUT-002 exception.
+type Exemption struct {
+	Command string
+	Reason  string
+}
+
 // Package-level state for the current output mode and command name.
 // Safe because CLI commands execute sequentially (Cobra's execution model).
 var (
@@ -121,6 +136,8 @@ var (
 	// commandNameSet is true when SetCommandName was called with a non-empty
 	// override. SetCommandFrom leaves that override in place.
 	commandNameSet bool
+	// rendered is true once this run has written its JSON envelope.
+	rendered bool
 )
 
 // SetOutputMode sets the current output mode ("text" or "json").
@@ -202,5 +219,56 @@ func RenderJSON(out io.Writer, envelope JSONEnvelope) error {
 	}
 	encoded = append(encoded, '\n')
 	_, err = out.Write(encoded)
+	if err == nil {
+		rendered = true
+	}
 	return err
+}
+
+// ExemptFromEnvelope annotates cmd so a successful JSON run prints the
+// command's own output and does not add an envelope. reason is listed by
+// EnvelopeExemptions. An empty reason does not exempt the command.
+func ExemptFromEnvelope(cmd *cobra.Command, reason string) {
+	if cmd == nil {
+		return
+	}
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return
+	}
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[AnnotationOut002Exempt] = reason
+}
+
+// EnvelopeExemptions lists every command under root that declares an OUT-002
+// exemption, in walk order. The command id is the path without the program name.
+func EnvelopeExemptions(root *cobra.Command) []Exemption {
+	if root == nil {
+		return nil
+	}
+	var out []Exemption
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		if reason, ok := exemptionReason(cmd); ok {
+			out = append(out, Exemption{Command: CommandID(cmd), Reason: reason})
+		}
+		for _, child := range cmd.Commands() {
+			walk(child)
+		}
+	}
+	walk(root)
+	return out
+}
+
+func exemptionReason(cmd *cobra.Command) (string, bool) {
+	if cmd == nil || cmd.Annotations == nil {
+		return "", false
+	}
+	reason := strings.TrimSpace(cmd.Annotations[AnnotationOut002Exempt])
+	if reason == "" {
+		return "", false
+	}
+	return reason, true
 }

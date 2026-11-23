@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,14 @@ func TestCompletionCommandRegistered(t *testing.T) {
 
 	// ASSERTION PHASE
 	assert.True(t, foundCompletion, "completion command should be registered in RootCmd")
+
+	var listed bool
+	for _, item := range output.EnvelopeExemptions(RootCmd) {
+		if item.Command == "completion" && item.Reason != "" {
+			listed = true
+		}
+	}
+	assert.True(t, listed, "completion must be a declared OUT-002 exemption")
 }
 
 // TestCompletionCommandMetadata tests the completion command's metadata

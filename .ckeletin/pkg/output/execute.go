@@ -47,6 +47,7 @@ func SetAfterRun(fn func()) {
 // The audit-log hook runs after that write, so a failure is logged before the
 // file is closed.
 func Execute(root *cobra.Command) int {
+	rendered = false
 	defer afterRun()
 	if root == nil {
 		return 1
@@ -56,6 +57,7 @@ func Execute(root *cobra.Command) int {
 
 	executed, err := root.ExecuteC()
 	if err == nil {
+		writeEmptySuccess(executed)
 		return 0
 	}
 	if !commandNameSet {
@@ -95,6 +97,27 @@ func Execute(root *cobra.Command) int {
 		fmt.Fprintf(writerOr(executed, root, false), "Error: %v\n", err)
 	}
 	return code
+}
+
+// writeEmptySuccess prints one success envelope when JSON mode produced no
+// document. An OUT-002 exemption keeps its native output. Text mode is unchanged.
+func writeEmptySuccess(executed *cobra.Command) {
+	if !IsJSONMode() || rendered {
+		return
+	}
+	if _, ok := exemptionReason(executed); ok {
+		return
+	}
+	if !commandNameSet {
+		SetCommandFrom(executed)
+	}
+	name := commandLabel(executed)
+	_ = RenderJSON(writerOr(executed, nil, true), JSONEnvelope{
+		Status:  "success",
+		Command: name,
+		Data:    nil,
+		Error:   nil,
+	})
 }
 
 func writerOr(executed, root *cobra.Command, stdout bool) io.Writer {

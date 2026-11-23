@@ -7,6 +7,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -63,5 +64,6 @@ func init() {
 		cmd.Long = completionLong(cmd.Root().Name())
 		cmd.Root().HelpFunc()(cmd, args)
 	})
+	output.ExemptFromEnvelope(completionCmd, "shell completion script")
 	MustAddToRoot(completionCmd)
 }

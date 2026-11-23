@@ -20,6 +20,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ### Added
 
+- **JSON mode fills in an empty success.** A command that succeeds and writes no envelope gets one success envelope with `data` null. A command annotated `ckeletin:out-002-exempt` prints its native output instead. `EnvelopeExemptions` lists those commands and the reason. Shell completion is exempt.
 - **Standard log-level flags.** `output.RegisterLogLevelFlags` registers persistent `--log-level`, `--log-level-console`, and `--log-level-file`, bound to `app.log_level`, `app.log.console_level`, and `app.log.file_level`. A changed flag wins over `<PREFIX>_APP_LOG_LEVEL`, `<PREFIX>_APP_LOG_CONSOLE_LEVEL`, and `<PREFIX>_APP_LOG_FILE_LEVEL`, which win over the config file, which wins over the default. The reference prefix is `CKELETIN_GO`. The bind runs before `logger.Init`.
 - **Component loggers share the console and the audit file.** `logger.Component(name)` writes `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change. `logger.SetDefaultFields` copies fields onto later lines. A field on the event with the same key wins. There is no per-component level key.
 

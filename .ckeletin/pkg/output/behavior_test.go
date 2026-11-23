@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -262,6 +263,82 @@ func TestExecute_ErrorPaths(t *testing.T) {
 		assert.Equal(t, "error", envelope.Status)
 		assert.Equal(t, "check", envelope.Command)
 	})
+}
+
+func TestExecute_EmptySuccessEnvelope(t *testing.T) {
+	SetOutputMode("json")
+	SetCommandName("")
+	t.Cleanup(func() {
+		SetOutputMode("")
+		SetCommandName("")
+	})
+
+	root := newApp(t)
+	var stdout bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"quiet"})
+	root.AddCommand(&cobra.Command{
+		Use:  "quiet",
+		RunE: func(*cobra.Command, []string) error { return nil },
+	})
+
+	code := Execute(root)
+
+	assert.Equal(t, 0, code)
+	assert.Equal(t, 1, strings.Count(stdout.String(), `"status"`), stdout.String())
+	var envelope JSONEnvelope
+	require.NoError(t, json.Unmarshal(stdout.Bytes(), &envelope), stdout.String())
+	assert.Equal(t, "success", envelope.Status)
+	assert.Equal(t, "quiet", envelope.Command)
+	assert.Nil(t, envelope.Data)
+	assert.Nil(t, envelope.Error)
+	assert.True(t, StatusAgrees(envelope.Status, code))
+
+	SetOutputMode("text")
+	stdout.Reset()
+	root.SetArgs([]string{"quiet"})
+	code = Execute(root)
+	assert.Equal(t, 0, code)
+	assert.Empty(t, stdout.String(), "text mode does not invent an envelope")
+}
+
+func TestExecute_ExemptCommandPrintsNativeOutput(t *testing.T) {
+	SetOutputMode("json")
+	SetCommandName("")
+	t.Cleanup(func() {
+		SetOutputMode("")
+		SetCommandName("")
+	})
+
+	root := newApp(t)
+	native := &cobra.Command{
+		Use: "script",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := fmt.Fprintln(cmd.OutOrStdout(), "native-script")
+			return err
+		},
+	}
+	ExemptFromEnvelope(native, "shell completion script")
+	root.AddCommand(native)
+	var stdout bytes.Buffer
+	root.SetOut(&stdout)
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"script"})
+
+	code := Execute(root)
+
+	assert.Equal(t, 0, code)
+	assert.Equal(t, "native-script\n", stdout.String())
+	assert.NotContains(t, stdout.String(), `"status"`)
+
+	found := EnvelopeExemptions(root)
+	require.Len(t, found, 1)
+	assert.Equal(t, "script", found[0].Command)
+	assert.Equal(t, "shell completion script", found[0].Reason)
+
+	ExemptFromEnvelope(&cobra.Command{Use: "blank"}, "  ")
+	assert.Empty(t, EnvelopeExemptions(&cobra.Command{Use: "app"}))
 }
 
 func TestExecute_InvalidOutputExitCode(t *testing.T) {
