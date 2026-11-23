@@ -17,6 +17,10 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 - **"File logging enabled" is a debug line.** With the file on, Init no longer prints that status at info. It is on stderr only at debug, and it is still in the audit file when the file level is debug.
 
+### Added
+
+- **Component loggers share the console and the audit file.** `logger.Component(name)` writes `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change. `logger.SetDefaultFields` copies fields onto later lines. A field on the event with the same key wins. There is no per-component level key.
+
 ## [0.2.12] - 2026-11-22
 
 ### Added

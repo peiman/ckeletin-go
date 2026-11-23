@@ -3,6 +3,7 @@ package logger
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"math"
@@ -1114,6 +1115,75 @@ func TestConsoleAndFileLevelPrecedence(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(body), "file-debug")
 	})
+}
+
+func TestComponentSharesSinkAndDefaultFieldLoses(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, path)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	t.Cleanup(func() {
+		SetDefaultFields(nil)
+		Cleanup()
+		viper.Set(config.KeyAppLogFileEnabled, false)
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+	})
+
+	console := &bytes.Buffer{}
+	SetDefaultFields(map[string]string{"component": "base", "run": "one"})
+	require.NoError(t, Init(console))
+	before := Component("engine")
+	before.Info().Msg("from-before")
+	assert.Contains(t, console.String(), "from-before")
+	assert.Contains(t, console.String(), "component=engine")
+	assert.Contains(t, console.String(), "run=one")
+
+	SetConsoleLevel(zerolog.ErrorLevel)
+	console.Reset()
+	before.Info().Msg("hidden-before")
+	after := Component("engine")
+	after.Info().Msg("hidden-after")
+	assert.NotContains(t, console.String(), "hidden-before")
+	assert.NotContains(t, console.String(), "hidden-after")
+
+	SetFileLevel(zerolog.ErrorLevel)
+	before.Debug().Msg("file-hidden")
+	log.Error().Str("component", "event").Msg("override")
+	Cleanup()
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "a component logger must not open a second file")
+
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	seen := map[string]int{}
+	for _, line := range strings.Split(string(body), "\n") {
+		if line == "" || !strings.Contains(line, "{") {
+			continue
+		}
+		var event map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &event))
+		message, _ := event["message"].(string)
+		seen[message]++
+		switch message {
+		case "from-before", "hidden-before", "hidden-after":
+			assert.Equal(t, "engine", event["component"], message)
+			assert.Equal(t, "one", event["run"], message)
+		case "override":
+			assert.Equal(t, "event", event["component"])
+			assert.Equal(t, "one", event["run"])
+		}
+	}
+	assert.Equal(t, 1, seen["from-before"])
+	assert.Equal(t, 1, seen["hidden-before"])
+	assert.Equal(t, 1, seen["hidden-after"])
+	assert.Equal(t, 0, seen["file-hidden"])
+	assert.Equal(t, 1, seen["override"])
 }
 
 func consoleLine(t *testing.T, format *string) string {

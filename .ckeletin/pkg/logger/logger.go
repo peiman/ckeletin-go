@@ -138,24 +138,7 @@ func Init(out io.Writer) error {
 		writers = append(writers, filteredFile)
 	}
 
-	// Create multi-writer
-	multi := zerolog.MultiLevelWriter(writers...)
-
-	// Create logger with timestamp
-	logger := zerolog.New(multi).With().Timestamp().Logger()
-
-	// Apply sampling if enabled
-	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
-		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
-		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
-		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       clampSamplingValue(initial),
-			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
-		})
-	}
-
-	log.Logger = logger
+	log.Logger = newLogger(zerolog.MultiLevelWriter(writers...))
 
 	// Set global log level to the most verbose level
 	// This allows both writers to filter independently
@@ -360,6 +343,88 @@ func openLogFileWithRotation(path string) (io.WriteCloser, error) {
 	return logger, nil
 }
 
+// sharedSink is the one console and file destination. Component loggers hold
+// this pointer, so a level change reaches loggers created before it.
+var sharedSink = &levelSink{}
+
+// defaultFields are copied onto every logger built after they are set.
+var defaultFields = map[string]string{}
+
+type levelSink struct {
+	mu sync.Mutex
+	w  zerolog.LevelWriter
+}
+
+func (s *levelSink) set(w zerolog.LevelWriter) {
+	s.mu.Lock()
+	s.w = w
+	s.mu.Unlock()
+}
+
+func (s *levelSink) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	w := s.w
+	s.mu.Unlock()
+	if w == nil {
+		return len(p), nil
+	}
+	return w.Write(p)
+}
+
+func (s *levelSink) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	s.mu.Lock()
+	w := s.w
+	s.mu.Unlock()
+	if w == nil {
+		return len(p), nil
+	}
+	return w.WriteLevel(level, p)
+}
+
+func newLogger(w zerolog.LevelWriter) zerolog.Logger {
+	sharedSink.set(w)
+	ctx := zerolog.New(sharedSink).With().Timestamp()
+	for key, value := range defaultFields {
+		ctx = ctx.Str(key, value)
+	}
+	logger := ctx.Logger()
+	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
+		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
+		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
+		logger = logger.Sample(&zerolog.BurstSampler{
+			Burst:       clampSamplingValue(initial),
+			Period:      time.Second,
+			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
+		})
+	}
+	return logger
+}
+
+// SetDefaultFields puts fields on every later line from the global logger and
+// from component loggers created after this call. A field on the event with
+// the same key wins.
+func SetDefaultFields(fields map[string]string) {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	defaultFields = make(map[string]string, len(fields))
+	for key, value := range fields {
+		defaultFields[key] = value
+	}
+	if currentConsoleWriter != nil {
+		rebuildLogger()
+	}
+}
+
+// Component returns a logger for one part of the program. It writes to the
+// same console and file as the global logger, with component set to name.
+// It does not open a file. SetConsoleLevel and SetFileLevel apply to a
+// component logger created before or after the change.
+func Component(name string) zerolog.Logger {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	return log.Logger.With().Str("component", name).Logger()
+}
+
 // rebuildLogger recreates the logger with current level settings.
 // This is called when runtime log level adjustments are made.
 func rebuildLogger() {
@@ -384,25 +449,9 @@ func rebuildLogger() {
 		writers = append(writers, filteredFile)
 	}
 
-	// Create multi-writer
-	multi := zerolog.MultiLevelWriter(writers...)
-
-	// Create logger with timestamp
-	logger := zerolog.New(multi).With().Timestamp().Logger()
-
-	// Apply sampling if enabled
-	if viper.GetBool(config.KeyAppLogSamplingEnabled) {
-		initial := viper.GetInt(config.KeyAppLogSamplingInitial)
-		thereafter := viper.GetInt(config.KeyAppLogSamplingThereafter)
-		logger = logger.Sample(&zerolog.BurstSampler{
-			Burst:       clampSamplingValue(initial),
-			Period:      time.Second,
-			NextSampler: &zerolog.BasicSampler{N: clampSamplingValue(thereafter)},
-		})
-	}
-
-	// Update global logger
-	log.Logger = logger
+	// Update global logger. Component loggers keep this sink, so the new
+	// levels apply to ones created before this rebuild.
+	log.Logger = newLogger(zerolog.MultiLevelWriter(writers...))
 
 	// Update global log level to the most verbose level
 	globalLevel := currentConsoleLevel

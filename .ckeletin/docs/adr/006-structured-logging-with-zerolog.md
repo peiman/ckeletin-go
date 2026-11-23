@@ -204,6 +204,8 @@ The default console log level is WARN. This means:
 
 `app.log.console_level` wins over `app.log_level`. When both are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. Empty or invalid uses debug.
 
+`logger.Component(name)` returns a logger that writes to the same console and file as the global logger, with `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change, because every logger holds the same sink. `logger.SetDefaultFields` copies fields onto later lines from the global logger and from component loggers created after the call. A field on the event with the same key wins. There is no per-component level key.
+
 This is intentional because:
 1. User input validation errors are expected behavior, not system errors
 2. The formatted output already communicates errors clearly
