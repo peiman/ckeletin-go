@@ -174,10 +174,16 @@ fi
 if [ -f ".go-arch-lint.yml" ] \
     && [ -d ".ckeletin/pkg/output" ] \
     && ! grep -qE '^  output:' .go-arch-lint.yml; then
-    python3 - << 'PY'
+    PYTHONUTF8=1 PYTHONIOENCODING=utf-8 python3 - << 'PY'
 import re
 import sys
 from pathlib import Path
+
+# Windows consoles default to cp1252. The status line uses a check mark.
+for stream in (sys.stdout, sys.stderr):
+    reconfigure = getattr(stream, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8", errors="backslashreplace")
 
 path = Path(".go-arch-lint.yml")
 text = path.read_text()

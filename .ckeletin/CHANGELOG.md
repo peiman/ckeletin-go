@@ -7,6 +7,14 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-11-23
+
+### Fixed
+
+- **Windows can remove a test directory after the logger ran.** `RestoreLoggerState` closes the audit file. With the audit log on by default, lumberjack kept `./logs/<app>.log` open and Windows refused to delete it.
+- **The changelog check does not print Git's CRLF warning.** `git diff` on Windows warned that `.ckeletin/cache/.last-update-check` would be converted, so the exempt path showed up in the output.
+- **The post-update migration prints on Windows.** Python was using cp1252 and could not encode the check mark in the status line.
+
 ## [0.2.13] - 2026-11-23
 
 ### Changed

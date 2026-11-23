@@ -515,6 +515,9 @@ func SaveLoggerState() (zerolog.Logger, zerolog.Level) {
 // RestoreLoggerState restores the global logger and log level to a previously saved state.
 // This is useful in tests to avoid global state pollution.
 func RestoreLoggerState(logger zerolog.Logger, level zerolog.Level) {
+	// Close the audit file opened after the save. On Windows a test temp
+	// directory cannot be removed while lumberjack still holds that file.
+	Cleanup()
 	log.Logger = logger
 	zerolog.SetGlobalLevel(level)
 }
