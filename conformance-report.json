@@ -387,10 +387,12 @@
         "grep -q 'IsJSONMode' cmd/docs.go",
         "grep -q 'IsJSONMode' cmd/config.go",
         "grep -q 'IsJSONMode' cmd/catalog.go",
-        "grep -q 'IsJSONMode' cmd/root.go"
+        "grep -q 'IsJSONMode' cmd/root.go",
+        "grep -q 'func Execute' .ckeletin/pkg/output/execute.go",
+        "grep -q 'func StatusAgrees' .ckeletin/pkg/output/json.go"
       ],
       "enforcement_level": "script",
-      "evidence": "The global --output text|json flag (cmd/root.go PersistentPreRunE) activates JSON mode for every production command, each emitting the standard envelope to stdout: ping (ui.RenderSuccess), docs config (docs.GenerateJSON), config validate (ui.RenderValidationJSON), catalog, and --version (renderVersion). Stderr logging is silenced in JSON mode. Behavioral proof: the TestOutputJSON_* suite plus command-specific JSON tests execute each command with --output json and assert a single valid envelope. Documented exemptions: `completion` emits shell scripts whose only consumer is already a machine (the shell sources them; a JSON wrapper would break every `source <(app completion bash)` usage), and dev-only commands (check, dev *) are compiled out of production builds (//go:build dev) so they are not part of the released command surface.\n",
+      "evidence": "The global --output text|json flag (cmd/root.go PersistentPreRunE) activates JSON mode for every production command, each emitting the standard envelope to stdout: ping (ui.RenderSuccess), docs config (docs.GenerateJSON), config validate (ui.RenderValidationJSON), catalog, and --version (renderVersion). Stderr logging is silenced in JSON mode. Behavioral proof: the TestOutputJSON_* suite plus command-specific JSON tests execute each command with --output json and assert a single valid envelope. In JSON mode the envelope status and the process exit agree: success exits 0 and error exits the non-zero code the command chose (output.Execute, output.ExitCodeOf, output.StatusAgrees). A command annotated ckeletin:out-002-exempt prints its native output, and output.EnvelopeExemptions lists those commands. `completion` is exempt because the shell sources the script. Dev-only commands (check, dev *) are compiled out of production builds (//go:build dev) so they are not part of the released command surface.\n",
       "status": "met",
       "violation_evidence": "Removing the JSON plumbing from the output package, the renderer, or any per-command wiring (docs config, config validate, catalog, --version) fails the per-file greps above. Behavioral coverage: cmd/output_json_test.go, cmd/docs_json_test.go, cmd/config_validate_json_test.go, cmd/catalog_test.go and cmd/version_output_test.go fail if any of those commands stops emitting a valid envelope under --output json.\n",
       "violation_tests": []
@@ -398,10 +400,11 @@
     "CKSPEC-OUT-003": {
       "checks": [
         "grep -rq 'type JSONEnvelope' .ckeletin/pkg/output",
-        "! grep -qE 'json:\"(status|command|data|error|code)[^\"]*,omitempty\"' .ckeletin/pkg/output/json.go"
+        "! grep -qE 'json:\"(status|command|data|error|code)[^\"]*,omitempty\"' .ckeletin/pkg/output/json.go",
+        "grep -q 'func CommandID' .ckeletin/pkg/output/command.go"
       ],
       "enforcement_level": "script",
-      "evidence": "JSONEnvelope struct in .ckeletin/pkg/output/json.go emits the TOTAL envelope: all four top-level keys \u2014 status, command, data, error \u2014 carry no `omitempty`, so every key is present in every envelope and an absent value (data on error, error on success) is emitted as JSON null rather than omitted. The error object is itself total {code, message} (#40, v0.11.0): JSONError.Code is a *string with `json:\"code\"` (no omitempty), so an error with no classification still emits \"code\": null \u2014 present, never dropped. JSONResponder interface for custom payloads. Verified by unit tests, including TestRenderJSON_ErrorCodeNullWhenAbsent which asserts a code-less error serializes \"code\": null.\n",
+      "evidence": "JSONEnvelope struct in .ckeletin/pkg/output/json.go emits the TOTAL envelope: all four top-level keys \u2014 status, command, data, error \u2014 carry no `omitempty`, so every key is present in every envelope and an absent value (data on error, error on success) is emitted as JSON null rather than omitted. The error object is itself total {code, message} (#40, v0.11.0): JSONError.Code is a *string with `json:\"code\"` (no omitempty), so an error with no classification still emits \"code\": null \u2014 present, never dropped. JSONResponder interface for custom payloads. The command value is the full path without the program name (output.CommandID): a nested command is `docs config`, a top-level command is its name alone, and `--version` reports `version`. A failure before a command resolves uses JSON null. Verified by unit tests, including TestRenderJSON_ErrorCodeNullWhenAbsent which asserts a code-less error serializes \"code\": null.\n",
       "status": "met",
       "violation_evidence": "Removing the JSONEnvelope struct fails the first grep check; adding `omitempty` to any of the four envelope keys or to JSONError.Code (which would drop a key when absent instead of emitting null) fails the second.\n",
       "violation_tests": []
@@ -533,7 +536,7 @@
       "violation_tests": []
     }
   },
-  "spec_version": "0.13.1",
+  "spec_version": "0.14.0",
   "summary": {
     "deferred": 0,
     "met": 46,
