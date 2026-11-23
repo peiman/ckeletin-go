@@ -38,7 +38,16 @@ var (
 	// rebuildLogger reuses it so a runtime level change does not pick up a later edit.
 	// Empty means the console line has no timestamp. The file writer is separate.
 	currentConsoleTimeFormat string
+	// loggerReady is true after Init and false after Cleanup. Component uses
+	// it to tell a live logger from a sink Init has not installed yet.
+	loggerReady bool
 )
+
+// UserOutputMessage is the audit message for a line the user already saw on
+// stdout or stderr. The console writer drops it so --log-level debug does not
+// print that line a second time. The file writer keeps it. Debug is the
+// default file level, so a quieter level would drop the line from the file.
+const UserOutputMessage = "user output"
 
 // Init initializes the logger with options from Viper.
 // Supports dual logging: console (user-friendly) + file (detailed JSON).
@@ -98,8 +107,9 @@ func Init(out io.Writer) error {
 	consoleWriter := newConsoleWriter(out)
 
 	filteredConsole := FilteredWriter{
-		Writer:   consoleWriter,
-		MinLevel: consoleLevel,
+		Writer:       consoleWriter,
+		MinLevel:     consoleLevel,
+		DropMessages: []string{UserOutputMessage},
 	}
 
 	writers = append(writers, filteredConsole)
@@ -148,6 +158,7 @@ func Init(out io.Writer) error {
 	}
 
 	log.Logger = newLogger(zerolog.MultiLevelWriter(writers...))
+	loggerReady = true
 
 	// Set global log level to the most verbose level
 	// This allows both writers to filter independently
@@ -181,6 +192,7 @@ func Init(out io.Writer) error {
 func Cleanup() {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
+	loggerReady = false
 	if logFile != nil {
 		if err := logFile.Close(); err != nil && !jsonMode() {
 			// Can't use logger here as it might be cleaning up. In JSON mode
@@ -194,8 +206,9 @@ func Cleanup() {
 }
 
 // jsonMode reports the resolved output mode without importing the output
-// package. The output package imports the command framework, and the logger
-// must stay free of that import so business logic can depend on logging
+// package. output.UseOutputMode writes that mode into app.output_format,
+// including when an alias flag or an environment variable decided it.
+// The logger stays free of the output package so business logic can log
 // without depending on rendering.
 func jsonMode() bool {
 	return strings.EqualFold(strings.TrimSpace(viper.GetString(config.KeyAppOutputFormat)), "json")
@@ -286,11 +299,32 @@ func clampSamplingValue(n int) uint32 {
 // Unset (no default installed) stays RFC3339, which is what Init hardcoded before
 // the key existed. A configured empty string, including a project default, drops
 // the console timestamp. The file writer does not use this value.
+//
+// Viper ignores an empty environment variable unless AllowEmptyEnv is on.
+// An empty APP_LOG_CONSOLE_TIME_FORMAT, with or without a prefix, still
+// clears the timestamp and wins over the config file.
 func loadConsoleTimeFormat() string {
+	if value, ok := consoleTimeFromEnv(); ok {
+		return value
+	}
 	if !viper.IsSet(config.KeyAppLogConsoleTimeFormat) {
 		return time.RFC3339
 	}
 	return viper.GetString(config.KeyAppLogConsoleTimeFormat)
+}
+
+func consoleTimeFromEnv() (string, bool) {
+	const suffix = "APP_LOG_CONSOLE_TIME_FORMAT"
+	for _, entry := range os.Environ() {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			continue
+		}
+		if key == suffix || strings.HasSuffix(key, "_"+suffix) {
+			return value, true
+		}
+	}
+	return "", false
 }
 
 // newConsoleWriter builds the console writer from the format and color captured
@@ -428,9 +462,22 @@ func SetDefaultFields(fields map[string]string) {
 // same console and file as the global logger, with component set to name.
 // It does not open a file. SetConsoleLevel and SetFileLevel apply to a
 // component logger created before or after the change.
+//
+// A call before Init still shares those sinks. The logger writes through the
+// sink Init installs, instead of keeping the default stderr logger from
+// before Init ran.
 func Component(name string) zerolog.Logger {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
+	if !loggerReady {
+		// Init has not installed the sink yet. Hold sharedSink, not the
+		// default stderr logger, so the line follows Init's writers.
+		ctx := zerolog.New(sharedSink).With().Timestamp()
+		for key, value := range defaultFields {
+			ctx = ctx.Str(key, value)
+		}
+		return ctx.Str("component", name).Logger()
+	}
 	return log.Logger.With().Str("component", name).Logger()
 }
 
@@ -443,8 +490,9 @@ func rebuildLogger() {
 	consoleWriter := newConsoleWriter(currentConsoleWriter)
 
 	filteredConsole := FilteredWriter{
-		Writer:   consoleWriter,
-		MinLevel: currentConsoleLevel,
+		Writer:       consoleWriter,
+		MinLevel:     currentConsoleLevel,
+		DropMessages: []string{UserOutputMessage},
 	}
 
 	writers = append(writers, filteredConsole)

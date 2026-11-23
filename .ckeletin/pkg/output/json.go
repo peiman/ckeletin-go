@@ -49,8 +49,58 @@ func (e *renderedError) ExitCode() int { return e.code }
 // Rendered reports that the command already wrote its one envelope and that
 // the process should exit with code. Code 0 is stored as 1 so an error status
 // is never paired with a successful exit.
+//
+// Execute corrects a disagreement with the status RenderJSON recorded.
+// A recorded error exits non-zero (this code, or 1 when the command returned
+// nil). A recorded success exits 0, including when the command returned
+// Rendered(code).
 func Rendered(code int) error {
 	return &renderedError{code: normalizeExitCode(code)}
+}
+
+// errorClasser is the classification Coded attaches. ExitCoder is a separate
+// interface: one chooses the process code, the other the envelope's error.code.
+type errorClasser interface {
+	ErrorCode() string
+}
+
+// classifiedError carries a stable error.code for the JSON envelope.
+type classifiedError struct {
+	code string
+	err  error
+}
+
+func (e *classifiedError) Error() string {
+	if e == nil || e.err == nil {
+		return ""
+	}
+	return e.err.Error()
+}
+
+func (e *classifiedError) Unwrap() error { return e.err }
+
+func (e *classifiedError) ErrorCode() string { return e.code }
+
+// Coded attaches a stable error.code to err. Execute copies it into the
+// envelope when it renders the failure. An empty code leaves error.code null.
+// A nil err becomes an error whose message is code.
+func Coded(code string, err error) error {
+	if err == nil {
+		err = errors.New(code)
+	}
+	return &classifiedError{code: code, err: err}
+}
+
+func errorClass(err error) *string {
+	var class errorClasser
+	if !errors.As(err, &class) {
+		return nil
+	}
+	code := class.ErrorCode()
+	if code == "" {
+		return nil
+	}
+	return &code
 }
 
 // ExitCodeOf returns 0 for a nil error and the error's ExitCode otherwise.
@@ -138,12 +188,17 @@ var (
 	commandNameSet bool
 	// rendered is true once this run has written its JSON envelope.
 	rendered bool
+	// renderedStatus is the status of that envelope. Execute uses it to
+	// correct the exit code when the command wrote the document itself.
+	renderedStatus string
 )
 
 // SetOutputMode sets the current output mode ("text" or "json").
-// Called from PersistentPreRunE after config initialization.
+// A caller that sets the mode directly pins it for this run. UseOutputMode
+// clears the pin after it publishes the resolved value.
 func SetOutputMode(mode string) {
 	currentOutputMode = mode
+	modePinned = true
 }
 
 // OutputMode returns the current output mode. Defaults to "text".
@@ -221,6 +276,7 @@ func RenderJSON(out io.Writer, envelope JSONEnvelope) error {
 	_, err = out.Write(encoded)
 	if err == nil {
 		rendered = true
+		renderedStatus = envelope.Status
 	}
 	return err
 }

@@ -45,6 +45,34 @@ func isolateSubprocessEnv(dir string, extra ...string) []string {
 	return append(env, extra...)
 }
 
+// unknownCommandRunEnv selects the subprocess that executes an unknown command.
+const unknownCommandRunEnv = "CKELETIN_TEST_UNKNOWN_COMMAND_RUN"
+
+// TestRun_UnknownCommandTextIsOnlyTheErrorLine guards usage errors that never
+// reach PersistentPreRunE. Text mode must print exactly one Error line and
+// must not add a raw zerolog JSON line from the default logger.
+func TestRun_UnknownCommandTextIsOnlyTheErrorLine(t *testing.T) {
+	if os.Getenv(unknownCommandRunEnv) == "1" {
+		cmd.RootCmd.SetArgs([]string{"nosuch"})
+		os.Exit(run())
+	}
+
+	home := t.TempDir()
+	proc := exec.Command(os.Args[0], "-test.run=^TestRun_UnknownCommandTextIsOnlyTheErrorLine$")
+	proc.Dir = home
+	proc.Env = isolateSubprocessEnv(home, unknownCommandRunEnv+"=1")
+	var stdout, stderr bytes.Buffer
+	proc.Stdout = &stdout
+	proc.Stderr = &stderr
+
+	err := proc.Run()
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, "stdout: %s\nstderr: %s", stdout.String(), stderr.String())
+	assert.NotEqual(t, 0, exitErr.ExitCode())
+	assert.Empty(t, stdout.String())
+	assert.Equal(t, "Error: unknown command \"nosuch\" for \"ckeletin-go\"\n", stderr.String())
+}
+
 // outputFormatEnvVarUnderTest derives the environment variable viper maps to
 // config.KeyAppOutputFormat (SetEnvPrefix + the "." -> "_" key replacer).
 func outputFormatEnvVarUnderTest() string {

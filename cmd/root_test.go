@@ -1519,7 +1519,7 @@ func TestJSONMode_EnvDriven_StderrSilent(t *testing.T) {
 // mode is activated by the config file itself: the mode is unknowable until
 // the config is read, so the pre-init logs emitted while READING that very
 // file must be buffered and discarded once the mode resolves to JSON. Pins
-// the post-initConfig SetOutputMode site (the viper read): without it the
+// the Setup resolution after initConfig (the viper read): without it the
 // mode never becomes JSON, ping renders text to stdout, and logger.Init
 // leaves the console writer enabled.
 func TestJSONMode_ConfigFileDriven_StderrSilent(t *testing.T) {

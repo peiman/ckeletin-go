@@ -106,7 +106,7 @@ app:
 
 The audit file is zerolog JSON. It always keeps its own timestamp. `SetConsoleLevel` rebuilds the console writer with the layout captured at `Init`.
 
-There is no flag. Set it from the config file, the environment (`<PREFIX>_APP_LOG_CONSOLE_TIME_FORMAT`), or a project default.
+There is no flag. Set it from the config file, the environment (`<PREFIX>_APP_LOG_CONSOLE_TIME_FORMAT`), or a project default. Viper treats an empty environment variable as unset. The logger reads this variable itself, so an empty value still clears the console timestamp and wins over the config file.
 
 ## Best Practices
 

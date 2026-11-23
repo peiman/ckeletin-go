@@ -1013,6 +1013,7 @@ func silenceConsoleTimeNoise(t *testing.T) {
 	viper.Set(config.KeyAppLogSamplingEnabled, false)
 	viper.Set(config.KeyAppLogColorEnabled, "false")
 	t.Setenv("NO_COLOR", "")
+	unsetConsoleTimeEnv(t)
 	t.Cleanup(func() {
 		viper.Set(config.KeyAppLogConsoleTimeFormat, time.RFC3339)
 		viper.Set(config.KeyAppLogColorEnabled, "auto")
@@ -1244,6 +1245,67 @@ func TestConsoleTimeFormat_UnsetMatchesRFC3339(t *testing.T) {
 	want := fixedLogTime.In(time.Local).Format(time.RFC3339) + " WRN hello\n"
 	assert.Equal(t, want, unset, "unset key must stay byte-identical to the historical RFC3339 console line")
 	assert.Equal(t, unset, again, "an explicit RFC3339 layout must match the unset default")
+}
+
+func unsetConsoleTimeEnv(t *testing.T) {
+	t.Helper()
+	const suffix = "APP_LOG_CONSOLE_TIME_FORMAT"
+	for _, entry := range os.Environ() {
+		key, _, ok := strings.Cut(entry, "=")
+		if !ok {
+			continue
+		}
+		if key == suffix || strings.HasSuffix(key, "_"+suffix) {
+			t.Setenv(key, "ckeletin-unset")
+			os.Unsetenv(key)
+		}
+	}
+}
+
+func TestComponentBeforeInitSharesSinks(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, path)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogConsoleLevel, "warn")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	t.Cleanup(func() {
+		viper.Set(config.KeyAppLogFileEnabled, false)
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+	})
+
+	early := Component("early")
+	console := &bytes.Buffer{}
+	require.NoError(t, Init(console))
+	early.Warn().Msg("after-init")
+	Cleanup()
+
+	assert.Contains(t, console.String(), "after-init")
+	assert.Contains(t, console.String(), "component=early")
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "after-init")
+	assert.Contains(t, string(body), "early")
+}
+
+func TestConsoleTimeFormat_EmptyEnvClearsTimestamp(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	withFixedLogTime(t)
+	silenceConsoleTimeNoise(t)
+
+	viper.Set(config.KeyAppLogConsoleTimeFormat, "15:04:05")
+	t.Setenv("APP_LOG_CONSOLE_TIME_FORMAT", "")
+	buf := &bytes.Buffer{}
+	require.NoError(t, Init(buf))
+	t.Cleanup(func() { Cleanup() })
+	log.Warn().Msg("hello")
+	assert.Equal(t, "WRN hello\n", buf.String())
 }
 
 func TestConsoleTimeFormat_EmptyDropsTimestamp(t *testing.T) {

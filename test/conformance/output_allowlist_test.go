@@ -60,6 +60,45 @@ func TestOutputAllowlist_Adversarial(t *testing.T) {
 		assert.Equal(t, 0, code, out)
 		assert.Contains(t, out, "compliant")
 	})
+
+	t.Run("app ui package is scanned", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "ui"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "ui", "x.go"), []byte(offender), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"), []byte("# none\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "internal/ui/x.go")
+		assert.Contains(t, out, "fmt.Println")
+	})
+
+	t.Run("extra line in allowlisted file fails", func(t *testing.T) {
+		two := "package bad\n\nimport \"fmt\"\n\nfunc speak() {\n\tfmt.Println(\"no\")\n\tfmt.Println(\"again\")\n}\n"
+		dir := fixtureWithPrint(t, two)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go count=1 full-screen TUI writes the frame\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "expected 1 direct output lines, found 2")
+		assert.Contains(t, out, "internal/bad/bad.go")
+	})
+
+	t.Run("pinned count passes", func(t *testing.T) {
+		dir := fixtureWithPrint(t, offender)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go count=1 full-screen TUI writes the frame\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.Equal(t, 0, code, out)
+	})
+
+	t.Run("pinned lines fail when the line moves", func(t *testing.T) {
+		dir := fixtureWithPrint(t, offender)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go lines=1 full-screen TUI writes the frame\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "expected output lines 1")
+	})
 }
 
 func fixtureWithPrint(t *testing.T, source string) string {

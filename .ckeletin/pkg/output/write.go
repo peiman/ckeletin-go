@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mattn/go-isatty"
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/progress"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -132,10 +133,13 @@ func (w *shadowWriter) Write(p []byte) (int, error) {
 	if err != nil || n != len(p) {
 		return n, err
 	}
+	// Debug stays at the default file level, so the audit file keeps the
+	// line. The console writer drops this message, including when
+	// --log-level debug would otherwise echo it beside the user's text.
 	log.Debug().
 		Str("command", w.command).
 		Str("stream", w.stream).
 		Str("output", string(p)).
-		Msg("user output")
+		Msg(logger.UserOutputMessage)
 	return n, nil
 }

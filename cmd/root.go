@@ -53,6 +53,9 @@ var (
 	binaryName       = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
 	configFileStatus string
 	configFileUsed   string
+	// pendingPreInit holds log lines emitted before Setup starts the logger.
+	// finishRootStartup flushes them once the output mode is resolved.
+	pendingPreInit *preInitLogBuffer
 
 	// Compiled regex patterns for EnvPrefix()
 	// Compiled once at package initialization for better performance
@@ -239,6 +242,7 @@ var RootCmd = &cobra.Command{
 	Long:          "",
 	SilenceErrors: true, // Errors are handled by main.go, don't print twice
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		pendingPreInit = nil
 		if rootFlagDefaultsErr != nil {
 			return fmt.Errorf("apply root flag defaults: %w", rootFlagDefaultsErr)
 		}
@@ -248,40 +252,21 @@ var RootCmd = &cobra.Command{
 			return fmt.Errorf("failed to bind flags: %w", err)
 		}
 
-		// output.RegisterOutputFlag already resolved the flag and the env var,
-		// and stored the command path, before this function runs. Errors
-		// raised during config load use that mode.
+		// output.Setup resolves the flag and the env var before this
+		// function, then the config file, the logger, and the failure audit
+		// after it returns. Do not call logger.Init or UseOutputMode here.
 
 		// Config-file-driven JSON mode is unknowable until the config is
 		// read, so buffer all pre-init log output and resolve it after the
 		// final mode is known: discarded in JSON mode, replayed to stderr in
 		// text mode.
-		preInit := bufferPreInitLogs()
+		pendingPreInit = bufferPreInitLogs()
 
-		// Initialize configuration
+		// Initialize configuration. Mode resolution and the logger run in
+		// Setup, which flushes pendingPreInit from WithAfterLogger.
 		if err := initConfig(); err != nil {
-			preInit.flush(false)
 			return err
 		}
-
-		// initConfig resolves the mode again once the config file is visible,
-		// still before the logger starts.
-
-		// Initialize logger with configuration values
-		if err := logger.Init(nil); err != nil {
-			preInit.flush(false)
-			return fmt.Errorf("failed to initialize logger: %w", err)
-		}
-		output.SetFailureLog(func(err error, command string, code int) {
-			log.Debug().
-				Err(err).
-				Str("command", command).
-				Int("exit_code", code).
-				Msg("command failed")
-		})
-		preInit.flush(true)
-
-		logConfigStatus()
 		return nil
 	},
 }
@@ -326,6 +311,20 @@ func (b *preInitLogBuffer) flush(realLoggerInstalled bool) {
 // logConfigStatus reports how configuration was resolved, once the real
 // logger is installed; in JSON mode this reaches only the audit log file
 // (the console writer is disabled).
+// finishRootStartup runs from output.Setup after the mode is resolved.
+// err is nil when the logger is installed. The pre-init buffer is discarded
+// in JSON mode and replayed in text mode.
+func finishRootStartup(err error) {
+	if pendingPreInit != nil {
+		pendingPreInit.flush(err == nil)
+		pendingPreInit = nil
+	}
+	if err != nil {
+		return
+	}
+	logConfigStatus()
+}
+
 func logConfigStatus() {
 	if configFileStatus == "" {
 		return
@@ -497,10 +496,9 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 
 	RootCmd.PersistentFlags().Int("log-sampling-thereafter", 100, "Number of messages to log thereafter per second")
 
-	// Output format flag. The helper also resolves the mode before this
-	// command's PersistentPreRunE, and again from inside initConfig.
-	output.RegisterOutputFlag(RootCmd, output.WithEnvPrefix(EnvPrefix()))
-	output.SetAfterRun(logger.Cleanup)
+	// Output flag, resolved mode, logger, failure audit, and log cleanup.
+	// The command's PersistentPreRunE only loads configuration.
+	output.Setup(RootCmd, output.WithEnvPrefix(EnvPrefix()), output.WithAfterLogger(finishRootStartup))
 
 	// Replace the literals above with the project overlay. The calls stay so
 	// the flags remain persistent and keep their CLI names and help text.
@@ -700,13 +698,9 @@ func initConfig() error {
 		}
 	}
 
-	// One resolver for flag > env > config file > default, before the
-	// registry walks every key. An invalid output value fails here, with
-	// the same error and exit code for every command, and the mode is
-	// stored before logger.Init runs.
-	if err := output.UseOutputMode(output.PhaseResolved); err != nil {
-		return err
-	}
+	// output.Setup resolves flag > env > config file > default after this
+	// returns and before the logger starts. An invalid output value fails
+	// there, with the same error and exit code for every command.
 
 	// Validate registered config options (colors, log levels, etc.)
 	if errs := config.ValidateRegisteredOptions(); len(errs) > 0 {

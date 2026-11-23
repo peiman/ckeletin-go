@@ -7,6 +7,7 @@
 package logger
 
 import (
+	"bytes"
 	"io"
 
 	"github.com/rs/zerolog"
@@ -29,11 +30,18 @@ import (
 type FilteredWriter struct {
 	Writer   io.Writer
 	MinLevel zerolog.Level
+	// DropMessages are zerolog message values this writer discards.
+	// The console writer lists UserOutputMessage. The file writer does not,
+	// so the audit file still records the line at the default debug level.
+	DropMessages []string
 }
 
 // WriteLevel implements zerolog.LevelWriter interface.
 // It only writes the log message if the level meets or exceeds the minimum level.
 func (w FilteredWriter) WriteLevel(level zerolog.Level, p []byte) (n int, err error) {
+	if droppedMessage(w.DropMessages, p) {
+		return len(p), nil
+	}
 	// Filter: only write if log level >= minimum level
 	// In zerolog, higher numeric values = higher severity
 	// (TraceLevel=-1, DebugLevel=0, InfoLevel=1, WarnLevel=2, ErrorLevel=3, etc.)
@@ -51,4 +59,16 @@ func (w FilteredWriter) WriteLevel(level zerolog.Level, p []byte) (n int, err er
 // We pass through all writes since we can't determine the level.
 func (w FilteredWriter) Write(p []byte) (n int, err error) {
 	return w.Writer.Write(p)
+}
+
+func droppedMessage(messages []string, p []byte) bool {
+	for _, msg := range messages {
+		if msg == "" {
+			continue
+		}
+		if bytes.Contains(p, []byte(`"message":"`+msg+`"`)) {
+			return true
+		}
+	}
+	return false
 }
