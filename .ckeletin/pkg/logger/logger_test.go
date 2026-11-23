@@ -1032,12 +1032,13 @@ func (c *closeCounter) Close() error {
 func TestInitClosesPreviousAuditFile(t *testing.T) {
 	previous := &closeCounter{}
 	logFile = previous
+	// TempDir's cleanup runs after this function returns. Close the audit
+	// file first, or Windows cannot delete app.log.
+	dir := t.TempDir()
+	defer Cleanup()
 	t.Cleanup(func() {
-		Cleanup()
 		viper.Set(config.KeyAppLogFileEnabled, false)
 	})
-
-	dir := t.TempDir()
 	viper.Set(config.KeyAppLogFileEnabled, true)
 	viper.Set(config.KeyAppLogFilePath, filepath.Join(dir, "app.log"))
 	viper.Set(config.KeyAppLogFileLevel, "debug")
