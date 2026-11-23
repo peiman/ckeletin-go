@@ -457,6 +457,8 @@ func resetOutputState() {
 	commandNameSet = false
 	currentCommandName = ""
 	currentCmd = nil
+	modeWroteKey = false
+	modeWroteValue = ""
 	SetFailureLog(nil)
 	SetAfterRun(nil)
 }

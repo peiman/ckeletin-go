@@ -11,8 +11,9 @@
 #   internal/ui/check.go count=1 check printer writes to stdout
 #   internal/progress/terminal.go lines=41 detects a terminal on stdout
 #
-# A pin that does not match the file fails. An unpinned path allows every
-# current and future match in that file, or in files under that directory.
+# Every entry needs count= or lines=. A pin that does not match fails,
+# including a count for a file that no longer prints and a path that is gone.
+# A directory is not an entry. Pin each file.
 # A missing or malformed allowlist is its own error. It is not a scan failure
 # and it does not dump a traceback.
 
@@ -53,6 +54,12 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 		pin="${rest%%[[:space:]]*}"
 		rest="${rest#"$pin"}"
 		rest="${rest#"${rest%%[![:space:]]*}"}"
+		if [[ "$pin" == "-" ]]; then
+			echo "Output allowlist is malformed"
+			echo "${allowlist}:${line_no}"
+			echo "Every entry needs count= or lines=. An unpinned path would allow new prints."
+			exit 1
+		fi
 		if [[ "$pin" == count=* ]]; then
 			num="${pin#count=}"
 			if [[ ! "$num" =~ ^[0-9]+$ ]]; then
@@ -187,6 +194,36 @@ if ((${#hit_files[@]} > 0)); then
 		fi
 	done
 fi
+
+for p in "${!paths[@]}"; do
+	entry="${paths[$p]}"
+	pin="${pins[$p]}"
+	if [[ ! -f "$entry" ]]; then
+		violations="${violations}${entry}: allowlist path does not exist"$'\n'
+		continue
+	fi
+	count=0
+	lines=""
+	if ((${#hit_files[@]} > 0)); then
+		for j in "${!hit_files[@]}"; do
+			if [[ "${hit_files[$j]}" == "$entry" ]]; then
+				count=$((count + 1))
+				lines="${lines}${hit_lines[$j]},"
+			fi
+		done
+	fi
+	lines="${lines%,}"
+	if [[ "$pin" == count=* ]]; then
+		want="${pin#count=}"
+		if [[ "$count" -eq 0 && "$want" -ne 0 ]]; then
+			violations="${violations}${entry}: expected ${want} direct output lines, found 0"$'\n'
+		fi
+		continue
+	fi
+	if [[ "$count" -eq 0 ]]; then
+		violations="${violations}${entry}: expected output lines ${pin#*=}, found none"$'\n'
+	fi
+done
 
 if [[ -n "$violations" ]]; then
 	echo "Direct output in business logic"

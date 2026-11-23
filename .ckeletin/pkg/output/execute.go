@@ -8,7 +8,10 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // afterRun runs after error rendering and before Execute returns.
@@ -66,12 +69,18 @@ func Execute(root *cobra.Command) (code int) {
 	pinned := modePinned
 	modePinned = false
 	resolvedPhase = phaseUnset
+	// A panic in RunE unwinds before ExecuteC returns, so the recovered
+	// command is the one PersistentPreRunE stored. Clear the previous run
+	// first. Null is only for a failure before any command resolves.
+	currentCmd = nil
 	var executed *cobra.Command
 	defer func() {
 		if rec := recover(); rec != nil {
-			// executed is still nil: the panic unwound before ExecuteC returned.
-			// Write to root. A stale currentCmd belongs to an earlier run.
-			code = renderFailure(root, root, fmt.Errorf("panic: %v", rec))
+			cmd := currentCmd
+			if cmd == nil {
+				cmd = root
+			}
+			code = renderFailure(cmd, root, fmt.Errorf("panic: %v", rec))
 		}
 		afterRun()
 	}()
@@ -112,26 +121,29 @@ func renderFailure(executed, root *cobra.Command, err error) int {
 		SetCommandFrom(executed)
 	}
 	if rendered && renderedStatus == "success" {
+		// The process still exits 0. The error must not disappear: the audit
+		// record is the only place it goes.
+		noteFailure(executed, err, 0)
 		return 0
 	}
 	code := ExitCodeOf(err)
 	if rendered && renderedStatus == "error" {
 		if !StatusAgrees("error", code) {
-			return 1
+			code = 1
 		}
+		noteFailure(executed, err, code)
 		return code
 	}
 	if !StatusAgrees("error", code) {
 		code = 1
 	}
 	if errors.Is(err, ErrRendered) {
+		noteFailure(executed, err, code)
 		return code
 	}
 
+	noteFailure(executed, err, code)
 	name := commandLabel(executed)
-	if failureLog != nil {
-		failureLog(err, name, code)
-	}
 
 	if IsJSONMode() {
 		env := JSONEnvelope{
@@ -150,9 +162,19 @@ func renderFailure(executed, root *cobra.Command, err error) int {
 	return code
 }
 
+func noteFailure(cmd *cobra.Command, err error, code int) {
+	if failureLog == nil || err == nil {
+		return
+	}
+	failureLog(err, commandLabel(cmd), code)
+}
+
 // absorbUnresolvedOutputFlag applies --output or the alias when cobra never
-// ran PersistentPreRunE, which is every parse and usage error. It returns
-// the mode error when the flag value is not text or json.
+// ran PersistentPreRunE, which is every parse and usage error. With no flag,
+// the early mode still comes from the environment. The probe defines only
+// the output flag and the alias, so an alias that lives below the root cannot
+// replace the real usage error with "unknown flag". An invalid mode is the
+// one error this function may return.
 func absorbUnresolvedOutputFlag(cmd *cobra.Command) error {
 	if cmd == nil {
 		return nil
@@ -162,22 +184,55 @@ func absorbUnresolvedOutputFlag(cmd *cobra.Command) error {
 		root = cmd.Root()
 	}
 	currentCmd = cmd
-	if !changedOutputFlag(cmd) {
-		picked := pickOutputArgs(commandArgs(root))
-		if len(picked) == 0 {
-			return nil
-		}
-		if root.Flags().Parsed() {
-			return nil
-		}
-		if err := root.ParseFlags(picked); err != nil {
-			return err
-		}
+	if changedOutputFlag(cmd) {
+		return UseOutputMode(PhaseEarly)
 	}
-	if !changedOutputFlag(cmd) {
-		return nil
+	picked := pickOutputArgs(commandArgs(root))
+	if value, ok := probeOutputValue(picked); ok {
+		return applyProbedMode(value)
 	}
 	return UseOutputMode(PhaseEarly)
+}
+
+// probeOutputValue reads --output or the alias from args. A parse problem
+// returns ok false and must not replace the original command error.
+func probeOutputValue(args []string) (string, bool) {
+	if len(args) == 0 {
+		return "", false
+	}
+	fs := pflag.NewFlagSet("output-probe", pflag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.ParseErrorsWhitelist.UnknownFlags = true
+	fs.String(outputFlagName, "", "")
+	if settings.alias != "" {
+		fs.String(settings.alias, "", "")
+	}
+	if err := fs.Parse(args); err != nil {
+		return "", false
+	}
+	if fs.Changed(outputFlagName) {
+		value, err := fs.GetString(outputFlagName)
+		return value, err == nil
+	}
+	if settings.alias != "" && fs.Changed(settings.alias) {
+		value, err := fs.GetString(settings.alias)
+		return value, err == nil
+	}
+	return "", false
+}
+
+func applyProbedMode(value string) error {
+	mode, err := validMode(value)
+	if err != nil {
+		return err
+	}
+	currentOutputMode = mode
+	modePinned = false
+	if PhaseEarly > resolvedPhase {
+		resolvedPhase = PhaseEarly
+	}
+	viper.Set(config.KeyAppOutputFormat, mode)
+	return nil
 }
 
 func changedOutputFlag(cmd *cobra.Command) bool {
@@ -225,7 +280,12 @@ func commandArgs(cmd *cobra.Command) []string {
 		return nil
 	}
 	v := reflect.ValueOf(cmd).Elem().FieldByName("args")
-	if v.IsValid() && v.Kind() == reflect.Slice && v.Len() > 0 {
+	// A missing field means this cobra changed shape. Do not guess os.Args:
+	// tests pass arguments with SetArgs, and os.Args is the test binary.
+	if !v.IsValid() || v.Kind() != reflect.Slice {
+		return nil
+	}
+	if v.Len() > 0 {
 		out := make([]string, v.Len())
 		for i := 0; i < v.Len(); i++ {
 			out[i] = v.Index(i).String()

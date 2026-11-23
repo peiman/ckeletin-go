@@ -3,11 +3,9 @@ package output
 import (
 	"fmt"
 
-	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // WithAfterLogger runs after Setup has resolved the output mode.
@@ -35,6 +33,7 @@ func Setup(root *cobra.Command, opts ...Option) {
 		return
 	}
 	RegisterOutputFlag(root, opts...)
+	RegisterLogLevelFlags(root)
 	hook := settings.afterLogger
 	// The hook belongs to this root. A later Setup or RegisterOutputFlag
 	// must not inherit it, and must not replace the closure captured below.
@@ -53,7 +52,7 @@ func Setup(root *cobra.Command, opts ...Option) {
 
 	prev := root.PersistentPreRunE
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if err := bindOutputFlag(cmd); err != nil {
+		if err := bindLogLevelFlags(cmd); err != nil {
 			return err
 		}
 		var runErr error
@@ -81,20 +80,6 @@ func Setup(root *cobra.Command, opts ...Option) {
 		callAfterLogger(hook, nil)
 		return nil
 	}
-}
-
-func bindOutputFlag(cmd *cobra.Command) error {
-	if cmd == nil || cmd.Root() == nil {
-		return fmt.Errorf("output flag: no command")
-	}
-	flag := cmd.Root().PersistentFlags().Lookup(outputFlagName)
-	if flag == nil {
-		return fmt.Errorf("output flag %q is not registered", outputFlagName)
-	}
-	if err := viper.BindPFlag(config.KeyAppOutputFormat, flag); err != nil {
-		return fmt.Errorf("bind flag %q to %s: %w", outputFlagName, config.KeyAppOutputFormat, err)
-	}
-	return nil
 }
 
 func installFailureLog() {

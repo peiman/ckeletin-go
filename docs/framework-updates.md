@@ -240,9 +240,11 @@ task ckeletin:update version=v0.2.0
 
 Without the `version` parameter, all commands default to the latest `main` branch.
 
-### Why does the update commit use `--no-verify`?
+### Does the update commit bypass hooks?
 
-The framework update commit bypasses pre-commit hooks (`--no-verify`) because:
+No. `task ckeletin:update` runs the application's hooks. `commit=false` leaves the files staged and does not commit. The old `--no-verify` bypass is gone.
+
+The framework update commit used to bypass pre-commit hooks (`--no-verify`) because:
 
 - The commit is machine-generated with deterministic content
 - The update task runs its own verification (build + tests) after committing

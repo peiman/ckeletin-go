@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Framework 0.2.14**: restoring the logger closes the audit file, so Windows can delete a test directory. The framework changelog check ignores Git's CRLF warning. The post-update migration prints UTF-8 on Windows.
 
+### Fixed
+
+- **Framework 0.2.18**: usage errors keep their real message when an output alias sits below the root. Env-driven JSON mode covers those errors. A success envelope no longer hides a later error. `ckeletin:update` does not skip hooks. The Windows test job waits 40 minutes.
+
 ### Changed
 
 - **Conformance report is spec 0.14.0.** The envelope status and the process exit agree, and `command` is the full path without the program name. The published report was spec 0.13.1.

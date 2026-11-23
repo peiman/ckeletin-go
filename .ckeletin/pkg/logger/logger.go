@@ -565,6 +565,16 @@ func GetFileLevel() zerolog.Level {
 //
 //	savedLogger, savedLevel := logger.SaveLoggerState()
 //	defer logger.RestoreLoggerState(savedLogger, savedLevel)
+//
+// AuditOpen reports whether the audit file handle is still held.
+// Execute's cleanup must leave this false. Tests use it to prove the file
+// was closed. Production code does not branch on it.
+func AuditOpen() bool {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	return logFile != nil
+}
+
 func SaveLoggerState() (zerolog.Logger, zerolog.Level) {
 	return log.Logger, zerolog.GlobalLevel()
 }

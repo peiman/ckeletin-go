@@ -1265,6 +1265,10 @@ func unsetConsoleTimeEnv(t *testing.T) {
 func TestComponentBeforeInitSharesSinks(t *testing.T) {
 	savedLogger, savedLevel := SaveLoggerState()
 	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	// An earlier test's Init must not make this pass. The logger starts
+	// unready, on stderr, the way a single -run sees the process.
+	loggerReady = false
+	log.Logger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")
@@ -1291,6 +1295,23 @@ func TestComponentBeforeInitSharesSinks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(body), "after-init")
 	assert.Contains(t, string(body), "early")
+}
+
+func TestRebuildLoggerKeepsShadowLinesOffTheConsole(t *testing.T) {
+	savedLogger, savedLevel := SaveLoggerState()
+	t.Cleanup(func() { RestoreLoggerState(savedLogger, savedLevel) })
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	t.Cleanup(func() { viper.Set(config.KeyAppLogConsoleLevel, "") })
+
+	buf := &bytes.Buffer{}
+	require.NoError(t, Init(buf))
+	log.Debug().Msg(UserOutputMessage)
+	SetConsoleLevel(zerolog.DebugLevel)
+	log.Debug().Msg(UserOutputMessage)
+	assert.NotContains(t, buf.String(), UserOutputMessage)
 }
 
 func TestConsoleTimeFormat_EmptyEnvClearsTimestamp(t *testing.T) {

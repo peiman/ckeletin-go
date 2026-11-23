@@ -105,13 +105,15 @@ A derived application calls `output.Setup` once. It does not copy the flag bindi
 ```go
 // PersistentPreRunE loads configuration and returns. It does not start
 // the logger or resolve the output mode.
+output.RegisterLogLevelFlags(root) // or let Setup do this; calling both is safe
 output.Setup(root,
     output.WithEnvPrefix(prefix),
     output.WithAliasFlag("format"), // optional; the command already has this flag
 )
+// main: os.Exit(output.Execute(root))
 ```
 
-`Setup` registers persistent `--output text|json`, binds it to `app.output_format`, and wraps `PersistentPreRunE`. The wrapper resolves the mode from the flag and the environment, runs the existing pre-run (the config file), resolves the mode again, starts the logger, and records later failures on the audit log. `Execute` closes the log. `WithAfterLogger` runs once that mode is known, including when startup stops with an error. The reference root uses it to discard or replay lines that were logged before the logger existed.
+`Setup` registers persistent `--output text|json` and the three `--log-level*` flags, and wraps `PersistentPreRunE`. `main` exits with `output.Execute(root)`. The wrapper resolves the mode from the flag and the environment, runs the existing pre-run (the config file), resolves the mode again, starts the logger, and records later failures on the audit log. `Execute` closes the log. `WithAfterLogger` runs once that mode is known, including when startup stops with an error. The reference root uses it to discard or replay lines that were logged before the logger existed.
 
 ### One mode, one key
 
