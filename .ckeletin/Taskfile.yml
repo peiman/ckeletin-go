@@ -1233,9 +1233,10 @@ tasks:
       - task: validate:package-organization
       - task: validate:config-consumption
       - task: validate:output
-      # validate:security is a sub-second grep script (ADR-004) — fast mode
-      # runs the same validate:* set as check:common, only skipping the
-      # heavyweight stages (race detection, integration tests, dep scans).
+      # validate:security is a sub-second grep script (ADR-004). Fast mode
+      # skips race detection, integration tests, and the heavier dependency
+      # scans. It still runs the binary license scan: a pull request uses
+      # this task, and the source scan can miss a disallowed license.
       - task: validate:security
       - task: validate:mkdir-lock
       - task: validate:dev-build-tags
@@ -1246,6 +1247,7 @@ tasks:
         silent: true
       - task: test:unit
       - task: check:framework-changelog
+      - task: check:license:binary
       - task: check:summary
         vars: { CHECK_MODE: "fast" }
 

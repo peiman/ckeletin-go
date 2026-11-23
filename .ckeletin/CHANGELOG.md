@@ -20,6 +20,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ### Added
 
+- **`task check:fast` runs the binary license scan.** The source scan can miss a disallowed license. A pull request that only runs the fast check can no longer merge one.
 - **Output-pattern check is part of `task check`.** `validate-output-patterns.sh` runs in the framework check a derived app executes, not only in the reference check binary. `.ckeletin-output-allowlist` lists extra paths that write directly, each with a reason. A missing or malformed file fails on its own. A new `fmt.Println` under `internal/` that is not listed fails.
 - **JSON mode fills in an empty success.** A command that succeeds and writes no envelope gets one success envelope with `data` null. A command annotated `ckeletin:out-002-exempt` prints its native output instead. `EnvelopeExemptions` lists those commands and the reason. Shell completion is exempt.
 - **Standard log-level flags.** `output.RegisterLogLevelFlags` registers persistent `--log-level`, `--log-level-console`, and `--log-level-file`, bound to `app.log_level`, `app.log.console_level`, and `app.log.file_level`. A changed flag wins over `<PREFIX>_APP_LOG_LEVEL`, `<PREFIX>_APP_LOG_CONSOLE_LEVEL`, and `<PREFIX>_APP_LOG_FILE_LEVEL`, which win over the config file, which wins over the default. The reference prefix is `CKELETIN_GO`. The bind runs before `logger.Init`.
