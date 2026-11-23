@@ -202,6 +202,8 @@ The default console log level is WARN. This means:
 - Users don't see: DEBUG, INFO, or ERROR logs (unless --log-level set)
 - For debugging: `--log-level debug` shows everything
 
+`app.log.console_level` wins over `app.log_level`. When both are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. Empty or invalid uses debug.
+
 This is intentional because:
 1. User input validation errors are expected behavior, not system errors
 2. The formatted output already communicates errors clearly

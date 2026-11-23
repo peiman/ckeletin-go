@@ -114,7 +114,7 @@
             },
             "file_level": {
               "default": "debug",
-              "description": "File log level (trace, debug, info, warn, error, fatal, panic)",
+              "description": "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug.",
               "examples": [
                 "debug"
               ],
@@ -180,8 +180,8 @@
           "type": "object"
         },
         "log_level": {
-          "default": "info",
-          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.",
+          "default": "warn",
+          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level.",
           "examples": [
             "debug"
           ],

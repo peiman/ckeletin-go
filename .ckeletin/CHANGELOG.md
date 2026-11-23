@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-11-23
+
+### Changed
+
+- **The console log level defaults to warn.** `app.log_level` was `info`. ADR-006 already said warn, and the registry now agrees. `app.log.console_level` wins when it is set. When both keys are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. An empty or invalid file level stays debug. This changes what a fresh command prints on stderr.
+
 ## [0.2.12] - 2026-11-22
 
 ### Added

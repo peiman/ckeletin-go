@@ -45,7 +45,7 @@ var (
 // Call this once in rootCmd's PersistentPreRunE or main initialization.
 //
 // Configuration:
-//   - app.log_level or app.log.console_level: Console log level (default: info)
+//   - app.log_level or app.log.console_level: Console log level (default: warn)
 //   - app.log.file_enabled: Enable file logging (default: false)
 //   - app.log.file_path: Log file path (default: ./logs/ckeletin-go.log)
 //   - app.log.file_level: File log level (default: debug)
@@ -220,28 +220,36 @@ func getConsoleLogLevel() zerolog.Level {
 	}
 
 	level, err := zerolog.ParseLevel(consoleLevelStr)
-	if err != nil {
-		level = zerolog.InfoLevel
-		log.Warn().
-			Err(err).
-			Str("provided_level", consoleLevelStr).
-			Msg("Invalid console log level, defaulting to 'info'")
+	if err != nil || consoleLevelStr == "" {
+		level = zerolog.WarnLevel
+		if consoleLevelStr != "" {
+			log.Warn().
+				Err(err).
+				Str("provided_level", consoleLevelStr).
+				Msg("Invalid console log level, defaulting to 'warn'")
+		}
 	}
 
 	return level
 }
 
 // getFileLogLevel determines the file log level from configuration.
+// app.log.file_level does not follow app.log_level. An empty value is the
+// documented default. zerolog.ParseLevel treats "" as NoLevel with a nil
+// error, which would drop debug lines, so empty is handled before parsing.
 func getFileLogLevel() zerolog.Level {
-	fileLevelStr := viper.GetString(config.KeyAppLogFileLevel)
+	fileLevelStr := strings.TrimSpace(viper.GetString(config.KeyAppLogFileLevel))
+	if fileLevelStr == "" {
+		return zerolog.DebugLevel
+	}
 
 	level, err := zerolog.ParseLevel(fileLevelStr)
 	if err != nil {
-		level = zerolog.DebugLevel
 		log.Warn().
 			Err(err).
 			Str("provided_level", fileLevelStr).
 			Msg("Invalid file log level, defaulting to 'debug'")
+		return zerolog.DebugLevel
 	}
 
 	return level

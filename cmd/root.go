@@ -477,7 +477,7 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 	configPathFlag = RootCmd.PersistentFlags().Lookup("config-path-mode")
 
 	// Legacy log level flag (for backward compatibility)
-	RootCmd.PersistentFlags().String("log-level", "info", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
+	RootCmd.PersistentFlags().String("log-level", "warn", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
 
 	// Dual logging configuration flags
 	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")

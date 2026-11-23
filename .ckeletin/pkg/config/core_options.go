@@ -21,8 +21,8 @@ func CoreOptions() []ConfigOption {
 		// If app.log.console_level is not set, this value is used for console output
 		{
 			Key:          "app.log_level",
-			DefaultValue: "info",
-			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Used as console level if app.log.console_level is not set.",
+			DefaultValue: "warn",
+			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
@@ -59,7 +59,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log.file_level",
 			DefaultValue: "debug",
-			Description:  "File log level (trace, debug, info, warn, error, fatal, panic)",
+			Description:  "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",

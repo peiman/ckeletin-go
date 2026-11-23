@@ -62,11 +62,11 @@ func TestInit(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			name:     "Invalid level defaults to info",
+			name:     "Invalid level defaults to warn",
 			logLevel: "invalid",
 			output:   new(bytes.Buffer),
 			testMessages: map[string]bool{
-				"Info message":  true,
+				"Info message":  false,
 				"Debug message": false,
 			},
 			expectedError: false,
@@ -909,7 +909,7 @@ func TestGetFileLogLevel(t *testing.T) {
 		{
 			name:          "File level empty",
 			fileLevel:     "",
-			expectedLevel: zerolog.NoLevel,
+			expectedLevel: zerolog.DebugLevel,
 		},
 		{
 			name:          "File level set to trace",
@@ -1014,6 +1014,75 @@ func silenceConsoleTimeNoise(t *testing.T) {
 		viper.Set(config.KeyAppLogConsoleTimeFormat, time.RFC3339)
 		viper.Set(config.KeyAppLogColorEnabled, "auto")
 		viper.Set(config.KeyAppLogFileEnabled, false)
+	})
+}
+
+func TestConsoleAndFileLevelPrecedence(t *testing.T) {
+	viper.Set(config.KeyAppLogFileEnabled, false)
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	t.Cleanup(func() {
+		Cleanup()
+		viper.Set(config.KeyAppLogLevel, "info")
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+		viper.Set(config.KeyAppLogFileLevel, "debug")
+		viper.Set(config.KeyAppLogFileEnabled, false)
+	})
+
+	t.Run("only log_level", func(t *testing.T) {
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+		viper.Set(config.KeyAppLogLevel, "warn")
+		buf := &bytes.Buffer{}
+		require.NoError(t, Init(buf))
+		log.Info().Msg("info-line")
+		log.Warn().Msg("warn-line")
+		assert.NotContains(t, buf.String(), "info-line")
+		assert.Contains(t, buf.String(), "warn-line")
+	})
+
+	t.Run("only console_level", func(t *testing.T) {
+		viper.Set(config.KeyAppLogLevel, "")
+		viper.Set(config.KeyAppLogConsoleLevel, "info")
+		buf := &bytes.Buffer{}
+		require.NoError(t, Init(buf))
+		log.Info().Msg("console-info")
+		assert.Contains(t, buf.String(), "console-info")
+	})
+
+	t.Run("both", func(t *testing.T) {
+		viper.Set(config.KeyAppLogLevel, "error")
+		viper.Set(config.KeyAppLogConsoleLevel, "debug")
+		buf := &bytes.Buffer{}
+		require.NoError(t, Init(buf))
+		log.Debug().Msg("both-debug")
+		assert.Contains(t, buf.String(), "both-debug")
+	})
+
+	t.Run("neither", func(t *testing.T) {
+		viper.Set(config.KeyAppLogLevel, "")
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+		buf := &bytes.Buffer{}
+		require.NoError(t, Init(buf))
+		log.Info().Msg("neither-info")
+		log.Warn().Msg("neither-warn")
+		assert.NotContains(t, buf.String(), "neither-info")
+		assert.Contains(t, buf.String(), "neither-warn")
+	})
+
+	t.Run("file level ignores log_level", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "app.log")
+		viper.Set(config.KeyAppLogLevel, "error")
+		viper.Set(config.KeyAppLogConsoleLevel, "error")
+		viper.Set(config.KeyAppLogFileLevel, "")
+		viper.Set(config.KeyAppLogFileEnabled, true)
+		viper.Set(config.KeyAppLogFilePath, path)
+		require.NoError(t, Init(&bytes.Buffer{}))
+		log.Debug().Msg("file-debug")
+		Cleanup()
+		body, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "file-debug")
 	})
 }
 
