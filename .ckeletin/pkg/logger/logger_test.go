@@ -1017,6 +1017,36 @@ func silenceConsoleTimeNoise(t *testing.T) {
 	})
 }
 
+func TestFileLoggingEnabledIsDebug(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "app.log")
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, path)
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+	t.Cleanup(func() {
+		Cleanup()
+		viper.Set(config.KeyAppLogFileEnabled, false)
+		viper.Set(config.KeyAppLogConsoleLevel, "")
+	})
+
+	for _, level := range []string{"info", "warn"} {
+		viper.Set(config.KeyAppLogConsoleLevel, level)
+		buf := &bytes.Buffer{}
+		require.NoError(t, Init(buf))
+		assert.NotContains(t, buf.String(), "File logging enabled", level)
+	}
+
+	viper.Set(config.KeyAppLogConsoleLevel, "debug")
+	buf := &bytes.Buffer{}
+	require.NoError(t, Init(buf))
+	assert.Contains(t, buf.String(), "File logging enabled")
+	body, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "File logging enabled")
+}
+
 func TestConsoleAndFileLevelPrecedence(t *testing.T) {
 	viper.Set(config.KeyAppLogFileEnabled, false)
 	viper.Set(config.KeyAppLogColorEnabled, "false")

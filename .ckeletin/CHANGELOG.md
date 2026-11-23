@@ -13,6 +13,10 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 - **The console log level defaults to warn.** `app.log_level` was `info`. ADR-006 already said warn, and the registry now agrees. `app.log.console_level` wins when it is set. When both keys are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. An empty or invalid file level stays debug. This changes what a fresh command prints on stderr.
 
+### Fixed
+
+- **"File logging enabled" is a debug line.** With the file on, Init no longer prints that status at info. It is on stderr only at debug, and it is still in the audit file when the file level is debug.
+
 ## [0.2.12] - 2026-11-22
 
 ### Added

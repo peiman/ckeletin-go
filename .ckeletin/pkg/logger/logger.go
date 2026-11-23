@@ -175,7 +175,7 @@ func Init(out io.Writer) error {
 	if viper.GetBool(config.KeyAppLogFileEnabled) && logFile != nil {
 		filePath := viper.GetString(config.KeyAppLogFilePath)
 		fileLevel := getFileLogLevel()
-		log.Info().
+		log.Debug().
 			Str("path", SanitizePath(filePath)).
 			Str("file_level", fileLevel.String()).
 			Msg("File logging enabled")
