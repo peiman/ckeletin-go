@@ -1193,6 +1193,9 @@ tasks:
       # The binary check above does not know about the mkdir-lock scan.
       # The script travels with .ckeletin/, so derived projects run it too.
       - task: validate:mkdir-lock
+      # The reference check binary also runs this script. A derived project's
+      # check command may not. The script travels with .ckeletin/.
+      - task: validate:output
       # Non-fatal footer: nudge when upstream .ckeletin/VERSION is a newer semver.
       # Throttled, time-boxed, CI-skipped and never fails the build (see the script).
       - cmd: '{{.SCRIPTS_DIR}}/check-framework-updates.sh'

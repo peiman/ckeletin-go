@@ -1,0 +1,7 @@
+# Paths under internal/ that write directly, outside the rendering layer.
+# The rendering layer (internal/ui, internal/progress, internal/logger,
+# internal/testutil) and *_test.go files are already exempt.
+# Each other line is a relative path, then a reason.
+# An empty list allows no extra paths. A new fmt.Print* still fails.
+# Example:
+# internal/tui/screen.go full-screen TUI writes the frame

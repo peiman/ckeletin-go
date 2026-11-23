@@ -71,7 +71,8 @@ Output patterns are validated automatically via static analysis:
 **1. Validation Script**
 - `scripts/validate-output-patterns.sh` checks source code patterns
 - Detects direct `fmt.Print*` and `os.Stdout` usage in `internal/*`
-- Allows exceptions: `internal/ui/*` (UI implementation), `*_test.go` (tests)
+- Allows the rendering layer (`internal/ui`, `internal/progress`, `internal/logger`, `internal/testutil`) and `*_test.go`
+- Requires `.ckeletin-output-allowlist` at the repository root. A listed path, with a reason, may write directly. A missing or malformed file fails on its own. A new `fmt.Println` that is not listed fails. `task check` runs the script, including in a derived project whose check binary does not.
 
 **2. Task Command**
 ```bash
