@@ -1,6 +1,6 @@
 module github.com/peiman/ckeletin-go
 
-go 1.26.9
+go 1.26.11
 
 require (
 	github.com/charmbracelet/bubbles v1.0.0
