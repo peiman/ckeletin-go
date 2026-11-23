@@ -47,10 +47,10 @@ log.Debug().Str("detail", value).Msg("Detailed debug info")
 
 ```go
 // Configuration via flags or config file
---log-console-level info      // INFO+ to console
+--log-level-console info     // INFO+ to console
 --log-file-enabled            // Enable file logging
 --log-file-path ./logs/app.log
---log-file-level debug        // DEBUG+ to file
+--log-level-file debug        // DEBUG+ to file
 ```
 
 **Result:**
@@ -203,6 +203,8 @@ The default console log level is WARN. This means:
 - For debugging: `--log-level debug` shows everything
 
 `app.log.console_level` wins over `app.log_level`. When both are empty the console level is warn. `app.log.file_level` does not follow `app.log_level`. Empty or invalid uses debug.
+
+The flags are `--log-level`, `--log-level-console`, and `--log-level-file`, registered by `output.RegisterLogLevelFlags`. A changed flag wins over the environment variable, which wins over the config file, which wins over the default. The environment variables are `<PREFIX>_APP_LOG_LEVEL`, `<PREFIX>_APP_LOG_CONSOLE_LEVEL`, and `<PREFIX>_APP_LOG_FILE_LEVEL`. The reference prefix is `CKELETIN_GO`. The flag is bound before `logger.Init`, so it applies to the first log line.
 
 `logger.Component(name)` returns a logger that writes to the same console and file as the global logger, with `component` set to that name. It does not open a second file. `SetConsoleLevel` and `SetFileLevel` apply to a component logger created before or after the change, because every logger holds the same sink. `logger.SetDefaultFields` copies fields onto later lines from the global logger and from component loggers created after the call. A field on the event with the same key wins. There is no per-component level key.
 

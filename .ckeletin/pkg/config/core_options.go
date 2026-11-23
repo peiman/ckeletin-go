@@ -22,7 +22,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log_level",
 			DefaultValue: "warn",
-			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level.",
+			Description:  "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level. Flag: --log-level.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
@@ -33,7 +33,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log.console_level",
 			DefaultValue: "",
-			Description:  "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.",
+			Description:  "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level. Flag: --log-level-console.",
 			Type:         "string",
 			Required:     false,
 			Example:      "info",
@@ -59,7 +59,7 @@ func CoreOptions() []ConfigOption {
 		{
 			Key:          "app.log.file_level",
 			DefaultValue: "debug",
-			Description:  "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug.",
+			Description:  "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug. Flag: --log-level-file.",
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",

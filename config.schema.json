@@ -82,7 +82,7 @@
             },
             "console_level": {
               "default": "",
-              "description": "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level.",
+              "description": "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses app.log_level. Flag: --log-level-console.",
               "examples": [
                 "info"
               ],
@@ -114,7 +114,7 @@
             },
             "file_level": {
               "default": "debug",
-              "description": "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug.",
+              "description": "File log level (trace, debug, info, warn, error, fatal, panic). Independent of app.log_level. Empty or invalid uses debug. Flag: --log-level-file.",
               "examples": [
                 "debug"
               ],
@@ -181,7 +181,7 @@
         },
         "log_level": {
           "default": "warn",
-          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level.",
+          "description": "Logging level for the application (trace, debug, info, warn, error, fatal, panic). Console level when app.log.console_level is empty. It does not change the file level. Flag: --log-level.",
           "examples": [
             "debug"
           ],

@@ -476,14 +476,13 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 		"Config path mode when --config is not set (xdg, native, both)")
 	configPathFlag = RootCmd.PersistentFlags().Lookup("config-path-mode")
 
-	// Legacy log level flag (for backward compatibility)
-	RootCmd.PersistentFlags().String("log-level", "warn", "Set the log level (trace, debug, info, warn, error, fatal, panic)")
+	// --log-level, --log-level-console, and --log-level-file are registered
+	// and bound by the framework helper. The other logging flags stay here.
+	output.RegisterLogLevelFlags(RootCmd)
 
 	// Dual logging configuration flags
-	RootCmd.PersistentFlags().String("log-console-level", "", "Console log level (trace, debug, info, warn, error, fatal, panic). If empty, uses --log-level.")
 	RootCmd.PersistentFlags().Bool("log-file-enabled", true, "Enable file logging to capture detailed logs. Set false to turn the audit log off.")
 	RootCmd.PersistentFlags().String("log-file-path", "./logs/ckeletin-go.log", "Path to the log file")
-	RootCmd.PersistentFlags().String("log-file-level", "debug", "File log level (trace, debug, info, warn, error, fatal, panic)")
 	RootCmd.PersistentFlags().String("log-color", "auto", "Enable colored console output (auto, true, false)")
 
 	// Log rotation configuration flags
@@ -518,10 +517,10 @@ var rootRegistryFlagBindings = []struct {
 	name string
 }{
 	{config.KeyAppLogLevel, "log-level"},
-	{config.KeyAppLogConsoleLevel, "log-console-level"},
+	{config.KeyAppLogConsoleLevel, "log-level-console"},
 	{config.KeyAppLogFileEnabled, "log-file-enabled"},
 	{config.KeyAppLogFilePath, "log-file-path"},
-	{config.KeyAppLogFileLevel, "log-file-level"},
+	{config.KeyAppLogFileLevel, "log-level-file"},
 	{config.KeyAppLogColorEnabled, "log-color"},
 	{config.KeyAppLogFileMaxSize, "log-file-max-size"},
 	{config.KeyAppLogFileMaxBackups, "log-file-max-backups"},

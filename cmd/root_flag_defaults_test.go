@@ -48,7 +48,7 @@ func TestRootFlags_ProjectDefaultIsFlagDefault(t *testing.T) {
 	assert.Equal(t, "error", logLevel.DefValue)
 	assert.Equal(t, "error", logLevel.Value.String())
 	assert.False(t, logLevel.Changed)
-	assert.Equal(t, "Set the log level (trace, debug, info, warn, error, fatal, panic)", logLevel.Usage)
+	assert.Equal(t, "Console log level when --log-level-console is empty (trace, debug, info, warn, error, fatal, panic). Does not change the file level.", logLevel.Usage)
 
 	enabled := RootCmd.PersistentFlags().Lookup("log-file-enabled")
 	require.NotNil(t, enabled)

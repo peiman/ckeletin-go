@@ -939,10 +939,10 @@ func TestLoggingFlagBindings(t *testing.T) {
 		flagName string
 	}{
 		// Console and file logging flags
-		{name: "log-console-level flag exists", flagName: "log-console-level"},
+		{name: "log-level-console flag exists", flagName: "log-level-console"},
 		{name: "log-file-enabled flag exists", flagName: "log-file-enabled"},
 		{name: "log-file-path flag exists", flagName: "log-file-path"},
-		{name: "log-file-level flag exists", flagName: "log-file-level"},
+		{name: "log-level-file flag exists", flagName: "log-level-file"},
 		// Log rotation flags
 		{name: "log-file-max-size flag exists", flagName: "log-file-max-size"},
 		{name: "log-file-max-backups flag exists", flagName: "log-file-max-backups"},
@@ -1480,7 +1480,7 @@ func TestJSONMode_EnvDriven_StderrSilent(t *testing.T) {
 			"ping",
 			"--log-file-enabled",
 			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
-			"--log-file-level", "debug",
+			"--log-level-file", "debug",
 		})
 		if err := Execute(); err != nil {
 			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
@@ -1529,7 +1529,7 @@ func TestJSONMode_ConfigFileDriven_StderrSilent(t *testing.T) {
 			"ping",
 			"--log-file-enabled",
 			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
-			"--log-file-level", "debug",
+			"--log-level-file", "debug",
 		})
 		if err := Execute(); err != nil {
 			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
@@ -1576,7 +1576,7 @@ func TestJSONMode_AuditFileStillReceivesLogs(t *testing.T) {
 			"ping", "--output", "json",
 			"--log-file-enabled",
 			"--log-file-path", os.Getenv(jsonAuditLogPathEnv),
-			"--log-file-level", "debug",
+			"--log-level-file", "debug",
 		})
 		if err := Execute(); err != nil {
 			fmt.Fprintf(os.Stderr, "execute failed: %v\n", err)
