@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.17**: `--format` (an alias of `--output`) drives logger silence, and alias text shows warnings when config says json. A command that renders `status: error` exits non-zero; a rendered success exits 0. `--output json` on a parse error prints one JSON envelope with `command` null. An unknown command in text mode prints only `Error: …`. A panic becomes that same error document and a non-zero exit. Shadow lines are not copied to stderr at debug. `output.Setup` is the derived-app wiring. `output.Coded` sets `error.code`. An empty console-time-format environment variable clears the timestamp. The output-pattern check does not skip every directory named `ui`.
+
 - **Framework 0.2.16**: the audit-file test closes the log before Windows deletes its temp directory.
 
 - **Framework 0.2.15**: a second logger init closes the previous audit file, and the post-update migration writes LF line endings.

@@ -394,17 +394,22 @@ func TestUseOutputMode_Precedence(t *testing.T) {
 	require.NoError(t, UseOutputMode(PhaseResolved))
 	assert.False(t, IsJSONMode(), "flag text overrides config json")
 
+	// The cases above publish the resolved mode into viper. Reset so the
+	// alias is the only json source: a dead alias branch must fail here.
+	viper.Reset()
 	root = &cobra.Command{Use: "app"}
 	child := &cobra.Command{Use: "child"}
 	child.Flags().String("format", "text", "alias")
 	root.AddCommand(child)
 	RegisterOutputFlag(root, WithEnvPrefix("APP"), WithAliasFlag("format"))
-	// Clear the env so the alias is the decider.
+	// Clear the env so the alias is the decider. Empty is not a value.
 	t.Setenv("APP_APP_OUTPUT_FORMAT", "")
 	require.NoError(t, child.ParseFlags([]string{"--format", "json"}))
 	SetCommandFrom(child)
 	require.NoError(t, UseOutputMode(PhaseResolved))
 	assert.True(t, IsJSONMode(), "alias flag turns JSON on")
+	assert.Equal(t, "json", viper.GetString(config.KeyAppOutputFormat),
+		"resolved mode is what the logger reads")
 
 	require.NoError(t, root.ParseFlags([]string{"--output", "text"}))
 	SetCommandFrom(child)

@@ -24,12 +24,36 @@ const (
 )
 
 type flagSettings struct {
-	alias     string
-	envPrefix string
+	alias       string
+	envPrefix   string
+	afterLogger func(error)
 }
 
 // settings is process-wide. A CLI resolves one output mode.
 var settings flagSettings
+
+// phaseUnset means UseOutputMode has not run for this Execute.
+// PhaseEarly is 0, so this stays below both phases.
+const phaseUnset Phase = -1
+
+// resolvedPhase is the last phase UseOutputMode finished.
+// Execute uses it to tell a finished resolution from a caller that only
+// preset the mode.
+var resolvedPhase = phaseUnset
+
+// modePinned is true after SetOutputMode. Execute does not replace a
+// preset mode when a command fails before PersistentPreRunE.
+var modePinned bool
+
+type modeSource int
+
+const (
+	sourceFlag modeSource = iota
+	sourceAlias
+	sourceEnv
+	sourceConfig
+	sourceDefault
+)
 
 // Option configures RegisterOutputFlag.
 type Option func(*flagSettings)
@@ -87,33 +111,49 @@ func RegisterOutputFlag(root *cobra.Command, opts ...Option) {
 	}
 }
 
-// UseOutputMode resolves the mode and stores it for IsJSONMode and logger.Init.
-// Invalid values return an error whose exit code is ExitInvalidOutput.
+// UseOutputMode resolves the mode and stores it for IsJSONMode.
+// It also writes the resolved value to app.output_format. logger.Init reads
+// that key and does not import this package, so an alias flag and a text
+// override of config json reach the console writer. The default is not
+// written during PhaseEarly: the config file is not loaded yet, and a viper
+// write would hide it. Invalid values return an error whose exit code is
+// ExitInvalidOutput.
 func UseOutputMode(phase Phase) error {
-	mode, err := resolveMode(phase)
+	mode, source, err := resolveMode(phase)
 	if err != nil {
 		return err
 	}
-	SetOutputMode(mode)
+	currentOutputMode = mode
+	modePinned = false
+	if phase > resolvedPhase {
+		resolvedPhase = phase
+	}
+	if source != sourceDefault || phase == PhaseResolved {
+		viper.Set(config.KeyAppOutputFormat, mode)
+	}
 	return nil
 }
 
-func resolveMode(phase Phase) (string, error) {
+func resolveMode(phase Phase) (string, modeSource, error) {
 	if value, ok := explicitFlag(currentCmd, outputFlagName); ok {
-		return validMode(value)
+		mode, err := validMode(value)
+		return mode, sourceFlag, err
 	}
 	if settings.alias != "" {
 		if value, ok := explicitFlag(currentCmd, settings.alias); ok {
-			return validMode(value)
+			mode, err := validMode(value)
+			return mode, sourceAlias, err
 		}
 	}
 	if value, ok := envMode(); ok {
-		return validMode(value)
+		mode, err := validMode(value)
+		return mode, sourceEnv, err
 	}
 	if phase == PhaseResolved && viper.IsSet(config.KeyAppOutputFormat) {
-		return validMode(viper.GetString(config.KeyAppOutputFormat))
+		mode, err := validMode(viper.GetString(config.KeyAppOutputFormat))
+		return mode, sourceConfig, err
 	}
-	return "text", nil
+	return "text", sourceDefault, nil
 }
 
 func explicitFlag(cmd *cobra.Command, name string) (string, bool) {

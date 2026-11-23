@@ -1,7 +1,9 @@
-# Paths under internal/ that write directly, outside the rendering layer.
-# The rendering layer (internal/ui, internal/progress, internal/logger,
-# internal/testutil) and *_test.go files are already exempt.
-# Each other line is a relative path, then a reason.
-# An empty list allows no extra paths. A new fmt.Print* still fails.
+# Paths under internal/ that write directly.
+# A directory named ui, progress, logger, or testutil is not exempt.
+# *_test.go files are already exempt.
+# Each other line is a relative path, an optional count= or lines= pin, then a reason.
+# A pin fails when the file gains or loses a matching line.
 # Example:
-# internal/tui/screen.go full-screen TUI writes the frame
+# internal/tui/screen.go count=1 full-screen TUI writes the frame
+internal/ui/check.go count=1 check printer writes to stdout
+internal/progress/terminal.go count=1 detects whether stdout is a terminal

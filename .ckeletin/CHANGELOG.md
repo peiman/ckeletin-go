@@ -7,6 +7,17 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.17] - 2026-11-23
+
+### Changed
+
+- **One output setup for a derived root.** `output.Setup` registers `--output`, binds it to `app.output_format`, resolves the mode, starts the logger, records failures on the audit log, and closes that log when `Execute` returns. The reference root uses it. `UseOutputMode` writes the resolved mode into `app.output_format`, so an alias flag drives console silence the same way config json does.
+- **Envelope status and the exit code agree** when the command rendered the document itself. A rendered error exits non-zero. A rendered success exits 0.
+- **A parse error sees `--output json`.** The envelope has `command` null when no command resolved. A usage error does not print a raw log line when no logger is installed.
+- **`Execute` recovers a panic** into one error envelope, or `Error: panic: …` in text mode, and a non-zero exit.
+- **Shadow lines stay in the audit file.** `--log-level debug` does not print them again on stderr. `logger.Component` before `Init` uses the sinks `Init` installs. An empty `APP_LOG_CONSOLE_TIME_FORMAT` clears the console timestamp. `output.Coded` sets `error.code`.
+- **Output-pattern exclusions are exact paths.** A directory named `ui` is scanned. An allowlist line may pin `count=` or `lines=`, and a new print in that file fails.
+
 ## [0.2.16] - 2026-11-23
 
 ### Fixed
