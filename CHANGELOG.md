@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.15**: a second logger init closes the previous audit file, and the post-update migration writes LF line endings.
+
 - **Framework 0.2.14**: restoring the logger closes the audit file, so Windows can delete a test directory. The framework changelog check ignores Git's CRLF warning. The post-update migration prints UTF-8 on Windows.
 
 ### Changed

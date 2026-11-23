@@ -277,7 +277,7 @@ if moved:
 if infra >= 0 and not re.search(r"(?m)^  output:\n    mayDependOn:", text):
     text = text[: infra + 1] + blocks + text[infra + 1 :]
 
-path.write_text(text)
+path.write_text(text, newline="\n")
 print("   ✓ Moved pkg/output into its own component")
 
 # A business package that still imports the writers is left where it is.

@@ -1020,6 +1020,34 @@ func silenceConsoleTimeNoise(t *testing.T) {
 	})
 }
 
+type closeCounter struct {
+	n int
+}
+
+func (c *closeCounter) Close() error {
+	c.n++
+	return nil
+}
+
+func TestInitClosesPreviousAuditFile(t *testing.T) {
+	previous := &closeCounter{}
+	logFile = previous
+	t.Cleanup(func() {
+		Cleanup()
+		viper.Set(config.KeyAppLogFileEnabled, false)
+	})
+
+	dir := t.TempDir()
+	viper.Set(config.KeyAppLogFileEnabled, true)
+	viper.Set(config.KeyAppLogFilePath, filepath.Join(dir, "app.log"))
+	viper.Set(config.KeyAppLogFileLevel, "debug")
+	viper.Set(config.KeyAppLogColorEnabled, "false")
+	viper.Set(config.KeyAppLogSamplingEnabled, false)
+
+	require.NoError(t, Init(&bytes.Buffer{}))
+	assert.Equal(t, 1, previous.n)
+}
+
 func TestFileLoggingEnabledIsDebug(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "app.log")

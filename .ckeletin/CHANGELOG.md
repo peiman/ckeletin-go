@@ -7,6 +7,13 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.15] - 2026-11-23
+
+### Fixed
+
+- **A second logger init closes the previous audit file.** `Init` used to replace the handle and leave the old one open. Windows then could not delete `./logs/<app>.log` when a test called `Init` more than once.
+- **The post-update migration writes LF.** On Windows, `Path.write_text` was turning the architecture file into CRLF.
+
 ## [0.2.14] - 2026-11-23
 
 ### Fixed
