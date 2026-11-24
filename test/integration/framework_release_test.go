@@ -50,6 +50,7 @@ func TestReleaseFramework_WritesVersionAndTag(t *testing.T) {
 	text := string(changelog)
 	assert.Contains(t, text, "## [0.2.19] - ")
 	assert.Contains(t, text, "The audit records a rendered error.")
+	assert.Contains(t, text, "rendered error.\n\n## [0.2.18]")
 	unreleased := text[strings.Index(text, "## [Unreleased]"):strings.Index(text, "## [0.2.19]")]
 	assert.NotContains(t, unreleased, "- ")
 

@@ -100,7 +100,7 @@ else:
 notes = body.strip("\n")
 if not any(line.startswith("- ") for line in notes.splitlines()):
     sys.exit("Nothing to release. [Unreleased] has no changelog bullets.")
-released = f"## [{version}] - {today}\n\n{notes}\n"
+released = f"## [{version}] - {today}\n\n{notes}\n\n"
 path.write_text(text[:start] + "## [Unreleased]\n\n" + released + tail.lstrip("\n"))
 PY
 
@@ -112,6 +112,6 @@ git tag -a "framework-v${next}" -m "Framework v${next}"
 
 echo "Tagged framework-v${next} at $(git rev-parse --short HEAD)"
 if [[ "$do_push" -eq 1 ]]; then
-	git push origin HEAD
+	git push origin "HEAD:${branch}"
 	git push origin "framework-v${next}"
 fi

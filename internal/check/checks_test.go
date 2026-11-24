@@ -107,6 +107,8 @@ func TestFilterLintOutput(t *testing.T) {
 		{"multiple issues", "main.go:10:5: error 1\nutils.go:20:3: error 2", "golangci-lint", "golangci-lint found 2 issue(s):\n  • main.go:10:5: error 1\n  • utils.go:20:3: error 2"},
 		{"filters package headers", "# github.com/example/pkg\nmain.go:10:5: error here", "go vet", "go vet found 1 issue(s):\n  • main.go:10:5: error here"},
 		{"filters level= lines", "level=warning msg=\"some warning\"\nmain.go:5:1: actual error", "golangci-lint", "golangci-lint found 1 issue(s):\n  • main.go:5:1: actual error"},
+		{"only level lines", "level=error msg=\"boom\"", "golangci-lint", "golangci-lint found issues"},
+		{"loader error", "Error: context loading failed: timed out", "golangci-lint", "golangci-lint found issues:\nError: context loading failed: timed out"},
 	}
 
 	for _, tt := range tests {
