@@ -150,6 +150,110 @@ func TestSetupClosesTheAuditFile(t *testing.T) {
 	assert.False(t, logger.AuditOpen())
 }
 
+func TestRenderedErrorReturnNil_IsAudited(t *testing.T) {
+	resetRound(t)
+	SetOutputMode("json")
+	var calls int
+	var got error
+	var code int
+	SetFailureLog(func(err error, _ string, c int) {
+		calls++
+		got = err
+		code = c
+	})
+	root := &cobra.Command{Use: "dapp"}
+	root.AddCommand(&cobra.Command{
+		Use: "renderederr",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return RenderJSON(cmd.OutOrStdout(), JSONEnvelope{
+				Status: "error", Command: "renderederr",
+				Error: &JSONError{Message: "boom"},
+			})
+		},
+	})
+	root.SetArgs([]string{"renderederr"})
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	assert.Equal(t, 1, Execute(root))
+	assert.Equal(t, 1, calls)
+	require.Error(t, got)
+	assert.Equal(t, "boom", got.Error())
+	assert.Equal(t, 1, code)
+}
+
+func TestRenderedCode_IsAudited(t *testing.T) {
+	resetRound(t)
+	SetOutputMode("json")
+	var calls int
+	var code int
+	SetFailureLog(func(_ error, _ string, c int) {
+		calls++
+		code = c
+	})
+	root := &cobra.Command{Use: "dapp", RunE: func(*cobra.Command, []string) error {
+		return Rendered(2)
+	}}
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	assert.Equal(t, 2, Execute(root))
+	assert.Equal(t, 1, calls)
+	assert.Equal(t, 2, code)
+	assert.Empty(t, out.String())
+}
+
+func TestPanicEnvelope_UsesTheSubcommand(t *testing.T) {
+	resetRound(t)
+	root := &cobra.Command{Use: "dapp"}
+	group := &cobra.Command{Use: "check"}
+	group.AddCommand(&cobra.Command{
+		Use: "model",
+		RunE: func(*cobra.Command, []string) error {
+			panic("boom")
+		},
+	})
+	root.AddCommand(group)
+	RegisterOutputFlag(root, WithEnvPrefix("APP"))
+	root.SetArgs([]string{"check", "model", "--output", "json"})
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	assert.NotEqual(t, 0, Execute(root))
+	env := decodeEnvelope(t, out.String())
+	assert.Equal(t, "check model", env["command"])
+}
+
+func TestSecondRun_DoesNotKeepTheFlag(t *testing.T) {
+	resetRound(t)
+	first := &cobra.Command{Use: "dapp", RunE: func(*cobra.Command, []string) error { return nil }}
+	RegisterOutputFlag(first, WithEnvPrefix("APP"))
+	first.SetArgs([]string{"--output", "json"})
+	out1 := &bytes.Buffer{}
+	first.SetOut(out1)
+	first.SetErr(out1)
+	assert.Equal(t, 0, Execute(first))
+	assert.Contains(t, out1.String(), `"status"`)
+
+	second := &cobra.Command{Use: "dapp", RunE: func(*cobra.Command, []string) error { return nil }}
+	RegisterOutputFlag(second, WithEnvPrefix("APP"))
+	out2 := &bytes.Buffer{}
+	second.SetOut(out2)
+	second.SetErr(out2)
+	assert.Equal(t, 0, Execute(second))
+	assert.NotContains(t, out2.String(), `"status"`)
+}
+
+func TestInvalidProbedMode_Exits2(t *testing.T) {
+	resetRound(t)
+	root := aliasTree(true)
+	root.SetArgs([]string{"check", "model", "x", "--bogus", "--format", "yaml"})
+	out := &bytes.Buffer{}
+	root.SetOut(out)
+	root.SetErr(out)
+	assert.Equal(t, 2, Execute(root))
+}
+
 func aliasTree(aliasOnGroup bool) *cobra.Command {
 	root := &cobra.Command{Use: "dapp"}
 	group := &cobra.Command{Use: "check"}

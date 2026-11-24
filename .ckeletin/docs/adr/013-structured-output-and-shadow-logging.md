@@ -123,7 +123,7 @@ Precedence is the changed `--output` flag, then a changed alias flag, then the e
 
 ### Command identifier
 
-The envelope field `command` is the full path without the program name, words separated by one space: `check model`. A top-level command is its name. `--version` uses `version`. `SetCommandName` still overrides the path. A failure before any command resolves, including a parse error, marshals `command` as JSON null. `Execute` reads `--output` from the arguments when `PersistentPreRunE` did not run, so `--output json` on that error is one JSON envelope. A failure after a parent resolved uses that parent's path (`check` when `check nope` does not resolve).
+The envelope field `command` is the full path without the program name, words separated by one space: `check model`. A top-level command is its name. `--version` uses `version`. `SetCommandName` still overrides the path. A failure before any command resolves, including a parse error, marshals `command` as JSON null. `Execute` reads `--output` from the arguments, and the output environment variable, when `PersistentPreRunE` did not run, so `--output json` or the env var on that error is one JSON envelope. A `json` value in the config file does not apply to a usage error: the file is loaded in the pre-run, which did not run. A failure after a parent resolved uses that parent's path (`check` when `check nope` does not resolve).
 
 ### One envelope per run
 

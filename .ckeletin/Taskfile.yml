@@ -239,7 +239,6 @@ tasks:
         echo "   Running post-update migrations..."
         bash .ckeletin/scripts/migrate-post-update.sh 2>/dev/null || true
 
-        echo "   Committing framework update..."
         git add .ckeletin .go-arch-lint.yml go.mod go.sum
         # Only commit if there are staged changes
         if git diff --cached --quiet; then
@@ -251,15 +250,16 @@ tasks:
           # commit=false leaves the files staged. The commit, when it runs,
           # does not pass --no-verify: the application's hooks are the gate.
           COMMIT="{{.commit}}"
+          COMMITTED=true
           if [ -z "$COMMIT" ] || [ "$COMMIT" = "true" ]; then
+            echo "   Committing framework update..."
             if ! git commit -m "chore: update ckeletin framework to v${NEW_VERSION}"; then
               echo "❌ The update commit was rejected. The application's hooks ran. Nothing was bypassed."
               exit 1
             fi
           else
+            COMMITTED=false
             echo "   Staged. Not committed (commit=$COMMIT)."
-            printf 'CKELETIN_UPDATE_RESULT={"status":"staged","from":"%s","to":"%s","committed":false,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
-            exit 0
           fi
 
           echo "🔍 Verifying project builds after update..."
@@ -311,10 +311,17 @@ tasks:
           fi
 
           echo ""
-          echo "✅ Framework updated successfully!"
-          printf 'CKELETIN_UPDATE_RESULT={"status":"updated","from":"%s","to":"%s","committed":true,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
+          if [ "$COMMITTED" = "true" ]; then
+            echo "✅ Framework updated successfully!"
+            printf 'CKELETIN_UPDATE_RESULT={"status":"updated","from":"%s","to":"%s","committed":true,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
+            echo "   Review changes with: git diff HEAD~1"
+          else
+            echo "✅ Framework update is staged. Not committed."
+            echo "   The build and tests above already ran."
+            printf 'CKELETIN_UPDATE_RESULT={"status":"staged","from":"%s","to":"%s","committed":false,"discarded":%s}\n' "$OLD_VERSION" "$NEW_VERSION" "$DISCARDED"
+            echo "   Review changes with: git diff --cached"
+          fi
           echo "   Module paths updated: $UPSTREAM_MODULE → $CURRENT_MODULE"
-          echo "   Review changes with: git diff HEAD~1"
         fi
 
   update:dry-run:

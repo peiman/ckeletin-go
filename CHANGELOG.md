@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework 0.2.19**: a rendered error that returns nil is audited. An output allowlist line without a pin fails. `ckeletin:update commit=false` still runs the build and the tests.
+
 - **Framework 0.2.18**: usage errors keep their real message when an output alias sits below the root. Env-driven JSON mode covers those errors. A success envelope no longer hides a later error. `ckeletin:update` does not skip hooks. The Windows test job waits 40 minutes.
 
 ### Changed

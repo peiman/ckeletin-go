@@ -66,6 +66,7 @@ func SetAfterRun(fn func()) {
 func Execute(root *cobra.Command) (code int) {
 	rendered = false
 	renderedStatus = ""
+	renderedErrorMessage = ""
 	pinned := modePinned
 	modePinned = false
 	resolvedPhase = phaseUnset
@@ -108,6 +109,11 @@ func Execute(root *cobra.Command) (code int) {
 func successExit(executed *cobra.Command) int {
 	writeEmptySuccess(executed)
 	if rendered && renderedStatus == "error" {
+		msg := renderedErrorMessage
+		if msg == "" {
+			msg = "command failed"
+		}
+		noteFailure(executed, errors.New(msg), 1)
 		return 1
 	}
 	return 0

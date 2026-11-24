@@ -191,6 +191,9 @@ var (
 	// renderedStatus is the status of that envelope. Execute uses it to
 	// correct the exit code when the command wrote the document itself.
 	renderedStatus string
+	// renderedErrorMessage is the error text of that envelope. A command
+	// that renders an error and returns nil still has to be audited.
+	renderedErrorMessage string
 )
 
 // SetOutputMode sets the current output mode ("text" or "json").
@@ -277,6 +280,10 @@ func RenderJSON(out io.Writer, envelope JSONEnvelope) error {
 	if err == nil {
 		rendered = true
 		renderedStatus = envelope.Status
+		renderedErrorMessage = ""
+		if envelope.Error != nil {
+			renderedErrorMessage = envelope.Error.Message
+		}
 	}
 	return err
 }

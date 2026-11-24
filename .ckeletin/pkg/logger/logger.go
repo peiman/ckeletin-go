@@ -559,22 +559,21 @@ func GetFileLevel() zerolog.Level {
 	return currentFileLevel
 }
 
-// SaveLoggerState returns the current global logger and log level for later restoration.
-// This is useful in tests to avoid global state pollution.
-// Use with RestoreLoggerState in a defer statement:
-//
-//	savedLogger, savedLevel := logger.SaveLoggerState()
-//	defer logger.RestoreLoggerState(savedLogger, savedLevel)
-//
 // AuditOpen reports whether the audit file handle is still held.
-// Execute's cleanup must leave this false. Tests use it to prove the file
-// was closed. Production code does not branch on it.
+// It exists for tests. Execute's cleanup must leave it false.
+// Production code does not branch on it.
 func AuditOpen() bool {
 	loggerMu.Lock()
 	defer loggerMu.Unlock()
 	return logFile != nil
 }
 
+// SaveLoggerState returns the current global logger and log level for later restoration.
+// This is useful in tests to avoid global state pollution.
+// Use with RestoreLoggerState in a defer statement:
+//
+//	savedLogger, savedLevel := logger.SaveLoggerState()
+//	defer logger.RestoreLoggerState(savedLogger, savedLevel)
 func SaveLoggerState() (zerolog.Logger, zerolog.Level) {
 	return log.Logger, zerolog.GlobalLevel()
 }
