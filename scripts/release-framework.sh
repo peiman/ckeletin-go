@@ -49,6 +49,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
 	exit 1
 fi
 
+module="$(awk 'NR==1 {print $2}' go.mod 2>/dev/null || true)"
+if [[ "$module" != "github.com/peiman/ckeletin-go" && "${CKELETIN_RELEASE_ALLOW_BRANCH:-}" != "1" ]]; then
+	echo "Only the ckeletin-go repository releases the framework." >&2
+	exit 1
+fi
+
 if [[ ! -f .ckeletin/VERSION || ! -f .ckeletin/CHANGELOG.md ]]; then
 	echo ".ckeletin/VERSION and .ckeletin/CHANGELOG.md are required." >&2
 	exit 1

@@ -13,6 +13,7 @@ import (
 
 func TestReleaseFramework_WritesVersionAndTag(t *testing.T) {
 	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module github.com/peiman/ckeletin-go\n\ngo 1.26.11\n"), 0o644))
 	writeFrameworkTree(t, dir, "0.2.18", `# Framework Changelog
 
 ## [Unreleased]
