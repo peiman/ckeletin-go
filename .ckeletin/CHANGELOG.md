@@ -7,6 +7,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+### Fixed
+
+- **The output allowlist checks every line.** A second line for the same path is malformed. `count=0` is malformed. A match inside a comment is not a write. A write to `os.Stderr` is. The check always reads `.ckeletin-output-allowlist`. An environment variable does not swap the file.
+- **A long result or status write does not fill the audit log.** The record keeps the first 4096 bytes, `truncated`, and the real size. The user's stream still receives the whole write.
+- **`output.Ask` asks on a terminal.** It writes the question on the status stream and reads one line. JSON mode, or a stream that is not a terminal, returns an error that names what to pass instead. The answer is not recorded.
+
 ## [0.2.19] - 2026-11-25
 
 ### Added

@@ -139,7 +139,7 @@ func TestOutputAllowlist_Adversarial(t *testing.T) {
 		dir := t.TempDir()
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal"), 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
-			[]byte("internal/gone.go count=0 removed\n"), 0o644))
+			[]byte("internal/gone.go count=1 removed\n"), 0o644))
 		out, code := runAllowlist(t, script, dir)
 		assert.NotEqual(t, 0, code, out)
 		assert.Contains(t, out, "internal/gone.go")
@@ -155,6 +155,69 @@ func TestOutputAllowlist_Adversarial(t *testing.T) {
 		assert.NotEqual(t, 0, code, out)
 		assert.Contains(t, out, ".ckeletin-output-allowlist:1")
 		assert.Contains(t, out, "not a file; pin each file")
+	})
+
+	t.Run("second line for the same file fails", func(t *testing.T) {
+		dir := fixtureWithPrint(t, offender)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go count=1 first\ninternal/bad/bad.go count=1 second\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, ".ckeletin-output-allowlist:2")
+		assert.Contains(t, out, "already listed")
+	})
+
+	t.Run("count zero fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "quiet"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "quiet", "x.go"), []byte("package quiet\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/quiet/x.go count=0 nothing\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, ".ckeletin-output-allowlist:1")
+		assert.Contains(t, out, "greater than zero")
+	})
+
+	t.Run("comment is not a match", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "quiet"), 0o755))
+		source := "package quiet\n\n// use fmt.Println here? no.\n/* os.Stderr.WriteString(\"y\") */\nfunc quiet() {}\n"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "quiet", "x.go"), []byte(source), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"), []byte("# none\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.Equal(t, 0, code, out)
+	})
+
+	t.Run("a print before a comment still counts", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "bad"), 0o755))
+		source := "package bad\n\nimport \"fmt\"\n\nfunc speak() { fmt.Println(\"a\") // fmt.Println(\"b\") }\n"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "bad", "bad.go"), []byte(source), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go count=1 the call\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.Equal(t, 0, code, out)
+	})
+
+	t.Run("stderr write fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "bad"), 0o755))
+		source := "package bad\n\nimport \"os\"\n\nfunc speak() { os.Stderr.WriteString(\"y\") }\n"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "bad", "bad.go"), []byte(source), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"), []byte("# none\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "os.Stderr")
+	})
+
+	t.Run("environment does not swap the allowlist", func(t *testing.T) {
+		dir := fixtureWithPrint(t, offender)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go count=1 full-screen TUI writes the frame\n"), 0o644))
+		out, code := runAllowlistEnv(t, script, dir, []string{"OUTPUT_ALLOWLIST=/dev/null"})
+		assert.Equal(t, 0, code, out)
+		assert.Contains(t, out, "compliant")
 	})
 
 	t.Run("pinned lines fail when the line moves", func(t *testing.T) {
@@ -177,8 +240,16 @@ func fixtureWithPrint(t *testing.T, source string) string {
 
 func runAllowlist(t *testing.T, script, dir string) (string, int) {
 	t.Helper()
+	return runAllowlistEnv(t, script, dir, nil)
+}
+
+func runAllowlistEnv(t *testing.T, script, dir string, extra []string) (string, int) {
+	t.Helper()
 	cmd := exec.Command("bash", script)
 	cmd.Dir = dir
+	if extra != nil {
+		cmd.Env = append(os.Environ(), extra...)
+	}
 	out, err := cmd.CombinedOutput()
 	code := 0
 	if err != nil {

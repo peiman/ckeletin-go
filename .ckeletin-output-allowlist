@@ -6,4 +6,5 @@
 # Example:
 # internal/tui/screen.go count=1 full-screen TUI writes the frame
 internal/ui/check.go count=1 check printer writes to stdout
-internal/progress/terminal.go count=1 detects whether stdout is a terminal
+internal/progress/terminal.go count=2 detects whether stdout or stderr is a terminal
+internal/progress/reporter.go count=2 default progress handler writes to stderr

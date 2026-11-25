@@ -11,15 +11,18 @@
 #   internal/ui/check.go count=1 check printer writes to stdout
 #   internal/progress/terminal.go lines=41 detects a terminal on stdout
 #
-# Every entry needs count= or lines=. A pin that does not match fails,
-# including a count for a file that no longer prints and a path that is gone.
-# A directory is not an entry. Pin each file.
+# Every entry needs count= or lines=. count= is greater than zero. A path
+# is listed once. A pin that does not match fails, including a count for a
+# file that no longer prints and a path that is gone. A directory is not an
+# entry. Pin each file. Comments are not matches. A write to os.Stderr is.
+# The allowlist is always .ckeletin-output-allowlist at the repository root.
+# An environment variable does not select another file.
 # A missing or malformed allowlist is its own error. It is not a scan failure
 # and it does not dump a traceback.
 
 set -u
 
-allowlist="${OUTPUT_ALLOWLIST:-.ckeletin-output-allowlist}"
+allowlist=".ckeletin-output-allowlist"
 
 # Exact framework paths. Do not add a directory name here. An application's
 # internal/ui is not a framework path and is scanned unless the application
@@ -56,10 +59,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 		rest="${rest#"${rest%%[![:space:]]*}"}"
 		if [[ "$pin" == count=* ]]; then
 			num="${pin#count=}"
-			if [[ ! "$num" =~ ^[0-9]+$ ]]; then
+			if [[ ! "$num" =~ ^[1-9][0-9]*$ ]]; then
 				echo "Output allowlist is malformed"
 				echo "${allowlist}:${line_no}"
-				echo "count= must be a non-negative integer."
+				echo "count= must be greater than zero."
 				exit 1
 			fi
 		else
@@ -90,6 +93,16 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 		echo "Each line is a relative path, an optional count= or lines= pin, then a reason."
 		exit 1
 	fi
+	if ((${#paths[@]} > 0)); then
+		for existing in "${paths[@]}"; do
+			if [[ "$existing" == "$path" ]]; then
+				echo "Output allowlist is malformed"
+				echo "${allowlist}:${line_no}"
+				echo "This path is already listed."
+				exit 1
+			fi
+		done
+	fi
 	paths+=("$path")
 	pins+=("$pin")
 done < "$allowlist"
@@ -101,10 +114,87 @@ if [[ ! -d internal ]]; then
 	exit 0
 fi
 
-hits=$(grep -R -n -E 'fmt\.Print|os\.Stdout' internal \
-	--include='*.go' \
-	--exclude='*_test.go' \
-	|| true)
+# Comments are blanked first. A mention of fmt.Println in a comment is not
+# a write. Strings are left intact, so a string that names the call still
+# matches. os.Stderr is a write to the status stream.
+if ! hits=$(python3 - <<'PY'
+import os
+import sys
+
+def strip_go_comments(src):
+    out = []
+    i = 0
+    n = len(src)
+    while i < n:
+        c = src[i]
+        nxt = src[i + 1] if i + 1 < n else ""
+        if c == "/" and nxt == "/":
+            while i < n and src[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+        if c == "/" and nxt == "*":
+            out.append(" ")
+            out.append(" ")
+            i += 2
+            while i < n and not (src[i] == "*" and i + 1 < n and src[i + 1] == "/"):
+                out.append("\n" if src[i] == "\n" else " ")
+                i += 1
+            if i < n:
+                out.append(" ")
+                out.append(" ")
+                i += 2
+            continue
+        if c == "`":
+            out.append(c)
+            i += 1
+            while i < n and src[i] != "`":
+                out.append(src[i])
+                i += 1
+            if i < n:
+                out.append("`")
+                i += 1
+            continue
+        if c == '"' or c == "'":
+            quote = c
+            out.append(c)
+            i += 1
+            while i < n and src[i] != quote:
+                if src[i] == "\\" and i + 1 < n:
+                    out.append(src[i])
+                    out.append(src[i + 1])
+                    i += 2
+                    continue
+                out.append(src[i])
+                i += 1
+            if i < n and src[i] == quote:
+                out.append(quote)
+                i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+needles = ("fmt.Print", "os.Stdout", "os.Stderr")
+for dirpath, _, names in os.walk("internal"):
+    for name in sorted(names):
+        if not name.endswith(".go") or name.endswith("_test.go"):
+            continue
+        path = os.path.join(dirpath, name).replace(os.sep, "/")
+        try:
+            text = open(path, encoding="utf-8").read()
+        except OSError as exc:
+            print(f"cannot read {path}: {exc}", file=sys.stderr)
+            sys.exit(1)
+        stripped = strip_go_comments(text).splitlines()
+        for number, line in enumerate(stripped, start=1):
+            if any(needle in line for needle in needles):
+                print(f"{path}:{number}:{line}")
+PY
+); then
+	echo "Output patterns: could not scan Go files"
+	exit 1
+fi
 
 hit_files=()
 hit_lines=()
@@ -220,7 +310,7 @@ done
 if [[ -n "$violations" ]]; then
 	echo "Direct output in business logic"
 	echo "Write through progress.Reporter, internal/ui, or .ckeletin/pkg/output."
-	echo "Do not call fmt.Print* or os.Stdout from internal/."
+	echo "Do not call fmt.Print* or write os.Stdout or os.Stderr from internal/."
 	echo "To keep an existing path, add it to ${allowlist} with a reason. A count= or lines= pin fails when the file gains or loses a match."
 	printf '%s' "$violations"
 	exit 1
