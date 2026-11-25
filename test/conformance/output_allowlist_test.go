@@ -55,7 +55,7 @@ func TestOutputAllowlist_Adversarial(t *testing.T) {
 	t.Run("listed path passes", func(t *testing.T) {
 		dir := fixtureWithPrint(t, offender)
 		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
-			[]byte("internal/bad/bad.go full-screen TUI writes the frame\n"), 0o644))
+			[]byte("internal/bad/bad.go count=1 full-screen TUI writes the frame\n"), 0o644))
 		out, code := runAllowlist(t, script, dir)
 		assert.Equal(t, 0, code, out)
 		assert.Contains(t, out, "compliant")
@@ -89,6 +89,72 @@ func TestOutputAllowlist_Adversarial(t *testing.T) {
 			[]byte("internal/bad/bad.go count=1 full-screen TUI writes the frame\n"), 0o644))
 		out, code := runAllowlist(t, script, dir)
 		assert.Equal(t, 0, code, out)
+	})
+
+	t.Run("unpinned entry fails", func(t *testing.T) {
+		dir := fixtureWithPrint(t, offender)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/bad/bad.go full-screen TUI writes the frame\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, ".ckeletin-output-allowlist:1")
+		assert.Contains(t, out, "count= or lines=")
+	})
+
+	t.Run("unpinned quiet file fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "quiet"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "quiet", "x.go"), []byte("package quiet\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/quiet/x.go a reason\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, ".ckeletin-output-allowlist:1")
+		assert.Contains(t, out, "count= or lines=")
+	})
+
+	t.Run("stale count on a quiet file fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "quiet"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "quiet", "x.go"), []byte("package quiet\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/quiet/x.go count=1 was a print\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "expected 1 direct output lines, found 0")
+	})
+
+	t.Run("stale lines on a quiet file fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "quiet"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "internal", "quiet", "x.go"), []byte("package quiet\n"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/quiet/x.go lines=1 was a print\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "expected output lines 1, found none")
+	})
+
+	t.Run("deleted file fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/gone.go count=0 removed\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, "internal/gone.go")
+		assert.Contains(t, out, "does not exist")
+	})
+
+	t.Run("directory entry fails", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "internal", "ui"), 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, ".ckeletin-output-allowlist"),
+			[]byte("internal/ui count=1 a whole package\n"), 0o644))
+		out, code := runAllowlist(t, script, dir)
+		assert.NotEqual(t, 0, code, out)
+		assert.Contains(t, out, ".ckeletin-output-allowlist:1")
+		assert.Contains(t, out, "not a file; pin each file")
 	})
 
 	t.Run("pinned lines fail when the line moves", func(t *testing.T) {

@@ -454,6 +454,7 @@ func resetOutputState() {
 	resolvedPhase = phaseUnset
 	rendered = false
 	renderedStatus = ""
+	renderedErrorMessage = ""
 	commandNameSet = false
 	currentCommandName = ""
 	currentCmd = nil

@@ -54,12 +54,6 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 		pin="${rest%%[[:space:]]*}"
 		rest="${rest#"$pin"}"
 		rest="${rest#"${rest%%[![:space:]]*}"}"
-		if [[ "$pin" == "-" ]]; then
-			echo "Output allowlist is malformed"
-			echo "${allowlist}:${line_no}"
-			echo "Every entry needs count= or lines=. An unpinned path would allow new prints."
-			exit 1
-		fi
 		if [[ "$pin" == count=* ]]; then
 			num="${pin#count=}"
 			if [[ ! "$num" =~ ^[0-9]+$ ]]; then
@@ -77,6 +71,18 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 				exit 1
 			fi
 		fi
+	fi
+	if [[ "$pin" == "-" ]]; then
+		echo "Output allowlist is malformed"
+		echo "${allowlist}:${line_no}"
+		echo "Every entry needs count= or lines=. An unpinned path would allow new prints."
+		exit 1
+	fi
+	if [[ -d "$path" ]]; then
+		echo "Output allowlist is malformed"
+		echo "${allowlist}:${line_no}"
+		echo "not a file; pin each file"
+		exit 1
 	fi
 	if [[ -z "$rest" || "$path" == /* || "$path" == *..* ]]; then
 		echo "Output allowlist is malformed"
@@ -156,17 +162,6 @@ if ((${#hit_files[@]} > 0)); then
 					break
 				fi
 			done
-			if [[ "$allowed" -eq 0 ]]; then
-				for p in "${!paths[@]}"; do
-					entry="${paths[$p]}"
-					entry_pin="${pins[$p]}"
-					if [[ "$entry_pin" == "-" && "$file" == "$entry"/* ]]; then
-						pin="-"
-						allowed=1
-						break
-					fi
-				done
-			fi
 		fi
 
 		if [[ "$allowed" -eq 0 ]]; then
@@ -178,9 +173,6 @@ if ((${#hit_files[@]} > 0)); then
 			continue
 		fi
 
-		if [[ "$pin" == "-" ]]; then
-			continue
-		fi
 		if [[ "$pin" == count=* ]]; then
 			want="${pin#count=}"
 			if [[ "$count" -ne "$want" ]]; then

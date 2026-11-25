@@ -11,6 +11,12 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 - **`release` is a task action.** `task release:framework` is the framework release. It is allowed by the task-naming check.
 
+### Fixed
+
+- **A rendered error that returns nil is audited.** The process still exits 1. The audit event carries the rendered message and that exit code. `Rendered(code)` is audited too.
+- **An allowlist entry without `count=` or `lines=` fails.** The rejection names the line, whether or not the file prints. A directory entry says to pin each file.
+- **`task ckeletin:update commit=false` still builds and tests.** It no longer prints "Committing" before saying the update was left staged.
+
 ## [0.2.18] - 2026-11-23
 
 ### Fixed
