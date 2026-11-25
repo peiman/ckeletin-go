@@ -7,6 +7,8 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.20] - 2026-11-25
+
 ### Fixed
 
 - **The output allowlist checks every line.** A second line for the same path is malformed. `count=0` is malformed. A match inside a comment is not a write. A write to `os.Stderr` is. The check always reads `.ckeletin-output-allowlist`. An environment variable does not swap the file.
