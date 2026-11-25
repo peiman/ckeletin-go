@@ -5,7 +5,7 @@
 # This ensures consistency and prevents naming drift.
 #
 # ADR-000 Pattern: action:target[:subvariant]
-# Valid actions: check, validate, test, generate, build, clean, format, bench
+# Valid actions: check, validate, test, generate, build, clean, format, bench, release
 # Allowed standalone: setup, init, install, run, tidy, default, doctor, format, test, build, check, bench, clean
 
 set -e
@@ -22,7 +22,7 @@ ERROR_DETAILS=""
 check_header "Validating ADR-000: Task naming convention"
 
 # Valid actions from ADR-000
-VALID_ACTIONS=(check validate test generate build clean format bench setup)
+VALID_ACTIONS=(check validate test generate build clean format bench setup release)
 
 # Allowed standalone tasks (tasks without colons that don't need action:target pattern)
 # These are utility/orchestrator tasks that operate on "everything"
