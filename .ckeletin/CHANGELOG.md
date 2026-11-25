@@ -7,6 +7,10 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+### Fixed
+
+- **`output.Ask` refuses in JSON mode even when the streams are a terminal.** The test uses a fake terminal, so removing the JSON-mode check lets the prompt run.
+
 ## [0.2.20] - 2026-11-25
 
 ### Fixed

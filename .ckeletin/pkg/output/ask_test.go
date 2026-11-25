@@ -31,6 +31,26 @@ func TestAsk_RefusesInJSONMode(t *testing.T) {
 	assert.Empty(t, errBuf.String())
 }
 
+// The streams report a terminal, so the only reason to refuse is JSON mode.
+// Removing that check lets the prompt run and this test goes red.
+func TestAsk_RefusesJSONModeEvenOnATerminal(t *testing.T) {
+	SetOutputMode("json")
+	t.Cleanup(func() { SetOutputMode("") })
+
+	cmd := &cobra.Command{Use: "app"}
+	var errBuf bytes.Buffer
+	cmd.SetErr(&errBuf)
+	cmd.SetIn(strings.NewReader("yes\n"))
+
+	alwaysOut := func(io.Writer) bool { return true }
+	alwaysIn := func(io.Reader) bool { return true }
+	answer, err := ask(cmd, "Delete it?", "--yes", alwaysOut, alwaysIn)
+	require.Error(t, err)
+	assert.Empty(t, answer)
+	assert.Contains(t, err.Error(), "pass --yes")
+	assert.Empty(t, errBuf.String(), "JSON mode must not write the question")
+}
+
 func TestAsk_RefusesWhenTheStreamIsNotATerminal(t *testing.T) {
 	SetOutputMode("text")
 	t.Cleanup(func() { SetOutputMode("") })
