@@ -7,6 +7,8 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.19] - 2026-11-25
+
 ### Added
 
 - **`release` is a task action.** `task release:framework` is the framework release. It is allowed by the task-naming check.
