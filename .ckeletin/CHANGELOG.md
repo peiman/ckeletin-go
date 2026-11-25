@@ -7,8 +7,6 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
-## [0.2.19] - 2026-11-24
-
 ### Fixed
 
 - **A rendered error that returns nil is audited.** The process still exits 1. The audit event carries the rendered message and that exit code. `Rendered(code)` is audited too.
