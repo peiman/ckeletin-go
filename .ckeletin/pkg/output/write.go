@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"bufio"
+
 	"github.com/mattn/go-isatty"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/logger"
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/progress"
@@ -66,6 +68,52 @@ func Statusf(cmd *cobra.Command, format string, args ...any) error {
 	return err
 }
 
+// Ask writes question on the status stream and reads one line from standard
+// input. JSON mode, a status stream that is not a terminal, and standard
+// input that is not a terminal all refuse. The error names instead, the
+// flag or argument the caller should pass. The answer is not written to
+// the audit log.
+func Ask(cmd *cobra.Command, question, instead string) (string, error) {
+	return ask(cmd, question, instead, isTerminal, readerIsTerminal)
+}
+
+func ask(cmd *cobra.Command, question, instead string, statusTerminal func(io.Writer) bool, inputTerminal func(io.Reader) bool) (string, error) {
+	if strings.TrimSpace(instead) == "" {
+		instead = "the value as an argument"
+	}
+	refusal := fmt.Errorf("cannot ask: pass %s", instead)
+	if IsJSONMode() || !statusTerminal(stdErr(cmd)) || !inputTerminal(stdIn(cmd)) {
+		return "", refusal
+	}
+	if !strings.HasSuffix(question, "\n") {
+		question += "\n"
+	}
+	if _, err := io.WriteString(Status(cmd), question); err != nil {
+		return "", err
+	}
+	line, err := bufio.NewReader(stdIn(cmd)).ReadString('\n')
+	line = strings.TrimRight(line, "\r\n")
+	if err != nil && line == "" {
+		return "", err
+	}
+	return line, nil
+}
+
+func stdIn(cmd *cobra.Command) io.Reader {
+	if cmd == nil {
+		return os.Stdin
+	}
+	return cmd.InOrStdin()
+}
+
+func readerIsTerminal(r io.Reader) bool {
+	file, ok := r.(*os.File)
+	if !ok {
+		return false
+	}
+	return isTerminal(file)
+}
+
 // Success writes msg as a result line. JSON mode writes nothing.
 func Success(msg string) error {
 	if !strings.HasSuffix(msg, "\n") {
@@ -119,6 +167,11 @@ type noopWriter struct{}
 
 func (noopWriter) Write(p []byte) (int, error) { return len(p), nil }
 
+// maxAuditOutputBytes is the most of one write the audit record keeps.
+// A longer write, such as a banner, stays on the user's stream. The record
+// keeps the start and the real size.
+const maxAuditOutputBytes = 4096
+
 type shadowWriter struct {
 	out     io.Writer
 	stream  string
@@ -136,10 +189,14 @@ func (w *shadowWriter) Write(p []byte) (int, error) {
 	// Debug stays at the default file level, so the audit file keeps the
 	// line. The console writer drops this message, including when
 	// --log-level debug would otherwise echo it beside the user's text.
-	log.Debug().
+	recorded := p
+	event := log.Debug().
 		Str("command", w.command).
-		Str("stream", w.stream).
-		Str("output", string(p)).
-		Msg(logger.UserOutputMessage)
+		Str("stream", w.stream)
+	if len(p) > maxAuditOutputBytes {
+		recorded = p[:maxAuditOutputBytes]
+		event = event.Bool("truncated", true).Int("output_bytes", len(p))
+	}
+	event.Str("output", string(recorded)).Msg(logger.UserOutputMessage)
 	return n, nil
 }

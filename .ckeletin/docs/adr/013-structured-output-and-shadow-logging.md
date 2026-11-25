@@ -70,9 +70,9 @@ Output patterns are validated automatically via static analysis:
 
 **1. Validation Script**
 - `scripts/validate-output-patterns.sh` checks source code patterns
-- Detects direct `fmt.Print*` and `os.Stdout` usage in `internal/*`
+- Detects direct `fmt.Print*`, `os.Stdout`, and `os.Stderr` usage in `internal/*`. A match inside a comment is not a write.
 - `*_test.go` files are exempt. A framework file is exempt only when its exact path is listed in the script. A directory named `ui`, `progress`, `logger`, or `testutil` is scanned. An application's `internal/ui` is not exempt unless that application allowlists the file.
-- Requires `.ckeletin-output-allowlist` at the repository root. A listed path, with a reason, may write directly. `count=N` or `lines=N,M` pins the matches, so a new `fmt.Print` in that file fails. A missing or malformed file fails on its own. `task check` runs the script, including in a derived project whose check binary does not.
+- Requires `.ckeletin-output-allowlist` at the repository root. The check reads that file. An environment variable does not select another one. A listed path, with a reason, may write directly. A path is listed once. `count=N` (N greater than zero) or `lines=N,M` pins the matches, so a new print in that file fails. A missing or malformed file fails on its own. `task check` runs the script, including in a derived project whose check binary does not.
 
 **2. Task Command**
 ```bash
@@ -85,7 +85,7 @@ task check           # Includes output validation
 - The command layer and presentation packages render the Data Stream
 - Business logic packages use the logger for the Status Stream's audit copy
 - Fails on direct `fmt.Print*` in `internal/*` unless the file is allowlisted
-- Fails on direct `os.Stdout` writes in `internal/*` unless the file is allowlisted
+- Fails on direct `os.Stdout` or `os.Stderr` writes in `internal/*` unless the file is allowlisted
 
 **4. Integration**
 - **Local**: Part of `task check` (before every commit)
@@ -147,7 +147,9 @@ The failure is logged at debug when `Setup` has installed the hook, so the audit
 
 `Result(cmd)` writes stdout. `Status(cmd)` writes stderr. Both honour `SetOut` and `SetErr`. `Resultf`, `Statusf`, and `Success` are the helpers. `Progressf` writes a status line and strips ANSI control codes when stderr is not a terminal.
 
-Every successful write is shadow-logged to the audit file afterwards, at debug, with `command` and `stream` (`stdout` or `stderr`). A failed write is not logged. The console writer drops that audit message, so `--log-level debug` does not print the user's line a second time.
+Every successful write is shadow-logged to the audit file afterwards, at debug, with `command` and `stream` (`stdout` or `stderr`). A write longer than 4096 bytes keeps that many bytes in the record, plus `truncated` and `output_bytes`. A failed write is not logged. The console writer drops that audit message, so `--log-level debug` does not print the user's line a second time.
+
+`Ask(cmd, question, instead)` writes the question on the status stream and reads one line from standard input. JSON mode, or a status stream or standard input that is not a terminal, returns an error that says `pass ` followed by `instead`. The answer is not recorded.
 
 JSON mode: `Result` and `Success` succeed without writing, so stdout stays the envelope. `Status` is silenced, matching the console logger.
 

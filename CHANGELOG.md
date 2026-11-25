@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Framework output checks and prompts.** The output allowlist rejects a repeated path and `count=0`, ignores comments, and catches writes to stderr. It always reads `.ckeletin-output-allowlist`. `output.Ask` reads one answer on a terminal and refuses otherwise. An audit record of a result or status write keeps at most 4096 bytes.
+
 ### Added
 
 - **`task release:framework` writes the framework version.** Feature commits leave notes under `[Unreleased]` and do not edit `.ckeletin/VERSION`. The command bumps that version, moves the notes under the new heading, commits, and tags `framework-vX.Y.Z`. `push=1` publishes the commit and the tag. App tags stay `vX.Y.Z` and are what publish binaries.
