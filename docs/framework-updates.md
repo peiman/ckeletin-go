@@ -240,6 +240,14 @@ task ckeletin:update version=v0.2.0
 
 Without the `version` parameter, all commands default to the latest `main` branch.
 
+### How is the framework version released?
+
+Feature commits record framework notes under `## [Unreleased]` in `.ckeletin/CHANGELOG.md`. They do not edit `.ckeletin/VERSION`.
+
+`task release:framework` reads that section, bumps the version (`bump=patch` by default, or `minor` or `major`), writes `.ckeletin/VERSION`, moves the notes under the new heading, commits, and tags `framework-vX.Y.Z`. `push=1` publishes the commit and the tag. That tag is the framework release. A derived app fetches it with `task ckeletin:update version=framework-vX.Y.Z`.
+
+`framework-v*` does not publish the reference CLI. App tags stay `v0.13.5` and the like.
+
 ### Does the update commit bypass hooks?
 
 No. `task ckeletin:update` runs the application's hooks. `commit=false` leaves the files staged and does not commit. The old `--no-verify` bypass is gone.

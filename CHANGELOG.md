@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`task release:framework` writes the framework version.** Feature commits leave notes under `[Unreleased]` and do not edit `.ckeletin/VERSION`. The command bumps that version, moves the notes under the new heading, commits, and tags `framework-vX.Y.Z`. `push=1` publishes the commit and the tag. App tags stay `vX.Y.Z` and are what publish binaries.
+
 - **Framework 0.2.3**: `task ckeletin:update` stops when `.ckeletin/` has uncommitted changes or a committed local difference, shows the diff, and does not replace the tree. `discard_local=1` discards a committed difference and says so. Project defaults belong in `internal/projectdefaults/ckeletin-project.toml`, outside `.ckeletin/`, and override only the framework default.
 
 - **Framework 0.2.2**: `task validate:commands:baseline` records a project's existing long `run*` functions in `.ckeletin-command-baseline`, so a project can adopt the 35-line limit and then shrink them one at a time. Recorded functions warn; growth, stale entries and new long functions fail. See ADR-001.
 
 ### Fixed
+
+- **A lint failure with no file location shows the tool's own message.** A loader or cache error from `golangci-lint` names no `.go` file. The check used to report only "found issues".
 
 - **Framework 0.2.17**: `--format` (an alias of `--output`) drives logger silence, and alias text shows warnings when config says json. A command that renders `status: error` exits non-zero; a rendered success exits 0. `--output json` on a parse error prints one JSON envelope with `command` null. An unknown command in text mode prints only `Error: …`. A panic becomes that same error document and a non-zero exit. Shadow lines are not copied to stderr at debug. `output.Setup` is the derived-app wiring. `output.Coded` sets `error.code`. An empty console-time-format environment variable clears the timestamp. The output-pattern check does not skip every directory named `ui`.
 

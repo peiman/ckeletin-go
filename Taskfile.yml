@@ -16,6 +16,11 @@ includes:
       MODULE_PATH: '{{.MODULE_PATH}}'
 
 tasks:
+  release:framework:
+    desc: "Release the framework from [Unreleased]. Writes VERSION, commits, and tags framework-vX.Y.Z. bump=patch|minor|major. push=1 publishes."
+    cmds:
+      - bash scripts/release-framework.sh --bump {{.bump | default "patch"}} {{if eq .push "1"}}--push{{end}}
+
   default:
     cmds:
       - task --list

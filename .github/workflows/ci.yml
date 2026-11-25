@@ -85,7 +85,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   test-matrix:
     name: Test
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
     strategy:
@@ -325,7 +325,7 @@ jobs:
   # ═══════════════════════════════════════════════════════════════════
   conformance:
     name: CKSPEC Conformance
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-conformance.yml
@@ -337,7 +337,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: startsWith(github.ref, 'refs/tags/') # Only run on tags
+    if: startsWith(github.ref, 'refs/tags/v') # Only run on tags
     needs: [test-matrix, build, conformance] # Tests + conformance must pass before release
     permissions:
       contents: write # Need write access to create releases
@@ -388,7 +388,7 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
       - name: Scan release artifacts for vulnerabilities
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439  # v7.4.2
         with:
           path: "dist/"

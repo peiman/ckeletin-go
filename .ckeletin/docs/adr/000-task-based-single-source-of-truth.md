@@ -266,7 +266,7 @@ action:target[:subvariant]
 ```
 
 Where:
-- **action** is what you're doing (check, validate, test, generate, build, clean, format, bench)
+- **action** is what you're doing (check, validate, test, generate, build, clean, format, bench, release)
 - **target** is what you're doing it to (a resource, variant, or modifier)
 
 ### Automated Enforcement

@@ -222,7 +222,19 @@ func filterLintOutput(output, tool string) string {
 	}
 
 	if len(issues) == 0 {
-		return tool + " found issues"
+		// A loader or cache failure often names no file. Keep that text.
+		var rest []string
+		for _, line := range lines {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "level=") {
+				continue
+			}
+			rest = append(rest, trimmed)
+		}
+		if len(rest) == 0 {
+			return tool + " found issues"
+		}
+		return tool + " found issues:\n" + strings.Join(rest, "\n")
 	}
 
 	var sb strings.Builder
