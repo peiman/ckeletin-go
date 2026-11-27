@@ -149,7 +149,11 @@ The failure is logged at debug when `Setup` has installed the hook, so the audit
 
 Every successful write is shadow-logged to the audit file afterwards, at debug, with `command` and `stream` (`stdout` or `stderr`). A write longer than 4096 bytes keeps that many bytes in the record, plus `truncated` and `output_bytes`. A failed write is not logged. The console writer drops that audit message, so `--log-level debug` does not print the user's line a second time.
 
-`Ask(cmd, question, instead)` writes the question on the status stream and reads one line from standard input. JSON mode, or a status stream or standard input that is not a terminal, returns an error that says `pass ` followed by `instead`. The answer is not recorded.
+`Ask(cmd, question, instead)` writes the question on the status stream and reads one line from standard input. The line must end with a newline. End of input without one returns `ErrNoAnswer` (`no answer`), which the caller treats as a refusal. JSON mode, or a status stream or standard input that is not a terminal, returns an error that says `pass ` followed by `instead`. The answer is not recorded.
+
+In JSON mode, `Result` and `Status` still write nothing to the streams. The same bytes are recorded in the log file.
+
+A panic in a command exits 1. The user-facing line is `Error: panic: …`. The stack trace is a debug record in the log file.
 
 JSON mode: `Result` and `Success` succeed without writing, so stdout stays the envelope. `Status` is silenced, matching the console logger.
 

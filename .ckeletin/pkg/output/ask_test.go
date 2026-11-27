@@ -118,7 +118,13 @@ func TestAsk_WriteErrorAndEmptyInput(t *testing.T) {
 	empty.SetErr(&errBuf)
 	empty.SetIn(strings.NewReader(""))
 	_, err = ask(empty, "Name?", "--name", alwaysOut, alwaysIn)
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNoAnswer)
+
+	partial := &cobra.Command{Use: "app"}
+	partial.SetErr(&errBuf)
+	partial.SetIn(strings.NewReader("y"))
+	_, err = ask(partial, "Name?", "--name", alwaysOut, alwaysIn)
+	require.ErrorIs(t, err, ErrNoAnswer)
 }
 
 type failWrite struct{}

@@ -5,7 +5,6 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -15,7 +14,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
@@ -103,8 +101,10 @@ func Init(out io.Writer) error {
 	currentColorEnabled = colorEnabled
 	currentConsoleTimeFormat = loadConsoleTimeFormat()
 
-	// Console writer with filtering
-	consoleWriter := newConsoleWriter(out)
+	// Console writer with filtering. The gate can hold formatted lines while
+	// an interactive display owns stderr, then write them in order.
+	consoleHoldGate.bind(out)
+	consoleWriter := newConsoleWriter(&consoleHoldGate)
 
 	filteredConsole := FilteredWriter{
 		Writer:       consoleWriter,
@@ -131,9 +131,8 @@ func Init(out io.Writer) error {
 
 		fileWriter, err := openLogFileWithRotation(filePath)
 		if err == nil {
-			// lumberjack opens the file lazily on FIRST write and swallows
-			// later write errors, so probe now: an unwritable path must fail
-			// Init instead of silently dropping every audit entry.
+			// Probe now: an unwritable path must fail Init instead of
+			// silently dropping every audit entry.
 			_, err = fileWriter.Write(nil)
 		}
 		if err != nil {
@@ -147,10 +146,10 @@ func Init(out io.Writer) error {
 		}
 
 		logFile = fileWriter
-		currentFileWriter = fileWriter // Store for rebuilding
+		currentFileWriter = fileWriter
 
 		filteredFile := FilteredWriter{
-			Writer:   fileWriter,
+			Writer:   singleKeyJSON{Writer: fileWriter},
 			MinLevel: fileLevel,
 		}
 
@@ -301,8 +300,8 @@ func clampSamplingValue(n int) uint32 {
 // the console timestamp. The file writer does not use this value.
 //
 // Viper ignores an empty environment variable unless AllowEmptyEnv is on.
-// An empty APP_LOG_CONSOLE_TIME_FORMAT, with or without a prefix, still
-// clears the timestamp and wins over the config file.
+// An empty PREFIX_APP_LOG_CONSOLE_TIME_FORMAT still clears the timestamp
+// and wins over the config file. A variable with a different prefix does not.
 func loadConsoleTimeFormat() string {
 	if value, ok := consoleTimeFromEnv(); ok {
 		return value
@@ -313,18 +312,21 @@ func loadConsoleTimeFormat() string {
 	return viper.GetString(config.KeyAppLogConsoleTimeFormat)
 }
 
+var consoleEnvPrefix string
+
+// SetEnvPrefix is the product's environment prefix, the same string viper
+// uses. The console time format is read only from
+// PREFIX_APP_LOG_CONSOLE_TIME_FORMAT. An empty prefix reads no variable.
+func SetEnvPrefix(prefix string) {
+	consoleEnvPrefix = prefix
+}
+
 func consoleTimeFromEnv() (string, bool) {
-	const suffix = "APP_LOG_CONSOLE_TIME_FORMAT"
-	for _, entry := range os.Environ() {
-		key, value, ok := strings.Cut(entry, "=")
-		if !ok {
-			continue
-		}
-		if key == suffix || strings.HasSuffix(key, "_"+suffix) {
-			return value, true
-		}
+	if consoleEnvPrefix == "" {
+		return "", false
 	}
-	return "", false
+	value, ok := os.LookupEnv(consoleEnvPrefix + "_APP_LOG_CONSOLE_TIME_FORMAT")
+	return value, ok
 }
 
 // newConsoleWriter builds the console writer from the format and color captured
@@ -365,25 +367,17 @@ func isColorEnabled(out io.Writer) bool {
 	}
 }
 
-// openLogFileWithRotation opens the log file with lumberjack rotation support.
-// Creates parent directories if they don't exist.
+// openLogFileWithRotation opens the log file for append and rotates it.
+// The directory is created here. The file is created on open, mode 0600.
 func openLogFileWithRotation(path string) (io.WriteCloser, error) {
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
-	}
-
-	// Configure lumberjack for log rotation
-	logger := &lumberjack.Logger{
-		Filename:   path,
-		MaxSize:    viper.GetInt(config.KeyAppLogFileMaxSize),    // megabytes
-		MaxBackups: viper.GetInt(config.KeyAppLogFileMaxBackups), // number of backups
-		MaxAge:     viper.GetInt(config.KeyAppLogFileMaxAge),     // days
-		Compress:   viper.GetBool(config.KeyAppLogFileCompress),  // compress with gzip
-	}
-
-	return logger, nil
+	maxBytes := int64(viper.GetInt(config.KeyAppLogFileMaxSize)) * 1024 * 1024
+	return openAppendLog(
+		path,
+		maxBytes,
+		viper.GetInt(config.KeyAppLogFileMaxBackups),
+		viper.GetInt(config.KeyAppLogFileMaxAge),
+		viper.GetBool(config.KeyAppLogFileCompress),
+	)
 }
 
 // sharedSink is the one console and file destination. Component loggers hold
@@ -487,7 +481,8 @@ func rebuildLogger() {
 	var writers []io.Writer
 
 	// Recreate console writer with the format captured at Init.
-	consoleWriter := newConsoleWriter(currentConsoleWriter)
+	consoleHoldGate.bind(currentConsoleWriter)
+	consoleWriter := newConsoleWriter(&consoleHoldGate)
 
 	filteredConsole := FilteredWriter{
 		Writer:       consoleWriter,
@@ -500,7 +495,7 @@ func rebuildLogger() {
 	// Add file writer if it exists
 	if currentFileWriter != nil {
 		filteredFile := FilteredWriter{
-			Writer:   currentFileWriter,
+			Writer:   singleKeyJSON{Writer: currentFileWriter},
 			MinLevel: currentFileLevel,
 		}
 		writers = append(writers, filteredFile)

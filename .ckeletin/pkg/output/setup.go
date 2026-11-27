@@ -34,6 +34,7 @@ func Setup(root *cobra.Command, opts ...Option) {
 	}
 	RegisterOutputFlag(root, opts...)
 	RegisterLogLevelFlags(root)
+	logger.SetEnvPrefix(settings.envPrefix)
 	hook := settings.afterLogger
 	// The hook belongs to this root. A later Setup or RegisterOutputFlag
 	// must not inherit it, and must not replace the closure captured below.

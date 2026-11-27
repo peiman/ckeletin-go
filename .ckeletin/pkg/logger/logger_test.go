@@ -78,6 +78,7 @@ func TestInit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// SETUP PHASE
 			viper.Set("app.log_level", tt.logLevel)
+			viper.Set(config.KeyAppLogConsoleLevel, "")
 
 			var buf *bytes.Buffer
 			var r, w *os.File
@@ -1198,6 +1199,7 @@ func TestComponentSharesSinkAndDefaultFieldLoses(t *testing.T) {
 		if line == "" || !strings.Contains(line, "{") {
 			continue
 		}
+		assert.Equal(t, 1, strings.Count(line, `"component"`), line)
 		var event map[string]any
 		require.NoError(t, json.Unmarshal([]byte(line), &event))
 		message, _ := event["message"].(string)
@@ -1321,7 +1323,10 @@ func TestConsoleTimeFormat_EmptyEnvClearsTimestamp(t *testing.T) {
 	silenceConsoleTimeNoise(t)
 
 	viper.Set(config.KeyAppLogConsoleTimeFormat, "15:04:05")
-	t.Setenv("APP_LOG_CONSOLE_TIME_FORMAT", "")
+	SetEnvPrefix("CKELETIN")
+	t.Cleanup(func() { SetEnvPrefix("") })
+	t.Setenv("OTHER_APP_LOG_CONSOLE_TIME_FORMAT", "15:04:05")
+	t.Setenv("CKELETIN_APP_LOG_CONSOLE_TIME_FORMAT", "")
 	buf := &bytes.Buffer{}
 	require.NoError(t, Init(buf))
 	t.Cleanup(func() { Cleanup() })
