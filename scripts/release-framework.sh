@@ -101,7 +101,9 @@ notes = body.strip("\n")
 if not any(line.startswith("- ") for line in notes.splitlines()):
     sys.exit("Nothing to release. [Unreleased] has no changelog bullets.")
 released = f"## [{version}] - {today}\n\n{notes}\n\n"
-path.write_text(text[:start] + "## [Unreleased]\n\n" + released + tail.lstrip("\n"))
+body = text[:start] + "## [Unreleased]\n\n" + released + tail.lstrip("\n")
+with path.open("w", encoding="utf-8", newline="\n") as handle:
+    handle.write(body)
 PY
 
 printf '%s\n' "$next" > .ckeletin/VERSION

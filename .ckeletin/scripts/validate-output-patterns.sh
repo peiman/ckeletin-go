@@ -145,14 +145,15 @@ def strip_go_comments(src):
                 out.append(" ")
                 i += 2
             continue
-        if c == "`":
+        tick = chr(96)
+        if c == tick:
             out.append(c)
             i += 1
-            while i < n and src[i] != "`":
+            while i < n and src[i] != tick:
                 out.append(src[i])
                 i += 1
             if i < n:
-                out.append("`")
+                out.append(tick)
                 i += 1
             continue
         if c == '"' or c == "'":
