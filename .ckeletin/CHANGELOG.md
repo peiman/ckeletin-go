@@ -9,6 +9,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ### Fixed
 
+- **Tests cover the reporter, the startup check, and a failed log write.** `output.NewReporter` writes each kind of line. `SetStartupCheck` is exercised. A log writer that fails is returned to the caller.
 - **The output check runs on macOS `/bin/bash`.** The scanner no longer puts a backtick inside a command substitution. The framework release writes the changelog with LF, so Windows does not glue the new heading to the previous one.
 
 ## [0.2.21] - 2026-11-27

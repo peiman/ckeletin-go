@@ -7,6 +7,7 @@ import (
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
 	"github.com/rs/zerolog"
+	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,6 +59,38 @@ func TestAdoption_ReferenceRootExtensionPoints(t *testing.T) {
 		require.NotNil(t, flag)
 		assert.True(t, flag.Hidden)
 		assert.False(t, RootCmd.PersistentFlags().Lookup("log-level").Hidden)
+	})
+
+	t.Run("strict validation still fails a bad level", func(t *testing.T) {
+		config.SetStartupCheck(config.StartupStrict)
+		config.SetDefaults()
+		viper.Set(config.KeyAppLogFileLevel, "not-a-level")
+		orig := cfgFile
+		cfgFile = ""
+		t.Cleanup(func() {
+			cfgFile = orig
+			viper.Set(config.KeyAppLogFileLevel, "debug")
+		})
+		require.Error(t, initConfig())
+	})
+
+	t.Run("status and help detection", func(t *testing.T) {
+		assert.False(t, skipsBrokenConfig(nil))
+		assert.True(t, skipsBrokenConfig(&cobra.Command{Use: "completion"}))
+		assert.False(t, skipsBrokenConfig(&cobra.Command{Use: "ping"}))
+		savedStatus, savedFile := configFileStatus, configFileUsed
+		t.Cleanup(func() {
+			configFileStatus = savedStatus
+			configFileUsed = savedFile
+		})
+		configFileStatus = ""
+		logConfigStatus()
+		configFileStatus = "No config file found, using defaults and environment variables"
+		configFileUsed = ""
+		logConfigStatus()
+		configFileStatus = "Using config file"
+		configFileUsed = "/tmp/ckeletin-config.yaml"
+		logConfigStatus()
 	})
 
 	t.Run("help survives a broken config file", func(t *testing.T) {

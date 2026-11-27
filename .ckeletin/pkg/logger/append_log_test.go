@@ -11,6 +11,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestAppendLog_CloseBeforeOpenAndMissingBackup(t *testing.T) {
+	var writer appendLog
+	require.NoError(t, writer.Close())
+	compressBackup(filepath.Join(t.TempDir(), "missing"))
+}
+
+type failWrite struct{}
+
+func (failWrite) Write([]byte) (int, error) { return 0, os.ErrClosed }
+
+func TestSingleKeyJSON_ReturnsTheWriterError(t *testing.T) {
+	_, err := (singleKeyJSON{Writer: failWrite{}}).Write([]byte("{\"a\":1}\n"))
+	require.Error(t, err)
+}
+
 func TestAppendLog_RejectsAFileAsTheDirectory(t *testing.T) {
 	dir := t.TempDir()
 	blocker := filepath.Join(dir, "not-a-directory")

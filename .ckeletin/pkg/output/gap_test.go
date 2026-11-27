@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -10,6 +11,32 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewReporter_WritesEachKindOfLine(t *testing.T) {
+	SetOutputMode("text")
+	t.Cleanup(func() { SetOutputMode("") })
+
+	cmd := &cobra.Command{Use: "app"}
+	var out, errBuf bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&errBuf)
+	reporter := NewReporter(cmd)
+	reporter.Step("step")
+	reporter.Status("status")
+	reporter.Warn("careful")
+	reporter.Done("done")
+
+	assert.Contains(t, errBuf.String(), "step")
+	assert.Contains(t, errBuf.String(), "status")
+	assert.Contains(t, errBuf.String(), "warning: careful")
+	assert.Contains(t, out.String(), "done")
+	assert.Equal(t, os.Stdout, stdOut(nil))
+	assert.Equal(t, os.Stderr, stdErr(nil))
+}
+
+func TestSetup_NilRootDoesNothing(t *testing.T) {
+	Setup(nil)
+}
 
 func TestJSONMode_RecordsStatusAndResult(t *testing.T) {
 	SetOutputMode("json")
