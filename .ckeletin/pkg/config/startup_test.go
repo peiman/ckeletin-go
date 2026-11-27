@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestStartupCheck_WarnIsOptIn(t *testing.T) {
+	SetStartupCheck(StartupStrict)
+	assert.False(t, StartupWarns())
+	SetStartupCheck(StartupWarn)
+	t.Cleanup(func() { SetStartupCheck(StartupStrict) })
+	assert.True(t, StartupWarns())
+}
+
 func TestEmptyFileLevelIsValid(t *testing.T) {
 	SetDefaults()
 	t.Cleanup(func() {

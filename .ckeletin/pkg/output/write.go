@@ -167,10 +167,6 @@ func stripANSI(s string) string {
 	return ansiCSI.ReplaceAllString(s, "")
 }
 
-type noopWriter struct{}
-
-func (noopWriter) Write(p []byte) (int, error) { return len(p), nil }
-
 // maxAuditOutputBytes is the most of one write the audit record keeps.
 // A longer write, such as a banner, stays on the user's stream. The record
 // keeps the start and the real size.
