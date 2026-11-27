@@ -47,7 +47,7 @@ func TestReleaseFramework_WritesVersionAndTag(t *testing.T) {
 
 	changelog, err := os.ReadFile(filepath.Join(dir, ".ckeletin", "CHANGELOG.md"))
 	require.NoError(t, err)
-	text := string(changelog)
+	text := strings.ReplaceAll(string(changelog), "\r\n", "\n")
 	assert.Contains(t, text, "## [0.2.19] - ")
 	assert.Contains(t, text, "The audit records a rendered error.")
 	assert.Contains(t, text, "rendered error.\n\n## [0.2.18]")
