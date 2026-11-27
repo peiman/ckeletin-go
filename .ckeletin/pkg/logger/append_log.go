@@ -141,7 +141,7 @@ func (l *appendLog) prune() {
 }
 
 func compressBackup(path string) {
-	in, err := os.Open(path)
+	in, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return
 	}
