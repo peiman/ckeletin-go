@@ -14,7 +14,7 @@ Only framework changes are tracked here — project-level changes belong in the 
 - **JSON mode records status and result lines.** They are not written to the streams. The log file keeps them.
 - **A log-file line has each key once.** A later `component` replaces the default.
 - **An empty `app.log.file_level` is valid.** It means debug, as ADR-006 says.
-- **Two processes can share one log file.** It is opened for append, including when the file is created or rotated. A rotated file is compressed from a read-only handle.
+- **Two processes can share one log file.** It is opened for append, including when the file is created or rotated. A rotated file is compressed from a read-only handle. A path whose parent is a file is an error.
 - **A panic keeps its stack in the log file.** The process exits 1.
 - **The console time format uses the product prefix only.**
 - **An interactive display can hold the console.** `logger.HoldConsole` keeps console lines off stderr until `logger.ReleaseConsole`. The log file still receives each line. JSON mode stays silent.

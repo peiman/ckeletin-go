@@ -51,6 +51,8 @@ func TestPanic_RecordsTheStack(t *testing.T) {
 
 	var audit bytes.Buffer
 	log.Logger = zerolog.New(&audit)
+	prepared := false
+	SetPrepare(func() { prepared = true })
 	root := &cobra.Command{Use: "app"}
 	root.RunE = func(*cobra.Command, []string) error {
 		panic("boom")
@@ -60,6 +62,7 @@ func TestPanic_RecordsTheStack(t *testing.T) {
 	root.SetOut(&bytes.Buffer{})
 
 	code := Execute(root)
+	assert.True(t, prepared)
 	assert.Equal(t, 1, code)
 	assert.Contains(t, errBuf.String(), "panic: boom")
 	assert.Contains(t, audit.String(), "recovered panic")
