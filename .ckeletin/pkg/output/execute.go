@@ -6,9 +6,11 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"strings"
 
 	"github.com/peiman/ckeletin-go/.ckeletin/pkg/config"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -19,6 +21,15 @@ import (
 // logger.Init installed the failure log and logger.Cleanup cleared it.
 // Neither did. Setup installs the failure log after the logger starts,
 // and the cleanup hook clears it so a later failure cannot write to stderr.
+// prepare runs at the start of Execute, before cobra parses arguments.
+// The reference root hides optional flags here.
+var prepare func()
+
+// SetPrepare registers the function Execute calls before it parses arguments.
+func SetPrepare(fn func()) {
+	prepare = fn
+}
+
 var afterRun = func() {}
 
 // failureLog records a command failure on the audit stream.
@@ -81,12 +92,19 @@ func Execute(root *cobra.Command) (code int) {
 			if cmd == nil {
 				cmd = root
 			}
+			// The user-facing line stays "panic: <value>" and the exit is 1.
+			// The stack is only in the log file (debug, so the default console
+			// level does not print it again).
+			log.Debug().Str("stack", string(debug.Stack())).Interface("panic", rec).Msg("recovered panic")
 			code = renderFailure(cmd, root, fmt.Errorf("panic: %v", rec))
 		}
 		afterRun()
 	}()
 	if root == nil {
 		return 1
+	}
+	if prepare != nil {
+		prepare()
 	}
 	root.SilenceErrors = true
 	root.SilenceUsage = true

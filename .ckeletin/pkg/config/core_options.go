@@ -63,7 +63,7 @@ func CoreOptions() []ConfigOption {
 			Type:         "string",
 			Required:     false,
 			Example:      "debug",
-			Validation:   ValidateLogLevel(false),
+			Validation:   ValidateLogLevel(true),
 		},
 		{
 			Key:          "app.log.color_enabled",

@@ -49,10 +49,11 @@ var (
 	// Dirty is "true"/"false" when injected (GoReleaser's {{ .IsGitDirty }});
 	// when empty, treeState() derives the state from Version, where Taskfile
 	// builds embed a "-dirty" suffix via `git describe --dirty`.
-	Dirty            = ""
-	binaryName       = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
-	configFileStatus string
-	configFileUsed   string
+	Dirty             = ""
+	binaryName        = "" // MUST be injected via ldflags (see Taskfile.yml LDFLAGS)
+	envPrefixOverride = ""
+	configFileStatus  string
+	configFileUsed    string
 	// pendingPreInit holds log lines emitted before Setup starts the logger.
 	// finishRootStartup flushes them once the output mode is resolved.
 	pendingPreInit *preInitLogBuffer
@@ -91,10 +92,22 @@ const (
 	treeStateUnknown = "unknown"
 )
 
-// EnvPrefix returns a sanitized environment variable prefix based on the binary name
+// SetEnvPrefix fixes the environment prefix. A product shipped under two
+// binary names uses one prefix. Empty keeps the prefix derived from the
+// binary name. Call it before Execute.
+func SetEnvPrefix(prefix string) {
+	envPrefixOverride = prefix
+}
+
+// EnvPrefix returns a sanitized environment variable prefix. SetEnvPrefix
+// wins. Otherwise the prefix comes from the binary name.
 func EnvPrefix() string {
 	// Convert to uppercase and replace non-alphanumeric characters with underscore
-	prefix := strings.ToUpper(binaryName)
+	prefix := envPrefixOverride
+	if prefix == "" {
+		prefix = binaryName
+	}
+	prefix = strings.ToUpper(prefix)
 	prefix = nonAlphanumericRegex.ReplaceAllString(prefix, "_")
 
 	// Ensure it doesn't start with a number (invalid for env vars)
@@ -264,7 +277,14 @@ var RootCmd = &cobra.Command{
 
 		// Initialize configuration. Mode resolution and the logger run in
 		// Setup, which flushes pendingPreInit from WithAfterLogger.
+		if skipsBrokenConfig(cmd) {
+			viper.Set(config.KeyAppLogFileEnabled, false)
+		}
 		if err := initConfig(); err != nil {
+			if skipsBrokenConfig(cmd) {
+				log.Debug().Err(err).Msg("skipping configuration for help or completion")
+				return nil
+			}
 			return err
 		}
 		return nil
@@ -330,10 +350,65 @@ func logConfigStatus() {
 		return
 	}
 	if configFileUsed != "" {
-		log.Info().Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
+		log.WithLevel(configStatusLevel).Str("config_file", logger.SanitizePath(configFileUsed)).Msg(configFileStatus)
 		return
 	}
 	log.Debug().Msg(configFileStatus)
+}
+
+// configStatusLevel is the level of the line that names the config file.
+// The default is info. An application can set it to debug.
+var configStatusLevel = zerolog.InfoLevel
+
+// SetConfigStatusLevel chooses the level of the config-file status line.
+// Call it before Execute. The default is info.
+func SetConfigStatusLevel(level zerolog.Level) {
+	configStatusLevel = level
+}
+
+func skipsBrokenConfig(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	switch cmd.Name() {
+	case "help", "completion":
+		return true
+	default:
+		return false
+	}
+}
+
+// extendedRootFlags is true for the reference binary. An adopting product
+// turns it off so rotation, sampling, color, and the log file stay config
+// and environment keys without a public flag.
+var extendedRootFlags = true
+
+var extendedRootFlagNames = []string{
+	"log-file-enabled",
+	"log-file-path",
+	"log-color",
+	"log-file-max-size",
+	"log-file-max-backups",
+	"log-file-max-age",
+	"log-file-compress",
+	"log-sampling-enabled",
+	"log-sampling-initial",
+	"log-sampling-thereafter",
+}
+
+// SetExtendedRootFlags turns the extra root logging flags on or off.
+// Call it before Execute. The default is on.
+func SetExtendedRootFlags(on bool) {
+	extendedRootFlags = on
+}
+
+func applyRootOptions() {
+	for _, name := range extendedRootFlagNames {
+		flag := RootCmd.PersistentFlags().Lookup(name)
+		if flag != nil {
+			flag.Hidden = !extendedRootFlags
+		}
+	}
 }
 
 func Execute() error {
@@ -499,6 +574,7 @@ Powered by Cobra, Viper, Zerolog, and Bubble Tea with enforced architecture patt
 	// Output flag, resolved mode, logger, failure audit, and log cleanup.
 	// The command's PersistentPreRunE only loads configuration.
 	output.Setup(RootCmd, output.WithEnvPrefix(EnvPrefix()), output.WithAfterLogger(finishRootStartup))
+	output.SetPrepare(applyRootOptions)
 
 	// Replace the literals above with the project overlay. The calls stay so
 	// the flags remain persistent and keep their CLI names and help text.
@@ -671,11 +747,17 @@ func initConfig() error {
 	// Validate default values to ensure they don't exceed limits
 	// This catches programming errors in default value definitions
 	if errs := config.ValidateAllConfigValues(viper.AllSettings()); len(errs) > 0 {
-		log.Debug().Int("error_count", len(errs)).Msg("Invalid default configuration values detected")
-		for i, err := range errs {
-			log.Debug().Int("error_num", i+1).Err(err).Msg("Default validation error")
+		if config.StartupWarns() {
+			for _, err := range errs {
+				log.Warn().Err(err).Msg("configuration value")
+			}
+		} else {
+			log.Debug().Int("error_count", len(errs)).Msg("Invalid default configuration values detected")
+			for i, err := range errs {
+				log.Debug().Int("error_num", i+1).Err(err).Msg("Default validation error")
+			}
+			return fmt.Errorf("configuration has %d invalid default value(s) - this is a programming error", len(errs))
 		}
-		return fmt.Errorf("configuration has %d invalid default value(s) - this is a programming error", len(errs))
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -693,8 +775,12 @@ func initConfig() error {
 
 		// Security validation after viper finds and reads the config
 		if err := config.ValidateConfigFileSecurity(configFileUsed, config.MaxConfigFileSize); err != nil {
-			log.Debug().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
-			return fmt.Errorf("config file security validation failed: %w", err)
+			if config.StartupWarns() {
+				log.Warn().Err(err).Str("path", configFileUsed).Msg("config file")
+			} else {
+				log.Debug().Err(err).Str("path", configFileUsed).Msg("Config file security validation failed")
+				return fmt.Errorf("config file security validation failed: %w", err)
+			}
 		}
 	}
 
@@ -704,10 +790,16 @@ func initConfig() error {
 
 	// Validate registered config options (colors, log levels, etc.)
 	if errs := config.ValidateRegisteredOptions(); len(errs) > 0 {
-		for _, err := range errs {
-			log.Debug().Err(err).Msg("Config validation error")
+		if config.StartupWarns() {
+			for _, err := range errs {
+				log.Warn().Err(err).Msg("configuration")
+			}
+		} else {
+			for _, err := range errs {
+				log.Debug().Err(err).Msg("Config validation error")
+			}
+			return fmt.Errorf("configuration validation failed: %w", errs[0])
 		}
-		return fmt.Errorf("configuration validation failed: %w", errs[0])
 	}
 
 	return nil

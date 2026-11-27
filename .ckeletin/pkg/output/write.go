@@ -1,6 +1,7 @@
 package output
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,7 +43,7 @@ var ansiCSI = regexp.MustCompile("\x1b\\[[0-9;]*[A-Za-z]")
 // only stdout document, so a text result must not land beside it.
 func Result(cmd *cobra.Command) io.Writer {
 	if IsJSONMode() {
-		return noopWriter{}
+		return &shadowWriter{out: io.Discard, stream: "stdout", command: commandLabel(cmd)}
 	}
 	return &shadowWriter{out: stdOut(cmd), stream: "stdout", command: commandLabel(cmd)}
 }
@@ -51,7 +52,7 @@ func Result(cmd *cobra.Command) io.Writer {
 // JSON mode silences it. The console logger is already silent in that mode.
 func Status(cmd *cobra.Command) io.Writer {
 	if IsJSONMode() {
-		return noopWriter{}
+		return &shadowWriter{out: io.Discard, stream: "stderr", command: commandLabel(cmd)}
 	}
 	return &shadowWriter{out: stdErr(cmd), stream: "stderr", command: commandLabel(cmd)}
 }
@@ -92,12 +93,15 @@ func ask(cmd *cobra.Command, question, instead string, statusTerminal func(io.Wr
 		return "", err
 	}
 	line, err := bufio.NewReader(stdIn(cmd)).ReadString('\n')
-	line = strings.TrimRight(line, "\r\n")
-	if err != nil && line == "" {
-		return "", err
+	if err != nil {
+		return "", ErrNoAnswer
 	}
-	return line, nil
+	return strings.TrimRight(line, "\r\n"), nil
 }
+
+// ErrNoAnswer is the refusal Ask returns when input ends without a line end.
+// A caller treats it as "no". y and then end of input is not a yes.
+var ErrNoAnswer = errors.New("no answer")
 
 func stdIn(cmd *cobra.Command) io.Reader {
 	if cmd == nil {

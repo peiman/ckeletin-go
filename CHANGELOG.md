@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Framework logging and the reference root.** JSON mode records status and result lines in the log file. `Ask` requires a newline. A log line has each key once. An empty file level is debug. Two processes can share a log file. A panic keeps its stack in the log file. The console time format uses the product prefix. A display can hold the console. `SetEnvPrefix`, `SetStartupCheck`, `SetConfigStatusLevel`, and `SetExtendedRootFlags` are how an application adopts the reference root.
+
 - **Framework output checks and prompts.** The output allowlist rejects a repeated path and `count=0`, ignores comments, and catches writes to stderr. It always reads `.ckeletin-output-allowlist`. `output.Ask` reads one answer on a terminal and refuses otherwise. An audit record of a result or status write keeps at most 4096 bytes.
 
 ### Added
