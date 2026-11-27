@@ -7,6 +7,8 @@ Only framework changes are tracked here — project-level changes belong in the 
 
 ## [Unreleased]
 
+## [0.2.22] - 2026-11-27
+
 ### Fixed
 
 - **Tests cover the reporter, the startup check, and a failed log write.** `output.NewReporter` writes each kind of line. `SetStartupCheck` is exercised. A log writer that fails is returned to the caller.
